@@ -61,7 +61,6 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 
 Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, Loyalty program, Advanced inventory, Advanced promotion, Mobile application, Online deposit, Advanced analytics.
 
-> Scope MUST HAVE giữ nguyên 15 module theo định hướng gốc. Đây là khối lượng lớn cho một học kỳ — xem mục 8 (Rủi ro) để có phương án dự phòng nếu tiến độ tụt lại ở Sprint 4–5.
 
 ---
 
@@ -82,7 +81,7 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 
 **Order State Machine:** `PENDING → CONFIRMED → PREPARING → READY → SERVED → COMPLETED`, với `REJECTED`/`CANCELLED` là trạng thái ngoại lệ. Backend phải kiểm tra tính hợp lệ của mọi transition — không cho chuyển trạng thái tùy ý (ví dụ không cho `PREPARING → CANCELLED` trực tiếp nếu không có rule phù hợp).
 
-**Conflict scenarios cần xử lý thật (không chỉ nêu trên giấy):**
+**Conflict scenarios cần xử lý thật:**
 
 - Hai khách cùng đặt món tại một bàn → 2 order riêng, cùng 1 Dining Session, không duplicate dữ liệu.
 - Duplicate Order do double-click/mạng chậm → dùng Idempotency Key/Unique Request ID.
@@ -112,18 +111,18 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 
 ---
 
-## 6. Timeline theo Sprint (14 tuần)
+## 6. Timeline theo Sprint
 
-| Sprint | Tuần | Nội dung chính | Deliverable |
+| Sprint | Nội dung chính | Deliverable |
 |--------|------|------------------|-------------|
-| 1 | 1–2 | Requirement: Vision, Scope, Actor, FR/NFR, Business Rules, Use Case List | SRS v1 |
-| 2 | 3–4 | Analysis: Use Case Diagram + Spec, Activity Diagram, Domain Model, Conflict Scenarios | Analysis Document |
-| 3 | 5 | Architecture & Database: ERD, API Design, Auth Design | Design Document |
-| 4 | 6–7 | Customer Core: QR → Table → Dining Session → Menu → Cart → Order | Demo: khách đặt món end-to-end |
-| 5 | 8–9 | Kitchen & Staff: order lifecycle, KDS, phục vụ, service request | Demo: Kitchen → Staff luồng đầy đủ |
-| 6 | 10–11 | Manager & Billing: CRUD quản lý, Reservation, Billing, Payment, Dashboard | Demo: thanh toán → Dining Session COMPLETED |
-| 7 | 12–13 | Testing: functional, role permission, state transition, concurrency (duplicate order, optimistic locking), security | Test Report |
-| 8 | 14–15 | Deployment & Defense: deploy, seed data, tài liệu, demo script, tập dượt bảo vệ | Final Package + Presentation |
+| 1 | Requirement: Vision, Scope, Actor, FR/NFR, Business Rules, Use Case List | SRS v1 |
+| 2 | Analysis: Use Case Diagram + Spec, Activity Diagram, Domain Model, Conflict Scenarios | Analysis Document |
+| 3 | Architecture & Database: ERD, API Design, Auth Design | Design Document |
+| 4 | Customer Core: QR → Table → Dining Session → Menu → Cart → Order | Demo: khách đặt món end-to-end |
+| 5 | Kitchen & Staff: order lifecycle, KDS, phục vụ, service request | Demo: Kitchen → Staff luồng đầy đủ |
+| 6 | Manager & Billing: CRUD quản lý, Reservation, Billing, Payment, Dashboard | Demo: thanh toán → Dining Session COMPLETED |
+| 7 | Testing: functional, role permission, state transition, concurrency (duplicate order, optimistic locking), security | Test Report |
+| 8 | Deployment & Defense: deploy, seed data, tài liệu, demo script, tập dượt bảo vệ | Final Package + Presentation |
 
 ---
 
