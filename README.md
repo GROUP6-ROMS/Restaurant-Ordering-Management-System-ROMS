@@ -1,6 +1,5 @@
 # Kế hoạch dự án — ROMS (Restaurant Ordering Management System)
 
-> **Giả định:** Nhóm 5 thành viên, học kỳ FPT University ~14–15 tuần. Nếu thực tế khác (số người, số tuần), điều chỉnh lại khối lượng công việc ở Phase 4–6 cho phù hợp.
 
 ---
 
