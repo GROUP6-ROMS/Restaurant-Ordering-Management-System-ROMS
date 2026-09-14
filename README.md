@@ -114,7 +114,7 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 ## 6. Timeline theo Sprint
 
 | Sprint | Nội dung chính | Deliverable |
-|--------|------|------------------|-------------|
+|------|------------------|-------------|
 | 1 | Requirement: Vision, Scope, Actor, FR/NFR, Business Rules, Use Case List | SRS v1 |
 | 2 | Analysis: Use Case Diagram + Spec, Activity Diagram, Domain Model, Conflict Scenarios | Analysis Document |
 | 3 | Architecture & Database: ERD, API Design, Auth Design | Design Document |
