@@ -3,20 +3,28 @@
 
 ---
 
-## 1. Tầm nhìn dự án
+## 1. Problem Statement
 
-ROMS là hệ thống quản lý nhà hàng số hóa toàn bộ quy trình: **Customer → Table → Dining Session → Order → Kitchen → Staff → Bill → Management**, bắt đầu từ việc khách quét QR tại bàn.
+- Customer Pain: Khách vào giờ cao điểm phải đợi nhân viên mang menu, gọi món dễ bị quên nhầm, muốn gọi thêm đá/nước hay tính tiền phải vẫy tay rát cả cổ.
+- Kitchen Pain: Tờ phiếu gọi món bằng giấy bị ướt, mất, hoặc chữ nhân viên quá xấu dẫn đến làm sai món, chậm món. Bếp không biết món nào vào trước/sau để ưu tiên.
+- Management Pain: Không kiểm soát được doanh thu thực tế theo thời gian thực, thất thoát nguyên liệu, không đánh giá được hiệu suất phục vụ của nhân viên.
+
+## 2. Tầm nhìn dự án
+
+ROMS là hệ thống quản lý nhà hàng số hóa toàn bộ quy trình: **Customer → Table → Dining Session → Order → Kitchen → Staff → Bill → Management**, bắt đầu từ việc khách quét QR tại bàn. 
+
+Hệ thống chuyển đổi mô hình gọi món truyền thống sang mô hình tự phục vụ thông minh qua QR, kết nối trực tiếp Khách hàng - Bếp - Nhân viên trên một nền tảng thời gian thực."
 
 Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 
 - QR chỉ là **entry point**, không phải toàn bộ sản phẩm.
-- **Dining Session** là business concept trung tâm — 1 bàn có 1 session active, nhiều khách/nhiều order thuộc cùng 1 session, tổng hợp thành 1 bill.
+- **Dining Session** là business concept trung tâm (trái tim của hệ thống) — 1 bàn có 1 session active, nhiều khách/nhiều order thuộc cùng 1 session, tổng hợp thành 1 bill.
 - Phạm vi SWP391: **1 nhà hàng duy nhất**, multi-tenant nằm ngoài scope.
 - Ưu tiên **core ổn định > nhiều feature dở dang**.
 
 ---
 
-## 2. Công nghệ dự kiến
+## 3. Công nghệ dự kiến
 
 | Layer | Công nghệ |
 |-------|-----------|
@@ -29,9 +37,9 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 
 ---
 
-## 3. Phạm vi (Scope MVP)
+## 4. Phạm vi (Scope MVP)
 
-### 3.1 MUST HAVE
+### MUST HAVE
 
 1. Authentication
 2. Role-based Authorization
@@ -49,7 +57,7 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 14. Basic Payment
 15. Basic Manager Dashboard
 
-### 3.2 SHOULD HAVE
+### SHOULD HAVE
 
 1. Reservation
 2. Check-in
@@ -57,14 +65,18 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 4. Real-time Order Status
 5. Food Recommendation
 
-### 3.3 FUTURE (ngoài scope môn học)
+### FUTURE (ngoài scope môn học)
 
 Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, Loyalty program, Advanced inventory, Advanced promotion, Mobile application, Online deposit, Advanced analytics.
 
 
 ---
 
-## 4. Quy tắc nghiệp vụ quan trọng (Business Rules)
+## 5. Actor
+
+## 6. Functional Requirements (FR)
+
+## 7. Quy tắc nghiệp vụ quan trọng (Business Rules)
 
 | Mã | Quy tắc |
 |----|---------|
@@ -79,7 +91,7 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 | BR-09 | Bill thuộc về một Dining Session, tổng hợp từ toàn bộ Order trong session đó |
 | BR-10 | Customer phải xác nhận recommendation trước khi món được thêm vào cart |
 
-**Order State Machine:** `PENDING → CONFIRMED → PREPARING → READY → SERVED → COMPLETED`, với `REJECTED`/`CANCELLED` là trạng thái ngoại lệ. Backend phải kiểm tra tính hợp lệ của mọi transition — không cho chuyển trạng thái tùy ý (ví dụ không cho `PREPARING → CANCELLED` trực tiếp nếu không có rule phù hợp).
+**Order State Machine:** `PENDING → CONFIRMED → PREPARING → READY → SERVED`, với `REJECTED`/`CANCELLED` là trạng thái ngoại lệ. Backend phải kiểm tra tính hợp lệ của mọi transition — không cho chuyển trạng thái tùy ý (ví dụ không cho `PREPARING → CANCELLED` trực tiếp nếu không có rule phù hợp).
 
 **Conflict scenarios cần xử lý thật:**
 
@@ -91,7 +103,7 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 
 ---
 
-## 5. Kịch bản Demo
+## 8. Kịch bản Demo
 
 Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD:
 
@@ -111,7 +123,7 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 
 ---
 
-## 6. Timeline theo Sprint
+## 9. Timeline theo Sprint
 
 | Sprint | Nội dung chính | Deliverable |
 |------|------------------|-------------|
@@ -126,7 +138,7 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 
 ---
 
-## 7. Thứ tự ưu tiên kỹ thuật (không đảo ngược)
+## 10. Thứ tự ưu tiên kỹ thuật (không đảo ngược)
 
 ```
 1. Requirement             8. Reservation
@@ -142,7 +154,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 8. Milestone nghiệm thu
+## 11. Milestone nghiệm thu
 
 - **M1 (cuối Sprint 2):** SRS + Use Case + Domain Model được duyệt.
 - **M2 (cuối Sprint 3):** ERD + API design hoàn chỉnh, review được kiến trúc trước khi code.
@@ -154,7 +166,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 9. Rủi ro chính & biện pháp
+## 12. Rủi ro chính & biện pháp
 
 | Rủi ro | Biện pháp |
 |--------|-----------|
@@ -167,7 +179,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 10. Phân công vai trò (mẫu — điền theo nhóm thực tế)
+## 13. Phân công vai trò (mẫu — điền theo nhóm thực tế)
 
 | Thành viên | Module phụ trách chính | Module hỗ trợ |
 |-----------|------------------------|----------------|
@@ -179,7 +191,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 11. Tiêu chí tự đánh giá trước khi nộp
+## Tiêu chí tự đánh giá trước khi nộp
 
 - [ ] Có thể demo end-to-end: QR → Order → Kitchen → Staff → Bill → Payment mà không lỗi
 - [ ] Mọi transition trạng thái Order được backend kiểm tra hợp lệ (không cho nhảy trạng thái tùy ý)
