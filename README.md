@@ -73,8 +73,33 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 ---
 
 ## 5. Actor
+Customer
+Waiter
+Kitchen Staff
+Cashier
+Restaurant Manage
+Payment Gateway
+
 
 ## 6. Functional Requirements (FR)
+| ID | Feature / Requirement | Actor | Priority |
+|:---|:---|:---:|:---:|
+| **FR-01** | **Staff Authentication & RBAC:** Login/logout with role-based access (Waiter, Kitchen, Cashier, Manager). | Staff | Must Have |
+| **FR-02** | **Table QR Verification:** Scan table QR to validate cryptographic token and resolve table identity. | Customer | Must Have |
+| **FR-03** | **Dining Session Management:** Initialize or join an active session; sync shared cart across diners at the same table. | Customer, System | Must Have |
+| **FR-04** | **Digital Menu Browsing:** View categorized food and drinks with prices, images, and live availability. | Customer | Must Have |
+| **FR-05** | **Cart Management:** Add/remove items, adjust quantities, and enter special cooking notes. | Customer | Must Have |
+| **FR-06** | **Batch Order Placement:** Submit orders with Idempotency Key to prevent duplicate submissions on network lag. | Customer, Waiter | Must Have |
+| **FR-07** | **Real-Time Order Tracking:** Track live dish cooking milestones (`CONFIRMED` → `PREPARING` → `READY` → `SERVED`). | Customer | Should Have |
+| **FR-08** | **Customer Order Cancellation:** Self-cancel dishes before preparation starts; auto-lock once status reaches `PREPARING`. | Customer | Must Have |
+| **FR-09** | **Kitchen Display System (KDS):** Display queue, update cooking milestones, and trigger food pickup alerts. | Kitchen Staff | Must Have |
+| **FR-10** | **Real-Time Table Map:** Monitor live floor map with visual table statuses (`AVAILABLE`, `OCCUPIED`, `DIRTY`, `RESERVED`). | Waiter, Manager | Must Have |
+| **FR-11** | **Waiter Service Request:** Page floor staff for in-dining assistance (water, ice, utensils, checkout call). | Customer, Waiter | Should Have |
+| **FR-12** | **Bill Aggregation:** Aggregate all served items in session, apply tax, and calculate voucher discounts. | Cashier, System | Must Have |
+| **FR-13** | **Payment Settlement:** Process payment via Cash or dynamic VNPay QR, print receipt, and close session. | Cashier | Must Have |
+| **FR-14** | **Table Reservation:** Book tables in advance; lock table 45m prior and auto-release after 20m no-show. | Customer, System | Should Have |
+| **FR-15** | **Menu & Stock Management:** CRUD menu items, toggle out-of-stock flags, and manage categories. | Manager | Must Have |
+| **FR-16** | **Sales & Revenue Dashboard:** View daily/monthly revenue metrics, order counts, and top-selling dishes. | Manager | Must Have |
 
 ## 7. Quy tắc nghiệp vụ quan trọng (Business Rules)
 
