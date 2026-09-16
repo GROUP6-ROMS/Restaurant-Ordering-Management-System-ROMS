@@ -102,6 +102,7 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 | **FR-14** | **Table Reservation:** Book tables in advance; lock table 45m prior and auto-release after 20m no-show. | Customer, System | Should Have |
 | **FR-15** | **Menu & Stock Management:** CRUD menu items, toggle out-of-stock flags, and manage categories. | Manager | Must Have |
 | **FR-16** | **Sales & Revenue Dashboard:** View daily/monthly revenue metrics, order counts, and top-selling dishes. | Manager | Must Have |
+| **FR-17** | **System Settings Management:** Manager cấu hình các tham số vận hành của hệ thống — thời gian khóa bàn trước giờ Reservation, thời gian auto-release khi no-show, và các tham số tương tự phát sinh sau này. Giá trị mặc định áp dụng nếu chưa cấu hình. | Manager | Should Have |
 
 ## 7. Quy tắc nghiệp vụ quan trọng (Business Rules)
 
