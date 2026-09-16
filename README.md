@@ -78,18 +78,22 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 
 ## 7. Quy tắc nghiệp vụ quan trọng (Business Rules)
 
-| Mã | Quy tắc |
-|----|---------|
-| BR-01 | Một Table chỉ có một Active Dining Session tại một thời điểm |
-| BR-02 | Một Dining Session có thể có nhiều Customer |
-| BR-03 | Mỗi Order phải thuộc một Dining Session |
-| BR-04 | QR phải được backend xác thực (không tin tableId thô từ frontend) |
-| BR-05 | Customer không được cancel Order sau khi Order đã chuyển sang PREPARING |
-| BR-06 | Chỉ Role được phân quyền mới được phép thay đổi từng trạng thái Order |
-| BR-07 | Bàn RESERVED không được assign cho Walk-in trong thời gian reservation |
-| BR-08 | Dining Session không thể hoàn thành khi vẫn còn Order đang active |
-| BR-09 | Bill thuộc về một Dining Session, tổng hợp từ toàn bộ Order trong session đó |
-| BR-10 | Customer phải xác nhận recommendation trước khi món được thêm vào cart |
+| Mã | Loại | Quy tắc | Implementation / Validation |
+|----|------|---------|-----------------------------|
+| BR-01 | Constraints | Một Table chỉ có một Active Dining Session tại một thời điểm | DB Constraint/Transaction: table_id + status = ACTIVE là duy nhất. Chặn mở Session mới khi bàn đang có Session ACTIVE. |
+| BR-02 | Facts | Một Dining Session có thể có nhiều Customer | Nhiều thiết bị cùng quét QR tại một bàn sẽ tham gia cùng session_id. |
+| BR-03 | Constraints | Một Customer chỉ có thể tham gia một Active Dining Session tại một thời điểm. | Backend kiểm tra customer_id hoặc session token trước khi join Session mới. |
+| BR-04 | Constraints | Một Order phải chứa ít nhất một món hợp lệ và đang được phép bán. | Validate items.size() > 0; kiểm tra từng Menu Item có is_available = true. Nếu hệ thống triển khai stock management trong MVP thì kiểm tra thêm stock > 0 |
+| BR-05 | Constraints | Customer chỉ được hủy Order trước khi Order chuyển sang PREPARING. | Backend chỉ cho Customer cancel khi Order còn ở trạng thái cho phép, tối thiểu là PENDING. Nếu status >= PREPARING, request bị từ chối. |
+| BR-06 | Constraints | Order chỉ được chuyển trạng thái theo State Machine đã định nghĩa, không được nhảy cóc trạng thái. | Backend validate mọi transition. Không cho phép chuyển trạng thái tùy ý, ví dụ PENDING → SERVED. |
+| BR-07 | Constraints | Chỉ Staff có quyền phù hợp mới được thay đổi Order status. | Áp dụng RBAC: Customer tạo/hủy Order theo rule; Chef xử lý PREPARING/READY; Waiter xử lý CONFIRMED/SERVED. |
+| BR-08 | Constraints | Dining Session chỉ được hoàn thành khi tất cả Order liên quan đã ở trạng thái kết thúc. | Checkout phải kiểm tra tất cả Order thuộc Session đều ở SERVED, CANCELLED hoặc REJECTED. |
+| BR-09 | Computations | Một Bill thuộc về một Dining Session và được tính dựa trên các Order hợp lệ phải thanh toán trong Session. | Tổng hợp các Order có trạng thái SERVED thuộc session_id để tính Bill. |
+| BR-10 | Constraints | Order CANCELLED hoặc REJECTED không được tính tiền. | Bill chỉ lấy các Order payable, ví dụ WHERE session_id = ? AND status = 'SERVED'. |
+| BR-11 | Constraints | Customer chỉ được truy cập Session khi QR hợp lệ và liên kết với Table/Session đang hoạt động. | Backend xác thực QR token. Không tin tableId hoặc sessionId do Frontend tự gửi. Từ chối QR giả mạo hoặc không còn hợp lệ. |
+| BR-12 | Action Enablers | Món được Recommendation/Upsell không được tự động thêm vào Cart. Customer phải xác nhận. | UI hiển thị Recommendation/Combo; chỉ thêm vào Cart sau khi Customer thực hiện action xác nhận như Add this item. |
+| BR-13 | Constraints | Bàn đang RESERVED trong thời gian Reservation không được cấp cho khách Walk-in. | Khi assign Table, Backend kiểm tra Reservation đang active. Nếu Table đang RESERVED thì từ chối Walk-in assignment. |
+| BR-14 | Constraints | Mỗi Order bắt buộc thuộc chính xác một Dining Session. | Order phải có session_id hợp lệ. Không cho phép tạo Order không thuộc Session hoặc đồng thời thuộc nhiều Session. |
 
 **Order State Machine:** `PENDING → CONFIRMED → PREPARING → READY → SERVED`, với `REJECTED`/`CANCELLED` là trạng thái ngoại lệ. Backend phải kiểm tra tính hợp lệ của mọi transition — không cho chuyển trạng thái tùy ý (ví dụ không cho `PREPARING → CANCELLED` trực tiếp nếu không có rule phù hợp).
 
