@@ -73,12 +73,14 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 ---
 
 ## 5. Actor
-Customer
-Waiter
-Kitchen Staff
-Cashier
-Restaurant Manage
-Payment Gateway
+| Actor | Type | Description |
+|:---|:---:|:---|
+| **Customer** | External | In-dining diner; scans table QR code to join dining session, browses digital menu, places batch orders, tracks live dish status, and requests service. |
+| **Waiter** | Internal | Floor staff; initiates sessions for walk-ins, takes orders on behalf of guests, monitors live table map, acknowledges service calls, and delivers ready dishes. |
+| **Kitchen Staff** | Internal | Chef/Cook; views kitchen queue on KDS touchscreen, advances cooking milestones (`CONFIRMED` → `PREPARING` → `READY`), and triggers food pickup alerts. |
+| **Cashier** | Internal | Checkout operator; audits served items in session, applies vouchers, settles payments via cash or dynamic VNPay QR, and completes dining sessions. |
+| **Manager** | Internal | Restaurant administrator; manages staff accounts/RBAC, designs floor layouts, exports table QRs, maintains menu catalog, and inspects revenue analytics. |
+| **System** | Automated | Background services; verifies HMAC-SHA256 QR tokens, brokers real-time WebSocket events, handles payment IPN webhooks, and auto-releases no-show reservations. |
 
 
 ## 6. Functional Requirements (FR)
