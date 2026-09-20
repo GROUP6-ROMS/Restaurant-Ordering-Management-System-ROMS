@@ -39,35 +39,35 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 
 ## 4. Phạm vi (Scope MVP)
 
-### MUST HAVE
+> **Nhóm 3 người — Scope đã được tái cơ cấu để khớp với capacity thực tế (~6 tuần code).**
+> Nguyên tắc: hoàn thành ít tính năng nhưng chạy thật, hơn là nhiều tính năng làm nửa vời.
 
-1. Authentication
-2. Role-based Authorization
-3. Table Management
-4. QR/Table Identification
-5. Menu
-6. Food Management
-7. Category Management
-8. Cart
-9. Order
-10. Dining Session
-11. Kitchen Order Processing
-12. Staff Order/Table Management
-13. Billing
-14. Basic Payment
-15. Basic Manager Dashboard
+### CORE MUST HAVE (bắt buộc hoàn thành 100%)
 
-### SHOULD HAVE
+1. Authentication + Role-based Authorization (RBAC)
+2. Table Management
+3. QR / Table Identification & Token Validation
+4. Dining Session Management (create / join / close)
+5. Menu + Category Management (CRUD)
+6. Cart + Order (full lifecycle + State Machine đầy đủ)
+7. Kitchen Order Processing — Kitchen Display System (KDS)
+8. Staff Order & Table Management
+9. Billing + Payment (Cash — bắt buộc; VNPay — nếu còn thời gian)
+10. **Reservation + Staff Check-in** ← _core feature ngang hàng với QR_
 
-1. Reservation
-2. Check-in
-3. Customer Service Request
-4. Real-time Order Status
-5. Food Recommendation
+### SHOULD HAVE (làm nếu hoàn thành CORE trước Sprint 6)
 
-### FUTURE (ngoài scope môn học)
+1. Real-time Order Status — polling 2 giây (không cần WebSocket)
+2. VNPay QR Payment
+3. Basic Manager Dashboard (3–4 metric: doanh thu ngày/tháng, top món, trạng thái bàn)
+4. Customer Service Request — đơn giản: 1 nút "Gọi nhân viên", không cần phân loại
 
-Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, Loyalty program, Advanced inventory, Advanced promotion, Mobile application, Online deposit, Advanced analytics.
+### CẮT KHỎI SCOPE (không làm trong môn học này)
+
+- Food Recommendation / Upsell
+- System Settings Management (tham số hardcode trong `application.properties`)
+- Voucher / Discount
+- Multi-restaurant, Multi-branch, SaaS subscription, Loyalty program, Mobile app, Advanced analytics, Online deposit
 
 
 ---
@@ -101,10 +101,72 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 | **FR-13** | **Payment Settlement:** Process payment via Cash or dynamic VNPay QR, print receipt, and close session. | Cashier | Must Have |
 | **FR-14** | **Table Reservation:** Book tables in advance; lock table 45m prior and auto-release after 20m no-show. | Customer, System | Should Have |
 | **FR-15** | **Menu & Stock Management:** CRUD menu items, toggle out-of-stock flags, and manage categories. | Manager | Must Have |
-| **FR-16** | **Sales & Revenue Dashboard:** View daily/monthly revenue metrics, order counts, and top-selling dishes. | Manager | Must Have |
-| **FR-17** | **System Settings Management:** Manager cấu hình các tham số vận hành của hệ thống — thời gian khóa bàn trước giờ Reservation, thời gian auto-release khi no-show, và các tham số tương tự phát sinh sau này. Giá trị mặc định áp dụng nếu chưa cấu hình. | Manager | Should Have |
+| **FR-16** | **Sales & Revenue Dashboard:** View daily/monthly revenue metrics, order counts, and top-selling dishes. | Manager | Should Have |
 
-## 7. Quy tắc nghiệp vụ quan trọng (Business Rules)
+---
+
+## 7. Non-Functional Requirements (NFR)
+
+> Phạm vi áp dụng: **1 nhà hàng duy nhất**, triển khai nội bộ, phục vụ đồng thời tối đa ~50 người dùng trong giờ cao điểm (khách + staff).
+
+### 7.1 Performance
+
+| ID | Yêu cầu | Mục tiêu đo được | Ghi chú |
+|:---|:--------|:-----------------|:--------|
+| NFR-P01 | API response time — luồng thông thường (menu, order, session) | **< 500 ms** ở mức tải bình thường | Đo tại server, không tính network của client |
+| NFR-P02 | QR token validation response | **< 300 ms** | Critical path — khách đứng ở bàn chờ |
+| NFR-P03 | Kitchen Display System (KDS) cập nhật trạng thái order mới | **< 2 s** (polling interval) | Polling 2s hoặc WebSocket nếu triển khai real-time |
+| NFR-P04 | Trang menu load lần đầu (First Contentful Paint) | **< 3 s** trên 4G mobile | Tối ưu ảnh món ăn, lazy load |
+| NFR-P05 | Báo cáo doanh thu (Dashboard query) | **< 3 s** | Query có thể nặng — thêm index nếu cần |
+| NFR-P06 | Hệ thống xử lý được | **50 concurrent users** mà không degradation | Giờ cao điểm của 1 nhà hàng thực tế |
+
+### 7.2 Security
+
+| ID | Yêu cầu | Chi tiết |
+|:---|:--------|:---------|
+| NFR-S01 | Authentication | JWT (JSON Web Token); Staff token hết hạn sau **8 giờ** (1 ca làm việc); Customer session token hết hạn sau **4 giờ** |
+| NFR-S02 | QR Token Integrity | QR chứa HMAC-SHA256 signature. Backend validate token mọi request — không tin `tableId`/`sessionId` do Frontend tự gửi |
+| NFR-S03 | Role-Based Access Control | Mọi API endpoint phải kiểm tra role trước khi xử lý. Customer không được gọi API của Staff/Manager và ngược lại |
+| NFR-S04 | Brute-force Protection | Giới hạn **5 lần login thất bại / phút** per IP — trả về HTTP 429 Too Many Requests |
+| NFR-S05 | Input Validation | Validate toàn bộ input phía Backend (không tin Frontend). Sử dụng Spring Validation + JPA Parameterized Query để chống SQL Injection |
+| NFR-S06 | Transport Security | **HTTPS bắt buộc** trên môi trường production/demo. HTTP chỉ dùng trong localhost dev |
+| NFR-S07 | Password Storage | Mật khẩu Staff được hash bằng **BCrypt** (salt rounds ≥ 10). Không lưu plaintext |
+| NFR-S08 | VNPay Webhook Integrity | Xác thực chữ ký HMAC-SHA512 trên mọi IPN callback từ VNPay trước khi xử lý payment |
+
+### 7.3 Usability
+
+| ID | Yêu cầu | Chi tiết |
+|:---|:--------|:---------|
+| NFR-U01 | Mobile-first cho Customer UI | Giao diện order của khách phải usable trên màn hình 360px–414px (điện thoại phổ thông). Không cần zoom, không bị overflow |
+| NFR-U02 | KDS readable trên tablet | Kitchen Display System phải hiển thị rõ trên tablet 10" ở khoảng cách ~60 cm. Font size tối thiểu 16px cho tên món, 20px cho order ID |
+| NFR-U03 | Error message thân thiện | Mọi lỗi phía Client phải hiển thị message tiếng Việt rõ ràng — không show raw HTTP status code hoặc stack trace |
+| NFR-U04 | Hành động quan trọng cần xác nhận | Các hành động không thể hoàn tác (hủy order, thanh toán, đóng session) phải có bước xác nhận (confirm dialog) |
+| NFR-U05 | Thời gian phản hồi cảm nhận | Mọi action của user phải có phản hồi visual (loading spinner, toast notification) trong vòng **200 ms** |
+
+### 7.4 Reliability & Availability
+
+| ID | Yêu cầu | Chi tiết |
+|:---|:--------|:---------|
+| NFR-R01 | Uptime trong giờ hoạt động | **99% uptime** trong khung giờ nhà hàng mở cửa (ví dụ 09:00–22:00) |
+| NFR-R02 | Idempotency cho Order | Duplicate Order do double-click hoặc mạng chậm phải bị phát hiện và chặn qua Idempotency Key — không tạo order trùng |
+| NFR-R03 | Concurrency control | Các thao tác đồng thời trên cùng 1 Order (2 staff cùng update status) phải dùng **Optimistic Locking** (`@Version` trong JPA) |
+| NFR-R04 | Database backup | Backup database hàng ngày. Có thể restore về trạng thái trong vòng 24 giờ gần nhất |
+| NFR-R05 | Graceful error handling | Backend không crash khi gặp lỗi đơn lẻ — trả về HTTP 4xx/5xx có structured error body thay vì unhandled exception |
+| NFR-R06 | Reservation auto-release | Scheduler chạy mỗi **60 giây** để kiểm tra và auto-release reservation no-show. Không được bỏ sót dù server vừa restart |
+
+### 7.5 Maintainability
+
+| ID | Yêu cầu | Chi tiết |
+|:---|:--------|:---------|
+| NFR-M01 | Codebase structure | Backend theo chuẩn Layered Architecture: Controller → Service → Repository. Không viết business logic trong Controller hoặc Repository |
+| NFR-M02 | API documentation | Tất cả API endpoint phải có Swagger/OpenAPI annotation để tự sinh tài liệu. Accessible tại `/swagger-ui.html` |
+| NFR-M03 | Environment configuration | Mọi thông tin nhạy cảm (DB password, JWT secret, VNPay key) phải đọc từ **environment variable hoặc `application.properties`** — không hardcode trong source code |
+| NFR-M04 | Seed data | Có script seed data đủ để demo ngay sau khi deploy: ≥ 10 bàn, ≥ 3 category, ≥ 15 món ăn, ≥ 3 tài khoản staff (1 Manager, 1 Waiter, 1 Kitchen) |
+| NFR-M05 | Test coverage | Bắt buộc có unit test cho: Order State Machine transitions, QR token validation, Business Rules quan trọng (BR-01, BR-05, BR-08). Mục tiêu coverage ≥ 60% service layer |
+
+---
+
+## 8. Quy tắc nghiệp vụ quan trọng (Business Rules)
 
 | Mã | Loại | Quy tắc | Implementation / Validation |
 |----|------|---------|-----------------------------|
@@ -122,6 +184,9 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 | BR-12 | Action Enablers | Món được Recommendation/Upsell không được tự động thêm vào Cart. Customer phải xác nhận. | UI hiển thị Recommendation/Combo; chỉ thêm vào Cart sau khi Customer thực hiện action xác nhận như Add this item. |
 | BR-13 | Constraints | Bàn đang RESERVED trong thời gian Reservation không được cấp cho khách Walk-in. | Khi assign Table, Backend kiểm tra Reservation đang active. Nếu Table đang RESERVED thì từ chối Walk-in assignment. |
 | BR-14 | Constraints | Mỗi Order bắt buộc thuộc chính xác một Dining Session. | Order phải có session_id hợp lệ. Không cho phép tạo Order không thuộc Session hoặc đồng thời thuộc nhiều Session. |
+| BR-15 | Constraints | Một Reservation chỉ được tạo cho thời điểm trong tương lai, không được đặt bàn cho thời gian đã qua. | Backend validate `reservation_time > LocalDateTime.now()`. Reject ngay với HTTP 400 nếu đặt bàn trong quá khứ. |
+| BR-16 | Constraints | Dining Session chỉ được chuyển sang COMPLETED khi không còn Order nào ở trạng thái trung gian (PENDING, CONFIRMED, PREPARING, READY) trong Session đó. | Checkout endpoint kiểm tra: `COUNT(orders WHERE status NOT IN ['SERVED','CANCELLED','REJECTED']) = 0`. Từ chối close session nếu còn món đang nấu. |
+| BR-17 | Computations | Giá tính trên Bill là giá tại thời điểm Order được tạo (snapshot price), không phải giá hiện tại của MenuItem. | `order_items.unit_price` lưu giá tại lúc add vào order. Nếu Manager thay đổi giá MenuItem sau đó, Bill đã tạo không bị ảnh hưởng. |
 
 **Order State Machine:** `PENDING → CONFIRMED → PREPARING → READY → SERVED`, với `REJECTED`/`CANCELLED` là trạng thái ngoại lệ. Backend phải kiểm tra tính hợp lệ của mọi transition — không cho chuyển trạng thái tùy ý (ví dụ không cho `PREPARING → CANCELLED` trực tiếp nếu không có rule phù hợp).
 
@@ -135,7 +200,7 @@ Multi-restaurant, Multi-branch, SaaS subscription, Advanced AI recommendation, L
 
 ---
 
-## 8. Kịch bản Demo
+## 9. Kịch bản Demo
 
 Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD:
 
@@ -155,7 +220,7 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 
 ---
 
-## 9. Timeline theo Sprint
+## 10. Timeline theo Sprint
 
 | Sprint | Nội dung chính | Deliverable |
 |------|------------------|-------------|
@@ -170,7 +235,7 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 
 ---
 
-## 10. Thứ tự ưu tiên kỹ thuật (không đảo ngược)
+## 11. Thứ tự ưu tiên kỹ thuật (không đảo ngược)
 
 ```
 1. Requirement             8. Reservation
@@ -186,7 +251,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 11. Milestone nghiệm thu
+## 12. Milestone nghiệm thu
 
 - **M1 (cuối Sprint 2):** SRS + Use Case + Domain Model được duyệt.
 - **M2 (cuối Sprint 3):** ERD + API design hoàn chỉnh, review được kiến trúc trước khi code.
@@ -198,7 +263,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 12. Rủi ro chính & biện pháp
+## 13. Rủi ro chính & biện pháp
 
 | Rủi ro | Biện pháp |
 |--------|-----------|
@@ -211,7 +276,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 13. Phân công vai trò (mẫu — điền theo nhóm thực tế)
+## 14. Phân công vai trò (mẫu — điền theo nhóm thực tế)
 
 | Thành viên | Module phụ trách chính | Module hỗ trợ |
 |-----------|------------------------|----------------|
