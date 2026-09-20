@@ -26,23 +26,20 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 
 ## 3. Công nghệ dự kiến
 
-| Layer | Công nghệ | Ghi chú |
-|-------|-----------|--------|
-| Backend | Java 17, Spring Boot 3.x, Spring Security 6, Spring Data JPA | - |
-| Database | Microsoft SQL Server 2019+ | HikariCP connection pool |
-| Frontend | **React 18 + Vite 5** | Đã thống nhất |
-| State Management | React Context API | Zustand nếu cần phức tạp hơn |
-| UI Components | Ant Design 5 | Responsive, mobile-friendly |
-| HTTP Client | Axios | Interceptor cho JWT tự động |
-| API | RESTful API + Swagger/OpenAPI 3 | Tự sinh docs tại `/swagger-ui.html` |
-| Real-time | Polling 2s (mặc định) | WebSocket/SSE nếu còn thời gian |
+| Layer | Công nghệ |
+|-------|-----------|
+| Backend | Java, Spring Boot, Spring Security, Spring Data JPA |
+| Database | Microsoft SQL Server |
+| Frontend | React (hoặc công nghệ nhóm thống nhất) |
+| API | RESTful API |
 
-> Quyết định này là **final** — toàn nhóm đã thống nhất. Không thay đổi tech sau Sprint 2.
+> Ghi chú: kiến trúc real-time (Order status, KDS) cần chọn công nghệ cụ thể trong Sprint 3 — ví dụ WebSocket (STOMP over SockJS trong Spring) hoặc Server-Sent Events, tùy độ quen thuộc của nhóm với Spring ecosystem.
 
 ---
 
 ## 4. Phạm vi (Scope MVP)
 
+> **Nhóm 3 người — Scope đã được tái cơ cấu để khớp với capacity thực tế (~6 tuần code).**
 > Nguyên tắc: hoàn thành ít tính năng nhưng chạy thật, hơn là nhiều tính năng làm nửa vời.
 
 ### CORE MUST HAVE (bắt buộc hoàn thành 100%)
@@ -81,9 +78,9 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 | **Customer** | External | In-dining diner; scans table QR code to join dining session, browses digital menu, places batch orders, tracks live dish status, and requests service. |
 | **Waiter** | Internal | Floor staff; initiates sessions for walk-ins, takes orders on behalf of guests, monitors live table map, acknowledges service calls, and delivers ready dishes. |
 | **Kitchen Staff** | Internal | Chef/Cook; views kitchen queue on KDS touchscreen, advances cooking milestones (`CONFIRMED` → `PREPARING` → `READY`), and triggers food pickup alerts. |
-| **Cashier** | Internal | Checkout operator; audits served items in session, settles payments via cash or VNPay QR, generates digital receipt, and completes dining sessions. |
+| **Cashier** | Internal | Checkout operator; audits served items in session, applies vouchers, settles payments via cash or dynamic VNPay QR, and completes dining sessions. |
 | **Manager** | Internal | Restaurant administrator; manages staff accounts/RBAC, designs floor layouts, exports table QRs, maintains menu catalog, and inspects revenue analytics. |
-| **System** | Automated | Background services; verifies HMAC-SHA256 QR tokens, brokers real-time events (polling/WebSocket), handles payment IPN webhooks, and auto-releases no-show reservations. |
+| **System** | Automated | Background services; verifies HMAC-SHA256 QR tokens, brokers real-time WebSocket events, handles payment IPN webhooks, and auto-releases no-show reservations. |
 
 
 ## 6. Functional Requirements (FR)
@@ -100,13 +97,11 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 | **FR-09** | **Kitchen Display System (KDS):** Display queue, update cooking milestones, and trigger food pickup alerts. | Kitchen Staff | Must Have |
 | **FR-10** | **Real-Time Table Map:** Monitor live floor map with visual table statuses (`AVAILABLE`, `OCCUPIED`, `DIRTY`, `RESERVED`). | Waiter, Manager | Must Have |
 | **FR-11** | **Waiter Service Request:** Page floor staff for in-dining assistance (water, ice, utensils, checkout call). | Customer, Waiter | Should Have |
-| **FR-12** | **Bill Aggregation:** Aggregate all served items in session and apply tax to calculate total amount. | Cashier, System | Must Have |
-| **FR-13** | **Payment Settlement:** Process payment via Cash or VNPay QR, generate digital receipt, and close session. | Cashier | Must Have |
-| **FR-14** | **Table Reservation:** Book tables in advance; lock table 45m prior and auto-release after 20m no-show. | Customer, Waiter, System | **Must Have** |
+| **FR-12** | **Bill Aggregation:** Aggregate all served items in session, apply tax, and calculate voucher discounts. | Cashier, System | Must Have |
+| **FR-13** | **Payment Settlement:** Process payment via Cash or dynamic VNPay QR, print receipt, and close session. | Cashier | Must Have |
+| **FR-14** | **Table Reservation:** Book tables in advance; lock table 45m prior and auto-release after 20m no-show. | Customer, System | Should Have |
 | **FR-15** | **Menu & Stock Management:** CRUD menu items, toggle out-of-stock flags, and manage categories. | Manager | Must Have |
 | **FR-16** | **Sales & Revenue Dashboard:** View daily/monthly revenue metrics, order counts, and top-selling dishes. | Manager | Should Have |
-| **FR-18** | **Reservation Check-in:** Waiter confirms guest arrival, transitions reservation to CHECKED_IN, and creates Dining Session for the reserved table. | Waiter | **Must Have** |
-| **FR-19** | **Table Status Lifecycle:** Staff manually updates table status after guests leave: OCCUPIED → DIRTY → AVAILABLE, enabling floor turnover tracking. | Waiter | Must Have |
 
 ---
 
@@ -186,7 +181,7 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 | BR-09 | Computations | Một Bill thuộc về một Dining Session và được tính dựa trên các Order hợp lệ phải thanh toán trong Session. | Tổng hợp các Order có trạng thái SERVED thuộc session_id để tính Bill. |
 | BR-10 | Constraints | Order CANCELLED hoặc REJECTED không được tính tiền. | Bill chỉ lấy các Order payable, ví dụ WHERE session_id = ? AND status = 'SERVED'. |
 | BR-11 | Constraints | Customer chỉ được truy cập Session khi QR hợp lệ và liên kết với Table/Session đang hoạt động. | Backend xác thực QR token. Không tin tableId hoặc sessionId do Frontend tự gửi. Từ chối QR giả mạo hoặc không còn hợp lệ. |
-| BR-12 | Constraints | Waiter chỉ được Check-in Reservation khi trạng thái là CONFIRMED và thời điểm hiện tại nằm trong khung giờ hợp lệ (từ giờ đặt bàn trừ 30 phút). | Backend validate `now >= reservationTime - 30m`. Từ chối check-in quá sớm hoặc khi Reservation không ở trạng thái CONFIRMED. |
+| BR-12 | Action Enablers | Món được Recommendation/Upsell không được tự động thêm vào Cart. Customer phải xác nhận. | UI hiển thị Recommendation/Combo; chỉ thêm vào Cart sau khi Customer thực hiện action xác nhận như Add this item. |
 | BR-13 | Constraints | Bàn đang RESERVED trong thời gian Reservation không được cấp cho khách Walk-in. | Khi assign Table, Backend kiểm tra Reservation đang active. Nếu Table đang RESERVED thì từ chối Walk-in assignment. |
 | BR-14 | Constraints | Mỗi Order bắt buộc thuộc chính xác một Dining Session. | Order phải có session_id hợp lệ. Không cho phép tạo Order không thuộc Session hoặc đồng thời thuộc nhiều Session. |
 | BR-15 | Constraints | Một Reservation chỉ được tạo cho thời điểm trong tương lai, không được đặt bàn cho thời gian đã qua. | Backend validate `reservation_time > LocalDateTime.now()`. Reject ngay với HTTP 400 nếu đặt bàn trong quá khứ. |
@@ -207,31 +202,21 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 
 ## 9. Kịch bản Demo
 
-Demo theo **hai kịch bản liền mạch** — không mở rời rạc từng CRUD:
+Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD:
 
-#### 🅐 Kịch bản chính: Walk-in qua QR
+1. **Customer đến nhà hàng** → quét QR tại Table 05.
+2. **Hệ thống xác định Table 05** → tạo hoặc tham gia Dining Session.
+3. **Customer xem menu** → chọn Burger + Cola.
+4. **Customer Place Order** → Kitchen nhận Order #1001.
+5. **Kitchen xử lý:** CONFIRMED → PREPARING → READY.
+6. **Customer thấy trạng thái order cập nhật real-time.**
+7. **Staff phục vụ** → order chuyển SERVED.
+8. **Customer yêu cầu Bill.**
+9. **Payment** → Dining Session chuyển COMPLETED.
 
-1. **Manager** xuất QR cho Table 05, dán lên bàn.
-2. **Customer đến** → quét QR → hệ thống tạo Dining Session #DS-001.
-3. **Customer xem menu** → thêm Phở Bò + Trà Đào vào cart.
-4. **Customer Place Order** → Kitchen nhận Order #ORD-001 trên KDS.
-5. **KDS hiển thị:** Kitchen chuyển CONFIRMED → PREPARING → READY.
-6. **Waiter** nhận thông báo → giao món → chuyển SERVED.
-7. **Cashier** tổng hợp bill → Customer thanh toán Cash.
-8. **Dining Session chuyển COMPLETED** → Table chuyển DIRTY → Staff dọn → AVAILABLE.
-
-#### 🅑 Kịch bản Reservation (CORE — demo bắt buộc)
-
-1. **Customer đặt bàn** → Reservation #RES-001, Table 03, 19:00.
-2. **18:15** → Hệ thống tự lock Table 03 (45 phút trước giờ đặt).
-3. **Walk-in** muốn Table 03 → Waiter thử assign → hệ thống **từ chối** (BR-13).
-4. **19:00** → Waiter check-in Reservation → tạo Dining Session #DS-002.
-5. **Customer quét QR** → join DS-002 → tiếp tục như Kịch bản A.
-6. _(Optional)_ Demo **no-show**: dùng thời gian test ngắn → Scheduler tự release sau 20 phút.
-
-**Demo Should Have (nếu còn thời gian):**
-- Polling tự động cập nhật trạng thái order mà không cần refresh trang.
-- Dashboard: hiển thị doanh thu ngày và top 5 món bán chạy.
+**Demo mở rộng (nếu Should Have hoàn thành):**
+- Reservation → Check-in → Dining Session → QR Ordering.
+- Customer: "Tôi muốn món cay dưới 100k" → hệ thống gợi ý 3–5 món phù hợp (rule-based).
 
 ---
 
@@ -243,8 +228,8 @@ Demo theo **hai kịch bản liền mạch** — không mở rời rạc từng 
 | 2 | Analysis: Use Case Diagram + Spec, Activity Diagram, Domain Model, Conflict Scenarios | Analysis Document |
 | 3 | Architecture & Database: ERD, API Design, Auth Design | Design Document |
 | 4 | Customer Core: QR → Table → Dining Session → Menu → Cart → Order | Demo: khách đặt món end-to-end |
-| 5 | Kitchen & Staff + **Reservation core**: order lifecycle, KDS, phục vụ, Reservation CRUD, Check-in, Auto-release Scheduler | Demo: Kitchen → Staff + Reservation check-in |
-| 6 | Billing, Payment (Cash), Table lifecycle, Dashboard (basic), VNPay (nếu còn thời gian) | Demo: **Kịch bản A + B đầy đủ** end-to-end |
+| 5 | Kitchen & Staff: order lifecycle, KDS, phục vụ, service request | Demo: Kitchen → Staff luồng đầy đủ |
+| 6 | Manager & Billing: CRUD quản lý, Reservation, Billing, Payment, Dashboard | Demo: thanh toán → Dining Session COMPLETED |
 | 7 | Testing: functional, role permission, state transition, concurrency (duplicate order, optimistic locking), security | Test Report |
 | 8 | Deployment & Defense: deploy, seed data, tài liệu, demo script, tập dượt bảo vệ | Final Package + Presentation |
 
@@ -282,34 +267,32 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 | Rủi ro | Biện pháp |
 |--------|-----------|
-| Reservation Scheduler chạy sai giờ hoặc bỏ sót khi server restart | Test Scheduler với thời gian rút ngắn (5 phút thay vì 45 phút) ngay từ Sprint 5. Dùng `@Scheduled` + `@Transactional`, Spring tự chạy lại sau restart — không cần lo mất event |
-| Real-time (WebSocket) tốn effort ngoài dự kiến | Dùng polling 2s cho đến hết Sprint 6. Chỉ nâng cấp WebSocket nếu Sprint 7 còn buffer time. KDS vẫn hoạt động tốt với polling |
-| Concurrency chỉ "nói trên giấy", không implement thật | Bắt buộc code + test thật cho Duplicate Order (Idempotency Key) và 1 case Optimistic Locking, đưa vào Test Report có bằng chứng (log, test case) |
-| QR/Table token bị làm giả hoặc bypass | Backend validate HMAC-SHA256 token mọi request — không tin `tableId`/`sessionId` do Frontend tự gửi |
-| Sprint 5 quá tải khi gánh cả Kitchen + Reservation | Nếu Reservation chưa xong cuối Sprint 5: chỉ cần phần Create + Auto-release chạy được; Check-in hoàn thiện đầu Sprint 6 |
-| Không rõ phân công cá nhân dẫn đến overlap | Mỗi người phụ trách module riêng biệt, tạo branch theo tên `feature/<tên-module>`, không làm chung file mà không có PR review |
+| Scope 15 module MUST HAVE quá tải so với thời gian | Nếu tới cuối Sprint 4 chưa demo được luồng Customer end-to-end, xin giảm scope ngay (gộp Category vào Food Management, hoãn Dashboard) thay vì cố ôm hết |
+| Real-time (WebSocket) tốn effort ngoài dự kiến | Làm polling đơn giản trước (Customer tự refresh trạng thái mỗi vài giây), nâng cấp WebSocket/STOMP sau nếu còn thời gian |
+| Concurrency chỉ "nói trên giấy", không implement thật | Bắt buộc code + test thật cho Duplicate Order và 1 case optimistic locking, đưa vào Test Report có bằng chứng (log, test case) |
+| QR/Table token bị làm giả hoặc bypass | Backend validate token mọi request, không tin dữ liệu frontend gửi lên |
+| Thiếu NFR cụ thể trong SRS | Bổ sung ít nhất: số concurrent user mục tiêu, response time kỳ vọng, JWT expiry/rate limit cơ bản |
+| Không rõ phân công cá nhân | Lập bảng phân công theo module ngay từ Sprint 1, cập nhật mỗi sprint |
 
 ---
 
-## 14. Phân công vai trò
+## 14. Phân công vai trò (mẫu — điền theo nhóm thực tế)
 
-| Thành viên | Module phụ trách chính | Module hỗ trợ | Tài liệu phụ trách |
-|-----------|------------------------|---------------|--------------------|
-| _(điền tên)_ | Auth + RBAC + Table + QR + Dining Session | Reservation (phần Session creation) | ERD, Use Case Diagram |
-| _(điền tên)_ | Menu + Category + Cart + Order + KDS | Unit Testing, CI setup | Activity Diagram, API Design |
-| _(điền tên)_ | Reservation (full) + Billing + Payment + Dashboard | Deployment, Seed data | Domain Model, Test Report |
+| Thành viên | Module phụ trách chính | Module hỗ trợ |
+|-----------|------------------------|----------------|
+| _(điền tên)_ | Auth + Role-based Authorization | Testing |
+| _(điền tên)_ | Table + QR + Dining Session | Documentation |
+| _(điền tên)_ | Menu + Category + Cart + Order | Kitchen module |
+| _(điền tên)_ | Kitchen Processing + Staff module | Real-time |
+| _(điền tên)_ | Billing + Payment + Dashboard | Deployment |
 
 ---
 
 ## Tiêu chí tự đánh giá trước khi nộp
 
-- [ ] Demo được **Kịch bản A** (QR Walk-in): QR → Order → Kitchen → Staff → Bill → Payment không lỗi
-- [ ] Demo được **Kịch bản B** (Reservation): Đặt bàn → Lock table → Check-in → Dining Session → COMPLETED
-- [ ] Demo được **no-show auto-release**: Reservation không check-in → Scheduler tự release table
+- [ ] Có thể demo end-to-end: QR → Order → Kitchen → Staff → Bill → Payment mà không lỗi
 - [ ] Mọi transition trạng thái Order được backend kiểm tra hợp lệ (không cho nhảy trạng thái tùy ý)
-- [ ] Có ít nhất 2 conflict scenario được xử lý thật và có test case chứng minh (Idempotency + Optimistic Lock)
-- [ ] Bill tính theo giá snapshot (BR-17) — Manager đổi giá sau, bill cũ không thay đổi
-- [ ] SRS, NFR, Business Rules đầy đủ và nhất quán
-- [ ] Có bảng phân công đầy đủ theo module, cập nhật đến sprint cuối
-- [ ] Tài liệu tách rõ CORE MUST/SHOULD/CẮT, không có feature "làm nửa vời" trong bản nộp
-- [ ] Thành viên đã điền tên thật vào Mục 14
+- [ ] Có ít nhất 2 conflict scenario được xử lý thật và có test case chứng minh
+- [ ] SRS có bảng NFR cụ thể (không chỉ functional requirement)
+- [ ] Có bảng phân công cá nhân theo module, cập nhật đến sprint cuối
+- [ ] Tài liệu tách rõ MUST/SHOULD/FUTURE, không có feature "làm nửa vời" trong bản nộp
