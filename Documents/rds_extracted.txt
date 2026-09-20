@@ -71,28 +71,33 @@ I. Overview4
 1. User Requirements4
 1.1 Actors4
 1.2 Use Cases5
-2. Overall Functionalities10
-2.1 Screens Flow10
+2. Overall Functionalities11
+2.1 Screens Flow11
 2.2 Screen Descriptions11
 2.3 Screen Authorization14
 2.4 Non-UI Functions16
 3. System High Level Design17
 3.1 Database Design17
 3.2 Code Packages20
-II. Requirement Specifications23
-1. Common Functions23
+II. Requirement Specifications24
+1. Common Functions24
 2. Customer Ordering & In-Dining Feature26
-3. Floor Service & Kitchen KDS Feature31
-4. Cashier Billing & Administration Feature33
-III. Design Specifications36
-1. <<Feature Name>>36
-1.1 <<SubFeature Name>>36
-1.2 System Access37
-IV. Appendix41
-1. Assumptions & Dependencies41
-2. Limitations & Exclusions41
-3. Business Rules41
-4. ..42
+3. Floor Service & Kitchen KDS Feature34
+4. Cashier Billing & Administration Feature37
+III. Design Specifications39
+1. Authentication & System Access39
+2. Table QR & Dining Session Management40
+3. Digital Menu Operations & Batch Ordering43
+4. Kitchen Order Processing (KDS)46
+IV. Appendix49
+1. Assumptions & Dependencies49
+1.1 Assumptions49
+1.2 Dependencies49
+2. Limitations & Exclusions50
+2.1 Excluded Features50
+2.2 Technical & Operational Limitations51
+3. Business Rules51
+4. ..52
 I. Overview
 1. User Requirements
 1.1 Actors
@@ -832,6 +837,74 @@ BR-04 (Valid Items Requirement): An order must contain at least one valid menu i
 BR-12 (Explicit Customer Confirmation): Recommended or upsold dishes must never be automatically added to the cart without explicit customer confirmation.
 BR-14 (Session Association): Every submitted batch order must strictly belong to exactly one valid, active DiningSession.
 Concurrency Protection: Duplicate order submissions caused by double-clicking or network latency are blocked via unique client-side UUID idempotency keys.
+2.3 UC-27_Manage Reservation & Check-in
+a. Functional Description
+UC ID and Name
+UC-27_Manage Reservation & Check-in
+Created By
+ROMS Development Team
+Date Created
+16/09/2026
+Primary Actor
+Customer (Online Diner), Waiter / Receptionist (Staff)
+Secondary Actors
+Restaurant Manager, System (Reservation Scheduler FN-05, Floor Table Map)
+Description
+Allows customers or staff to book a dining table in advance for a future timestamp with customer party size and contact info. When customers arrive, staff verifies the booking and performs Check-in, transitioning the table to OCCUPIED and generating an active Dining Session. Unattended bookings exceeding the grace period are automatically expired by the system scheduler.
+Trigger
+Customer submits booking on restaurant portal, or walks in/phones in to staff.
+Preconditions
+1. Selected booking time must be in the future (BR-15).
+2. Restaurant has at least one table with capacity >= requested party size available during the requested time window.
+Postconditions
+1. Reservation record created with status CONFIRMED.
+2. At lock-in window (15 mins prior), table status marked as RESERVED on Floor Map (BR-13).
+3. Upon successful Check-in: Reservation status becomes CHECKED_IN, table becomes OCCUPIED, and a new active DiningSession is initialized (BR-01).
+Normal Flow
+Phase 1: Table Booking
+1. Customer/Staff selects date, arrival time, party size (number of guests), customer name, phone number, and optional dining notes.
+2. Backend validates that booking timestamp > current server time (BR-15).
+3. Backend checks table availability and allocates suitable table matching capacity.
+4. Customer confirms booking details.
+5. Backend creates Reservation record (status: CONFIRMED) and generates a unique Booking Reference Code.
+6. System displays confirmation details and sends booking confirmation.
+Phase 2: Arrival & Check-in
+7. 15 minutes before scheduled arrival, background service marks table status as RESERVED on the Live Table Map (BR-13).
+8. Customer arrives at restaurant and presents phone number or Booking Code to staff.
+9. Staff opens Reservation list, searches booking, and taps "Check-in".
+10. Backend verifies booking is still valid (CONFIRMED).
+11. Backend updates Reservation status to CHECKED_IN.
+12. Backend automatically initializes a new DiningSession (status: ACTIVE) for the table (BR-01) and sets table to OCCUPIED.
+13. Waiter escorts guests to table; guests scan tabletop QR code to order.
+Alternative Flows
+3a. Customer Self-Cancellation:
+1. Customer cancels booking at least 1 hour before scheduled arrival.
+2. System updates Reservation to CANCELLED, releases any held table slot.
+8a. Early Arrival Check-in:
+1. Guests arrive earlier than scheduled window.
+2. If assigned table is clean and available, staff manually triggers check-in early.
+Exceptions
+2a. Past Timestamp Submitted (BR-15):
+1. Client submits booking time in the past.
+2. Backend rejects request with HTTP 400 Bad Request: "Reservation time must be in the future."
+3a. Fully Booked / Capacity Exceeded:
+1. No tables available matching party size for selected slot.
+2. System alerts: "No tables available for this time slot. Please choose another time."
+7a. No-Show Auto-Release (FN-05 / BR-13):
+1. Current time exceeds scheduled arrival by more than 20 minutes without check-in.
+2. Scheduler FN-05 automatically transitions Reservation status from CONFIRMED to EXPIRED.
+3. Table status resets from RESERVED back to AVAILABLE.
+Priority
+High / Must Have
+Frequency of Use
+Daily (Prior to meal shifts and customer arrivals)
+Assumptions
+Basic reservation without advance financial deposit; table allocation is held up to 20 minutes grace period.
+b. Business Rules
+BR-13 (Reservation Protection): A table marked as RESERVED must not be assigned or claimed by walk-in customers during its active reservation window (commencing 15 minutes prior to scheduled arrival).
+BR-15 (Future Booking Guard): A Reservation can only be created for a future date and time. Any reservation request with a past timestamp must be rejected immediately by backend validation with HTTP 400 Bad Request.
+FN-05 (Scheduled Auto-Release / No-Show Rule): The background scheduler scans upcoming table reservations every 5 minutes. If a reservation is not checked in within 20 minutes past the scheduled arrival time, the system automatically transitions the status to EXPIRED and restores the table status to AVAILABLE.
+BR-01 (Single Active Session on Check-in): Successful check-in instantly binds the table to a single active DiningSession with status ACTIVE and marks the table as OCCUPIED. Walk-ins or duplicate sessions cannot be created on that table until checkout is completed.
 3. Floor Service & Kitchen KDS Feature
 3.1 UC-22 & UC-23_Kitchen Order Processing (KDS)
 a. Functional Description
@@ -1177,8 +1250,98 @@ WHERE id = ? AND version = ? AND status = 'CONFIRMED';
 UPDATE order_items 
 SET status = 'READY', version = version + 1 
 WHERE id = ? AND version = ? AND status = 'PREPARING';
+5. Table Reservation & Check-in Management
+5.1 Reservation Booking & Reception Desk (SCR-17 & SCR-18)
+a. Table Reservation & Reception Desk (SCR-18)
+This screen is used by restaurant staff and hostesses at the reception desk to manage guest reservations, view upcoming bookings, filter by date and reservation status, assign suitable dining tables, and perform check-in when guests arrive. It also interfaces with the customer-facing reservation portal (SCR-17) to process advance booking submissions and enforce business rules (future booking validation, reservation holding window, and automated no-show release).
+Related use cases:
+UC-27_Manage Reservation & Check-in
+UC-07_Manage Restaurant Tables
+UI Design
+<<Mockup prototype>>
+Field Name
+Field Type
+Description
+Booking Date & Time Picker
+Date & Time Selector
+Selects target dining date and time. Validation: Must be strictly in the future (BR-15).
+Party Size Stepper
+Numeric Stepper (1-20)
+Number of arriving guests. Used to query and allocate dining tables with adequate capacity.
+Customer Name*
+Text Box
+Mandatory customer contact name (2-50 characters). Displays on booking card.
+Phone Number*
+Text Box
+Mandatory phone number (10 digits). Primary search identifier for reception check-in desk.
+Dining Notes
+Text Box
+Optional special dining requests (e.g., high chair, window seat, celebration). Max 200 characters.
+Table Allocation Dropdown
+Select Dropdown
+Lists available restaurant tables with capacity >= party size for selected dining window.
+Status Filter Tabs
+Tab Bar
+Filters reservation list by operational status: ALL, CONFIRMED, CHECKED_IN, EXPIRED, CANCELLED.
+"Check-in" Button
+Button (Primary Green)
+Staff taps upon customer arrival: transitions Reservation to CHECKED_IN, sets table to OCCUPIED, and generates active DiningSession (BR-01).
+"Cancel Booking" Button
+Button (Secondary Red)
+Staff or customer cancels booking. Prompts confirmation dialog and releases reserved table slot.
+Search & Lookup Bar
+Search Input
+Quick real-time filter across reservations by customer name, phone number, or booking reference code.
+Database Access
+Table
+CRUD
+Description
+reservations
+C, R, U
+Inserts advance table bookings, queries reservations by date and phone number, and updates status to CHECKED_IN, EXPIRED, or CANCELLED.
+dining_tables
+R, U
+Queries tables by capacity; checks availability; updates status to RESERVED during lock-in window and to OCCUPIED upon check-in.
+dining_sessions
+C
+Creates a new active Dining Session record for the table upon successful customer check-in.
+audit_logs
+C
+Records audit trail entries when a booking is cancelled, modified, or auto-expired by the background scheduler.
+SQL Commands:
+1/ Query available tables matching party size for target time slot:
+SELECT dt.id, dt.table_number, dt.capacity, dt.area_zone, dt.status
+FROM dining_tables dt
+WHERE dt.capacity >= ? AND dt.status = 'AVAILABLE'
+  AND dt.id NOT IN (
+      SELECT r.table_id
+      FROM reservations r
+      WHERE r.status = 'CONFIRMED'
+        AND r.reservation_time BETWEEN DATEADD(minute, -60, ?) AND DATEADD(minute, 60, ?)
+  )
+ORDER BY dt.capacity ASC;
+2/ Create new table reservation (SCR-17 Customer / Staff Booking):
+INSERT INTO reservations (customer_name, phone_number, party_size, reservation_time, note, table_id, status, created_at)
+VALUES (?, ?, ?, ?, ?, ?, 'CONFIRMED', NOW());
+3/ Perform Customer Check-in at Reception Desk (Executed in atomic transaction):
+-- Step A: Transition reservation status to CHECKED_IN
+UPDATE reservations
+SET status = 'CHECKED_IN', updated_at = NOW()
+WHERE id = ? AND status = 'CONFIRMED';
+-- Step B: Automatically initialize new active Dining Session for table (BR-01)
+INSERT INTO dining_sessions (table_id, guest_count, start_time, status)
+VALUES (?, ?, NOW(), 'ACTIVE');
+-- Step C: Update table status to OCCUPIED on Live Table Map
+UPDATE dining_tables
+SET status = 'OCCUPIED'
+WHERE id = ?;
+4/ Scheduled Reservation Auto-Release (Background cron job FN-05 executing periodically):
+UPDATE reservations
+SET status = 'EXPIRED', updated_at = NOW()
+WHERE status = 'CONFIRMED'
+  AND reservation_time < DATEADD(minute, -20, NOW());
 IV. Appendix
-1. Assumptions & Dependencies
+Assumptions & Dependencies
 1.1 Assumptions
 ID
 Assumption Title
