@@ -1,1 +1,6 @@
+# Scratch directory
+scratch/
 
+# Office temporary files
+~$*.pptx
+~$*.docx
