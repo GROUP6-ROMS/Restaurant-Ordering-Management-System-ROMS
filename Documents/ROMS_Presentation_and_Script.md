@@ -1,7 +1,8 @@
 # TÀI LIỆU THUYẾT TRÌNH DỰ ÁN & BÁO CÁO RDS (REQUIREMENT & DESIGN SPECIFICATION)
 ## DỰ ÁN: RESTAURANT ORDERING MANAGEMENT SYSTEM (ROMS)
 **Môn học:** SWP391 — Software Development Project | **Đại học FPT**  
-**File thuyết trình đính kèm:** `Documents/ROMS_Project_and_RDS_Overview.pptx`  
+**File thuyết trình Tiếng Việt:** `Documents/ROMS_Project_and_RDS_Overview_VN.pptx` (và `Documents/ROMS_Bao_Cao_Tong_Quan_va_RDS_Tieng_Viet.pptx`)  
+**File thuyết trình Tiếng Anh:** `Documents/ROMS_Project_and_RDS_Overview.pptx`  
 **Bộ nhận diện & Màu chủ đề:** Logo gốc `Documents/ROMS_Logo_Exact.svg` — Terracotta Burnt Orange (`#BD593A`), Deep Charcoal (`#221C1A`), Warm Amber (`#D9822B`), Ivory Background (`#FCFBF6`).  
 **Tập hình ảnh minh họa:** Trích xuất nguyên bản từ `Documents/rds_images/` (`image1.png` → `image13.png`).
 
@@ -191,10 +192,10 @@ Slide deck được thiết kế theo tỷ lệ chuẩn **16:9 Widescreen**, đ�
 ### Slide 14: Staff Authentication & Role-Based Governance
 - **Category:** `4. PROTOTYPE & USER INTERACTION`
 - **Title:** `Staff Authentication & Role-Based Governance`
-- **Subtitle:** `Secure access control, shift token management, and executive analytics oversight`
+- **Subtitle:** `Secure access control, role-based authorization, and executive analytics oversight`
 - **Left Embedded Mockup:** `image9.png` *(Staff Authentication & Assigned Role Dashboard)*
 - **Right Administrative Highlights:**
-  - *Shift-Based JWT Authentication:* 8-hour token validity matching restaurant work shifts.
+  - *Role-Based Staff Authentication:* Staff authenticate via username/password verified securely via BCrypt. System validates credentials and enforces strict role-based access control (RBAC).
   - *Dynamic Role Redirection:* Automatic routing based on role (Waiter → Floor Map; Kitchen → KDS; Cashier → Billing; Manager → Full Portal).
   - *Brute-Force Login Protection:* Max 5 failed logins per minute per IP address.
   - *Executive Analytics:* Daily net sales, table turnover ratios, kitchen prep duration, and top dishes.
@@ -207,7 +208,7 @@ Slide deck được thiết kế theo tỷ lệ chuẩn **16:9 Widescreen**, đ�
 - **Subtitle:** `Measurable engineering benchmarks ensuring enterprise-grade performance and security`
 - **4 Benchmark Cards:**
   - *Performance:* API latency < 500 ms; QR verification < 300 ms; KDS sync < 2 s; 50 concurrent users.
-  - *Security:* HMAC-SHA256 QR validation; JWT + RBAC; BCrypt password hashing (10 rounds); Jakarta Validation.
+  - *Security:* HMAC-SHA256 QR validation; Strict RBAC authorization; BCrypt password hashing (10 rounds); Jakarta Validation.
   - *Usability:* Mobile-first (360px-414px); 10-inch tablet KDS readable from 60 cm; Vietnamese friendly error toasts.
   - *Reliability & Concurrency:* Idempotency deduplication; JPA `@Version` Optimistic Locking; 99% uptime.
 
@@ -277,15 +278,52 @@ Slide deck được thiết kế theo tỷ lệ chuẩn **16:9 Widescreen**, đ�
 ---
 
 ### [SLIDE 3: PROJECT SCOPE & ARCHITECTURAL PHILOSOPHY]
-> **Hành động:** [Chuyển sang Slide 3] Giọng dứt khoát, tự tin, chỉ tay vào bảng Scope Matrix bên trái.
+> **Thời lượng chuẩn:** 2 phút 00 giây – 2 phút 30 giây.  
+> **Phong thái:** Đĩnh đạc, dứt khoát, ánh mắt tự tin nhìn thẳng vào các thầy cô phản biện; giọng điệu mang tính định hướng kiến trúc (Architectural Conviction).  
+> **Cử chỉ:** Chỉ tay sang cột bên trái **Scope Matrix**, sau đó di chuyển tay sang cột bên phải **Core Philosophy** khi chuyển luận điểm.
 
-*"Thưa thầy cô, với quy mô nhóm 3 thành viên trong thời lượng 6 tuần thực hiện đồ án SWP391, nhóm em quán triệt nguyên tắc vàng: **Thà làm ít tính năng mà hoạt động ổn định 100%, có xử lý concurrency và bảo mật thật, còn hơn ôm đồm quá nhiều tính năng mà chạy lỗi trên sân khấu.***
+*(Mở đầu chuyển ý từ Slide 2 sang Slide 3)*  
+*"Kính thưa các thầy cô trong hội đồng, từ những bài toán vận hành nhức nhối vừa nêu ở Slide 2, câu hỏi lớn nhất đặt ra cho nhóm phát triển là: **Làm thế nào để giải quyết triệt để các vấn đề này trong giới hạn một đồ án môn học 6 tuần với nhân sự chỉ vỏn vẹn 3 thành viên?** [Nghỉ 1 giây]*
 
-*Nhóm em đã phân định ranh giới Scope cực kỳ minh bạch:*
-* **Phần Core Must-Have (bắt buộc hoàn thành 100%):** Bao gồm Đăng nhập phân quyền RBAC; Quản lý bàn và xác thực mã QR bảo mật bằng chữ ký số HMAC-SHA256; Vòng đời Dining Session; Quản lý thực đơn Menu; Giỏ hàng và đặt món theo đợt chống trùng lặp; Màn hình bếp KDS; Bản đồ bàn trực tiếp cho phục vụ; Tính hóa đơn kèm thuế VAT 8% và thanh toán VietQR; cùng hệ thống đặt bàn trước có tự động hủy khi quá giờ.
-* **Phần Out-of-Scope (cắt bỏ hoàn toàn):** Nhóm không làm hệ thống chuỗi nhiều chi nhánh Multi-tenant, không làm App di động cài đặt (mà tập trung 100% Mobile Web), không làm nạp tiền cọc online phức tạp để dồn toàn lực bảo vệ luồng nghiệp vụ lõi.*
+*Câu trả lời của nhóm em nằm trọn vẹn trong Slide số 3 này: **Xác định ranh giới MVP chuẩn xác và kiên định với triết lý thiết kế hướng chất lượng.**"*
 
-*Đặc biệt, về mặt triết lý thiết kế, nhóm em xác định: **'Dining Session' — Phiên dùng bữa — chính là trái tim của toàn bộ hệ thống**. Bàn ăn chỉ là vật thể vật lý, còn Dining Session mới là đối tượng trung tâm quản lý nhiều thực khách cùng ngồi, gom các đợt gọi món, và chốt lại duy nhất một hóa đơn thanh toán."*
+*(Chỉ tay vào Card bên trái — Scope Matrix)*  
+*"Thưa thầy cô, đối với một đồ án SWP391, sai lầm lớn nhất của sinh viên thường là 'feature creep' — vẽ ra quá nhiều tính năng rồi cuối kỳ nộp sản phẩm chắp vá, lỗi tè le khi demo. Nhóm em quán triệt một tuyên ngôn hành động ngay từ ngày đầu:*  
+> **'Thà làm một tập tính năng vừa đủ nhưng chạy mượt mà 100%, bảo mật chuẩn chỉ và xử lý xung đột đồng thời (concurrency) tận gốc, còn hơn ôm đồm một đống tính năng nửa vời rồi crash trên sân khấu.'**
+
+*Chính vì vậy, nhóm em phân định ranh giới Scope cực kỳ dứt khoát thành hai phần rõ rệt:*
+
+* **Thứ nhất — Về phần Core Must-Have (Cam kết hoàn thiện 100%):** Nhóm tập trung tối đa nguồn lực vào đúng 8 mắt xích tạo nên **một chu trình vận hành khép kín (End-to-End Operational Loop)**:
+  1. Xác thực và phân quyền nhân viên chuẩn RBAC;
+  2. Định danh và bảo vệ bàn ăn bằng mã QR có **chữ ký số HMAC-SHA256** chống giả mạo;
+  3. Quản lý trọn vẹn vòng đời một **Dining Session**;
+  4. Quản lý thực đơn và danh mục món ăn;
+  5. Giỏ hàng và đặt món theo đợt (Batch Ordering) có **khóa Idempotency Key** chống bấm đúp;
+  6. Màn hình điều phối bếp **KDS** theo hàng đợi thời gian thực;
+  7. Bản đồ bàn trực quan cho nhân viên phục vụ sảnh;
+  8. Tổng hợp hóa đơn, tính thuế VAT 8% theo chuẩn kế toán Việt Nam, thanh toán **Dynamic VietQR**, và cơ chế đặt bàn trước tự động giải phóng bàn nếu khách không đến.
+
+* **Thứ hai — Về phần Out-of-Scope (Chủ động cắt bỏ có tính toán):** Để bảo vệ tiến độ và chất lượng kỹ thuật, nhóm em **từ chối 4 tính năng** thường gây bẫy thời gian:
+  1. *Không làm hệ thống chuỗi Multi-tenant:* ROMS được thiết kế tối ưu hóa chuyên sâu cho một nhà hàng độc lập quy mô 20–50 bàn. Chúng em không muốn lãng phí 2 tuần vào việc thiết lập tenant isolation và sharding cơ sở dữ liệu.
+  2. *Không làm ứng dụng di động cài đặt (Native Mobile App):* Trong ngành F&B thực tế, không có thực khách nào muốn tải một app 100MB chỉ để gọi 2 cốc nước và một đĩa mì. Nhóm dồn 100% nỗ lực vào **Mobile Web Responsive** — khách chỉ cần mở camera quét là gọi món ngay lập tức, triệt tiêu mọi ma sát trải nghiệm.
+  3. *Không làm cổng nạp tiền cọc / trung gian thanh toán trực tuyến phức tạp:* Văn hóa ẩm thực Việt Nam là thanh toán sau khi dùng bữa. Nhóm sử dụng giải pháp **VietQR động chuyển khoản 24/7 trực tiếp vào tài khoản nhà hàng**, vừa thực tế, vừa không mất phí cổng trung gian.
+  4. *Không làm tích điểm thành viên (Loyalty Points):* Tránh làm phình to mô hình dữ liệu để tập trung toàn lực kiểm thử độ ổn định của luồng đặt món."*
+
+*(Chỉ tay sang Card bên phải — Core Philosophy)*  
+*"Bên cạnh ranh giới phạm vi, linh hồn của dự án ROMS nằm ở **3 Triết lý Kiến trúc cốt lõi** bên phải màn hình:*
+
+* **Triết lý 1: 'Dining Session' là trái tim trung tâm của toàn bộ hệ thống.**  
+  *Thưa thầy cô, đây là sự khác biệt giữa tư duy làm bài tập và tư duy thiết kế phần mềm thực tế. Nếu thiết kế sơ sài, người ta sẽ gắn đơn hàng trực tiếp vào Bàn (`Table`). Nhưng Bàn ăn chỉ là một vật thể vật lý vô tri ngoài đời thực. Thực thể mang tính sống còn là **Dining Session (Phiên dùng bữa)**.  
+  Một bàn có thể có nhiều người cùng ngồi quét mã; trong 2 tiếng ngồi ăn, khách có thể gọi 3 đợt món khác nhau; và cuối cùng thu ngân chỉ thu đúng một hóa đơn. Toàn bộ logic ràng buộc ai được đặt món, bếp nấu cho ai, và thu ngân in hóa đơn nào... đều xoay quanh vòng đời của Dining Session từ lúc OPEN đến CLOSED. Thiết kế này giúp hệ thống sẵn sàng xử lý mượt mà các tình huống đổi bàn, gộp bàn mà không bao giờ bị loạn đơn.*
+
+* **Triết lý 2: Mã QR chỉ là cánh cổng vào (Entry Point), tuyệt đối không phải là sản phẩm.**  
+  *Nhiều người lầm tưởng mã QR chỉ là một đường link dẫn tới trang web tĩnh. Với ROMS, mã QR là một cơ chế xác thực vị trí vật lý. Đường link QR chứa mã bàn kết hợp với chữ ký bảo mật **HMAC-SHA256**. Khách không thể ngồi ở nhà tự gõ `tableId=5` hay chụp ảnh mã QR cũ mang về nhà để đặt món phá hoại nhà hàng.*
+
+* **Triết lý 3: Chất lượng kỹ thuật hơn số lượng tính năng (Quality over Quantity).**  
+  *Nhóm em ưu tiên dành chất xám để giải quyết các bài toán hóc búa về tính toàn vẹn dữ liệu: Làm sao để mạng chập chờn khách bấm 5 lần nút Đặt món mà bếp chỉ nhận 1 đơn? Đó là nhờ **Idempotency Key**. Làm sao để hai phục vụ cùng chỉnh sửa một bàn không bị ghi đè dữ liệu? Đó là nhờ cơ chế **Optimistic Locking (`@Version`)**. Đó chính là đẳng cấp kỹ thuật mà nhóm hướng tới trong đồ án này.*
+
+*(Câu kết dứt khoát, mở đường sang Slide 4)*  
+*Và để hiện thực hóa triết lý kiến trúc cùng phạm vi nghiệp vụ khép kín này, hệ thống phân chia trách nhiệm và quyền hạn của từng con người trong nhà hàng ra sao? Em xin kính mời quý thầy cô cùng theo dõi **Slide số 4: System Actors & Role-Based Access Control**!"*
 
 ---
 
@@ -402,7 +440,7 @@ Slide deck được thiết kế theo tỷ lệ chuẩn **16:9 Widescreen**, đ�
 > **Hành động:** [Chuyển sang Slide 14] Chỉ vào giao diện đăng nhập và Dashboard `image9.png`.
 
 *"Hình ảnh trên màn hình minh họa giao diện xác thực và bảng điều khiển quản trị:
-* Nhân viên đăng nhập bằng tài khoản và mật khẩu được mã hóa an toàn bằng thuật toán **BCrypt**. Sau khi xác thực thành công, hệ thống cấp phát token JWT có thời hạn 8 tiếng — tương ứng với đúng 1 ca làm việc của nhân viên.
+* Nhân viên đăng nhập trực tiếp bằng tài khoản và mật khẩu nội bộ được băm bảo mật an toàn bằng thuật toán **BCrypt**. Hệ thống xác thực danh tính tức thì và kích hoạt phân quyền vai trò (RBAC) theo ca làm việc.
 * Hệ thống tự động điều hướng thông minh theo quyền: Phục vụ vào thẳng Bản đồ bàn, Đầu bếp vào thẳng KDS, Thu ngân vào thẳng Hóa đơn, và Quản lý vào trang Dashboard thống kê doanh thu trong ngày, số lượng món bán chạy nhất và tỷ lệ lấp đầy bàn."*
 
 ---
@@ -412,7 +450,7 @@ Slide deck được thiết kế theo tỷ lệ chuẩn **16:9 Widescreen**, đ�
 
 *"Để đảm bảo phần mềm hoạt động trơn tru trong môi trường thực tế, tài liệu RDS của nhóm em cam kết 4 bộ chỉ số phi chức năng có thể đo lường được:
 * **Hiệu năng (Performance):** Thời gian phản hồi API trung bình dưới 500ms; thời gian xác thực mã QR dưới 300ms; độ trễ cập nhật đơn hàng lên KDS dưới 2 giây; hệ thống chịu tải mượt mà với 50 người dùng đồng thời trong giờ cao điểm của 1 nhà hàng.
-* **Bảo mật (Security):** Toàn bộ API được bảo vệ bởi bộ lọc JWT và phân quyền RBAC; mật khẩu nhân viên băm muối bằng BCrypt; giới hạn Brute-force tối đa 5 lần đăng nhập sai/phút trên một địa chỉ IP.
+* **Bảo mật (Security):** Toàn bộ API nội bộ được kiểm soát chặt chẽ theo phân quyền RBAC; mật khẩu nhân viên băm muối bằng BCrypt; giới hạn Brute-force tối đa 5 lần đăng nhập sai/phút trên một địa chỉ IP.
 * **Khả năng sử dụng (Usability):** Giao diện khách hàng thiết kế chuẩn Mobile-First cho màn hình điện thoại từ 360px đến 414px; giao diện KDS font chữ tối thiểu 16px đọc rõ từ khoảng cách 60cm; toàn bộ thông báo lỗi hiển thị bằng tiếng Việt thân thiện, tuyệt đối không văng mã lỗi 500 hay Stack Trace ra màn hình.
 * **Độ tin cậy (Reliability):** Áp dụng khóa lạc quan `@Version` để ngăn chặn hai nhân viên cùng chỉnh sửa một đơn hàng cùng lúc."*
 
