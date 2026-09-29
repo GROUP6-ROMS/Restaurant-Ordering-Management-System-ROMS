@@ -30,7 +30,7 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 |-------|-----------|
 | Backend | Java, Spring Boot, Spring Security, Spring Data JPA |
 | Database | Microsoft SQL Server |
-| Frontend | React (hoặc công nghệ nhóm thống nhất) |
+| Frontend | React |
 | API | RESTful API |
 
 > Ghi chú: kiến trúc real-time (Order status, KDS) cần chọn công nghệ cụ thể trong Sprint 3 — ví dụ WebSocket (STOMP over SockJS trong Spring) hoặc Server-Sent Events, tùy độ quen thuộc của nhóm với Spring ecosystem.
@@ -254,6 +254,7 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 ## 12. Milestone nghiệm thu
 
 - **M1 (cuối Sprint 2):** SRS + Use Case + Domain Model được duyệt.
+- **M-FREEZE (30/09/2026):** 🔒 **UI/UX Design Freeze (Baseline v1.0.0)** — Chính thức khóa 18 màn hình từ Stitch Project `8715052598064593406`. Chi tiết xem tại: **[docs/UI_DESIGN_FREEZE_SPEC.md](file:///d:/Documents/Ki_5/SWP391/Restaurant-Ordering-Management-System-ROMS-/docs/UI_DESIGN_FREEZE_SPEC.md)**.
 - **M2 (cuối Sprint 3):** ERD + API design hoàn chỉnh, review được kiến trúc trước khi code.
 - **M3 (cuối Sprint 4):** Demo thật — khách quét QR, đặt món, order vào hệ thống. Đây là mốc sống còn của dự án.
 - **M4 (cuối Sprint 5):** Demo luồng Kitchen nhận order → Staff phục vụ.
@@ -276,15 +277,15 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 
 ---
 
-## 14. Phân công vai trò (mẫu — điền theo nhóm thực tế)
+## 14. Phân công vai trò & Kế hoạch tác chiến từng ngày
 
-| Thành viên | Module phụ trách chính | Module hỗ trợ |
-|-----------|------------------------|----------------|
-| _(điền tên)_ | Auth + Role-based Authorization | Testing |
-| _(điền tên)_ | Table + QR + Dining Session | Documentation |
-| _(điền tên)_ | Menu + Category + Cart + Order | Kitchen module |
-| _(điền tên)_ | Kitchen Processing + Staff module | Real-time |
-| _(điền tên)_ | Billing + Payment + Dashboard | Deployment |
+> 📌 **Chi tiết toàn diện:** Xem kế hoạch phân công tác chiến chi tiết từng ngày (Day 1 đến Day 36) cho 3 thành viên tại file: **[KE_HOACH_THUC_HIEN_SWP391_ROMS.md](file:///d:/Documents/Ki_5/SWP391/Restaurant-Ordering-Management-System-ROMS-/docs/KE_HOACH_THUC_HIEN_SWP391_ROMS.md)**.
+
+| Thành viên | Vai trò & Module phụ trách chính | Màn hình Stitch (`8715052598064593406`) | Module hỗ trợ & Trách nhiệm QA |
+| :--- | :--- | :--- | :--- |
+| **Thành viên 1**<br>*(Team Lead / Core Architect)* | - Base Architecture, Docker Compose, MS SQL<br>- Security (JWT, RBAC), Dining Session Engine<br>- Order State Machine, Kitchen Display System (KDS)<br>- Xử lý Concurrency & Idempotency Key, SSE | `SCR-01` Staff Login<br>`SCR-15` Kitchen Display System (KDS) | - Code Review toàn bộ PR<br>- Unit Test State Machine & Concurrency<br>- Setup CI/CD & Deploy Demo Server |
+| **Thành viên 2**<br>*(Customer Experience Engineer)* | - Customer Mobile Experience (QR Scan HMAC)<br>- Menu số, Bộ lọc món, Chi tiết & Ghi chú món<br>- Quản lý Giỏ hàng, Gửi Order hàng loạt (Batch Order)<br>- Theo dõi trạng thái món thời gian thực (Live Tracking)<br>- Phân hệ Đặt bàn trước (Reservation) | `SCR-09` Table Welcome Screen<br>`SCR-10` Customer Mobile Menu<br>`SCR-11` Customer Order Tracking<br>`SCR-12` Customer Mobile Cart<br>`Reservation` Trang Đặt Bàn Online | - Tối ưu UX/UI Responsive Mobile (360-414px)<br>- Tối ưu hình ảnh món ăn, Lazy loading<br>- Unit Test QR Token Validator & Cart Logic |
+| **Thành viên 3**<br>*(Staff Operations & Billing)* | - Bồi bàn: Sơ đồ sảnh, Trạng thái bàn, Chuyển bàn, Đổi trạng thái<br>- Thu ngân: POS Terminal, Tính Bill, Tiền mặt + VNPay QR Sandbox<br>- Quản lý Két tiền & Đóng ca (Shift Handover)<br>- Quản trị Admin: CRUD Thực đơn, CRUD Nhân sự, Dashboard Doanh thu | `SCR-05` Waiter Terminal & Sơ đồ sảnh<br>`SCR-06` Chi tiết đơn & Gọi món tại bàn<br>`SCR-07` Chuyển bàn & Đổi trạng thái<br>`SCR-02` POS Terminal Thu Ngân<br>`SCR-03` Hóa đơn & Lịch sử POS<br>`SCR-04` Két tiền & Đóng ca<br>`SCR-21` Quản lý Nhân sự & Phân quyền<br>`SCR-22` Quản lý Thực đơn & Món ăn<br>`SCR-24` Báo cáo & Hiệu suất | - Thiết kế Database DDL & Migrations<br>- Xây dựng bộ Seed Data thực tế (≥10 bàn, 15 món)<br>- Unit Test luồng tính tiền hóa đơn |
 
 ---
 
