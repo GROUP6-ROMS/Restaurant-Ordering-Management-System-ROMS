@@ -220,21 +220,6 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 
 ---
 
-## 10. Timeline theo Sprint
-
-| Sprint | Nội dung chính | Deliverable |
-|------|------------------|-------------|
-| 1 | Requirement: Vision, Scope, Actor, FR/NFR, Business Rules, Use Case List | SRS v1 |
-| 2 | Analysis: Use Case Diagram + Spec, Activity Diagram, Domain Model, Conflict Scenarios | Analysis Document |
-| 3 | Architecture & Database: ERD, API Design, Auth Design | Design Document |
-| 4 | Customer Core: QR → Table → Dining Session → Menu → Cart → Order | Demo: khách đặt món end-to-end |
-| 5 | Kitchen & Staff: order lifecycle, KDS, phục vụ, service request | Demo: Kitchen → Staff luồng đầy đủ |
-| 6 | Manager & Billing: CRUD quản lý, Reservation, Billing, Payment, Dashboard | Demo: thanh toán → Dining Session COMPLETED |
-| 7 | Testing: functional, role permission, state transition, concurrency (duplicate order, optimistic locking), security | Test Report |
-| 8 | Deployment & Defense: deploy, seed data, tài liệu, demo script, tập dượt bảo vệ | Final Package + Presentation |
-
----
-
 ## 11. Thứ tự ưu tiên kỹ thuật (không đảo ngược)
 
 ```
@@ -261,32 +246,6 @@ Không làm Reservation/Dashboard/Chatbot trước khi luồng Order lõi (bư�
 - **M5 (cuối Sprint 6):** Demo trọn vẹn: QR → Order → Kitchen → Staff → Bill → Payment → Completed.
 - **M6 (cuối Sprint 7):** Test report, chứng minh xử lý được ít nhất 2 conflict scenario thật.
 - **M7 (cuối Sprint 8):** Bảo vệ.
-
----
-
-## 13. Rủi ro chính & biện pháp
-
-| Rủi ro | Biện pháp |
-|--------|-----------|
-| Scope 15 module MUST HAVE quá tải so với thời gian | Nếu tới cuối Sprint 4 chưa demo được luồng Customer end-to-end, xin giảm scope ngay (gộp Category vào Food Management, hoãn Dashboard) thay vì cố ôm hết |
-| Real-time (WebSocket) tốn effort ngoài dự kiến | Làm polling đơn giản trước (Customer tự refresh trạng thái mỗi vài giây), nâng cấp WebSocket/STOMP sau nếu còn thời gian |
-| Concurrency chỉ "nói trên giấy", không implement thật | Bắt buộc code + test thật cho Duplicate Order và 1 case optimistic locking, đưa vào Test Report có bằng chứng (log, test case) |
-| QR/Table token bị làm giả hoặc bypass | Backend validate token mọi request, không tin dữ liệu frontend gửi lên |
-| Thiếu NFR cụ thể trong SRS | Bổ sung ít nhất: số concurrent user mục tiêu, response time kỳ vọng, JWT expiry/rate limit cơ bản |
-| Không rõ phân công cá nhân | Lập bảng phân công theo module ngay từ Sprint 1, cập nhật mỗi sprint |
-
----
-
-## 14. Phân công vai trò & Kế hoạch tác chiến Backend-First từng ngày
-
-> 📌 **Chiến lược tiếp cận:** **BACKEND-FIRST (Giai đoạn 1: Xây 100% Backend API vững chắc → Giai đoạn 2: Ghép nối 18 màn hình Frontend React → Giai đoạn 3: E2E Demo & Bảo vệ)**.  
-> Chi tiết từng ngày (Day 01 đến Day 36) cho 3 thành viên xem tại: **[docs/KE_HOACH_THUC_HIEN_SWP391_ROMS.md](file:///d:/Documents/Ki_5/SWP391/Restaurant-Ordering-Management-System-ROMS-/docs/KE_HOACH_THUC_HIEN_SWP391_ROMS.md)**.
-
-| Thành viên | Giai đoạn 1 (Tuần 1-3): 100% Backend APIs | Giai đoạn 2 (Tuần 4-5): Frontend React (Stitch UI) | Giai đoạn 3 (Tuần 6): Testing & Defense |
-| :--- | :--- | :--- | :--- |
-| **Thành viên 1**<br>*(Team Lead / Core Architect)* | - Base Architecture, Docker Compose, MS SQL<br>- Security (JWT, RBAC), Dining Session Engine<br>- Order State Machine, KDS APIs, SSE Realtime<br>- Xử lý Concurrency & Idempotency Key | - Khung React Vite, Axios, Auth Context<br>- `SCR-01` Staff Login Screen<br>- `SCR-15` Kitchen Display System (KDS) | - Đóng gói Docker Compose trọn gói<br>- Concurrency Testing (Optimistic Locking)<br>- Điều phối bảo vệ kỹ thuật |
-| **Thành viên 2**<br>*(Customer Experience Engineer)* | - Thuật toán sinh/kiểm tra mã QR HMAC-SHA256<br>- Menu & Category APIs, Upload ảnh món<br>- Cart Validation, Batch Order Placement DTO<br>- Đặt bàn trước (Reservation) & Auto-release Scheduler | - `Landing Page` & `Reservation` Online<br>- `SCR-09` Table Welcome Screen<br>- `SCR-10` Customer Mobile Menu<br>- `SCR-12` Customer Mobile Cart<br>- `SCR-11` Customer Order Tracking | - Tối ưu UX/UI Responsive Mobile (360-414px)<br>- Viết User Manual cho Khách hàng<br>- Phụ trách Demo trên điện thoại thật |
-| **Thành viên 3**<br>*(Staff Operations & Billing)* | - Thiết kế Schema MS SQL DDL & Master Seed Data<br>- Sơ đồ sảnh Waiter, Chuyển bàn, Đổi trạng thái<br>- Billing Aggregation (chặn thanh toán BR-16)<br>- Cash Checkout + Tích hợp VNPay Webhook IPN<br>- Két tiền ca, Admin CRUD Nhân sự, Dashboard KPI | - `SCR-05` Waiter Terminal & Sơ đồ sảnh<br>- `SCR-06` Chi tiết đơn & Gọi món tại bàn<br>- `SCR-07` Chuyển bàn & Đổi trạng thái<br>- `SCR-02` POS Terminal Quầy Thu Ngân<br>- `SCR-03` Hóa đơn nhiệt & `SCR-04` Két tiền ca<br>- `SCR-21` Nhân sự, `SCR-22` Menu, `SCR-24` Dashboard | - Nạp bộ Seed Data thực tế (12 bàn, 20 món)<br>- Test kịch bản thanh toán Tiền mặt / VNPay<br>- Chuẩn bị tài liệu Database Document (ERD) |
 
 ---
 
