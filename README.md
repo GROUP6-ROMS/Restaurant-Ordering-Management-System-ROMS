@@ -85,7 +85,8 @@ Nguyên tắc cốt lõi xuyên suốt kế hoạch:
 
 ## 6. Functional Requirements (FR)
 | ID | Feature / Requirement | Actor | Priority |
-| **FR-01** | **Staff Authentication & RBAC:** Login/logout with role-based access (Waiter, Kitchen, Cashier, Manager). Bảng quyết định kiểm thử: **[docs/BANG_QUYET_DINH_AUTHENTICATION.md](docs/BANG_QUYET_DINH_AUTHENTICATION.md)** | Staff | Must Have |
+|:---|:---|:---:|:---:|
+| **FR-01** | **Staff Authentication & RBAC:** Login/logout with role-based access (Waiter, Kitchen, Cashier, Manager). | Staff | Must Have |
 | **FR-02** | **Table QR Verification:** Scan table QR to validate cryptographic token and resolve table identity. | Customer | Must Have |
 | **FR-03** | **Dining Session Management:** Initialize or join an active session; sync shared cart across diners at the same table. | Customer, System | Must Have |
 | **FR-04** | **Digital Menu Browsing:** View categorized food and drinks with prices, images, and live availability. | Customer | Must Have |

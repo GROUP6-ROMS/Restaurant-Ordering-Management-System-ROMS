@@ -1,4 +1,4 @@
-package com.swp391.roms;
+package com.romsteam.roms;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

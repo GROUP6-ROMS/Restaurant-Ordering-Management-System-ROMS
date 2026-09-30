@@ -1,4 +1,4 @@
-package com.swp391.roms;
+package com.romsteam.roms;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
