@@ -1,52 +1,192 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+		 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.1.1</version>
-		<relativePath/> <!-- lookup parent from repository -->
+		<version>3.4.5</version>
+		<relativePath/>
 	</parent>
+
 	<groupId>com.romsteam</groupId>
 	<artifactId>roms</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<name>roms</name>
+	<description>Restaurant Ordering Management System Backend</description>
+
 	<properties>
 		<java.version>21</java.version>
+		<!-- Gom version vào đây để dễ nâng cấp sau -->
+		<jjwt.version>0.12.6</jjwt.version>
+		<springdoc.version>2.6.0</springdoc.version>
 	</properties>
+
 	<dependencies>
+
+		<!-- ===================================================
+			 SPRING BOOT CORE STARTERS
+			 =================================================== -->
+
+		<!--
+			Web: giúp viết REST API (@RestController, @GetMapping...)
+			Đây là dependency QUAN TRỌNG NHẤT — không có thì không có API
+		-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter</artifactId>
+			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
+		<!--
+			Security: xác thực (authentication) + phân quyền (authorization)
+			Cần cho: JWT login, RBAC (Waiter/Kitchen/Manager không dùng chung API)
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		<!--
+			Data JPA: ORM — ánh xạ Java class ↔ bảng database
+			Thay vì viết SQL thủ công, ta dùng Repository interface
+			Ví dụ: orderRepository.findBySessionId(sessionId)
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!--
+			Validation: kiểm tra dữ liệu đầu vào ngay tại Controller
+			Ví dụ: @NotBlank, @Min(1), @Email trên các trường DTO
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- ===================================================
+			 DATABASE DRIVERS
+			 =================================================== -->
+
+		<!--
+			SQL Server JDBC driver
+			scope=runtime: chỉ cần khi chạy app, không cần khi compile
+		-->
+		<dependency>
+			<groupId>com.microsoft.sqlserver</groupId>
+			<artifactId>mssql-jdbc</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!--
+			H2: database trong bộ nhớ RAM
+			Dùng cho: chạy unit test mà không cần SQL Server thật
+		-->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- ===================================================
+			 TIỆN ÍCH
+			 =================================================== -->
+
+		<!--
+			Lombok: tự sinh getter/setter/constructor/builder bằng annotation
+			Thay vì viết 50 dòng getter/setter → chỉ cần @Data
+			optional=true: không bị lây sang project khác dùng thư viện này
+		-->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ===================================================
+			 JWT — JSON Web Token (xác thực không cần session)
+			 Cần 3 artifact vì JJWT tách riêng: API / Implementation / JSON parser
+			 =================================================== -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>${jjwt.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- ===================================================
+			 SWAGGER / API DOCUMENTATION
+			 Tự sinh trang tài liệu API tại: /swagger-ui.html
+			 =================================================== -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+
+		<!-- ===================================================
+			 TESTING
+			 =================================================== -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 	</dependencies>
 
 	<build>
 		<plugins>
+			<!--
+				Lombok cần khai báo ở đây để Java compiler nhận ra annotation
+				Nếu thiếu phần này, @Data/@Builder sẽ báo lỗi "cannot find symbol"
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+
+			<!-- Plugin build file .jar để deploy -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<!-- Loại Lombok ra khỏi file jar cuối — không cần khi chạy -->
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

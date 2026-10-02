@@ -1,4 +1,4 @@
-package com.romsteam.roms.enums;
+package com.romsteam.roms.entity.enums;
 
 public enum UserRole {
     MANAGER,
