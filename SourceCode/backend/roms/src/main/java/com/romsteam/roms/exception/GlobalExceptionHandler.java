@@ -15,6 +15,7 @@ import java.util.Map;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
     // 1. Xử lý lỗi không tìm thấy tài nguyên (HTTP 404)
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
@@ -22,6 +23,7 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));
     }
+
     // 2. Xử lý lỗi vi phạm quy tắc nghiệp vụ (HTTP 400)
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
@@ -29,6 +31,7 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
     }
+
     // 3. Xử lý lỗi dữ liệu đầu vào không hợp lệ khi dùng @Valid (@NotBlank, @NotNull, @Min...)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(MethodArgumentNotValidException ex) {
@@ -44,6 +47,7 @@ public class GlobalExceptionHandler {
                         .data(errors)
                         .build());
     }
+
     // 4. Bắt tất cả các lỗi bất ngờ còn lại (HTTP 500) - Không để lộ stack trace
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneralException(Exception ex) {
@@ -52,4 +56,3 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Hệ thống đã xảy ra lỗi nội bộ: " + ex.getMessage()));
     }
 }
-
