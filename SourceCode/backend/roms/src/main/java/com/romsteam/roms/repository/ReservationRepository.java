@@ -9,12 +9,12 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
-    // Tìm đơn đặt bàn theo mã code tra cứu (ví dụ: "RES-8842")
+    // Tim don dat ban theo ma code tra cuu (vi du: "RES-8842")
     Optional<Reservation> findByReservationCode(String reservationCode);
 
-    // Tìm các đơn đặt bàn trong một khoảng thời gian (dùng để kiểm tra kín chỗ)
+    // Tim cac don dat ban trong mot khoang thoi gian (dung de kiem tra kin cho)
     List<Reservation> findByReservationTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
 
-    // NFR-R06: Quét các đơn đặt bàn quá giờ hẹn mà khách không đến (No-show) để tự động hủy
+    // NFR-R06: Quet cac don dat ban qua gio hen ma khach khong den (No-show) de tu dong huy
     List<Reservation> findByStatusAndReservationTimeBefore(ReservationStatus status, LocalDateTime thresholdTime);
 }

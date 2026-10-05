@@ -8,9 +8,9 @@ import java.util.List;
 @Repository
 public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
 
-    // Lấy các món ăn thuộc về 1 danh mục cụ thể
+    // Lay cac mon an thuoc ve 1 danh muc cu the
     List<MenuItem> findByCategoryIdAndIsActiveTrue(Long categoryId);
 
-    // BR-04: Lấy các món đang cho phép bán (đang bật kinh doanh và còn hàng)
+    // BR-04: Lay cac mon dang cho phep ban (dang bat kinh doanh va con hang)
     List<MenuItem> findByIsAvailableTrueAndIsActiveTrue();
 }

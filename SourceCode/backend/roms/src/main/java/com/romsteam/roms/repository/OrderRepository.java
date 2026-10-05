@@ -11,19 +11,19 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    // Lấy toàn bộ các đợt gọi món của 1 phiên ăn
+    // Lay toan bo cac dot goi mon cua 1 phien an
     List<Order> findBySessionId(Long sessionId);
 
-    // Tìm đơn theo mã hiển thị (ví dụ: "ORD-1001")
+    // Tim don theo ma hien thi (vi du: "ORD-1001")
     Optional<Order> findByOrderNumber(String orderNumber);
 
-    // NFR-R02: Chặn duplicate đơn hàng bằng Idempotency Key (chống bấm đúp)
+    // NFR-R02: Chan duplicate don hang bang Idempotency Key (chong bam dup)
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
 
-    // Dành cho màn hình Bếp (KDS): Lấy các đơn đang cần nấu (PENDING, CONFIRMED, PREPARING)
-    // Sắp xếp đơn nào vào trước nấu trước (FIFO)
+    // Danh cho man hinh Bep (KDS): Lay cac don dang can nau (PENDING, CONFIRMED, PREPARING)
+    // Sap xep don nao vao truoc nau truoc (FIFO)
     List<Order> findByStatusInOrderByCreatedAtAsc(Collection<OrderStatus> statuses);
 
-    // BR-16: Đếm số order chưa hoàn thành trong 1 session (dùng khi kiểm tra trước lúc thanh toán)
+    // BR-16: Dem so order chua hoan thanh trong 1 session (dung khi kiem tra truoc luc thanh toan)
     long countBySessionIdAndStatusIn(Long sessionId, Collection<OrderStatus> statuses);
 }

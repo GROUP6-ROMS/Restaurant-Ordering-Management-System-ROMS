@@ -9,12 +9,12 @@ import java.util.Optional;
 @Repository
 public interface DiningSessionRepository extends JpaRepository<DiningSession, Long> {
 
-    // BR-01: Tìm phiên ăn ACTIVE duy nhất tại một bàn
+    // BR-01: Tim phien an ACTIVE duy nhat tai mot ban
     Optional<DiningSession> findByTableIdAndStatus(Long tableId, SessionStatus status);
 
-    // Nhận diện phiên ăn qua token lưu trong điện thoại của khách sau khi quét QR
+    // Nhan dien phien an qua token luu trong dien thoai cua khach sau khi quet QR
     Optional<DiningSession> findBySessionToken(String sessionToken);
 
-    // Lọc tất cả phiên ăn theo trạng thái
+    // Loc tat ca phien an theo trang thai
     List<DiningSession> findByStatus(SessionStatus status);
 }

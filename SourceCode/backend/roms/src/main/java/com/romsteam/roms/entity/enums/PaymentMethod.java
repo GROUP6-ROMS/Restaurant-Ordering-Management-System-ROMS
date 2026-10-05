@@ -1,10 +1,10 @@
 package com.romsteam.roms.entity.enums;
 
 /**
- * Phương thức thanh toán được hỗ trợ trong hệ thống ROMS.
+ * Phuong thuc thanh toan duoc ho tro trong he thong ROMS.
  */
 public enum PaymentMethod {
-    CASH,           // Tiền mặt
-    BANK_TRANSFER,  // Chuyển khoản / VNPay
-    CARD            // Thẻ ngân hàng
+    CASH,           // Tien mat
+    BANK_TRANSFER,  // Chuyen khoan / VNPay
+    CARD            // The ngan hang
 }

@@ -8,9 +8,9 @@ import java.util.List;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    // Lấy danh mục đang hoạt động, sắp xếp theo thứ tự hiển thị từ nhỏ đến lớn
+    // Lay danh muc dang hoat dong, sap xep theo thu tu hien thi tu nho den lon
     List<Category> findByIsActiveTrueOrderByDisplayOrderAsc();
 
-    // Kiểm tra trùng tên danh mục khi thêm mới
+    // Kiem tra trung ten danh muc khi them moi
     boolean existsByName(String name);
 }

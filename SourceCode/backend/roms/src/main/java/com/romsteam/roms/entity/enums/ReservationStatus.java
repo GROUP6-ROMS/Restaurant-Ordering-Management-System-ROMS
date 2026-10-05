@@ -1,11 +1,11 @@
 package com.romsteam.roms.entity.enums;
 
 /**
- * Trạng thái của một đơn đặt bàn trước (Reservation).
+ * Trang thai cua mot don dat ban truoc (Reservation).
  */
 public enum ReservationStatus {
-    PENDING,    // Chờ xác nhận xếp bàn
-    CONFIRMED,  // Đã xác nhận và giữ bàn
-    COMPLETED,  // Khách đã đến và check-in vào bàn thành công
-    CANCELLED   // Đã hủy (khách hủy hoặc tự động hủy do no-show)
+    PENDING,    // Cho xac nhan xep ban
+    CONFIRMED,  // Da xac nhan va giu ban
+    COMPLETED,  // Khach da den va check-in vao ban thanh cong
+    CANCELLED   // Da huy (khach huy hoac tu dong huy do no-show)
 }

@@ -8,7 +8,7 @@ import java.util.List;
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
-    // Lấy danh sách món ăn trong 1 đợt gọi món
+    // Lay danh sach mon an trong 1 dot goi mon
     List<OrderItem> findByOrderId(Long orderId);
 }
 

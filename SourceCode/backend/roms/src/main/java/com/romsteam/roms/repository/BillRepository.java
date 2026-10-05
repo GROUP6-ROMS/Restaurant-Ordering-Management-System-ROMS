@@ -8,12 +8,12 @@ import java.util.Optional;
 @Repository
 public interface BillRepository extends JpaRepository<Bill, Long> {
 
-    // Tìm hóa đơn của một phiên ăn
+    // Tim hoa don cua mot phien an
     Optional<Bill> findBySessionId(Long sessionId);
 
-    // Tìm hóa đơn theo mã số hóa đơn (in trên bill)
+    // Tim hoa don theo ma so hoa don (in tren bill)
     Optional<Bill> findByBillNumber(String billNumber);
 
-    // Đối soát theo mã giao dịch ngân hàng / VNPay
+    // Doi soat theo ma giao dich ngan hang / VNPay
     Optional<Bill> findByTransactionId(String transactionId);
 }

@@ -8,16 +8,16 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface RestaurantTableRepository extends JpaRepository<RestaurantTable, Long> {
-    // Tìm bàn theo số bàn (ví dụ: "Bàn 05")
+    // Tim ban theo so ban (vi du: "Ban 05")
     Optional<RestaurantTable> findByTableNumber(String tableNumber);
 
-    // BR-02 & BR-11: Xác thực mã bí mật gắn trong QR Code khi khách quét bàn
+    // BR-02 & BR-11: Xac thuc ma bi mat gan trong QR Code khi khach quet ban
     Optional<RestaurantTable> findByQrToken(String qrToken);
 
-    // Lọc bàn theo trạng thái (AVAILABLE, OCCUPIED, DIRTY, RESERVED) để hiện sơ đồ sảnh
+    // Loc ban theo trang thai (AVAILABLE, OCCUPIED, DIRTY, RESERVED) de hien so do sanh
     List<RestaurantTable> findByStatus(TableStatus status);
 
-    // Lấy các bàn đang mở kinh doanh
+    // Lay cac ban dang mo kinh doanh
     List<RestaurantTable> findByIsActiveTrue();
 }
 

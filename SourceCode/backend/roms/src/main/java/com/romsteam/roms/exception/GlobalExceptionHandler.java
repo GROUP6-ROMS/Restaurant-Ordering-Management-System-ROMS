@@ -7,52 +7,41 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import java.util.HashMap;
 import java.util.Map;
-/**
- * Bộ xử lý lỗi tập trung toàn hệ thống (NFR-R05).
- * Chặn mọi Exception phát sinh và trả về HTTP Status + JSON có cấu trúc.
- */
+
+// @RestControllerAdvice: Lang nghe va danh chan (intercept) moi Exception xay ra o tat ca cac RestController
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 1. Xử lý lỗi không tìm thấy tài nguyên (HTTP 404)
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getMessage()));
+    // 1. Xu ly ngoai le nghiep vu do lap trinh vien tu nem ra (AppException)
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
+        ApiResponse<Void> response = ApiResponse.error(ex.getMessage());
+        return new ResponseEntity<>(response, ex.getHttpStatus());
     }
 
-    // 2. Xử lý lỗi vi phạm quy tắc nghiệp vụ (HTTP 400)
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
-    }
-
-    // 3. Xử lý lỗi dữ liệu đầu vào không hợp lệ khi dùng @Valid (@NotBlank, @NotNull, @Min...)
+    // 2. Xu ly ngoai le khi du lieu request body vi pham validation (@Valid: rong, qua dai, so am...)
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        // Gom danh sach cac truong bi loi va thong diep tuong ung: Key = ten thuoc tinh, Value = cau loi
         Map<String, String> errors = new HashMap<>();
-        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            errors.put(fieldError.getField(), fieldError.getDefaultMessage());
-        }
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.<Map<String, String>>builder()
-                        .success(false)
-                        .message("Dữ liệu đầu vào không hợp lệ")
-                        .data(errors)
-                        .build());
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
+        ApiResponse<Void> response = ApiResponse.error("Dữ liệu gửi lên không hợp lệ!", errors);
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
-    // 4. Bắt tất cả các lỗi bất ngờ còn lại (HTTP 500) - Không để lộ stack trace
+    // 3. Xu ly tat ca cac ngoai le he thong khong mong muon khac (NullPointerException, SQL loi ket noi...)
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGeneralException(Exception ex) {
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Hệ thống đã xảy ra lỗi nội bộ: " + ex.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex) {
+        // Ghi de thong diep chung de tranh de lo thong tin nhay cam cua server ra client
+        ApiResponse<Void> response = ApiResponse.error("Đã xảy ra lỗi hệ thống nội bộ: " + ex.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }

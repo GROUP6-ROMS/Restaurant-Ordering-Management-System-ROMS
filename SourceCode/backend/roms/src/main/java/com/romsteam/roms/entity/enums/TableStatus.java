@@ -1,6 +1,6 @@
 package com.romsteam.roms.entity.enums;
 
-// Trạng thái của một bàn ăn trong nhà hàng.
+// Trang thai cua mot ban an trong nha hang.
 public enum TableStatus {
     AVAILABLE,
     OCCUPIED,

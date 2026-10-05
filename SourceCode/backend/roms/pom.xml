@@ -5,190 +5,113 @@
 		 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.5</version>
-		<relativePath/>
-	</parent>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
+    </parent>
 
-	<groupId>com.romsteam</groupId>
-	<artifactId>roms</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>roms</name>
-	<description>Restaurant Ordering Management System Backend</description>
+    <groupId>com.romsteam</groupId>
+    <artifactId>roms</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>roms</name>
+    <description>Restaurant Ordering Management System Backend</description>
 
-	<properties>
-		<java.version>21</java.version>
-		<!-- Gom version vào đây để dễ nâng cấp sau -->
-		<jjwt.version>0.12.6</jjwt.version>
-		<springdoc.version>2.6.0</springdoc.version>
-	</properties>
+    <properties>
+        <!-- Phien ban Java su dung: Java 21 LTS -->
+        <java.version>21</java.version>
+        <!-- Phien ban thu vien sinh va xac thuc token JWT -->
+        <jjwt.version>0.12.6</jjwt.version>
+        <!-- Phien ban tai lieu Swagger OpenAPI -->
+        <springdoc.version>2.6.0</springdoc.version>
+    </properties>
 
-	<dependencies>
+    <dependencies>
+        <!-- 1. REST API: Xay dung cac Controller tiep nhan request HTTP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
 
-		<!-- ===================================================
-			 SPRING BOOT CORE STARTERS
-			 =================================================== -->
+        <!-- 2. Security: Bao mat he thong va phan quyen theo vai tro nhan vien -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
 
-		<!--
-			Web: giúp viết REST API (@RestController, @GetMapping...)
-			Đây là dependency QUAN TRỌNG NHẤT — không có thì không có API
-		-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
+        <!-- 3. Spring Data JPA & Hibernate: Tuong tac voi co so du lieu qua cac Entity -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
 
-		<!--
-			Security: xác thực (authentication) + phân quyền (authorization)
-			Cần cho: JWT login, RBAC (Waiter/Kitchen/Manager không dùng chung API)
-		-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
+        <!-- 4. Validation: Kiem tra tinh hop le cua du lieu dau vao (@NotNull, @Size...) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
 
-		<!--
-			Data JPA: ORM — ánh xạ Java class ↔ bảng database
-			Thay vì viết SQL thủ công, ta dùng Repository interface
-			Ví dụ: orderRepository.findBySessionId(sessionId)
-		-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
+        <!-- 5. SQL Server Driver: Trinh dieu khien ket noi Microsoft SQL Server -->
+        <dependency>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 
-		<!--
-			Validation: kiểm tra dữ liệu đầu vào ngay tại Controller
-			Ví dụ: @NotBlank, @Min(1), @Email trên các trường DTO
-		-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
-		</dependency>
+        <!-- 6. H2 Database: Co so du lieu in-memory phuc vu chay Unit Test -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 
-		<!-- ===================================================
-			 DATABASE DRIVERS
-			 =================================================== -->
+        <!-- 7. JJWT (JSON Web Token): Thu vien tao, giai ma va xac minh token JWT -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
 
-		<!--
-			SQL Server JDBC driver
-			scope=runtime: chỉ cần khi chạy app, không cần khi compile
-		-->
-		<dependency>
-			<groupId>com.microsoft.sqlserver</groupId>
-			<artifactId>mssql-jdbc</artifactId>
-			<scope>runtime</scope>
-		</dependency>
+        <!-- 8. Swagger / OpenAPI: Tu dong sinh giao dien tai lieu thu nghiem API truc quan -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
 
-		<!--
-			H2: database trong bộ nhớ RAM
-			Dùng cho: chạy unit test mà không cần SQL Server thật
-		-->
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-		</dependency>
+        <!-- 9. Testing: Thu vien kiem thu tu dong -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
-		<!-- ===================================================
-			 TIỆN ÍCH
-			 =================================================== -->
-
-		<!--
-			Lombok: tự sinh getter/setter/constructor/builder bằng annotation
-			Thay vì viết 50 dòng getter/setter → chỉ cần @Data
-			optional=true: không bị lây sang project khác dùng thư viện này
-		-->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<optional>true</optional>
-		</dependency>
-
-		<!-- ===================================================
-			 JWT — JSON Web Token (xác thực không cần session)
-			 Cần 3 artifact vì JJWT tách riêng: API / Implementation / JSON parser
-			 =================================================== -->
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-api</artifactId>
-			<version>${jjwt.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-impl</artifactId>
-			<version>${jjwt.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-jackson</artifactId>
-			<version>${jjwt.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-
-		<!-- ===================================================
-			 SWAGGER / API DOCUMENTATION
-			 Tự sinh trang tài liệu API tại: /swagger-ui.html
-			 =================================================== -->
-		<dependency>
-			<groupId>org.springdoc</groupId>
-			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>${springdoc.version}</version>
-		</dependency>
-
-		<!-- ===================================================
-			 TESTING
-			 =================================================== -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.security</groupId>
-			<artifactId>spring-security-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-	</dependencies>
-
-	<build>
-		<plugins>
-			<!--
-				Lombok cần khai báo ở đây để Java compiler nhận ra annotation
-				Nếu thiếu phần này, @Data/@Builder sẽ báo lỗi "cannot find symbol"
-			-->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<annotationProcessorPaths>
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
-
-			<!-- Plugin build file .jar để deploy -->
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<!-- Loại Lombok ra khỏi file jar cuối — không cần khi chạy -->
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
-
+    <build>
+        <plugins>
+            <!-- Plugin dong goi file JAR chay ung dung Spring Boot -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 </project>

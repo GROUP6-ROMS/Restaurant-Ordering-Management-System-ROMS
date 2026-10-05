@@ -1,78 +1,224 @@
 package com.romsteam.roms.entity;
 
+import com.romsteam.roms.entity.enums.BillStatus;
 import com.romsteam.roms.entity.enums.PaymentMethod;
-import com.romsteam.roms.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
-import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-/**
- * Entity đại diện cho hóa đơn thanh toán của một phiên ăn (DiningSession).
- */
+
+// Khai bao Entity dai dien cho hoa don thanh toan
 @Entity
-@Table(name = "bills")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Table(name = "bills") // Ten bang bills trong SQL Server
 public class Bill {
+
+    // Khoa chinh hoa don
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // QUAN HỆ 1 - 1: Mỗi phiên ăn chỉ có 1 Hóa đơn duy nhất
+    // Quan he 1 - 1 voi phien an: Moi phien an (ban an) sau khi ket thuc co dung 1 hoa don thanh toan
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false, unique = true)
     private DiningSession session;
 
-    // Thu ngân nào là người lập và thu tiền hóa đơn này (Staff có role CASHIER/MANAGER)
+    // Khoa ngoai tro sang nhan vien thu ngan chot hoa don (Staff)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cashier_id", nullable = false)
+    @JoinColumn(name = "cashier_id")
     private Staff cashier;
 
-    // Mã số hóa đơn để in ra phiếu tính tiền (ví dụ: "BILL-20260930-001")
-    @Column(name = "bill_number", nullable = false, unique = true, length = 50)
-    private String billNumber;
+    // Ma so hoa don hien thi tren bill in (vi du: "BILL-20261004-0001") - Duy nhat
+    @Column(name = "bill_code", nullable = false, unique = true, length = 50)
+    private String billCode;
 
-    // Tổng tiền thức ăn trước thuế (Tổng các món có trạng thái SERVED - BR-09, BR-10)
+    // Tong tien tam tinh truoc thue & giam gia (tong tien tat ca cac mon an trong phien)
     @Column(name = "subtotal", nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
-    // Tiền thuế VAT (nếu có, ví dụ 8% hoặc 10%)
-    @Builder.Default
-    @Column(name = "tax_amount", nullable = false, precision = 12, scale = 2)
+    // Tien thue VAT (vi du: 8% hoac 10% neu co)
+    @Column(name = "tax_amount", precision = 12, scale = 2)
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
-    // Tổng tiền khách phải trả thực tế = subtotal + taxAmount - discountAmount
+    // So tien giam gia hoac chiet khau khuyen mai (neu co)
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    // Tong so tien thuc te khach can thanh toan: finalAmount = subtotal + taxAmount - discountAmount
     @Column(name = "final_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalAmount;
 
-    // Hình thức thanh toán: CASH, BANK_TRANSFER, hoặc CARD (khớp màn hình POS)
+    // Phuong thuc thanh toan khach da su dung (CASH, BANK_TRANSFER, CARD)
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false, length = 20)
+    @Column(name = "payment_method", length = 30)
     private PaymentMethod paymentMethod;
 
-    // Trạng thái thanh toán: PENDING, PAID, FAILED
+    // Trang thai hoa don (UNPAID: tam tinh, PAID: da tra tien, CANCELLED: huy)
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status", nullable = false, length = 20)
-    @Builder.Default
-    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+    @Column(name = "status", nullable = false, length = 20)
+    private BillStatus status = BillStatus.UNPAID;
 
-    // Mã giao dịch từ cổng thanh toán / ngân hàng (nếu thanh toán online) để đối soát
-    @Column(name = "transaction_id", length = 100)
-    private String transactionId;
+    // Thoi diem khach thanh toan xong tien
+    @Column(name = "payment_time")
+    private LocalDateTime paymentTime;
 
-    // Thời điểm khách thanh toán thành công
-    @Column(name = "paid_at")
-    private LocalDateTime paidAt;
+    // Ghi chu cua thu ngan tren hoa don (vi du: "Khach VIP giam 10%", "Tra thua tien bo")
+    @Column(name = "note", length = 255)
+    private String note;
+
+    // Thoi diem tao hoa don trong he thong
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    // Thoi diem cap nhat hoa don gan nhat
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-}
 
+    // ===================================================================
+    // CONSTRUCTORS (HAM KHOI TAO)
+    // ===================================================================
+
+    // Constructor mac dinh khong tham so (bat buoc cho Hibernate/JPA)
+    public Bill() {
+        this.taxAmount = BigDecimal.ZERO;
+        this.discountAmount = BigDecimal.ZERO;
+        this.status = BillStatus.UNPAID;
+    }
+
+    // Constructor day du tham so
+    public Bill(Long id, DiningSession session, Staff cashier, String billCode, BigDecimal subtotal, BigDecimal taxAmount, BigDecimal discountAmount, BigDecimal finalAmount, PaymentMethod paymentMethod, BillStatus status, LocalDateTime paymentTime, String note, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
+        this.session = session;
+        this.cashier = cashier;
+        this.billCode = billCode;
+        this.subtotal = subtotal;
+        this.taxAmount = taxAmount != null ? taxAmount : BigDecimal.ZERO;
+        this.discountAmount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
+        this.finalAmount = finalAmount;
+        this.paymentMethod = paymentMethod;
+        this.status = status != null ? status : BillStatus.UNPAID;
+        this.paymentTime = paymentTime;
+        this.note = note;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
+    // ===================================================================
+    // GETTERS & SETTERS (PHUONG THUC DOC VA GHI DU LIEU)
+    // ===================================================================
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public DiningSession getSession() {
+        return session;
+    }
+
+    public void setSession(DiningSession session) {
+        this.session = session;
+    }
+
+    public Staff getCashier() {
+        return cashier;
+    }
+
+    public void setCashier(Staff cashier) {
+        this.cashier = cashier;
+    }
+
+    public String getBillCode() {
+        return billCode;
+    }
+
+    public void setBillCode(String billCode) {
+        this.billCode = billCode;
+    }
+
+    public BigDecimal getSubtotal() {
+        return subtotal;
+    }
+
+    public void setSubtotal(BigDecimal subtotal) {
+        this.subtotal = subtotal;
+    }
+
+    public BigDecimal getTaxAmount() {
+        return taxAmount;
+    }
+
+    public void setTaxAmount(BigDecimal taxAmount) {
+        this.taxAmount = taxAmount;
+    }
+
+    public BigDecimal getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+        this.discountAmount = discountAmount;
+    }
+
+    public BigDecimal getFinalAmount() {
+        return finalAmount;
+    }
+
+    public void setFinalAmount(BigDecimal finalAmount) {
+        this.finalAmount = finalAmount;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public BillStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(BillStatus status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getPaymentTime() {
+        return paymentTime;
+    }
+
+    public void setPaymentTime(LocalDateTime paymentTime) {
+        this.paymentTime = paymentTime;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+}
