@@ -4,9 +4,3 @@ scratch/
 # Office temporary files
 ~$*.pptx
 ~$*.docx
-
-# IDE & Editor files
-.idea/
-*.iml
-target/
-node_modules/

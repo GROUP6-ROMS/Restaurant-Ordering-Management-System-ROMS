@@ -46,10 +46,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Cho phép nguồn từ Vite Frontend (port 5173, 5174, 5175...) và localhost bất kỳ
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:*",
-                "http://127.0.0.1:*"));
+        // Cho phép nguồn từ Vite Frontend (port 5173) và Preview (port 4173)
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173"));
 
         // Cho phép toàn bộ các phương thức HTTP
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
