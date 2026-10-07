@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { authApi } from '../api/authApi';
 
 const AuthContext = createContext();
 
@@ -33,18 +34,23 @@ export function AuthProvider({ children }) {
       // 1. Gọi API Backend thật
       const response = await authApi.login(username, pinCode);
 
-      // Backend trả về: { success: true, data: { token, id, username, fullName, role } }
-      const { token, id, fullName, role } = response.data.data;
-      const userData = { id, username, fullName, role };
+      // Backend trả về: { success: true, data: { accessToken, tokenType, id, username, fullName, role } }
+      const resData = response.data?.data || {};
+      const authToken = resData.accessToken || resData.token;
+      const { id, fullName, role } = resData;
+      const userData = { id, username: resData.username || username, fullName, role };
+
       // 2. Lưu token và thông tin user vào localStorage
-      localStorage.setItem('roms_token', token);
+      localStorage.setItem('roms_token', authToken);
       localStorage.setItem('roms_user', JSON.stringify(userData));
+
       // 3. Cập nhật state
-      setToken(token);
+      setToken(authToken);
       setUser(userData);
       return { success: true, role };
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!';
+      console.error('Lỗi đăng nhập:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!';
       return { success: false, message: errorMsg };
     }
   };
