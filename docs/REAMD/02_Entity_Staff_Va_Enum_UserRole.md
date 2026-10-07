@@ -1,21 +1,24 @@
-# BƯỚC 02: TẠO ENUM USERROLE & ENTITY STAFF (SỬ DỤNG LOMBOK)
+# BƯỚC 02: TẠO ENUM USERROLE, ENUM SHIFTTYPE & ENTITY STAFF (SỬ DỤNG LOMBOK)
 
 ## 1. Bước Này Làm Gì?
 - Tạo enum `UserRole` đại diện cho các vai trò của nhân viên trong quán: `MANAGER`, `WAITER`, `KITCHEN`, `CASHIER`.
-- Tạo entity `Staff` ánh xạ vào bảng `staffs` trong CSDL để quản lý tài khoản nhân viên đăng nhập.
-- **Sử dụng Lombok:** Dùng các annotation `@Getter`, `@Setter`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Builder` để loại bỏ toàn bộ boilerplate code (constructors, getters, setters).
-- **Quy tắc quan trọng về xác thực:** Nhân viên đăng nhập vào ca làm việc bằng **Tên đăng nhập / Mã nhân viên (`username`)** và **Mã PIN 6 chữ số (`pinCode`)**, **HOÀN TOÀN KHÔNG SỬ DỤNG PASSWORD**. Mã PIN 6 số được băm mã hóa bằng thuật toán BCrypt trước khi lưu trữ trong CSDL.
+- Tạo enum `ShiftType` đại diện cho các ca làm việc trong ngày (`MORNING`, `EVENING`, `FULL_DAY`, `NONE`) kèm logic kiểm tra khung giờ hợp lệ (cho phép vào ca trước giờ mở ca 15 phút).
+- Tạo entity `Staff` ánh xạ vào bảng `staffs` trong CSDL để quản lý tài khoản nhân viên, mã PIN 6 số băm BCrypt, ca trực được phân công (`assignedShift`) và trạng thái đang trong ca (`isOnShift`).
+- **Sử dụng Lombok:** Dùng các annotation `@Getter`, `@Setter`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Builder` để loại bỏ toàn bộ boilerplate code.
+- **Quy tắc quan trọng về xác thực:** 
+  1. Nhân viên đăng nhập vào ca làm việc bằng **Tên đăng nhập / Mã nhân viên (`username`)** và **Mã PIN 6 chữ số (`pinCode`)**, **HOÀN TOÀN KHÔNG SỬ DỤNG PASSWORD**.
+  2. **Ràng buộc phân ca (Shift Enforcement):** Ngoại trừ `MANAGER` (luôn được phép đăng nhập), mọi nhân viên khác (`WAITER`, `KITCHEN`, `CASHIER`) **bắt buộc phải được Quản lý phân công ca làm việc** (`assignedShift != NONE`) và **chỉ được đăng nhập trong khung giờ ca trực** (cho phép sớm hơn 15 phút).
 
 ---
 
 ## 2. Các File Code & Chức Năng
 
 ### File 1: `UserRole.java`
-- **Đường dẫn:** `src/main/java/com/romsteam/roms/enums/UserRole.java`
+- **Đường dẫn:** `src/main/java/com/romsteam/roms/entity/enums/UserRole.java`
 - **Chức năng:** Định nghĩa 4 vai trò của nhân viên nhà hàng (đã loại bỏ quầy Bar, chỉ phục vụ đồ uống đóng lon/chai sẵn).
 
 ```java
-package com.romsteam.roms.enums;
+package com.romsteam.roms.entity.enums;
 
 public enum UserRole {
     MANAGER,  // Quản lý: toàn quyền xem báo cáo, quản lý nhân sự, duyệt chốt ca, phân ca
@@ -27,14 +30,58 @@ public enum UserRole {
 
 ---
 
-### File 2: `Staff.java`
+### File 2: `ShiftType.java`
+- **Đường dẫn:** `src/main/java/com/romsteam/roms/entity/enums/ShiftType.java`
+- **Chức năng:** Định nghĩa các ca làm việc trong ngày và phương thức kiểm tra giờ vào ca hợp lệ (cho phép trước 15 phút).
+
+```java
+package com.romsteam.roms.entity.enums;
+
+import java.time.LocalTime;
+
+public enum ShiftType {
+    NONE("Chưa phân ca", null, null),
+    MORNING("Ca Sáng", LocalTime.of(6, 0), LocalTime.of(14, 0)),
+    EVENING("Ca Tối", LocalTime.of(14, 0), LocalTime.of(22, 0)),
+    FULL_DAY("Ca Cả Ngày", LocalTime.of(6, 0), LocalTime.of(23, 0));
+
+    private final String label;
+    private final LocalTime startTime;
+    private final LocalTime endTime;
+
+    ShiftType(String label, LocalTime startTime, LocalTime endTime) {
+        this.label = label;
+        this.startTime = startTime;
+        this.endTime = endTime;
+    }
+
+    public String getLabel() { return label; }
+    public LocalTime getStartTime() { return startTime; }
+    public LocalTime getEndTime() { return endTime; }
+
+    /**
+     * Kiểm tra thời gian hiện tại có hợp lệ để vào ca:
+     * Cho phép đăng nhập trước thời gian mở ca 15 phút, và trước thời gian kết thúc ca.
+     */
+    public boolean isWithinShift(LocalTime now) {
+        if (startTime == null || endTime == null) return false;
+        LocalTime allowStartTime = startTime.minusMinutes(15);
+        return !now.isBefore(allowStartTime) && !now.isAfter(endTime);
+    }
+}
+```
+
+---
+
+### File 3: `Staff.java`
 - **Đường dẫn:** `src/main/java/com/romsteam/roms/entity/Staff.java`
-- **Chức năng:** Đại diện cho bảng `staffs` trong SQL Server, lưu thông tin tài khoản đăng nhập (Username và Mã PIN 6 số đã băm BCrypt) và vai trò của nhân viên. Sử dụng Lombok tinh gọn mã nguồn.
+- **Chức năng:** Đại diện cho bảng `staffs` trong SQL Server, lưu thông tin tài khoản đăng nhập (Username và Mã PIN 6 số đã băm BCrypt), vai trò, ca làm việc được phân công và trạng thái trực ca.
 
 ```java
 package com.romsteam.roms.entity;
 
-import com.romsteam.roms.enums.UserRole;
+import com.romsteam.roms.entity.enums.ShiftType;
+import com.romsteam.roms.entity.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,9 +89,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-// Khai báo lớp này là một Entity tương ứng với bảng staffs trong CSDL
 @Entity
-@Table(name = "staffs") // Tên bảng lưu trữ trong SQL Server
+@Table(name = "staffs")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -52,45 +98,51 @@ import java.time.LocalDateTime;
 @Builder
 public class Staff {
 
-    // Khóa chính tự tăng (IDENTITY trong SQL Server)
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Tên đăng nhập / Mã nhân viên (bắt buộc, duy nhất, ví dụ: "MGR-084", "EMP-8812", "KDS-001", "CSH-002")
+    // Tên đăng nhập / Mã nhân viên (ví dụ: MGR-001, EMP-001)
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
 
-    // Mã PIN 6 chữ số đã mã hóa theo chuẩn BCrypt (bắt buộc, dùng để đăng nhập ca trực, KHÔNG dùng password)
-    // Độ dài 255 ký tự để chứa chuỗi hash BCrypt an toàn
+    // Mã PIN 6 chữ số băm BCrypt (không dùng password thông thường)
     @Column(name = "pin_code", nullable = false, length = 255)
     private String pinCode;
 
-    // Họ và tên đầy đủ của nhân viên
-    @Column(name = "full_name", nullable = false, length = 100)
+    // Họ và tên đầy đủ nhân viên (hỗ trợ tiếng Việt Unicode)
+    @Column(name = "full_name", nullable = false, columnDefinition = "NVARCHAR(100)")
     private String fullName;
 
     // Số điện thoại liên hệ
     @Column(name = "phone", length = 15)
     private String phone;
 
-    // Vai trò của nhân viên (lưu dưới dạng chuỗi trong DB: MANAGER, WAITER, KITCHEN, CASHIER)
-    // LƯU Ý: Hệ thống không có quầy Bar, chỉ có đúng 4 vai trò này.
+    // Vai trò (MANAGER, WAITER, KITCHEN, CASHIER)
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     private UserRole role;
 
-    // Trạng thái tài khoản: true = đang làm việc, false = đã nghỉ việc hoặc bị khóa tài khoản
+    // Trạng thái tài khoản (true = hoạt động, false = khóa/nghỉ việc)
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    // Thời điểm tạo tài khoản (Hibernate tự động điền giá trị lúc thực hiện lệnh INSERT)
+    // Ca làm việc được Quản lý phân công (NONE, MORNING, EVENING, FULL_DAY)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assigned_shift", length = 30)
+    @Builder.Default
+    private ShiftType assignedShift = ShiftType.NONE;
+
+    // Trạng thái thực tế có đang trực trong ca hay không (true sau khi login, false sau khi logout)
+    @Builder.Default
+    @Column(name = "is_on_shift", nullable = false)
+    private Boolean isOnShift = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Thời điểm sửa đổi thông tin gần nhất (Hibernate tự động cập nhật lúc chạy lệnh UPDATE)
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

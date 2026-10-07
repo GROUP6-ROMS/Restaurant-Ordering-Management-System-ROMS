@@ -5,4 +5,9 @@ export const authApi = {
     login: (username, pinCode) => {
         return axiosClient.post('/auth/login', { username, pinCode });
     },
+
+    // Đăng xuất ca làm việc (Backend cập nhật isOnShift = false)
+    logout: (username) => {
+        return axiosClient.post('/auth/logout', { username });
+    },
 };

@@ -34,11 +34,11 @@ export function AuthProvider({ children }) {
       // 1. Gọi API Backend thật
       const response = await authApi.login(username, pinCode);
 
-      // Backend trả về: { success: true, data: { accessToken, tokenType, id, username, fullName, role } }
+      // Backend trả về: { success: true, data: { accessToken, tokenType, id, username, fullName, role, assignedShift, isOnShift } }
       const resData = response.data?.data || {};
       const authToken = resData.accessToken || resData.token;
-      const { id, fullName, role } = resData;
-      const userData = { id, username: resData.username || username, fullName, role };
+      const { id, fullName, role, assignedShift, isOnShift } = resData;
+      const userData = { id, username: resData.username || username, fullName, role, assignedShift, isOnShift };
 
       // 2. Lưu token và thông tin user vào localStorage
       localStorage.setItem('roms_token', authToken);
@@ -55,11 +55,19 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('roms_user');
-    localStorage.removeItem('roms_token');
+  const logout = async () => {
+    try {
+      if (user?.username) {
+        await authApi.logout(user.username);
+      }
+    } catch (e) {
+      console.warn('Lỗi gọi API đăng xuất:', e);
+    } finally {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('roms_user');
+      localStorage.removeItem('roms_token');
+    }
   };
 
   return (

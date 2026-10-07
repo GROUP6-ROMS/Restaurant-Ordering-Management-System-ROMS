@@ -1,5 +1,6 @@
 package com.romsteam.roms.entity;
 
+import com.romsteam.roms.entity.enums.ShiftType;
 import com.romsteam.roms.entity.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -48,6 +49,17 @@ public class Staff {
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    // Ca lam viec duoc Quan ly phan cong (NONE, MORNING, EVENING, FULL_DAY)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assigned_shift", length = 30)
+    @Builder.Default
+    private ShiftType assignedShift = ShiftType.NONE;
+
+    // Trang thai thuc te co dang trong ca lam viec hay khong (true sau khi dang nhap vao ca, false khi ket thuc ca/logout)
+    @Builder.Default
+    @Column(name = "is_on_shift", nullable = false)
+    private Boolean isOnShift = false;
 
     // Thoi diem tao tai khoan (Hibernate tu dong dien gia tri luc thuc hien lenh INSERT)
     @CreationTimestamp
