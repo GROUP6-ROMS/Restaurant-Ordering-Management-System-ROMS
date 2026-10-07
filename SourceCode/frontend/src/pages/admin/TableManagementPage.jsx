@@ -1,39 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../components/common/Icon';
+import { tableApi } from '../../api/tableApi';
 
-const INITIAL_ZONES = [
-  { id: 'ALL', name: 'Tất Cả Khu Vực', count: 18 },
-  { id: 'ZONE_1', name: 'Tầng 1 - Sảnh Chính', count: 10 },
-  { id: 'ZONE_2', name: 'Tầng 2 - Ban Công', count: 5 },
-  { id: 'VIP', name: 'Phòng VIP', count: 3 },
-];
-
-const INITIAL_TABLES = [
-  { id: 1, code: 'T-01', name: 'Bàn T-01', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 4, shape: 'SQUARE', status: 'OCCUPIED', guests: 3, currentBill: 820000, timeIn: '18:45', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-01' },
-  { id: 2, code: 'T-02', name: 'Bàn T-02', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 2, shape: 'ROUND', status: 'AVAILABLE', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-02' },
-  { id: 3, code: 'T-03', name: 'Bàn T-03', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 4, shape: 'SQUARE', status: 'OCCUPIED', guests: 4, currentBill: 1250000, timeIn: '19:10', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-03' },
-  { id: 4, code: 'T-04', name: 'Bàn T-04', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 6, shape: 'RECTANGLE', status: 'RESERVED', guests: 0, currentBill: 0, timeIn: 'Đặt lúc 20:00', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-04' },
-  { id: 5, code: 'T-05', name: 'Bàn T-05', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 4, shape: 'SQUARE', status: 'DIRTY', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-05' },
-  { id: 6, code: 'T-06', name: 'Bàn T-06', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 4, shape: 'SQUARE', status: 'AVAILABLE', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-06' },
-  { id: 7, code: 'T-07', name: 'Bàn T-07', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 8, shape: 'RECTANGLE', status: 'AVAILABLE', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-07' },
-  { id: 8, code: 'T-08', name: 'Bàn T-08', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 2, shape: 'ROUND', status: 'OCCUPIED', guests: 2, currentBill: 450000, timeIn: '19:30', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-08' },
-
-  { id: 9, code: 'B-01', name: 'Ban Công 01', zone: 'ZONE_2', zoneName: 'Tầng 2 - Ban Công', capacity: 4, shape: 'SQUARE', status: 'OCCUPIED', guests: 3, currentBill: 670000, timeIn: '18:50', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/B-01' },
-  { id: 10, code: 'B-02', name: 'Ban Công 02', zone: 'ZONE_2', zoneName: 'Tầng 2 - Ban Công', capacity: 4, shape: 'SQUARE', status: 'AVAILABLE', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/B-02' },
-  { id: 11, code: 'B-03', name: 'Ban Công 03', zone: 'ZONE_2', zoneName: 'Tầng 2 - Ban Công', capacity: 2, shape: 'ROUND', status: 'BLOCKED', blockedReason: 'Bảo trì hệ thống đèn & thông gió', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/B-03' },
-  { id: 12, code: 'B-04', name: 'Ban Công 04', zone: 'ZONE_2', zoneName: 'Tầng 2 - Ban Công', capacity: 6, shape: 'RECTANGLE', status: 'RESERVED', guests: 0, currentBill: 0, timeIn: 'Đặt lúc 20:30', reservationInfo: 'Chị Mai (0982xxx)', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/B-04' },
-  { id: 13, code: 'B-05', name: 'Ban Công 05', zone: 'ZONE_2', zoneName: 'Tầng 2 - Ban Công', capacity: 4, shape: 'SQUARE', status: 'OCCUPIED', guests: 4, currentBill: 1120000, timeIn: '19:15', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/B-05' },
-
-  { id: 14, code: 'VIP-01', name: 'Hoàng Gia', zone: 'VIP', zoneName: 'Phòng VIP', capacity: 12, shape: 'RECTANGLE', status: 'OCCUPIED', guests: 10, currentBill: 5800000, timeIn: '18:00', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/VIP-01' },
-  { id: 15, code: 'VIP-02', name: 'Thượng Uyển', zone: 'VIP', zoneName: 'Phòng VIP', capacity: 8, shape: 'ROUND', status: 'AVAILABLE', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/VIP-02' },
-  { id: 16, code: 'VIP-03', name: 'Sen Vàng', zone: 'VIP', zoneName: 'Phòng VIP', capacity: 10, shape: 'RECTANGLE', status: 'RESERVED', guests: 0, currentBill: 0, timeIn: 'Đặt lúc 21:00', reservationInfo: 'Anh Tuấn (0912xxx)', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/VIP-03' },
-
-  { id: 17, code: 'T-09', name: 'Bàn T-09', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 4, shape: 'RECTANGLE', status: 'OCCUPIED', guests: 2, currentBill: 340000, timeIn: '19:40', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-09' },
-  { id: 18, code: 'T-10', name: 'Bàn T-10', zone: 'ZONE_1', zoneName: 'Tầng 1 - Sảnh Chính', capacity: 4, shape: 'RECTANGLE', status: 'AVAILABLE', guests: 0, currentBill: 0, timeIn: null, qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/T-10' },
+const ZONES = [
+  { id: 'ALL', name: 'Tất Cả Khu Vực' },
+  { id: 'ZONE_1', name: 'Tầng 1 - Sảnh Chính' },
+  { id: 'ZONE_2', name: 'Tầng 2 - Ban Công' },
+  { id: 'VIP', name: 'Phòng VIP' },
 ];
 
 export default function TableManagementPage() {
-  const [tables, setTables] = useState(INITIAL_TABLES);
+  const [tables, setTables] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   const [selectedZone, setSelectedZone] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,13 +31,12 @@ export default function TableManagementPage() {
     blockedReason: 'Bảo trì trang thiết bị'
   });
 
-  // New Table Form
+  // Form Thêm Bàn Mới (Đã bỏ thuộc tính shape)
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     zone: 'ZONE_1',
-    capacity: 4,
-    shape: 'SQUARE'
+    capacity: 4
   });
 
   const showToast = (msg) => {
@@ -65,101 +44,177 @@ export default function TableManagementPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // ===================================================================
+  // 1. TẢI DỮ LIỆU TỪ BACKEND QUA API
+  // ===================================================================
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // Gọi API lấy danh sách bàn theo bộ lọc
+      const params = {};
+      if (selectedZone !== 'ALL') params.zone = selectedZone;
+      if (statusFilter !== 'ALL') params.status = statusFilter;
+      if (searchTerm.trim()) params.search = searchTerm.trim();
+
+      const resTables = await tableApi.getTables(params);
+      if (resTables.data && resTables.data.success) {
+        setTables(resTables.data.data || []);
+      }
+
+      // Gọi API lấy số liệu 5 thẻ KPI
+      const resSummary = await tableApi.getSummary();
+      if (resSummary.data && resSummary.data.success) {
+        setSummary(resSummary.data.data);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải dữ liệu bàn từ backend:', error);
+      const errMsg = error.response?.data?.message
+        || (error.response?.status === 401 || error.response?.status === 403
+            ? 'Chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng đăng nhập lại!'
+            : 'Không thể kết nối đến máy chủ Backend!');
+      showToast(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Tự động gọi API khi khởi tạo trang hoặc thay đổi khu vực / trạng thái
+  useEffect(() => {
+    loadData();
+  }, [selectedZone, statusFilter]);
+
+  // Tìm kiếm theo từ khóa (Frontend fallback lọc nhanh nếu cần)
   const filteredTables = tables.filter(t => {
-    if (selectedZone !== 'ALL' && t.zone !== selectedZone) return false;
-    if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
     if (searchTerm.trim() !== '') {
       const q = searchTerm.toLowerCase();
-      return t.code.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);
+      const codeMatch = t.code ? t.code.toLowerCase().includes(q) : false;
+      const nameMatch = t.name ? t.name.toLowerCase().includes(q) : false;
+      return codeMatch || nameMatch;
     }
     return true;
   });
 
-  // Open Status Configuration Modal
+  // ===================================================================
+  // 2. MỞ MODAL ĐỔI TRẠNG THÁI BÀN
+  // ===================================================================
   const handleOpenStatusModal = (table, targetStatus = null) => {
     setStatusModalTable(table);
     setStatusForm({
       status: targetStatus || table.status,
-      reservationTime: table.timeIn ? table.timeIn.replace('Đặt lúc ', '') : '20:00',
+      reservationTime: table.reservedTime || (table.timeIn ? table.timeIn.replace('Đặt lúc ', '') : '20:00'),
       reservationGuest: table.reservationInfo || '',
       guestsCount: table.guests || table.capacity,
       blockedReason: table.blockedReason || 'Bảo trì định kỳ / Ghép bàn'
     });
   };
 
-  // Save Table Status
-  const handleSaveTableStatus = () => {
+  // ===================================================================
+  // 3. LƯU CẬP NHẬT TRẠNG THÁI BÀN LÊN BACKEND
+  // ===================================================================
+  const handleSaveTableStatus = async () => {
     if (!statusModalTable) return;
-    setTables(prev => prev.map(t => {
-      if (t.id === statusModalTable.id) {
-        return {
-          ...t,
-          status: statusForm.status,
-          timeIn: statusForm.status === 'RESERVED'
-            ? `Đặt lúc ${statusForm.reservationTime}`
-            : (statusForm.status === 'OCCUPIED' ? (t.timeIn || '19:00') : null),
-          reservationInfo: statusForm.status === 'RESERVED' ? statusForm.reservationGuest : null,
-          blockedReason: statusForm.status === 'BLOCKED' ? statusForm.blockedReason : null,
-          guests: statusForm.status === 'OCCUPIED'
-            ? parseInt(statusForm.guestsCount) || t.capacity
-            : (statusForm.status === 'RESERVED' ? parseInt(statusForm.guestsCount) || t.capacity : 0)
-        };
+    try {
+      const payload = {
+        status: statusForm.status,
+        blockedReason: statusForm.status === 'BLOCKED' ? statusForm.blockedReason : null,
+        reservationInfo: statusForm.status === 'RESERVED' ? statusForm.reservationGuest : null,
+        reservedTime: statusForm.status === 'RESERVED' ? statusForm.reservationTime : null,
+        guestsCount: parseInt(statusForm.guestsCount) || statusModalTable.capacity
+      };
+
+      const res = await tableApi.updateStatus(statusModalTable.id, payload);
+      if (res.data && res.data.success) {
+        showToast(`Đã cập nhật trạng thái bàn ${statusModalTable.code}!`);
+        setStatusModalTable(null);
+        await loadData(); // Tải lại dữ liệu mới nhất
       }
-      return t;
-    }));
-    const tCode = statusModalTable.code;
-    setStatusModalTable(null);
-    showToast(`Đã cập nhật trạng thái bàn ${tCode}!`);
+    } catch (error) {
+      console.error('Lỗi cập nhật trạng thái bàn:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi cập nhật trạng thái bàn!';
+      showToast(errMsg);
+    }
   };
 
-  // Handle Add Table
-  const handleCreateTable = (e) => {
+  // ===================================================================
+  // 4. CHUYỂN NHANH TRẠNG THÁI BÀN (NÚT BẤM NHANH TRÊN THẺ)
+  // ===================================================================
+  const handleToggleStatus = async (id, newStatus) => {
+    try {
+      const payload = {
+        status: newStatus,
+        guestsCount: newStatus === 'OCCUPIED' ? 4 : 0
+      };
+
+      const res = await tableApi.updateStatus(id, payload);
+      if (res.data && res.data.success) {
+        showToast('Đã cập nhật trạng thái bàn!');
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi chuyển trạng thái bàn:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi đổi trạng thái bàn!';
+      showToast(errMsg);
+    }
+  };
+
+  // ===================================================================
+  // 5. THÊM BÀN ĂN MỚI
+  // ===================================================================
+  const handleCreateTable = async (e) => {
     e.preventDefault();
     if (!formData.code.trim()) return;
 
-    const zoneObj = INITIAL_ZONES.find(z => z.id === formData.zone);
-    const newT = {
-      id: Date.now(),
-      code: formData.code.toUpperCase(),
-      name: formData.name || `Bàn ${formData.code.toUpperCase()}`,
-      zone: formData.zone,
-      zoneName: zoneObj ? zoneObj.name : 'Sảnh',
-      capacity: parseInt(formData.capacity) || 4,
-      shape: formData.shape,
-      status: 'AVAILABLE',
-      guests: 0,
-      currentBill: 0,
-      timeIn: null,
-      qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/${formData.code.toUpperCase()}`
-    };
+    try {
+      const payload = {
+        tableNumber: formData.code.trim().toUpperCase(),
+        name: formData.name.trim() || `Bàn ${formData.code.trim().toUpperCase()}`,
+        zone: formData.zone,
+        capacity: parseInt(formData.capacity) || 4
+      };
 
-    setTables(prev => [newT, ...prev]);
-    setShowAddModal(false);
-    setFormData({ code: '', name: '', zone: 'ZONE_1', capacity: 4, shape: 'SQUARE' });
-    showToast(`Đã thêm bàn mới: ${newT.code} (${newT.name})`);
-  };
-
-  // Quick toggle table status
-  const handleToggleStatus = (id, newStatus) => {
-    setTables(prev => prev.map(t => {
-      if (t.id === id) {
-        return {
-          ...t,
-          status: newStatus,
-          guests: newStatus === 'AVAILABLE' || newStatus === 'DIRTY' || newStatus === 'BLOCKED' ? 0 : t.guests
-        };
+      const res = await tableApi.createTable(payload);
+      if (res.data && res.data.success) {
+        showToast(`Đã thêm bàn mới: ${payload.tableNumber}!`);
+        setShowAddModal(false);
+        setFormData({ code: '', name: '', zone: 'ZONE_1', capacity: 4 });
+        await loadData();
       }
-      return t;
-    }));
-    showToast('Đã cập nhật trạng thái bàn!');
+    } catch (error) {
+      console.error('Lỗi thêm bàn mới:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi thêm bàn mới!';
+      showToast(errMsg);
+    }
   };
 
-  const totalSeats = tables.reduce((s, t) => s + t.capacity, 0);
-  const occupiedSeats = tables.filter(t => t.status === 'OCCUPIED').reduce((s, t) => s + t.guests, 0);
-  const occupiedTables = tables.filter(t => t.status === 'OCCUPIED').length;
-  const reservedTables = tables.filter(t => t.status === 'RESERVED').length;
-  const availableTables = tables.filter(t => t.status === 'AVAILABLE').length;
-  const blockedTables = tables.filter(t => t.status === 'BLOCKED').length;
+  // ===================================================================
+  // 6. LÀM MỚI MÃ QR TOKEN CHO BÀN
+  // ===================================================================
+  const handleRefreshQrToken = async (id) => {
+    try {
+      const res = await tableApi.refreshQr(id);
+      if (res.data && res.data.success) {
+        showToast('Đã tái tạo mã QR Token mới cho bàn thành công!');
+        setSelectedQrTable(res.data.data);
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi tái tạo mã QR:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi làm mới mã QR!';
+      showToast(errMsg);
+    }
+  };
+
+  // ===================================================================
+  // 7. SỐ LIỆU 5 THẺ KPI (ƯU TIÊN LẤY TỪ BACKEND SUMMARY)
+  // ===================================================================
+  const totalTables = summary ? summary.totalTables : tables.length;
+  const totalSeats = summary ? summary.totalSeats : tables.reduce((s, t) => s + (t.capacity || 0), 0);
+  const occupiedTables = summary ? summary.occupiedTables : tables.filter(t => t.status === 'OCCUPIED').length;
+  const occupiedGuests = summary ? summary.occupiedGuests : tables.filter(t => t.status === 'OCCUPIED').reduce((s, t) => s + (t.guests || 0), 0);
+  const availableTables = summary ? summary.availableTables : tables.filter(t => t.status === 'AVAILABLE').length;
+  const reservedTables = summary ? summary.reservedTables : tables.filter(t => t.status === 'RESERVED').length;
+  const blockedTables = summary ? summary.blockedTables : tables.filter(t => t.status === 'BLOCKED').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -187,7 +242,7 @@ export default function TableManagementPage() {
         </div>
       )}
 
-      {/* Header & Quick Action */}
+      {/* Header & Quick Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -205,6 +260,28 @@ export default function TableManagementPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={loadData}
+            title="Làm mới dữ liệu từ máy chủ"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              background: '#FFFFFF',
+              border: '1px solid #EAE0DE',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              color: '#56423D',
+              cursor: 'pointer'
+            }}
+          >
+            <Icon name="refresh" size={18} />
+            Làm Mới
+          </button>
+
           <button
             type="button"
             onClick={() => showToast('Đang tạo tệp PDF chứa mã QR của tất cả các bàn...')}
@@ -250,32 +327,35 @@ export default function TableManagementPage() {
         </div>
       </div>
 
-      {/* KPI Stats Bar */}
+      {/* 5 Thẻ KPI Thống Kê Tổng Quan */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '14px'
       }}>
+        {/* Thẻ 1 */}
         <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#89726B', fontSize: '0.8rem', fontWeight: 600 }}>
             <span>Tổng Số Bàn</span>
             <Icon name="table_restaurant" size={20} style={{ color: '#9D4124' }} />
           </div>
           <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#1F1B1A', marginTop: '6px' }}>
-            {tables.length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#89726B' }}>bàn ({totalSeats} chỗ)</span>
+            {totalTables} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#89726B' }}>bàn ({totalSeats} chỗ)</span>
           </div>
         </div>
 
+        {/* Thẻ 2 */}
         <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#89726B', fontSize: '0.8rem', fontWeight: 600 }}>
             <span>Đang Phục Vụ</span>
             <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#9D4124' }} />
           </div>
           <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#9D4124', marginTop: '6px' }}>
-            {occupiedTables} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#89726B' }}>bàn ({occupiedSeats} khách)</span>
+            {occupiedTables} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#89726B' }}>bàn ({occupiedGuests} khách)</span>
           </div>
         </div>
 
+        {/* Thẻ 3 */}
         <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#89726B', fontSize: '0.8rem', fontWeight: 600 }}>
             <span>Bàn Trống Sẵn Sàng</span>
@@ -286,6 +366,7 @@ export default function TableManagementPage() {
           </div>
         </div>
 
+        {/* Thẻ 4 */}
         <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#89726B', fontSize: '0.8rem', fontWeight: 600 }}>
             <span>Bàn Đã Đặt Trước</span>
@@ -296,6 +377,7 @@ export default function TableManagementPage() {
           </div>
         </div>
 
+        {/* Thẻ 5 */}
         <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#89726B', fontSize: '0.8rem', fontWeight: 600 }}>
             <span>Đã Khóa / Bảo Trì</span>
@@ -307,7 +389,7 @@ export default function TableManagementPage() {
         </div>
       </div>
 
-      {/* Filter and Zone Tabs */}
+      {/* Bộ lọc Phân Khu & Ô Tìm Kiếm */}
       <div style={{
         background: '#FFFFFF',
         borderRadius: '16px',
@@ -317,10 +399,14 @@ export default function TableManagementPage() {
         flexDirection: 'column',
         gap: '16px'
       }}>
-        {/* Zone Tabs */}
+        {/* Tabs Khu Vực */}
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {INITIAL_ZONES.map(z => {
+          {ZONES.map(z => {
             const isActive = selectedZone === z.id;
+            const count = z.id === 'ALL'
+              ? tables.length
+              : tables.filter(t => t.zone === z.id).length;
+
             return (
               <button
                 key={z.id}
@@ -339,13 +425,13 @@ export default function TableManagementPage() {
                   transition: 'all 0.15s ease'
                 }}
               >
-                {z.name}
+                {z.name} ({count})
               </button>
             );
           })}
         </div>
 
-        {/* Search & Status Filters */}
+        {/* Ô Tìm Kiếm & Lọc Trạng Thái */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '360px', background: '#FDF7F5', border: '1px solid #EAE0DE', borderRadius: '10px', padding: '8px 12px' }}>
             <Icon name="search" size={18} style={{ color: '#89726B' }} />
@@ -354,6 +440,7 @@ export default function TableManagementPage() {
               placeholder="Tìm theo mã bàn, tên bàn..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') loadData(); }}
               style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem', color: '#1F1B1A' }}
             />
           </div>
@@ -385,262 +472,196 @@ export default function TableManagementPage() {
         </div>
       </div>
 
-      {/* Grid of Tables */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-        gap: '16px'
-      }}>
-        {filteredTables.map(t => {
-          let statusBadge = { bg: '#E8F5E9', color: '#2E7D32', label: 'Bàn Trống', icon: 'check_circle' };
-          if (t.status === 'OCCUPIED') statusBadge = { bg: '#FFEBEE', color: '#C62828', label: 'Đang Phục Vụ', icon: 'restaurant' };
-          else if (t.status === 'RESERVED') statusBadge = { bg: '#FFF8E1', color: '#B45309', label: 'Đã Đặt', icon: 'schedule' };
-          else if (t.status === 'DIRTY') statusBadge = { bg: '#EDE7F6', color: '#4527A0', label: 'Cần Dọn', icon: 'cleaning_services' };
-          else if (t.status === 'BLOCKED') statusBadge = { bg: '#F5F5F4', color: '#57534E', label: 'Đã Khóa', icon: 'lock' };
+      {/* Danh Sách Thẻ Bàn (Grid of Tables) */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#89726B', fontSize: '0.95rem' }}>
+          <Icon name="sync" size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: '8px' }} />
+          <div>Đang tải dữ liệu sơ đồ bàn từ CSDL...</div>
+        </div>
+      ) : filteredTables.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', background: '#FFFFFF', borderRadius: '16px', border: '1px dashed #EAE0DE', color: '#89726B' }}>
+          <Icon name="table_restaurant" size={36} style={{ color: '#D1C2BE', marginBottom: '8px' }} />
+          <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1F1B1A' }}>Không tìm thấy bàn nào phù hợp</div>
+          <p style={{ fontSize: '0.85rem', margin: '4px 0 0' }}>Vui lòng kiểm tra lại bộ lọc hoặc bấm "Thêm Bàn Mới" để bổ sung.</p>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          gap: '16px'
+        }}>
+          {filteredTables.map(t => {
+            let statusBadge = { bg: '#E8F5E9', color: '#2E7D32', label: 'Bàn Trống', icon: 'check_circle' };
+            if (t.status === 'OCCUPIED') statusBadge = { bg: '#FFEBEE', color: '#C62828', label: 'Đang Phục Vụ', icon: 'restaurant' };
+            else if (t.status === 'RESERVED') statusBadge = { bg: '#FFF8E1', color: '#B45309', label: 'Đã Đặt', icon: 'schedule' };
+            else if (t.status === 'DIRTY') statusBadge = { bg: '#EDE7F6', color: '#4527A0', label: 'Cần Dọn', icon: 'cleaning_services' };
+            else if (t.status === 'BLOCKED') statusBadge = { bg: '#F5F5F4', color: '#57534E', label: 'Đã Khóa', icon: 'lock' };
 
-          return (
-            <div
-              key={t.id}
-              style={{
-                background: '#FFFFFF',
-                borderRadius: '16px',
-                border: t.status === 'BLOCKED' ? '1.5px dashed #D1D5DB' : '1px solid #F0E6E4',
-                padding: '16px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '14px',
-                opacity: t.status === 'BLOCKED' ? 0.9 : 1,
-                transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-              }}
-            >
-              {/* Table Card Top */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <div>
-                    <span style={{
-                      fontFamily: "'Epilogue', sans-serif",
-                      fontWeight: 900,
-                      fontSize: '1.25rem',
-                      color: '#1F1B1A'
-                    }}>
-                      {t.code}
-                    </span>
-                    <h4 style={{ margin: '2px 0 0', fontSize: '0.85rem', fontWeight: 600, color: '#56423D' }}>
-                      {t.name}
-                    </h4>
-                  </div>
+            const billDisplay = t.currentBill ? Number(t.currentBill).toLocaleString('vi-VN') + '₫' : '0₫';
 
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    background: statusBadge.bg,
-                    color: statusBadge.color,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    <Icon name={statusBadge.icon} size={13} style={{ color: statusBadge.color }} />
-                    {statusBadge.label}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#89726B' }}>
-                  <Icon name="location_on" size={14} />
-                  <span>{t.zoneName}</span>
-                </div>
-              </div>
-
-              {/* Table Stats */}
-              <div style={{
-                background: '#FFF8F6',
-                borderRadius: '10px',
-                padding: '10px 12px',
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px',
-                fontSize: '0.78rem'
-              }}>
+            return (
+              <div
+                key={t.id}
+                style={{
+                  background: '#FFFFFF',
+                  borderRadius: '16px',
+                  border: t.status === 'BLOCKED' ? '1.5px dashed #D1D5DB' : '1px solid #F0E6E4',
+                  padding: '16px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                  opacity: t.status === 'BLOCKED' ? 0.9 : 1,
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                }}
+              >
+                {/* Table Card Top */}
                 <div>
-                  <span style={{ color: '#89726B', display: 'block' }}>Sức chứa:</span>
-                  <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{t.capacity} chỗ ({t.shape === 'ROUND' ? 'Bàn tròn' : 'Bàn vuông'})</span>
-                </div>
-
-                <div>
-                  <span style={{ color: '#89726B', display: 'block' }}>Thực tế:</span>
-                  <span style={{ fontWeight: 700, color: t.guests > 0 ? '#9D4124' : '#1F1B1A' }}>
-                    {t.guests > 0 ? `${t.guests} khách` : '0 khách'}
-                  </span>
-                </div>
-
-                {t.status === 'OCCUPIED' && (
-                  <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#89726B' }}>Hóa đơn hiện tại:</span>
-                    <span style={{ fontWeight: 800, color: '#9D4124' }}>{t.currentBill.toLocaleString('vi-VN')}₫</span>
-                  </div>
-                )}
-
-                {t.status === 'RESERVED' && (
-                  <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#89726B' }}>Thời gian hẹn:</span>
-                      <span style={{ fontWeight: 800, color: '#B45309' }}>{t.timeIn || 'Chưa định giờ'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div>
+                      <span style={{
+                        fontFamily: "'Epilogue', sans-serif",
+                        fontWeight: 900,
+                        fontSize: '1.25rem',
+                        color: '#1F1B1A'
+                      }}>
+                        {t.code}
+                      </span>
+                      <h4 style={{ margin: '2px 0 0', fontSize: '0.85rem', fontWeight: 600, color: '#56423D' }}>
+                        {t.name}
+                      </h4>
                     </div>
-                    {t.reservationInfo && (
-                      <div style={{ fontSize: '0.72rem', color: '#56423D' }}>
-                        Khách: <strong>{t.reservationInfo}</strong>
-                      </div>
-                    )}
-                  </div>
-                )}
 
-                {t.status === 'BLOCKED' && (
-                  <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#89726B' }}>Lý do khóa:</span>
-                    <span style={{ fontWeight: 700, color: '#57534E' }}>{t.blockedReason || 'Bảo trì bàn'}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions Footer */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderTop: '1px solid #F6ECEA', paddingTop: '12px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedQrTable(t)}
-                    style={{
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: statusBadge.bg,
+                      color: statusBadge.color,
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '3px',
-                      padding: '6px 8px',
-                      borderRadius: '8px',
-                      background: '#FDF7F5',
-                      border: '1px solid #EAE0DE',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      color: '#9D4124',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Icon name="qr_code_2" size={15} />
-                    QR
-                  </button>
+                      gap: '4px'
+                    }}>
+                      <Icon name={statusBadge.icon} size={13} style={{ color: statusBadge.color }} />
+                      {statusBadge.label}
+                    </span>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenStatusModal(t)}
-                    title="Cài đặt trạng thái bàn, khóa bàn hoặc thời gian đặt"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      padding: '6px 8px',
-                      borderRadius: '8px',
-                      background: '#FFFFFF',
-                      border: '1px solid #9D4124',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      color: '#9D4124',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Icon name="tune" size={15} />
-                    Đổi TT
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#89726B' }}>
+                    <Icon name="location_on" size={14} />
+                    <span>{t.zoneName}</span>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {t.status === 'BLOCKED' && (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        background: '#059669',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Mở Khóa
-                    </button>
-                  )}
+                {/* Table Stats (Đã bỏ shape) */}
+                <div style={{
+                  background: '#FFF8F6',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '8px',
+                  fontSize: '0.78rem'
+                }}>
+                  <div>
+                    <span style={{ color: '#89726B', display: 'block' }}>Sức chứa:</span>
+                    <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{t.capacity} chỗ</span>
+                  </div>
 
-                  {t.status === 'DIRTY' && (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        background: '#059669',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Đã Dọn
-                    </button>
-                  )}
+                  <div>
+                    <span style={{ color: '#89726B', display: 'block' }}>Thực tế:</span>
+                    <span style={{ fontWeight: 700, color: t.guests > 0 ? '#9D4124' : '#1F1B1A' }}>
+                      {t.guests > 0 ? `${t.guests} khách` : '0 khách'}
+                    </span>
+                  </div>
 
-                  {t.status === 'AVAILABLE' && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenStatusModal(t, 'BLOCKED')}
-                        title="Khóa bàn"
-                        style={{
-                          padding: '6px 8px',
-                          borderRadius: '8px',
-                          background: '#F3F4F6',
-                          color: '#374151',
-                          border: '1px solid #D1D5DB',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px'
-                        }}
-                      >
-                        <Icon name="lock" size={13} /> Khóa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenStatusModal(t, 'RESERVED')}
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          background: '#FEF3C7',
-                          color: '#78350F',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Đặt Bàn
-                      </button>
-                    </>
+                  {t.status === 'OCCUPIED' && (
+                    <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#89726B' }}>Hóa đơn hiện tại:</span>
+                      <span style={{ fontWeight: 800, color: '#9D4124' }}>{billDisplay}</span>
+                    </div>
                   )}
 
                   {t.status === 'RESERVED' && (
-                    <>
+                    <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#89726B' }}>Thời gian hẹn:</span>
+                        <span style={{ fontWeight: 800, color: '#B45309' }}>{t.reservedTime || t.timeIn || 'Chưa định giờ'}</span>
+                      </div>
+                      {t.reservationInfo && (
+                        <div style={{ fontSize: '0.72rem', color: '#56423D' }}>
+                          Khách: <strong>{t.reservationInfo}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {t.status === 'BLOCKED' && (
+                    <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#89726B' }}>Lý do khóa:</span>
+                      <span style={{ fontWeight: 700, color: '#57534E' }}>{t.blockedReason || 'Bảo trì bàn'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions Footer */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderTop: '1px solid #F6ECEA', paddingTop: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedQrTable(t)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        background: '#FDF7F5',
+                        border: '1px solid #EAE0DE',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: '#9D4124',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Icon name="qr_code_2" size={15} />
+                      QR
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenStatusModal(t)}
+                      title="Cài đặt trạng thái bàn, khóa bàn hoặc thời gian đặt"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        background: '#FFFFFF',
+                        border: '1px solid #9D4124',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: '#9D4124',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Icon name="tune" size={15} />
+                      Đổi TT
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {t.status === 'BLOCKED' && (
                       <button
                         type="button"
-                        onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
+                        onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
                         style={{
-                          padding: '6px 8px',
+                          padding: '6px 10px',
                           borderRadius: '8px',
-                          background: '#9D4124',
+                          background: '#059669',
                           color: '#FFFFFF',
                           border: 'none',
                           fontSize: '0.75rem',
@@ -648,34 +669,115 @@ export default function TableManagementPage() {
                           cursor: 'pointer'
                         }}
                       >
-                        Nhận Bàn
+                        Mở Khóa
                       </button>
+                    )}
+
+                    {t.status === 'DIRTY' && (
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
                         style={{
-                          padding: '6px 8px',
+                          padding: '6px 10px',
                           borderRadius: '8px',
-                          background: '#F0E6E4',
-                          color: '#56423D',
+                          background: '#059669',
+                          color: '#FFFFFF',
                           border: 'none',
                           fontSize: '0.75rem',
                           fontWeight: 700,
                           cursor: 'pointer'
                         }}
                       >
-                        Hủy
+                        Đã Dọn
                       </button>
-                    </>
-                  )}
+                    )}
+
+                    {t.status === 'AVAILABLE' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(t, 'BLOCKED')}
+                          title="Khóa bàn"
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            background: '#F3F4F6',
+                            color: '#374151',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}
+                        >
+                          <Icon name="lock" size={13} /> Khóa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(t, 'RESERVED')}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            background: '#FEF3C7',
+                            color: '#78350F',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Đặt Bàn
+                        </button>
+                      </>
+                    )}
+
+                    {t.status === 'RESERVED' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            background: '#9D4124',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Nhận Bàn
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            background: '#F0E6E4',
+                            color: '#56423D',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Hủy
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* MODAL: XEM VÀ IN MÃ QR CỦA BÀN */}
+      {/* MODAL 1: XEM VÀ IN MÃ QR CỦA BÀN */}
       {selectedQrTable && (
         <div style={{
           position: 'fixed',
@@ -683,7 +785,7 @@ export default function TableManagementPage() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
+          background: 'rgba(0,0,0,0.65)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
@@ -694,11 +796,11 @@ export default function TableManagementPage() {
           <div style={{
             background: '#FFFFFF',
             borderRadius: '24px',
-            maxWidth: '380px',
+            maxWidth: '420px',
             width: '100%',
             padding: '28px',
-            textAlign: 'center',
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+            textAlign: 'center',
             position: 'relative'
           }}>
             <button
@@ -722,86 +824,96 @@ export default function TableManagementPage() {
               <Icon name="close" size={18} />
             </button>
 
-            <span style={{ fontSize: '0.78rem', color: '#9D4124', fontWeight: 800, background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px' }}>
-              QR ORDER TẠI BÀN
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9D4124', background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px' }}>
+              Tem Bàn QR Code
             </span>
 
-            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.4rem', color: '#1F1B1A', margin: '10px 0 2px' }}>
-              {selectedQrTable.code} - {selectedQrTable.name}
+            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.5rem', color: '#1F1B1A', margin: '8px 0 2px' }}>
+              {selectedQrTable.code}
             </h3>
-            <p style={{ fontSize: '0.8rem', color: '#89726B', margin: '0 0 16px' }}>
-              {selectedQrTable.zoneName} • Sức chứa {selectedQrTable.capacity} khách
+            <p style={{ margin: 0, color: '#89726B', fontSize: '0.85rem' }}>
+              {selectedQrTable.name} — {selectedQrTable.zoneName}
             </p>
 
+            {/* QR Image Box */}
             <div style={{
-              background: '#FFF8F6',
-              padding: '16px',
-              borderRadius: '16px',
-              border: '2px dashed #9D4124',
-              display: 'inline-block',
-              marginBottom: '16px'
+              background: '#FDF7F5',
+              padding: '20px',
+              borderRadius: '20px',
+              border: '2px dashed #EAE0DE',
+              margin: '20px 0',
+              display: 'inline-block'
             }}>
               <img
-                src={selectedQrTable.qrUrl}
-                alt={`QR ${selectedQrTable.code}`}
-                style={{ width: '180px', height: '180px', display: 'block' }}
+                src={selectedQrTable.qrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/${selectedQrTable.code}`}
+                alt={`Mã QR ${selectedQrTable.code}`}
+                style={{ width: '200px', height: '200px', borderRadius: '12px', display: 'block' }}
               />
-              <span style={{ fontSize: '0.72rem', color: '#56423D', marginTop: '8px', display: 'block', fontWeight: 600 }}>
-                Quét để mở Menu & Gọi món
+              <span style={{ display: 'block', fontSize: '0.72rem', color: '#89726B', marginTop: '8px', fontWeight: 600 }}>
+                Token: {selectedQrTable.qrToken || 'qr-secret-key'}
               </span>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <p style={{ fontSize: '0.8rem', color: '#56423D', margin: '0 0 20px', lineHeight: 1.4 }}>
+              Thực khách chỉ cần dùng camera điện thoại quét mã trên mặt bàn để tự động vào thực đơn và gọi món.
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => {
-                  showToast(`Đã gửi lệnh in mã QR cho ${selectedQrTable.code}`);
-                  setSelectedQrTable(null);
-                }}
+                onClick={() => handleRefreshQrToken(selectedQrTable.id)}
+                title="Tái tạo token mới nếu tem dán bàn cũ bị lộ"
                 style={{
                   flex: 1,
                   padding: '12px',
                   borderRadius: '12px',
-                  background: '#9D4124',
-                  color: '#FFFFFF',
-                  border: 'none',
+                  background: '#F6ECEA',
+                  border: '1px solid #EAE0DE',
                   fontWeight: 700,
-                  fontSize: '0.85rem',
+                  fontSize: '0.8rem',
+                  color: '#9D4124',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
-                  cursor: 'pointer'
+                  gap: '4px'
                 }}
               >
-                <Icon name="print" size={18} />
-                In Thẻ Bàn
+                <Icon name="refresh" size={16} />
+                Đổi Token
               </button>
 
               <button
                 type="button"
                 onClick={() => {
                   window.open(selectedQrTable.qrUrl, '_blank');
+                  showToast('Đang mở ảnh QR để in...');
                 }}
                 style={{
-                  padding: '12px 16px',
+                  flex: 1.5,
+                  padding: '12px',
                   borderRadius: '12px',
-                  background: '#F0E6E4',
-                  color: '#56423D',
+                  background: '#9D4124',
                   border: 'none',
                   fontWeight: 700,
                   fontSize: '0.85rem',
-                  cursor: 'pointer'
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
               >
-                Tải Về
+                <Icon name="print" size={18} />
+                In Tem Mã QR
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: THÊM BÀN MỚI */}
+      {/* MODAL 2: THÊM BÀN MỚI (Đã loại bỏ shape hoàn toàn) */}
       {showAddModal && (
         <div style={{
           position: 'fixed',
@@ -844,7 +956,7 @@ export default function TableManagementPage() {
             <form onSubmit={handleCreateTable} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
-                  Mã Bàn (VD: T-09, VIP-04) <span style={{ color: '#BA1A1A' }}>*</span>
+                  Mã Bàn (VD: T-11, VIP-04) <span style={{ color: '#BA1A1A' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -976,7 +1088,7 @@ export default function TableManagementPage() {
         </div>
       )}
 
-      {/* MODAL: CÀI ĐẶT TRẠNG THÁI BÀN (KHÓA BÀN / ĐẶT BÀN VỚI THỜI GIAN ĐẶT) */}
+      {/* MODAL 3: CÀI ĐẶT TRẠNG THÁI BÀN (KHÓA / ĐẶT CHỖ / DỌN DẸP) */}
       {statusModalTable && (
         <div style={{
           position: 'fixed',
@@ -1033,7 +1145,7 @@ export default function TableManagementPage() {
               </div>
             </div>
 
-            {/* Status Choices */}
+            {/* Lựa Chọn Trạng Thái */}
             <div style={{ marginBottom: '18px' }}>
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1F1B1A', marginBottom: '8px' }}>
                 Chọn trạng thái bàn:
@@ -1074,7 +1186,7 @@ export default function TableManagementPage() {
               </div>
             </div>
 
-            {/* Conditional Sub-forms */}
+            {/* Form Phụ Khi Chọn ĐẶT TRƯỚC */}
             {statusForm.status === 'RESERVED' && (
               <div style={{ background: '#FFFDF0', padding: '14px', borderRadius: '14px', border: '1px solid #FDE68A', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
@@ -1118,6 +1230,7 @@ export default function TableManagementPage() {
               </div>
             )}
 
+            {/* Form Phụ Khi Chọn KHÓA BÀN */}
             {statusForm.status === 'BLOCKED' && (
               <div style={{ background: '#F9FAFB', padding: '14px', borderRadius: '14px', border: '1px solid #E5E7EB', marginBottom: '18px' }}>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
@@ -1133,6 +1246,7 @@ export default function TableManagementPage() {
               </div>
             )}
 
+            {/* Form Phụ Khi Chọn ĐANG PHỤC VỤ */}
             {statusForm.status === 'OCCUPIED' && (
               <div style={{ background: '#FEF2F2', padding: '14px', borderRadius: '14px', border: '1px solid #FECACA', marginBottom: '18px' }}>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#991B1B', marginBottom: '4px' }}>
