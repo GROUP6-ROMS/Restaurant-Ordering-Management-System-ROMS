@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth") // Tien to endpoint xac thuc (da permitAll trong SecurityConfig)
+@RequestMapping("/api/auth")
 public class AuthController {
 
     private final AuthService authService;
@@ -22,21 +22,21 @@ public class AuthController {
         this.authService = authService;
     }
 
-    // Endpoint dang nhap he thong: POST /api/auth/login
+    // POST /api/auth/login - Dang nhap ca truc
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(response, "Đăng nhập ca làm việc thành công!"));
     }
 
-    // Endpoint xac thuc ma PIN cua Quan ly: POST /api/auth/verify-manager-pin
+    // POST /api/auth/verify-manager-pin - Quan ly phe duyet
     @PostMapping("/verify-manager-pin")
     public ResponseEntity<ApiResponse<Boolean>> verifyManagerPin(@Valid @RequestBody VerifyManagerPinRequest request) {
         boolean isValid = authService.verifyManagerPin(request);
         return ResponseEntity.ok(ApiResponse.success(isValid, "Xác thực mã PIN Quản lý thành công!"));
     }
 
-    // Endpoint dang xuat ca truc: POST /api/auth/logout
+    // POST /api/auth/logout - Dang xuat ca truc (Cap nhat isOnShift = false)
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@RequestBody(required = false) Map<String, String> body,
                                                     Authentication authentication) {

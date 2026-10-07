@@ -11,6 +11,7 @@ public interface AuthService {
     // Xac thuc ma PIN cua Quan ly
     boolean verifyManagerPin(com.romsteam.roms.dto.request.VerifyManagerPinRequest request);
 
-    // Dang xuat: neu da het ca hoac ket thuc ca thi cap nhat isOnShift = false
+    // Khi nhan vien bam Dang xuat, he thong cap nhat isOnShift = false.
+    // LUU Y: Trong luc dang truc, du qua gio ca nhan vien van thao tac tren web binh thuong, chi bi chan khi da logout va co tinh dang nhap lai.
     void logout(String username);
 }

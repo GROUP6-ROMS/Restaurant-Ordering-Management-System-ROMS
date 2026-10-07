@@ -2,12 +2,12 @@
 
 ## 1. Bước Này Làm Gì?
 - Tạo enum `UserRole` đại diện cho các vai trò của nhân viên trong quán: `MANAGER`, `WAITER`, `KITCHEN`, `CASHIER`.
-- Tạo enum `ShiftType` đại diện cho các ca làm việc trong ngày (`MORNING`, `EVENING`, `FULL_DAY`, `NONE`) kèm logic kiểm tra khung giờ hợp lệ (cho phép vào ca trước giờ mở ca 15 phút).
-- Tạo entity `Staff` ánh xạ vào bảng `staffs` trong CSDL để quản lý tài khoản nhân viên, mã PIN 6 số băm BCrypt, ca trực được phân công (`assignedShift`) và trạng thái đang trong ca (`isOnShift`).
+- Tạo enum `ShiftType` đại diện cho 2 ca làm việc chuẩn trong ngày (`MORNING`: 06:00 - 14:00, `EVENING`: 14:00 - 22:00) kèm logic kiểm tra khung giờ hợp lệ (cho phép vào ca trước giờ mở ca 15 phút). Không cần ca `FULL_DAY` vì nhân viên làm cả ngày sẽ được xếp 2 ca (Ca Sáng và Ca Tối) trong bảng `staff_schedules`.
+- Tạo entity `Staff` ánh xạ vào bảng `staffs` trong CSDL để quản lý tài khoản nhân viên, mã PIN 6 số băm BCrypt, vai trò (`role`) và trạng thái đang trong ca (`isOnShift`). **Lưu ý:** Không lưu ca làm việc trên bảng `staffs` vì toàn bộ lịch làm việc được chuẩn hóa lưu trữ trong bảng riêng `staff_schedules`.
 - **Sử dụng Lombok:** Dùng các annotation `@Getter`, `@Setter`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Builder` để loại bỏ toàn bộ boilerplate code.
 - **Quy tắc quan trọng về xác thực:** 
   1. Nhân viên đăng nhập vào ca làm việc bằng **Tên đăng nhập / Mã nhân viên (`username`)** và **Mã PIN 6 chữ số (`pinCode`)**, **HOÀN TOÀN KHÔNG SỬ DỤNG PASSWORD**.
-  2. **Ràng buộc phân ca (Shift Enforcement):** Ngoại trừ `MANAGER` (luôn được phép đăng nhập), mọi nhân viên khác (`WAITER`, `KITCHEN`, `CASHIER`) **bắt buộc phải được Quản lý phân công ca làm việc** (`assignedShift != NONE`) và **chỉ được đăng nhập trong khung giờ ca trực** (cho phép sớm hơn 15 phút).
+  2. **Ràng buộc phân ca đa ngày (Multi-day Shift Enforcement):** Ngoại trừ `MANAGER` (luôn được phép đăng nhập), mọi nhân viên khác (`WAITER`, `KITCHEN`, `CASHIER`) **bắt buộc phải có lịch làm việc trong ngày hôm nay (`LocalDate.now()`)** trong bảng `staff_schedules` và **chỉ được đăng nhập trong khung giờ ca trực** (cho phép sớm hơn 15 phút).
 
 ---
 
@@ -32,7 +32,7 @@ public enum UserRole {
 
 ### File 2: `ShiftType.java`
 - **Đường dẫn:** `src/main/java/com/romsteam/roms/entity/enums/ShiftType.java`
-- **Chức năng:** Định nghĩa các ca làm việc trong ngày và phương thức kiểm tra giờ vào ca hợp lệ (cho phép trước 15 phút).
+- **Chức năng:** Định nghĩa các ca làm việc chuẩn trong ngày và phương thức kiểm tra giờ vào ca hợp lệ (cho phép trước 15 phút).
 
 ```java
 package com.romsteam.roms.entity.enums;
@@ -40,10 +40,8 @@ package com.romsteam.roms.entity.enums;
 import java.time.LocalTime;
 
 public enum ShiftType {
-    NONE("Chưa phân ca", null, null),
     MORNING("Ca Sáng", LocalTime.of(6, 0), LocalTime.of(14, 0)),
-    EVENING("Ca Tối", LocalTime.of(14, 0), LocalTime.of(22, 0)),
-    FULL_DAY("Ca Cả Ngày", LocalTime.of(6, 0), LocalTime.of(23, 0));
+    EVENING("Ca Tối", LocalTime.of(14, 0), LocalTime.of(22, 0));
 
     private final String label;
     private final LocalTime startTime;
@@ -75,12 +73,11 @@ public enum ShiftType {
 
 ### File 3: `Staff.java`
 - **Đường dẫn:** `src/main/java/com/romsteam/roms/entity/Staff.java`
-- **Chức năng:** Đại diện cho bảng `staffs` trong SQL Server, lưu thông tin tài khoản đăng nhập (Username và Mã PIN 6 số đã băm BCrypt), vai trò, ca làm việc được phân công và trạng thái trực ca.
+- **Chức năng:** Đại diện cho bảng `staffs` trong SQL Server, lưu thông tin tài khoản đăng nhập (Username và Mã PIN 6 số đã băm BCrypt), vai trò (`role`) và trạng thái đang trong ca trực (`isOnShift`).
 
 ```java
 package com.romsteam.roms.entity;
 
-import com.romsteam.roms.entity.enums.ShiftType;
 import com.romsteam.roms.entity.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -128,15 +125,9 @@ public class Staff {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    // Ca làm việc được Quản lý phân công (NONE, MORNING, EVENING, FULL_DAY)
-    @Enumerated(EnumType.STRING)
-    @Column(name = "assigned_shift", length = 30)
-    @Builder.Default
-    private ShiftType assignedShift = ShiftType.NONE;
-
     // Trạng thái thực tế có đang trực trong ca hay không (true sau khi login, false sau khi logout)
     @Builder.Default
-    @Column(name = "is_on_shift", nullable = false)
+    @Column(name = "is_on_shift", nullable = false, columnDefinition = "BIT DEFAULT 0")
     private Boolean isOnShift = false;
 
     @CreationTimestamp
