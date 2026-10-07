@@ -37,10 +37,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + staff.getRole().name());
 
         // 4. Tra ve doi tuong User chuan cua Spring Security
-        // LUU Y QUAN TRONG: Can lay mat khau da ma hoa (staff.getPassword()) de Spring Security doi chieu voi mat khau nguoi dung nhap
+        // LUU Y: Su dung ma PIN da ma hoa BCrypt (staff.getPinCode()) lam mat khau/credentials
         return new User(
                 staff.getUsername(),
-                staff.getPassword(), // Mat khau BCrypt lay tu Entity Staff
+                staff.getPinCode(), // Ma PIN BCrypt lay tu Entity Staff
                 Collections.singletonList(authority)
         );
     }

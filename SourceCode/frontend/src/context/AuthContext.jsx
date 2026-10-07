@@ -28,45 +28,25 @@ export function AuthProvider({ children }) {
 
   const [token, setToken] = useState(() => localStorage.getItem('roms_token') || null);
 
-  const login = (username, password, explicitRole = null, customFullName = null) => {
-    let role = explicitRole || 'WAITER';
-    let fullName = customFullName || 'Nhân Viên Phục Vụ';
+  const login = async (username, pinCode) => {
+    try {
+      // 1. Gọi API Backend thật
+      const response = await authApi.login(username, pinCode);
 
-    if (!explicitRole) {
-      const u = username.toLowerCase();
-      if (u.includes('admin') || u.includes('manager') || u.includes('mgr')) {
-        role = 'MANAGER';
-      } else if (u.includes('kitchen') || u.includes('bep')) {
-        role = 'KITCHEN';
-      } else if (u.includes('cashier') || u.includes('thungan')) {
-        role = 'CASHIER';
-      } else {
-        role = 'WAITER';
-      }
+      // Backend trả về: { success: true, data: { token, id, username, fullName, role } }
+      const { token, id, fullName, role } = response.data.data;
+      const userData = { id, username, fullName, role };
+      // 2. Lưu token và thông tin user vào localStorage
+      localStorage.setItem('roms_token', token);
+      localStorage.setItem('roms_user', JSON.stringify(userData));
+      // 3. Cập nhật state
+      setToken(token);
+      setUser(userData);
+      return { success: true, role };
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!';
+      return { success: false, message: errorMsg };
     }
-
-    if (!customFullName) {
-      if (role === 'MANAGER' || role === 'ADMIN') {
-        fullName = 'Trần Anh Thư (Quản Lý)';
-      } else if (role === 'KITCHEN') {
-        fullName = 'Vũ Đức Thắng (Bếp Trưởng)';
-      } else if (role === 'CASHIER') {
-        fullName = 'Hoàng Hải Yến (Thu Ngân)';
-      } else {
-        fullName = 'Nguyễn Văn An (Bồi Bàn)';
-      }
-    }
-
-    const userData = { username, fullName, role };
-    const fakeToken = 'jwt-mock-' + Date.now();
-
-    setUser(userData);
-    setToken(fakeToken);
-
-    localStorage.setItem('roms_user', JSON.stringify(userData));
-    localStorage.setItem('roms_token', fakeToken);
-
-    return { success: true, user: userData };
   };
 
   const logout = () => {

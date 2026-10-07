@@ -34,11 +34,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse login(LoginRequest request) {
         try {
-            // 1. Thuc hien xac thuc username va password qua Spring Security AuthenticationManager
+            // 1. Thuc hien xac thuc username va pinCode qua Spring Security AuthenticationManager
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getUsername(),
-                            request.getPassword()
+                            request.getPinCode()
                     )
             );
 
@@ -62,8 +62,8 @@ public class AuthServiceImpl implements AuthService {
             );
 
         } catch (BadCredentialsException e) {
-            // Nem ngoai le neu sai ten dang nhap hoac mat khau
-            throw new AppException("Sai ten dang nhap hoac mat khau!", HttpStatus.UNAUTHORIZED);
+            // Nem ngoai le neu sai ten dang nhap hoac ma PIN
+            throw new AppException("Sai tên đăng nhập hoặc mã PIN!", HttpStatus.UNAUTHORIZED);
         }
     }
 }

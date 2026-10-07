@@ -8,9 +8,10 @@ public class LoginRequest {
     @NotBlank(message = "Ten dang nhap khong duoc de trong")
     private String username;
 
-    // Mat khau dang nhap (khong duoc de trong)
-    @NotBlank(message = "Mat khau khong duoc de trong")
-    private String password;
+    // Ma PIN 6 chu so (bat buoc, dung dinh dang 6 chu so)
+    @NotBlank(message = "Mã PIN không được để trống")
+    @jakarta.validation.constraints.Pattern(regexp = "^\\d{6}$", message = "Mã PIN phải gồm đúng 6 chữ số")
+    private String pinCode;
 
     // ===================================================================
     // CONSTRUCTORS
@@ -19,9 +20,9 @@ public class LoginRequest {
     public LoginRequest() {
     }
 
-    public LoginRequest(String username, String password) {
+    public LoginRequest(String username, String pinCode) {
         this.username = username;
-        this.password = password;
+        this.pinCode = pinCode;
     }
 
     // ===================================================================
@@ -36,11 +37,11 @@ public class LoginRequest {
         this.username = username;
     }
 
-    public String getPassword() {
-        return password;
+    public String getPinCode() {
+        return pinCode;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    public void setPinCode(String pinCode) {
+        this.pinCode = pinCode;
     }
 }
