@@ -6,9 +6,9 @@ import RomsLogo from '../../components/common/RomsLogo';
 
 const PRESET_ACCOUNTS = [
   { role: 'MANAGER', roleLabel: 'Quản Lý', code: 'MGR-001', pin: '123456', name: 'Dương Trong', icon: 'shield_person', color: '#9D4124' },
-  { role: 'WAITER', roleLabel: 'Phục Vụ', code: 'EMP-001', pin: '123456', name: 'Phạm Minh Đức', icon: 'room_service', color: '#596232' },
-  { role: 'KITCHEN', roleLabel: 'Bếp KDS', code: 'KDS-001', pin: '123456', name: 'Ngô Viết Bảo Huy', icon: 'cooking', color: '#D97706' },
-  { role: 'CASHIER', roleLabel: 'Thu Ngân', code: 'CSH-001', pin: '123456', name: 'Đỗ Võ Thanh Trung', icon: 'point_of_sale', color: '#BA1A1A' },
+  { role: 'WAITER', roleLabel: 'Phục Vụ', code: 'EMP-001', pin: '123456', name: 'Phạm Minh Đức', icon: 'room_service', color: '#9D4124' },
+  { role: 'KITCHEN', roleLabel: 'Bếp KDS', code: 'KDS-001', pin: '123456', name: 'Ngô Viết Bảo Huy', icon: 'cooking', color: '#9D4124' },
+  { role: 'CASHIER', roleLabel: 'Thu Ngân', code: 'CSH-001', pin: '123456', name: 'Đỗ Võ Thanh Trung', icon: 'point_of_sale', color: '#9D4124' },
 ];
 
 export default function StaffLoginPage() {

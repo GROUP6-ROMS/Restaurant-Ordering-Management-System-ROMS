@@ -1,6 +1,5 @@
 package com.romsteam.roms.entity;
 
-import com.romsteam.roms.entity.enums.ShiftType;
 import com.romsteam.roms.entity.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -9,9 +8,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-// Khai bao lop nay la mot Entity tuong ung voi mot bang trong CSDL
 @Entity
-@Table(name = "staffs") // Ten bang luu tru trong SQL Server
+@Table(name = "staffs")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,54 +17,45 @@ import java.time.LocalDateTime;
 @Builder
 public class Staff {
 
-    // Khoa chinh tu tang (IDENTITY trong SQL Server)
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Ten dang nhap (bat buoc, duy nhat, khong trung lap giua cac nhan vien)
+    // Tên đăng nhập / Mã nhân viên (ví dụ: MGR-001, EMP-001)
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
 
-    // Ma PIN 6 so cua nhan vien (duoc ma hoa BCrypt, bat buoc de dang nhap ca lam viec)
+    // Mã PIN 6 chữ số băm BCrypt (không dùng password thông thường)
     @Column(name = "pin_code", nullable = false, length = 255)
     private String pinCode;
 
-    // Ho va ten day du cua nhan vien
+    // Họ và tên đầy đủ nhân viên (hỗ trợ tiếng Việt Unicode)
     @Column(name = "full_name", nullable = false, columnDefinition = "NVARCHAR(100)")
     private String fullName;
 
-    // So dien thoai lien he
+    // Số điện thoại liên hệ
     @Column(name = "phone", length = 15)
     private String phone;
 
-    // Vai tro cua nhan vien (luu duoi dang chuoi chu trong DB: MANAGER, WAITER, KITCHEN, CASHIER)
+    // Vai trò (MANAGER, WAITER, KITCHEN, CASHIER)
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     private UserRole role;
 
-    // Trang thai tai khoan: true = dang lam viec, false = da nghi viec hoac bi khoa tai khoan
+    // Trạng thái tài khoản (true = hoạt động, false = khóa/nghỉ việc)
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    // Ca lam viec duoc Quan ly phan cong (NONE, MORNING, EVENING, FULL_DAY)
-    @Enumerated(EnumType.STRING)
-    @Column(name = "assigned_shift", length = 30)
+    // Trạng thái thực tế có đang trực trong ca hay không (true sau khi login, false sau khi logout)
     @Builder.Default
-    private ShiftType assignedShift = ShiftType.NONE;
-
-    // Trang thai thuc te co dang trong ca lam viec hay khong (true sau khi dang nhap vao ca, false khi ket thuc ca/logout)
-    @Builder.Default
-    @Column(name = "is_on_shift", nullable = false)
+    @Column(name = "is_on_shift", nullable = false, columnDefinition = "BIT DEFAULT 0")
     private Boolean isOnShift = false;
 
-    // Thoi diem tao tai khoan (Hibernate tu dong dien gia tri luc thuc hien lenh INSERT)
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Thoi diem sua doi thong tin gan nhat (Hibernate tu dong cap nhat luc chay lenh UPDATE)
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

@@ -3,7 +3,6 @@ import { authApi } from '../api/authApi';
 
 const AuthContext = createContext();
 
-// Helper dinh vi trang chu chuan xac cho tung role
 export function getRoleHome(role) {
   switch (role?.toUpperCase()) {
     case 'MANAGER':
@@ -31,7 +30,6 @@ export function AuthProvider({ children }) {
 
   const login = async (username, pinCode) => {
     try {
-      // 1. Gọi API Backend thật
       const response = await authApi.login(username, pinCode);
 
       // Backend trả về: { success: true, data: { accessToken, tokenType, id, username, fullName, role, assignedShift, isOnShift } }
@@ -40,11 +38,9 @@ export function AuthProvider({ children }) {
       const { id, fullName, role, assignedShift, isOnShift } = resData;
       const userData = { id, username: resData.username || username, fullName, role, assignedShift, isOnShift };
 
-      // 2. Lưu token và thông tin user vào localStorage
       localStorage.setItem('roms_token', authToken);
       localStorage.setItem('roms_user', JSON.stringify(userData));
 
-      // 3. Cập nhật state
       setToken(authToken);
       setUser(userData);
       return { success: true, role };

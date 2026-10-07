@@ -15,17 +15,19 @@
    - `WAITER`: Phục vụ sảnh bàn, sơ đồ bàn, nhận order bàn, phục vụ nước đóng chai (`/waiter/*`).
    - `KITCHEN`: Màn hình điều phối chế biến Bếp KDS (`/kitchen/*`).
    - `CASHIER`: Thu ngân thanh toán hóa đơn, in bill, đóng ca két tiền (`/pos/*`).
-5. **Ràng buộc phân ca & giờ trực (Shift Enforcement):**
-   - **Với Quản lý (`MANAGER`):** Luôn được phép đăng nhập mọi lúc để mở cửa quán, phân ca nhân sự và giám sát vận hành.
+5. **Ràng buộc phân ca theo ngày & giờ trực (Multi-Day Shift Enforcement):**
+   - **Với Quản lý (`MANAGER`):** Luôn được phép đăng nhập mọi lúc để mở cửa quán, xếp lịch cho nhân viên và giám sát vận hành.
    - **Với Nhân viên thường (`WAITER`, `KITCHEN`, `CASHIER`):**
-     - Bắt buộc phải được Quản lý phân công ca làm việc (`assignedShift != NONE`). Nếu chưa được phân ca, hệ thống **từ chối đăng nhập (403 Forbidden)** và thông báo: *"Bạn chưa được phân công ca làm việc hôm nay! Vui lòng liên hệ Quản lý."*
-     - **Quy tắc 15 phút mở ca:** Nhân viên chỉ được phép đăng nhập **trước giờ mở ca 15 phút** cho đến khi hết ca:
+     - **Ràng buộc đúng ngày (Lịch phân ca nhiều ngày):** Quản lý có thể xếp lịch làm việc cho nhân viên trước nhiều ngày/nhiều tuần trong bảng `staff_schedules`. Khi đăng nhập, hệ thống kiểm tra xem **hôm nay (`LocalDate.now()`)** nhân viên có lịch làm việc không:
+       - Nếu hôm nay **không có lịch**, hệ thống **từ chối đăng nhập (403 Forbidden)**: *"Bạn không có lịch làm việc trong ngày hôm nay (dd/MM/yyyy)! Vui lòng liên hệ Quản lý."*
+     - **Ràng buộc đúng giờ ca (Quy tắc 15 phút mở ca):** Nếu hôm nay có lịch trực, hệ thống tiếp tục kiểm tra xem thời gian hiện tại (`LocalTime.now()`) có nằm trong khung giờ của ca trực đó không (cho phép sớm hơn 15 phút):
        - **Ca Sáng (06:00 - 14:00):** Được phép vào ca từ **05:45** đến **14:00**.
        - **Ca Tối (14:00 - 22:00):** Được phép vào ca từ **13:45** đến **22:00**.
-       - **Ca Cả Ngày (06:00 - 23:00):** Được phép vào ca từ **05:45** đến **23:00** (dùng cho ca gãy/chạy demo).
-     - Nếu ngoài khung giờ ca, hệ thống **từ chối đăng nhập** và hiển thị thông báo chi tiết khung giờ.
-     - Khi đăng nhập thành công vào ca: Hệ thống tự động cập nhật `isOnShift = true`.
+       - **Ca Cả Ngày (06:00 - 23:00):** Được phép vào ca từ **05:45** đến **23:00**.
+       - Nếu chưa đến giờ hoặc đã hết ca: Bị chặn (403 Forbidden) và thông báo danh sách ca được xếp hôm nay.
+     - Khi đăng nhập thành công vào ca: Hệ thống tự động cập nhật `isOnShift = true` và gán ca trực hiện tại.
      - Khi nhân viên bấm đăng xuất (Logout): Hệ thống tự động cập nhật `isOnShift = false`.
+     - **Đảm bảo công việc liên tục (Không đá người dùng giữa chừng):** Trong lúc nhân viên đang trực, nếu thời gian vượt quá giờ kết thúc ca (ví dụ quá 14:00 nhưng nhân viên vẫn đang phục vụ, in hóa đơn dở dang...), **hệ thống KHÔNG ngắt phiên hay chặn thao tác**. Token JWT vẫn có hiệu lực và nhân viên vẫn sử dụng web bình thường. Việc kiểm tra giờ ca chỉ diễn ra **ở thời điểm đăng nhập** — tức là khi nhân viên bấm Đăng xuất ra rồi đăng nhập lại sau khi đã hết ca thì mới bị hệ thống chặn.
 
 ### 1.2. Sơ đồ luồng tương tác (Sequence Diagram)
 ```text
@@ -93,10 +95,8 @@ package com.romsteam.roms.entity.enums;
 import java.time.LocalTime;
 
 public enum ShiftType {
-    NONE("Chưa phân ca", null, null),
     MORNING("Ca Sáng", LocalTime.of(6, 0), LocalTime.of(14, 0)),
-    EVENING("Ca Tối", LocalTime.of(14, 0), LocalTime.of(22, 0)),
-    FULL_DAY("Ca Cả Ngày", LocalTime.of(6, 0), LocalTime.of(23, 0));
+    EVENING("Ca Tối", LocalTime.of(14, 0), LocalTime.of(22, 0));
 
     private final String label;
     private final LocalTime startTime;
@@ -126,21 +126,98 @@ public enum ShiftType {
 
 ---
 
-### Bước B2: Bổ Sung Trường Phân Ca Vào Entity `Staff.java`
+### Bước B2: Bổ Sung Trường Trạng Thái Ca Trực Vào Entity `Staff.java`
 - **Đường dẫn:** `src/main/java/com/romsteam/roms/entity/Staff.java`
-- **Nhiệm vụ:** Thêm 2 trường `assignedShift` và `isOnShift` để lưu ca làm việc và trạng thái trực ca của nhân viên.
+- **Nhiệm vụ:** Thêm trường `isOnShift` để lưu trạng thái trực ca của nhân viên. **Lưu ý:** Không cần lưu trường `assignedShift` trên bảng `staffs` vì toàn bộ lịch làm việc đã được chuẩn hóa lưu trữ trong bảng riêng `staff_schedules`.
 
 ```java
-    // Ca lam viec duoc Quan ly phan cong (NONE, MORNING, EVENING, FULL_DAY)
-    @Enumerated(EnumType.STRING)
-    @Column(name = "assigned_shift", length = 30)
+    // Trạng thái thực tế có đang trực trong ca hay không (true sau khi login, false sau khi logout)
     @Builder.Default
-    private ShiftType assignedShift = ShiftType.NONE;
-
-    // Trang thai thuc te co dang trong ca lam viec hay khong
-    @Builder.Default
-    @Column(name = "is_on_shift", nullable = false)
+    @Column(name = "is_on_shift", nullable = false, columnDefinition = "BIT DEFAULT 0")
     private Boolean isOnShift = false;
+```
+
+---
+
+### Bước B2.1: Tạo Entity Lịch Phân Ca Đa Ngày `StaffSchedule.java`
+- **Đường dẫn:** `src/main/java/com/romsteam/roms/entity/StaffSchedule.java`
+- **Nhiệm vụ:** Cho phép Quản lý phân ca cho nhân viên theo từng ngày cụ thể (`work_date`), hỗ trợ lên lịch nhiều ngày, nhiều tuần.
+
+```java
+package com.romsteam.roms.entity;
+
+import com.romsteam.roms.entity.enums.ShiftType;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "staff_schedules", uniqueConstraints = {
+        @UniqueConstraint(name = "UQ_staff_date_shift", columnNames = {"staff_id", "work_date", "shift_type"})
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class StaffSchedule {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // Nhan vien duoc phan ca
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "staff_id", nullable = false)
+    private Staff staff;
+
+    // Ngay lam viec (LocalDate, dinh dang YYYY-MM-DD trong SQL Server)
+    @Column(name = "work_date", nullable = false)
+    private LocalDate workDate;
+
+    // Ca lam viec trong ngay (MORNING, EVENING)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shift_type", nullable = false, length = 30)
+    private ShiftType shiftType;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+}
+```
+
+---
+
+### Bước B2.2: Tạo `StaffScheduleRepository.java`
+- **Đường dẫn:** `src/main/java/com/romsteam/roms/repository/StaffScheduleRepository.java`
+- **Nhiệm vụ:** Truy vấn lịch trực theo ngày của nhân viên (`findByStaffAndWorkDate`) hoặc của toàn nhà hàng.
+
+```java
+package com.romsteam.roms.repository;
+
+import com.romsteam.roms.entity.Staff;
+import com.romsteam.roms.entity.StaffSchedule;
+import com.romsteam.roms.entity.enums.ShiftType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface StaffScheduleRepository extends JpaRepository<StaffSchedule, Long> {
+    // Tìm danh sách ca trực của nhân viên trong một ngày cụ thể (phục vụ kiểm tra điều kiện đăng nhập)
+    List<StaffSchedule> findByStaffAndWorkDate(Staff staff, LocalDate workDate);
+}
 ```
 
 ---
@@ -222,10 +299,12 @@ import com.romsteam.roms.dto.request.LoginRequest;
 import com.romsteam.roms.dto.request.VerifyManagerPinRequest;
 import com.romsteam.roms.dto.response.LoginResponse;
 import com.romsteam.roms.entity.Staff;
+import com.romsteam.roms.entity.StaffSchedule;
 import com.romsteam.roms.entity.enums.ShiftType;
 import com.romsteam.roms.entity.enums.UserRole;
 import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.repository.StaffRepository;
+import com.romsteam.roms.repository.StaffScheduleRepository;
 import com.romsteam.roms.security.JwtTokenProvider;
 import com.romsteam.roms.service.AuthService;
 import org.springframework.http.HttpStatus;
@@ -237,22 +316,29 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final StaffRepository staffRepository;
+    private final StaffScheduleRepository staffScheduleRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            StaffRepository staffRepository,
+                           StaffScheduleRepository staffScheduleRepository,
                            JwtTokenProvider jwtTokenProvider,
                            PasswordEncoder passwordEncoder) {
         this.authenticationManager = authenticationManager;
         this.staffRepository = staffRepository;
+        this.staffScheduleRepository = staffScheduleRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.passwordEncoder = passwordEncoder;
     }
@@ -275,24 +361,50 @@ public class AuthServiceImpl implements AuthService {
             Staff staff = staffRepository.findByUsername(request.getUsername())
                     .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
 
-            // 4. KIEM TRA DIEU KIEN PHAN CONG CA TRUC:
-            // Neu KHONG phai Quan ly (MANAGER), bat buoc phai duoc phan cong ca va trong khung gio ca truc
+            // 4. KIEM TRA DIEU KIEN PHAN CONG CA TRUC THEO NGAY (MULTI-DAY SHIFT SCHEDULING):
+            // Neu KHONG phai Quan ly (MANAGER), bat buoc phai co lich truc trong ngay hom nay va dung khung gio ca
+            String currentShiftName = "NONE";
             if (staff.getRole() != UserRole.MANAGER) {
-                ShiftType shift = staff.getAssignedShift();
-                if (shift == null || shift == ShiftType.NONE) {
-                    throw new AppException("Bạn chưa được phân công ca làm việc hôm nay! Vui lòng liên hệ Quản lý.", HttpStatus.FORBIDDEN);
+                LocalDate today = LocalDate.now();
+                LocalTime now = LocalTime.now();
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+                // 4.1. Tim tat ca ca truc cua nhan vien trong ngay hom nay (today) tu bang staff_schedules
+                List<StaffSchedule> todaySchedules = staffScheduleRepository.findByStaffAndWorkDate(staff, today);
+
+                // Neu hom nay khong duoc xep bat ky ca truc nao trong lich
+                if (todaySchedules == null || todaySchedules.isEmpty()) {
+                    throw new AppException(
+                            String.format("Bạn không có lịch làm việc trong ngày hôm nay (%s)! Vui lòng liên hệ Quản lý.",
+                                    today.format(dateFormatter)),
+                            HttpStatus.FORBIDDEN
+                    );
                 }
 
-                LocalTime now = LocalTime.now();
-                if (!shift.isWithinShift(now)) {
+                // 4.2. Kiem tra xem gio hien tai co nam trong khung gio ca truc nao hom nay khong (cho phep som 15 phut)
+                StaffSchedule activeSchedule = todaySchedules.stream()
+                        .filter(s -> s.getShiftType() != null && s.getShiftType().isWithinShift(now))
+                        .findFirst()
+                        .orElse(null);
+
+                if (activeSchedule == null) {
+                    String shiftsInfo = todaySchedules.stream()
+                            .map(s -> String.format("%s (%s - %s)",
+                                    s.getShiftType().getLabel(),
+                                    s.getShiftType().getStartTime(),
+                                    s.getShiftType().getEndTime()))
+                            .collect(Collectors.joining(", "));
+
                     String message = String.format(
-                            "Chưa đến hoặc đã hết ca làm việc của bạn (Ca %s: %s - %s). Bạn chỉ được đăng nhập trước giờ mở ca 15 phút!",
-                            shift.getLabel(),
-                            shift.getStartTime(),
-                            shift.getEndTime()
+                            "Chưa đến hoặc đã hết ca làm việc của bạn hôm nay (%s). Lịch trực hôm nay: [%s]. Bạn chỉ được đăng nhập trước giờ mở ca 15 phút!",
+                            today.format(dateFormatter),
+                            shiftsInfo
                     );
                     throw new AppException(message, HttpStatus.FORBIDDEN);
                 }
+
+                // Lay ten ca truc truc tiep tu activeSchedule de tra ve cho Frontend
+                currentShiftName = activeSchedule.getShiftType().name();
             }
 
             // 5. Cap nhat trang thai dang trong ca truc
@@ -302,7 +414,7 @@ public class AuthServiceImpl implements AuthService {
             // 6. Sinh token JWT
             String token = jwtTokenProvider.generateToken(authentication);
 
-            // 7. Dong goi LoginResponse tra ve cho frontend
+            // 7. Dong goi LoginResponse tra ve cho frontend (lay shift truc tiep tu staff_schedules)
             return LoginResponse.builder()
                     .accessToken(token)
                     .tokenType("Bearer")
@@ -310,7 +422,7 @@ public class AuthServiceImpl implements AuthService {
                     .username(staff.getUsername())
                     .fullName(staff.getFullName())
                     .role(staff.getRole().name())
-                    .assignedShift(staff.getAssignedShift() != null ? staff.getAssignedShift().name() : "NONE")
+                    .assignedShift(currentShiftName)
                     .isOnShift(staff.getIsOnShift())
                     .build();
 
@@ -411,6 +523,8 @@ public class AuthController {
     }
 }
 ```
+
+---
 
 ---
 
@@ -547,31 +661,111 @@ export function useAuth() {
 
 ## 4. Hướng Dẫn Kiểm Thử & Xử Lý Sự Cố (Troubleshooting)
 
-### 4.1. Tạo Dữ Liệu Phân Ca Trong SQL Server
-Để kiểm tra tính năng phân ca, chạy các câu lệnh SQL Server sau:
+### 4.1. Script SQL Tạo Mới Dữ Liệu Mẫu Hoàn Toàn (`staffs` & `staff_schedules`)
+
+Khi bạn khởi động lại Backend với `spring.jpa.hibernate.ddl-auto=create`, toàn bộ các bảng trong CSDL đã được Hibernate xóa và tạo lại mới tinh (trống dữ liệu). 
+
+Chạy đoạn Script dưới đây trong **SQL Server Management Studio (SSMS)** để nạp đầy đủ dữ liệu mẫu cho cả 2 bảng:
 
 ```sql
--- 1. Quản lý (luôn vào được không giới hạn ca):
-UPDATE staffs SET assigned_shift = 'NONE' WHERE username = 'MGR-001';
+USE ROMS_DB;
+GO
 
--- 2. Phục vụ - Gán Ca Tối (14:00 - 22:00, được vào từ 13:45):
-UPDATE staffs SET assigned_shift = 'EVENING' WHERE username = 'EMP-001';
+-- ==================================================================================
+-- BƯỚC 1: DỌN SẠCH DỮ LIỆU CŨ (NẾU CÓ)
+-- ==================================================================================
+DELETE FROM staff_schedules;
+DELETE FROM staffs;
+GO
 
--- 3. Bếp - Gán Ca Sáng (06:00 - 14:00, được vào từ 05:45):
-UPDATE staffs SET assigned_shift = 'MORNING' WHERE username = 'KDS-001';
+-- ==================================================================================
+-- BƯỚC 2: TẠO MỚI 4 TÀI KHOẢN NHÂN VIÊN MẪU (BẢNG staffs)
+-- Mã PIN 6 số dùng chung cho tất cả tài khoản: 123456
+-- Chuỗi BCrypt Hash tương ứng: $2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92
+-- ==================================================================================
+INSERT INTO staffs (username, pin_code, full_name, phone, role, is_active, is_on_shift, created_at, updated_at)
+VALUES 
+-- 1. Quản Lý (Toàn quyền quản trị 24/7, không cần xếp ca)
+('MGR-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Dương Trọng', '0901000001', 'MANAGER', 1, 0, GETDATE(), GETDATE()),
 
--- 4. Thu ngân - Chưa được phân ca (để test trường hợp bị chặn):
-UPDATE staffs SET assigned_shift = 'NONE' WHERE username = 'CSH-001';
+-- 2. Phục Vụ (Demo đăng nhập ca trực thành công)
+('EMP-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Phạm Minh Đức', '0901000002', 'WAITER', 1, 0, GETDATE(), GETDATE()),
 
--- 5. Ca Cả Ngày linh hoạt (06:00 - 23:00, dùng khi muốn test bất kỳ lúc nào):
--- UPDATE staffs SET assigned_shift = 'FULL_DAY' WHERE username = 'EMP-001';
+-- 3. Bếp KDS (Demo chặn do ngoài giờ ca trực)
+('KDS-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Ngô Viết Bảo Huy', '0901000003', 'KITCHEN', 1, 0, GETDATE(), GETDATE()),
+
+-- 4. Thu Ngân (Demo chặn do chưa xếp lịch hôm nay)
+('CSH-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Đỗ Võ Thanh Trung', '0901000004', 'CASHIER', 1, 0, GETDATE(), GETDATE());
+GO
+
+-- ==================================================================================
+-- BƯỚC 3: PHÂN CA MẪU NHIỀU NGÀY (BẢNG staff_schedules)
+-- Lấy staff_id động qua subquery (SELECT id FROM staffs WHERE username = '...')
+-- ==================================================================================
+
+-- ----------------------------------------------------------------------------------
+-- (1) Phục vụ EMP-001:
+-- * Hôm nay: Xếp cả 2 ca Sáng & Tối (từ 05:45 đến 22:00 bạn test lúc nào cũng đăng nhập được)
+-- ----------------------------------------------------------------------------------
+INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+VALUES 
+-- Ca Sáng hôm nay (06:00 - 14:00)
+((SELECT id FROM staffs WHERE username = 'EMP-001'), CAST(GETDATE() AS DATE), 'MORNING', GETDATE(), GETDATE()),
+-- Ca Tối hôm nay (14:00 - 22:00)
+((SELECT id FROM staffs WHERE username = 'EMP-001'), CAST(GETDATE() AS DATE), 'EVENING', GETDATE(), GETDATE()),
+-- Ca Sáng ngày mai (06:00 - 14:00)
+((SELECT id FROM staffs WHERE username = 'EMP-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'MORNING', GETDATE(), GETDATE());
+
+-- ----------------------------------------------------------------------------------
+-- (2) Bếp KDS-001:
+-- * Hôm nay: Chỉ xếp duy nhất Ca Sáng (06:00 - 14:00)
+-- -> Mục đích test: Nếu bạn đăng nhập vào buổi chiều hoặc tối sau 14:00, 
+--    hệ thống sẽ từ chối (403 Forbidden): "Chưa đến hoặc đã hết ca làm việc của bạn hôm nay..."
+-- ----------------------------------------------------------------------------------
+INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+VALUES 
+((SELECT id FROM staffs WHERE username = 'KDS-001'), CAST(GETDATE() AS DATE), 'MORNING', GETDATE(), GETDATE());
+
+-- ----------------------------------------------------------------------------------
+-- (3) Thu ngân CSH-001:
+-- * Hôm nay NGHỈ: Hoàn toàn KHÔNG xếp lịch hôm nay (chỉ có lịch ngày mai)
+-- -> Mục đích test: Khi đăng nhập hôm nay, hệ thống chặn (403 Forbidden):
+--    "Bạn không có lịch làm việc trong ngày hôm nay! Vui lòng liên hệ Quản lý."
+-- ----------------------------------------------------------------------------------
+INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+VALUES 
+((SELECT id FROM staffs WHERE username = 'CSH-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'EVENING', GETDATE(), GETDATE());
+
+-- (4) Quản lý MGR-001:
+-- Không cần xếp ca. Quản lý luôn được phép đăng nhập mọi lúc!
+GO
+
+-- ==================================================================================
+-- BƯỚC 4: TRUY VẤN ĐỐI SOÁT KIỂM TRA DỮ LIỆU VỪA TẠO
+-- ==================================================================================
+SELECT 
+    s.id AS StaffId,
+    s.username AS Username,
+    s.full_name AS FullName,
+    s.role AS Role,
+    sch.work_date AS WorkDate,
+    sch.shift_type AS ShiftType,
+    CASE 
+        WHEN sch.shift_type = 'MORNING' THEN N'Ca Sáng (06:00 - 14:00)'
+        WHEN sch.shift_type = 'EVENING' THEN N'Ca Tối (14:00 - 22:00)'
+        ELSE N'Không xếp ca (Quản lý hoặc Nghỉ)'
+    END AS ShiftHours,
+    s.is_on_shift AS IsCurrentlyOnDuty
+FROM staffs s
+LEFT JOIN staff_schedules sch ON s.id = sch.staff_id
+ORDER BY s.id, sch.work_date, sch.shift_type;
 ```
 
-### 4.2. Kịch Bản Kiểm Thử Đăng Nhập Thực Tế
-| Tài khoản | Vai trò | Ca gán | Thời điểm thử | Kết quả mong đợi |
+### 4.2. Kịch Bản Kiểm Thử Đăng Nhập Thực Tế (Kiểm Tra Ràng Buộc Kép: Ngày & Giờ Ca)
+| Tài khoản | Vai trò | Lịch làm việc | Thời điểm thử | Kết quả mong đợi |
 |---|---|---|---|---|
-| `MGR-001` | `MANAGER` | Bất kỳ | Mọi lúc | ✅ **Thành công**: Vào trang `/admin/reports`. |
-| `CSH-001` | `CASHIER` | `NONE` | Mọi lúc | ❌ **Bị chặn (403)**: *"Bạn chưa được phân công ca làm việc hôm nay! Vui lòng liên hệ Quản lý."* |
-| `KDS-001` | `KITCHEN` | `MORNING` | Lúc 16:50 (chiều) | ❌ **Bị chặn (403)**: *"Chưa đến hoặc đã hết ca làm việc của bạn (Ca Ca Sáng: 06:00 - 14:00)..."* |
-| `EMP-001` | `WAITER` | `EVENING` | Lúc 16:50 (chiều) | ✅ **Thành công**: Nằm trong khoảng 13:45 - 22:00, `isOnShift = true`, vào `/waiter/floor-plan`. |
-| `EMP-001` | `WAITER` | `EVENING` | Bấm Đăng xuất | ✅ **Thành công**: Hệ thống cập nhật `isOnShift = false` trong CSDL. |
+| `MGR-001` | `MANAGER` | Không cần xếp ca | Mọi lúc | ✅ **Thành công**: Quản lý luôn được vào trang `/admin/reports` để điều hành và xếp lịch. |
+| `CSH-001` | `CASHIER` | Hôm nay không có lịch (chỉ có lịch ngày mai) | Hôm nay | ❌ **Bị chặn (403)**: *"Bạn không có lịch làm việc trong ngày hôm nay (dd/MM/yyyy)! Vui lòng liên hệ Quản lý."* |
+| `KDS-001` | `KITCHEN` | Hôm nay Ca Sáng (`06:00 - 14:00`) | Lúc 20:00 (buổi tối) | ❌ **Bị chặn (403)**: *"Chưa đến hoặc đã hết ca làm việc của bạn hôm nay... Lịch trực hôm nay: [Ca Sáng (06:00 - 14:00)]. Bạn chỉ được đăng nhập trước giờ mở ca 15 phút!"* |
+| `EMP-001` | `WAITER` | Hôm nay Ca Tối (`14:00 - 22:00`) | Lúc 20:00 (buổi tối) | ✅ **Thành công**: Nằm trong khoảng 13:45 - 22:00, `isOnShift = true`, vào `/waiter/floor-plan`. |
+| `EMP-001` | `WAITER` | Hôm nay Ca Tối | Bấm Đăng xuất | ✅ **Thành công**: Hệ thống cập nhật `isOnShift = false` trong CSDL. |
