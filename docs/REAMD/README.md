@@ -43,6 +43,7 @@
 | **12** | [12_AuthService_Va_Login_Api.md](12_AuthService_Va_Login_Api.md) | **Full-Stack (Backend + Frontend)**: Đăng nhập ca trực & Phân quyền RBAC. Backend (DTOs, Service, Controller, Security JWT, Lombok) và Frontend (Vite Proxy, Axios Client, AuthContext, StaffLoginPage, ProtectedRoute). |
 | **13** | [13_Quan_Ly_Ban_Va_Ma_QR.md](13_Quan_Ly_Ban_Va_Ma_QR.md) | Nghiệp vụ Quản lý bàn & QR: DTOs `CreateTableRequest`, `UpdateTableStatusRequest`, `TableResponse` (Lombok `@Data`), `RestaurantTableServiceImpl` và Controllers (`@RequiredArgsConstructor`). |
 | **14** | [14_Khoi_Tao_Va_Kien_Truc_Frontend.md](14_Khoi_Tao_Va_Kien_Truc_Frontend.md) | Khởi tạo và kiến trúc tổng quan Frontend React Vite + TailwindCSS. |
+| **15** | [15_Bao_Cao_Doanh_Thu_Va_Van_Hanh_Reports_Analytics.md](15_Bao_Cao_Doanh_Thu_Va_Van_Hanh_Reports_Analytics.md) | **Full-Stack (Backend & Frontend)**: Báo cáo Doanh thu & Vận hành (`http://localhost:5173/admin/reports`). Backend (DTOs, Repository JPQL, ReportService, ReportController) và Frontend (reportApi, Bộ lọc thời gian linh hoạt, Biểu đồ khung giờ, Phân bổ thanh toán, Top món bán chạy, Xuất Excel UTF-8 & In Báo cáo). |
 
 ---
 
