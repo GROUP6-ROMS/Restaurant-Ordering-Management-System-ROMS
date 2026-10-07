@@ -220,6 +220,23 @@ Demo theo một câu chuyện liền mạch, không mở rời rạc từng CRUD
 
 ---
 
+## 10. Quy chuẩn lập trình Full-Stack & Ràng buộc tài liệu Markdown cho Team & AI
+
+> ⚠️ **RÀNG BUỘC BẮT BUỘC (MANDATORY CODING & DOCUMENTATION RULE):**  
+> Nhóm phát triển gồm nhiều thành viên (và các AI Agent hỗ trợ từng thành viên). Để đảm bảo tính đồng bộ kiến trúc tuyệt đối, tránh tình trạng "Backend một đằng, Frontend một nẻo":
+>
+> 1. **BẮT BUỘC TẠO/CẬP NHẬT FILE MD HƯỚNG DẪN FULL-STACK:**  
+>    Khi code bất kỳ chức năng nào (Quản lý bàn, Menu thực đơn, Giỏ hàng & Gọi món, Điều phối Bếp KDS, Thanh toán Bill, Đặt bàn trước...), thành viên hoặc AI Agent phụ trách **BẮT BUỘC** phải tạo hoặc cập nhật một file hướng dẫn markdown `.md` tương ứng trong thư mục `docs/REAMD/`.
+> 2. **HƯỚNG DẪN ĐỒNG THỜI CẢ BACKEND & FRONTEND:**  
+>    - **Backend:** Liệt kê đầy đủ Entity, DTO (Lombok), Repository, Service, Controller, Validation, Phân quyền endpoint.
+>    - **Frontend:** Liệt kê đầy đủ Axios API service, State/Context, Components/Pages giao diện, Form validation, Xử lý gọi API.
+>    - **Luồng dữ liệu (Data Flow):** Mô tả rõ ràng request từ màn hình nào gửi sang endpoint nào và trả về kết quả gì.
+>    - **Test & Troubleshooting:** Hướng dẫn kiểm thử cURL / Postman / SQL mẫu và bảng các lỗi thường gặp.
+> 3. **ĐỒNG BỘ 100% VỚI CODE THỰC TẾ:** Mọi tên biến, tên trường DTO/Entity, endpoint URL trong file `.md` phải trùng khớp 100% với code thật trong thư mục `SourceCode/`. Tuyệt đối không viết tài liệu giả định lệch với code.
+> 4. **CẬP NHẬT MỤC LỤC TỔNG:** Cập nhật dòng tương ứng vào Bảng Mục lục trong [docs/REAMD/README.md](docs/REAMD/README.md).
+
+---
+
 ## 11. Thứ tự ưu tiên kỹ thuật (không đảo ngược)
 
 ```

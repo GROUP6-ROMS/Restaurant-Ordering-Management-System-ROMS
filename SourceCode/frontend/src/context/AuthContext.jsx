@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
+import { authApi } from '../api/authApi';
 
 const AuthContext = createContext();
 
-// Helper dinh vi trang chu chuan xac cho tung role
 export function getRoleHome(role) {
   switch (role?.toUpperCase()) {
     case 'MANAGER':
@@ -28,52 +28,42 @@ export function AuthProvider({ children }) {
 
   const [token, setToken] = useState(() => localStorage.getItem('roms_token') || null);
 
-  const login = (username, password, explicitRole = null, customFullName = null) => {
-    let role = explicitRole || 'WAITER';
-    let fullName = customFullName || 'Nhân Viên Phục Vụ';
+  const login = async (username, pinCode) => {
+    try {
+      const response = await authApi.login(username, pinCode);
 
-    if (!explicitRole) {
-      const u = username.toLowerCase();
-      if (u.includes('admin') || u.includes('manager') || u.includes('mgr')) {
-        role = 'MANAGER';
-      } else if (u.includes('kitchen') || u.includes('bep')) {
-        role = 'KITCHEN';
-      } else if (u.includes('cashier') || u.includes('thungan')) {
-        role = 'CASHIER';
-      } else {
-        role = 'WAITER';
-      }
+      // Backend trả về: { success: true, data: { accessToken, tokenType, id, username, fullName, role, assignedShift, isOnShift } }
+      const resData = response.data?.data || {};
+      const authToken = resData.accessToken || resData.token;
+      const { id, fullName, role, assignedShift, isOnShift } = resData;
+      const userData = { id, username: resData.username || username, fullName, role, assignedShift, isOnShift };
+
+      localStorage.setItem('roms_token', authToken);
+      localStorage.setItem('roms_user', JSON.stringify(userData));
+
+      setToken(authToken);
+      setUser(userData);
+      return { success: true, role };
+    } catch (error) {
+      console.error('Lỗi đăng nhập:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!';
+      return { success: false, message: errorMsg };
     }
-
-    if (!customFullName) {
-      if (role === 'MANAGER' || role === 'ADMIN') {
-        fullName = 'Trần Anh Thư (Quản Lý)';
-      } else if (role === 'KITCHEN') {
-        fullName = 'Vũ Đức Thắng (Bếp Trưởng)';
-      } else if (role === 'CASHIER') {
-        fullName = 'Hoàng Hải Yến (Thu Ngân)';
-      } else {
-        fullName = 'Nguyễn Văn An (Bồi Bàn)';
-      }
-    }
-
-    const userData = { username, fullName, role };
-    const fakeToken = 'jwt-mock-' + Date.now();
-
-    setUser(userData);
-    setToken(fakeToken);
-
-    localStorage.setItem('roms_user', JSON.stringify(userData));
-    localStorage.setItem('roms_token', fakeToken);
-
-    return { success: true, user: userData };
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('roms_user');
-    localStorage.removeItem('roms_token');
+  const logout = async () => {
+    try {
+      if (user?.username) {
+        await authApi.logout(user.username);
+      }
+    } catch (e) {
+      console.warn('Lỗi gọi API đăng xuất:', e);
+    } finally {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('roms_user');
+      localStorage.removeItem('roms_token');
+    }
   };
 
   return (

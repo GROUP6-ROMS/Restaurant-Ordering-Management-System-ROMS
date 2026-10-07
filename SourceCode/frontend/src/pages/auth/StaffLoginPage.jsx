@@ -5,10 +5,10 @@ import Icon from '../../components/common/Icon';
 import RomsLogo from '../../components/common/RomsLogo';
 
 const PRESET_ACCOUNTS = [
-  { role: 'MANAGER', roleLabel: 'Quản Lý', code: 'MGR-084', pin: '123456', name: 'Trần Anh Thư', icon: 'shield_person', color: '#9D4124' },
-  { role: 'WAITER', roleLabel: 'Phục Vụ', code: 'EMP-8812', pin: '123456', name: 'Nguyễn Văn An', icon: 'room_service', color: '#596232' },
-  { role: 'KITCHEN', roleLabel: 'Bếp KDS', code: 'KDS-001', pin: '123456', name: 'Vũ Đức Thắng', icon: 'cooking', color: '#D97706' },
-  { role: 'CASHIER', roleLabel: 'Thu Ngân', code: 'CSH-002', pin: '123456', name: 'Hoàng Hải Yến', icon: 'point_of_sale', color: '#BA1A1A' },
+  { role: 'MANAGER', roleLabel: 'Quản Lý', code: 'MGR-001', pin: '123456', name: 'Dương Trong', icon: 'shield_person', color: '#9D4124' },
+  { role: 'WAITER', roleLabel: 'Phục Vụ', code: 'EMP-001', pin: '123456', name: 'Phạm Minh Đức', icon: 'room_service', color: '#9D4124' },
+  { role: 'KITCHEN', roleLabel: 'Bếp KDS', code: 'KDS-001', pin: '123456', name: 'Ngô Viết Bảo Huy', icon: 'cooking', color: '#9D4124' },
+  { role: 'CASHIER', roleLabel: 'Thu Ngân', code: 'CSH-001', pin: '123456', name: 'Đỗ Võ Thanh Trung', icon: 'point_of_sale', color: '#9D4124' },
 ];
 
 export default function StaffLoginPage() {
@@ -16,7 +16,7 @@ export default function StaffLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [employeeCode, setEmployeeCode] = useState('MGR-084');
+  const [employeeCode, setEmployeeCode] = useState('MGR-001');
   const [pin, setPin] = useState('123456');
   const [activeRole, setActiveRole] = useState('MANAGER');
   const [activeField, setActiveField] = useState('pin'); // 'code' or 'pin'
@@ -68,7 +68,7 @@ export default function StaffLoginPage() {
   };
 
   // Submit Login
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!employeeCode.trim()) {
       setErrorMessage('Vui lòng nhập Mã Nhân Viên!');
@@ -79,17 +79,19 @@ export default function StaffLoginPage() {
       return;
     }
 
-    // Determine role from presets or fallback
-    const matched = PRESET_ACCOUNTS.find(p => p.code.toUpperCase() === employeeCode.toUpperCase());
-    const finalRole = matched ? matched.role : activeRole;
-    const finalName = matched ? matched.name : `Nhân viên ${employeeCode}`;
+    // 1. Chờ kết quả xác thực từ Backend
+    const result = await login(employeeCode, pin);
 
-    login(employeeCode, pin, finalRole, finalName);
-
-    // Redirect to assigned station
-    const targetRoute = getRoleHome(finalRole);
-    navigate(targetRoute, { replace: true });
+    // 2. Nếu đăng nhập thành công từ CSDL -> Điều hướng vào ca trực
+    if (result.success) {
+      const targetRoute = getRoleHome(result.role);
+      navigate(targetRoute, { replace: true });
+    } else {
+      // 3. Nếu sai mã PIN hoặc tài khoản không tồn tại -> Báo lỗi đỏ lên giao diện
+      setErrorMessage(result.message);
+    }
   };
+
 
   return (
     <div style={{
@@ -212,7 +214,7 @@ export default function StaffLoginPage() {
                   <input
                     type="text"
                     required
-                    placeholder="VD: MGR-084, BAR-088..."
+                    placeholder="VD: MGR-001, EMP-001..."
                     value={employeeCode}
                     onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
                     onFocus={() => setActiveField('code')}

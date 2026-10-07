@@ -7,4 +7,11 @@ public interface AuthService {
 
     // Xu ly xac thuc thong tin dang nhap va tra ve token JWT
     LoginResponse login(LoginRequest request);
+
+    // Xac thuc ma PIN cua Quan ly
+    boolean verifyManagerPin(com.romsteam.roms.dto.request.VerifyManagerPinRequest request);
+
+    // Khi nhan vien bam Dang xuat, he thong cap nhat isOnShift = false.
+    // LUU Y: Trong luc dang truc, du qua gio ca nhan vien van thao tac tren web binh thuong, chi bi chan khi da logout va co tinh dang nhap lai.
+    void logout(String username);
 }
