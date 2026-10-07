@@ -31,7 +31,7 @@ public class RestaurantTable {
     private String tableNumber;
 
     // Tên bàn hiển thị thân thiện (ví dụ: "Bàn T-01", "Ban Công 01", "Hoàng Gia")
-    @Column(name = "name", length = 100)
+    @Column(name = "name", columnDefinition = "NVARCHAR(100)")
     private String name;
 
     // Phân khu vực: "ZONE_1" (Sảnh chính), "ZONE_2" (Ban công), "VIP" (Phòng VIP)
@@ -50,11 +50,11 @@ public class RestaurantTable {
     private TableStatus status = TableStatus.AVAILABLE;
 
     // Lý do khóa bàn khi status = BLOCKED (ví dụ: "Bảo trì hệ thống đèn & thông gió")
-    @Column(name = "blocked_reason", length = 255)
+    @Column(name = "blocked_reason", columnDefinition = "NVARCHAR(255)")
     private String blockedReason;
 
     // Thông tin khách đặt trước khi status = RESERVED (ví dụ: "Chị Mai (0982xxx)")
-    @Column(name = "reservation_info", length = 255)
+    @Column(name = "reservation_info",  columnDefinition = "NVARCHAR(255)")
     private String reservationInfo;
 
     // Giờ hẹn khách đến khi status = RESERVED (ví dụ: "20:00" hoặc "Đặt lúc 20:30")

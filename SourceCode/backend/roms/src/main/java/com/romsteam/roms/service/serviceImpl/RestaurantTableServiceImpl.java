@@ -2,10 +2,12 @@ package com.romsteam.roms.service.serviceImpl;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
+import com.romsteam.roms.dto.response.TableOrdersResponse;
 import com.romsteam.roms.dto.response.TableResponse;
 import com.romsteam.roms.dto.response.TableSummaryResponse;
 import com.romsteam.roms.entity.DiningSession;
 import com.romsteam.roms.entity.Order;
+import com.romsteam.roms.entity.OrderItem;
 import com.romsteam.roms.entity.RestaurantTable;
 import com.romsteam.roms.entity.enums.SessionStatus;
 import com.romsteam.roms.entity.enums.TableStatus;
@@ -22,9 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -299,6 +299,92 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .qrUrl(qrUrl)
                 .isActive(table.getIsActive())
                 .updatedAt(table.getUpdatedAt())
+                .build();
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public TableOrdersResponse getTableActiveOrders(Long tableId) {
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
+
+        Optional<DiningSession> sessionOpt = diningSessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
+        if (sessionOpt.isEmpty()) {
+            return TableOrdersResponse.builder()
+                    .tableId(table.getId())
+                    .tableNumber(table.getTableNumber())
+                    .tableName(table.getName())
+                    .zoneName(table.getZone())
+                    .totalAmount(BigDecimal.ZERO)
+                    .totalItems(0)
+                    .items(Collections.emptyList())
+                    .build();
+        }
+
+        DiningSession session = sessionOpt.get();
+        List<Order> orders = orderRepository.findBySessionId(session.getId());
+
+        List<TableOrdersResponse.OrderItemDetail> items = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        int pending = 0, cooking = 0, ready = 0, served = 0;
+
+        for (Order order : orders) {
+            if (order.getItems() != null) {
+                for (OrderItem item : order.getItems()) {
+                    String statusStr = item.getStatus() != null ? item.getStatus().name() : "PENDING";
+                    String statusText = switch (statusStr) {
+                        case "COOKING" -> "Đang nấu";
+                        case "READY" -> "Đã nấu xong";
+                        case "SERVED" -> "Đã lên bàn";
+                        case "CANCELLED" -> "Đã hủy";
+                        default -> "Chờ bếp nhận";
+                    };
+
+                    if ("PENDING".equals(statusStr)) pending += item.getQuantity();
+                    else if ("COOKING".equals(statusStr)) cooking += item.getQuantity();
+                    else if ("READY".equals(statusStr)) ready += item.getQuantity();
+                    else if ("SERVED".equals(statusStr)) served += item.getQuantity();
+
+                    BigDecimal subtotal = item.getSubtotal() != null ? item.getSubtotal() : BigDecimal.ZERO;
+                    totalAmount = totalAmount.add(subtotal);
+
+                    items.add(TableOrdersResponse.OrderItemDetail.builder()
+                            .orderItemId(item.getId())
+                            .orderCode(order.getOrderCode())
+                            .itemName(item.getMenuItem() != null ? item.getMenuItem().getName() : "Món chưa đặt tên")
+                            .imageUrl(item.getMenuItem() != null ? item.getMenuItem().getImageUrl() : null)
+                            .quantity(item.getQuantity())
+                            .unitPrice(item.getUnitPrice())
+                            .subtotal(subtotal)
+                            .note(item.getNote())
+                            .status(statusStr)
+                            .statusText(statusText)
+                            .build());
+                }
+            }
+        }
+
+        long duration = 0;
+        if (session.getStartTime() != null) {
+            duration = java.time.Duration.between(session.getStartTime(), java.time.LocalDateTime.now()).toMinutes();
+        }
+
+        return TableOrdersResponse.builder()
+                .tableId(table.getId())
+                .tableNumber(table.getTableNumber())
+                .tableName(table.getName())
+                .zoneName(table.getZone())
+                .sessionId(session.getId())
+                .sessionToken(session.getSessionToken())
+                .guestCount(session.getGuestCount())
+                .timeIn(session.getStartTime() != null ? session.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")) : "--:--")
+                .durationMinutes(Math.max(0, duration))
+                .totalItems(items.size())
+                .pendingItems(pending)
+                .cookingItems(cooking)
+                .readyItems(ready)
+                .servedItems(served)
+                .totalAmount(totalAmount)
+                .items(items)
                 .build();
     }
 }

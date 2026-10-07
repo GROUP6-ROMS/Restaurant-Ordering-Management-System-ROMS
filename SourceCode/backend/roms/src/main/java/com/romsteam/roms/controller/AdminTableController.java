@@ -3,6 +3,7 @@ package com.romsteam.roms.controller;
 import com.romsteam.roms.dto.request.CreateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
+import com.romsteam.roms.dto.response.TableOrdersResponse;
 import com.romsteam.roms.dto.response.TableResponse;
 import com.romsteam.roms.dto.response.TableSummaryResponse;
 import com.romsteam.roms.entity.enums.TableStatus;
@@ -80,5 +81,11 @@ public class AdminTableController {
     public ResponseEntity<ApiResponse<Void>> deleteTable(@PathVariable Long id) {
         tableService.deleteTable(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa bàn ăn thành công!"));
+    }
+    // 8. GET /api/admin/tables/{id}/orders - Xem nhanh toàn bộ món đang phục vụ tại bàn
+    @GetMapping("/{id}/orders")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> getTableOrders(@PathVariable Long id) {
+        TableOrdersResponse ordersResponse = tableService.getTableActiveOrders(id);
+        return ResponseEntity.ok(ApiResponse.success(ordersResponse, "Lấy danh sách món tại bàn thành công!"));
     }
 }

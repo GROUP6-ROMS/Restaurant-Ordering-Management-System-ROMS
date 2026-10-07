@@ -20,6 +20,10 @@ export default function TableManagementPage() {
   const [selectedQrTable, setSelectedQrTable] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  // State ngăn kéo (Drawer) xem nhanh Order tại bàn
+  const [orderDrawerTable, setOrderDrawerTable] = useState(null); // Bàn đang chọn xem đơn
+  const [activeOrdersData, setActiveOrdersData] = useState(null); // Dữ liệu món lấy từ API
+  const [orderDrawerLoading, setOrderDrawerLoading] = useState(false);
 
   // Status Modal State (Cập nhật trạng thái bàn, khóa bàn, đặt bàn với thời gian)
   const [statusModalTable, setStatusModalTable] = useState(null);
@@ -51,13 +55,9 @@ export default function TableManagementPage() {
     try {
       setLoading(true);
 
-      // Gọi API lấy danh sách bàn theo bộ lọc
-      const params = {};
-      if (selectedZone !== 'ALL') params.zone = selectedZone;
-      if (statusFilter !== 'ALL') params.status = statusFilter;
-      if (searchTerm.trim()) params.search = searchTerm.trim();
 
-      const resTables = await tableApi.getTables(params);
+
+      const resTables = await tableApi.getTables();
       if (resTables.data && resTables.data.success) {
         setTables(resTables.data.data || []);
       }
@@ -82,16 +82,29 @@ export default function TableManagementPage() {
   // Tự động gọi API khi khởi tạo trang hoặc thay đổi khu vực / trạng thái
   useEffect(() => {
     loadData();
-  }, [selectedZone, statusFilter]);
+  }, []);
 
   // Tìm kiếm theo từ khóa (Frontend fallback lọc nhanh nếu cần)
+  // Lọc bàn hiển thị theo Khu vực, Trạng thái và Ô tìm kiếm
   const filteredTables = tables.filter(t => {
+    // 1. Lọc theo Khu Vực được chọn trong Dropdown
+    if (selectedZone !== 'ALL' && t.zone !== selectedZone) {
+      return false;
+    }
+
+    // 2. Lọc theo Trạng Thái được chọn trong Dropdown
+    if (statusFilter !== 'ALL' && t.status !== statusFilter) {
+      return false;
+    }
+
+    // 3. Lọc theo Từ Khóa Tìm Kiếm
     if (searchTerm.trim() !== '') {
       const q = searchTerm.toLowerCase();
       const codeMatch = t.code ? t.code.toLowerCase().includes(q) : false;
       const nameMatch = t.name ? t.name.toLowerCase().includes(q) : false;
       return codeMatch || nameMatch;
     }
+
     return true;
   });
 
@@ -206,15 +219,39 @@ export default function TableManagementPage() {
   };
 
   // ===================================================================
-  // 7. SỐ LIỆU 5 THẺ KPI (ƯU TIÊN LẤY TỪ BACKEND SUMMARY)
+  // 6.1 XEM NHANH ORDER TẠI BÀN (QUICK BILL PREVIEW)
   // ===================================================================
-  const totalTables = summary ? summary.totalTables : tables.length;
-  const totalSeats = summary ? summary.totalSeats : tables.reduce((s, t) => s + (t.capacity || 0), 0);
-  const occupiedTables = summary ? summary.occupiedTables : tables.filter(t => t.status === 'OCCUPIED').length;
-  const occupiedGuests = summary ? summary.occupiedGuests : tables.filter(t => t.status === 'OCCUPIED').reduce((s, t) => s + (t.guests || 0), 0);
-  const availableTables = summary ? summary.availableTables : tables.filter(t => t.status === 'AVAILABLE').length;
-  const reservedTables = summary ? summary.reservedTables : tables.filter(t => t.status === 'RESERVED').length;
-  const blockedTables = summary ? summary.blockedTables : tables.filter(t => t.status === 'BLOCKED').length;
+  const handleOpenOrderDrawer = async (table) => {
+    setOrderDrawerTable(table);
+    setOrderDrawerLoading(true);
+    try {
+      const res = await tableApi.getTableOrders(table.id);
+      if (res.data && res.data.success) {
+        setActiveOrdersData(res.data.data);
+      }
+    } catch (error) {
+      console.error('Lỗi lấy thông tin món tại bàn:', error);
+      showToast('Không thể lấy thông tin món ăn tại bàn!');
+    } finally {
+      setOrderDrawerLoading(false);
+    }
+  };
+
+  // ===================================================================
+  // 7. SỐ LIỆU 5 THẺ KPI (TỰ ĐỘNG THAY ĐỔI THEO KHU VỰC ĐƯỢC CHỌN)
+  // ===================================================================
+  // Nếu chọn "Tất Cả" thì lấy toàn bộ bàn, nếu chọn khu vực cụ thể thì chỉ lấy bàn của khu vực đó
+  const kpiTables = selectedZone === 'ALL'
+      ? tables
+      : tables.filter(t => t.zone === selectedZone);
+  // Tính toán số liệu tương ứng:
+  const totalTables = selectedZone === 'ALL' && summary ? summary.totalTables : kpiTables.length;
+  const totalSeats = selectedZone === 'ALL' && summary ? summary.totalSeats : kpiTables.reduce((s, t) => s + (t.capacity || 0), 0);
+  const occupiedTables = selectedZone === 'ALL' && summary ? summary.occupiedTables : kpiTables.filter(t => t.status === 'OCCUPIED').length;
+  const occupiedGuests = selectedZone === 'ALL' && summary ? summary.occupiedGuests : kpiTables.filter(t => t.status === 'OCCUPIED').reduce((s, t) => s + (t.guests || 0), 0);
+  const availableTables = selectedZone === 'ALL' && summary ? summary.availableTables : kpiTables.filter(t => t.status === 'AVAILABLE').length;
+  const reservedTables = selectedZone === 'ALL' && summary ? summary.reservedTables : kpiTables.filter(t => t.status === 'RESERVED').length;
+  const blockedTables = selectedZone === 'ALL' && summary ? summary.blockedTables : kpiTables.filter(t => t.status === 'BLOCKED').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -389,62 +426,65 @@ export default function TableManagementPage() {
         </div>
       </div>
 
-      {/* Bộ lọc Phân Khu & Ô Tìm Kiếm */}
+      {/* Bộ lọc Phân Khu, Trạng Thái & Ô Tìm Kiếm */}
       <div style={{
         background: '#FFFFFF',
         borderRadius: '16px',
         padding: '16px 20px',
         border: '1px solid #F0E6E4',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '16px'
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px'
       }}>
-        {/* Tabs Khu Vực */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {ZONES.map(z => {
-            const isActive = selectedZone === z.id;
-            const count = z.id === 'ALL'
-              ? tables.length
-              : tables.filter(t => t.zone === z.id).length;
-
-            return (
-              <button
-                key={z.id}
-                type="button"
-                onClick={() => setSelectedZone(z.id)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: isActive ? '#9D4124' : '#F6ECEA',
-                  color: isActive ? '#FFFFFF' : '#56423D',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {z.name} ({count})
-              </button>
-            );
-          })}
+        {/* Ô Tìm Kiếm */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '240px', maxWidth: '360px', background: '#FDF7F5', border: '1px solid #EAE0DE', borderRadius: '10px', padding: '8px 12px' }}>
+          <Icon name="search" size={18} style={{ color: '#89726B' }} />
+          <input
+            type="text"
+            placeholder="Tìm theo mã bàn, tên bàn..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') loadData(); }}
+            style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem', color: '#1F1B1A' }}
+          />
         </div>
 
-        {/* Ô Tìm Kiếm & Lọc Trạng Thái */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '360px', background: '#FDF7F5', border: '1px solid #EAE0DE', borderRadius: '10px', padding: '8px 12px' }}>
-            <Icon name="search" size={18} style={{ color: '#89726B' }} />
-            <input
-              type="text"
-              placeholder="Tìm theo mã bàn, tên bàn..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') loadData(); }}
-              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem', color: '#1F1B1A' }}
-            />
+        {/* Nhóm Dropdown: Khu Vực & Trạng Thái */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          {/* Dropdown Khu Vực */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#89726B', fontWeight: 600 }}>Khu vực:</span>
+            <select
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #EAE0DE',
+                background: '#FFFFFF',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                color: '#1F1B1A',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {ZONES.map(z => {
+                const count = z.id === 'ALL'
+                  ? tables.length
+                  : tables.filter(t => t.zone === z.id).length;
+                return (
+                  <option key={z.id} value={z.id}>
+                    {z.name} ({count})
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
+          {/* Dropdown Trạng Thái */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.8rem', color: '#89726B', fontWeight: 600 }}>Trạng thái:</span>
             <select
@@ -458,7 +498,8 @@ export default function TableManagementPage() {
                 fontSize: '0.82rem',
                 fontWeight: 600,
                 color: '#1F1B1A',
-                outline: 'none'
+                outline: 'none',
+                cursor: 'pointer'
               }}
             >
               <option value="ALL">Tất cả ({tables.length})</option>
@@ -578,8 +619,22 @@ export default function TableManagementPage() {
                   </div>
 
                   {t.status === 'OCCUPIED' && (
-                    <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#89726B' }}>Hóa đơn hiện tại:</span>
+                    <div
+                      onClick={() => handleOpenOrderDrawer(t)}
+                      title="Bấm để xem nhanh các món đã gọi"
+                      style={{
+                        gridColumn: 'span 2',
+                        borderTop: '1px dashed #EAE0DE',
+                        paddingTop: '6px',
+                        marginTop: '2px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span style={{ color: '#89726B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon name="receipt_long" size={14} style={{ color: '#9D4124' }} /> Hóa đơn hiện tại:
+                      </span>
                       <span style={{ fontWeight: 800, color: '#9D4124' }}>{billDisplay}</span>
                     </div>
                   )}
@@ -768,6 +823,30 @@ export default function TableManagementPage() {
                           Hủy
                         </button>
                       </>
+                    )}
+
+                    {t.status === 'OCCUPIED' && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenOrderDrawer(t)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: '#9D4124',
+                          border: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: '#FFFFFF',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(157, 65, 36, 0.2)'
+                        }}
+                      >
+                        <Icon name="receipt_long" size={15} />
+                        Xem Đơn
+                      </button>
                     )}
                   </div>
                 </div>
@@ -1298,6 +1377,139 @@ export default function TableManagementPage() {
                 Lưu Trạng Thái
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* DRAWER: XEM NHANH ORDER VÀ TIẾN ĐỘ BẾP TẠI BÀN               */}
+      {/* ============================================================= */}
+      {orderDrawerTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          zIndex: 10000,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            width: '100%',
+            maxWidth: '460px',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '-8px 0 32px rgba(0,0,0,0.15)'
+          }}>
+            {/* Header Drawer */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9D4124' }}>{orderDrawerTable.code}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1F1B1A' }}>{orderDrawerTable.name}</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '2px' }}>
+                  {orderDrawerTable.zoneName} • {activeOrdersData?.guestCount || orderDrawerTable.guests || orderDrawerTable.capacity} khách
+                  {activeOrdersData?.timeIn && ` • Vào lúc: ${activeOrdersData.timeIn}`}
+                  {activeOrdersData?.durationMinutes !== undefined && activeOrdersData?.durationMinutes > 0 && ` (${activeOrdersData.durationMinutes} phút)`}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setOrderDrawerTable(null); setActiveOrdersData(null); }}
+                style={{ background: '#F6ECEA', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#56423D' }}
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+
+            {/* Nội dung danh sách món */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+              {orderDrawerLoading ? (
+                <div style={{ textAlign: 'center', padding: '60px 0', color: '#89726B' }}>
+                  <Icon name="sync" size={28} style={{ animation: 'spin 1s linear infinite' }} />
+                  <div style={{ marginTop: '8px', fontSize: '0.85rem' }}>Đang tải danh sách món của bàn...</div>
+                </div>
+              ) : !activeOrdersData || !activeOrdersData.items || activeOrdersData.items.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#89726B' }}>
+                  <Icon name="soup_kitchen" size={40} style={{ color: '#D1C2BE', marginBottom: '8px' }} />
+                  <div style={{ fontWeight: 700, color: '#1F1B1A' }}>Chưa có món nào được gọi</div>
+                  <p style={{ fontSize: '0.82rem', margin: '4px 0 0' }}>Bàn đang chờ khách quét mã QR để bắt đầu gọi món.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Thanh thống kê tiến độ món */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: '#FFF8F6', padding: '12px', borderRadius: '12px', border: '1px solid #F0E6E4', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#89726B' }}>Chờ bếp</div>
+                      <div style={{ fontWeight: 800, color: '#B45309', fontSize: '1.1rem' }}>{activeOrdersData.pendingItems || 0}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#89726B' }}>Đang nấu</div>
+                      <div style={{ fontWeight: 800, color: '#9D4124', fontSize: '1.1rem' }}>{activeOrdersData.cookingItems || 0}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#89726B' }}>Đã ra món</div>
+                      <div style={{ fontWeight: 800, color: '#059669', fontSize: '1.1rem' }}>{activeOrdersData.servedItems || 0}</div>
+                    </div>
+                  </div>
+
+                  {/* Danh sách từng món */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {activeOrdersData.items.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '10px', background: '#FAFAFA', border: '1px solid #F0E6E4' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1F1B1A' }}>
+                            {item.itemName} <span style={{ color: '#9D4124' }}>x{item.quantity}</span>
+                          </div>
+                          {item.note && (
+                            <div style={{ fontSize: '0.75rem', color: '#89726B', fontStyle: 'italic', marginTop: '2px' }}>
+                              📝 {item.note}
+                            </div>
+                          )}
+                          <span style={{
+                            display: 'inline-block',
+                            marginTop: '4px',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: item.status === 'COOKING' ? '#FFEDD5' : item.status === 'SERVED' ? '#DCFCE7' : '#FEF3C7',
+                            color: item.status === 'COOKING' ? '#9A3412' : item.status === 'SERVED' ? '#166534' : '#92400E'
+                          }}>
+                            {item.statusText}
+                          </span>
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A' }}>
+                          {Number(item.subtotal).toLocaleString('vi-VN')}₫
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Drawer: Tạm tính */}
+            {activeOrdersData && (
+              <div style={{ padding: '16px 24px', borderTop: '1px solid #F0E6E4', background: '#FFF8F6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#89726B', fontWeight: 600 }}>Tạm tính ({activeOrdersData.totalItems || 0} món):</span>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#9D4124' }}>
+                    {Number(activeOrdersData.totalAmount || 0).toLocaleString('vi-VN')}₫
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setOrderDrawerTable(null); setActiveOrdersData(null); }}
+                  style={{ width: '100%', padding: '10px', borderRadius: '10px', background: '#9D4124', color: '#FFFFFF', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Đóng Ngăn Kéo
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

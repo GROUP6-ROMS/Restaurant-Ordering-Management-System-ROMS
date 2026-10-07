@@ -2,6 +2,7 @@ package com.romsteam.roms.service;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
+import com.romsteam.roms.dto.response.TableOrdersResponse;
 import com.romsteam.roms.dto.response.TableResponse;
 import com.romsteam.roms.dto.response.TableSummaryResponse;
 import com.romsteam.roms.entity.enums.TableStatus;
@@ -33,4 +34,5 @@ public interface RestaurantTableService {
 
     // 8. Xóa bàn (chặn xóa nếu bàn đang có khách)
     void deleteTable(Long id);
+    TableOrdersResponse getTableActiveOrders(Long tableId);
 }

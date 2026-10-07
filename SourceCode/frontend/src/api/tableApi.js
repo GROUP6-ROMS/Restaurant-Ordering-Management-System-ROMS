@@ -34,5 +34,9 @@ export const tableApi = {
     // Khách hàng xác thực QR code
     verifyCustomerQr: (qrToken) => {
         return axiosClient.post('/customer/tables/verify-qr', { qrToken });
-    }
+    },
+    // Xem nhanh danh sách món đang gọi tại bàn
+    getTableOrders: (tableId) => {
+        return axiosClient.get(`/admin/tables/${tableId}/orders`);
+    },
 };
