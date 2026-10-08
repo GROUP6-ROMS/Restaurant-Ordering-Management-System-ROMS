@@ -23,12 +23,12 @@ public class MenuItem {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    // Ten mon an (vi du: "Bo bit tet sot tieu den", "Tra dao cam sa")
-    @Column(name = "name", nullable = false, length = 150)
+    // Ten mon an (ho tro tieng Viet Unicode co dau)
+    @Column(name = "name", nullable = false, columnDefinition = "NVARCHAR(150)")
     private String name;
 
     // Mo ta chi tiet mon an (thanh phan, huong vi...)
-    @Column(name = "description", length = 500)
+    @Column(name = "description", columnDefinition = "NVARCHAR(500)")
     private String description;
 
     // Gia ban niem yet (Dung BigDecimal de tranh loi sai so lam tron so thuc trong thanh toan)

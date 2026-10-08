@@ -29,11 +29,16 @@ public interface ReportService {
     List<BestsellerDishResponse> getTopBestsellers(ReportTimeframe timeframe, int limit, LocalDate startDate, LocalDate endDate);
 
     /**
-     * Xuất dữ liệu báo cáo sang định dạng CSV UTF-8 có BOM (mở trực tiếp bằng Microsoft Excel không lỗi font tiếng Việt)
+     * Xuất dữ liệu báo cáo sang định dạng Excel (.xls chuẩn bảng biểu XML/HTML với màu sắc, căn lề và định dạng số)
      * @param timeframe Khoảng thời gian lọc
      * @param startDate Ngày bắt đầu tùy chỉnh
      * @param endDate Ngày kết thúc tùy chỉnh
-     * @return Mảng byte chứa nội dung file CSV
+     * @return Mảng byte chứa nội dung file Excel chuyên nghiệp
+     */
+    byte[] exportReportExcel(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate);
+
+    /**
+     * Tương thích ngược: Xuất CSV
      */
     byte[] exportReportCsv(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate);
 }

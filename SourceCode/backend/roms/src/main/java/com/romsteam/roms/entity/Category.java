@@ -16,12 +16,12 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Ten danh muc (vi du: "Khai vi", "Mon chinh", "Nuoc uong") - Bat buoc nhap, khong duoc trung lap
-    @Column(name = "name", nullable = false, unique = true, length = 100)
+    // Ten danh muc (ho tro tieng Viet Unicode co dau)
+    @Column(name = "name", nullable = false, unique = true, columnDefinition = "NVARCHAR(100)")
     private String name;
 
     // Mo ta ngan gon ve danh muc mon an
-    @Column(name = "description", length = 255)
+    @Column(name = "description", columnDefinition = "NVARCHAR(255)")
     private String description;
 
     // Thu tu hien thi tren thanh Menu giao dien khach hang (so nho dung truoc: 1, 2, 3...)

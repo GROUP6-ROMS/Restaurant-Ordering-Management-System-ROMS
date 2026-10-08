@@ -30,4 +30,17 @@ public class HourlyRevenueResponse {
 
     // Tỷ lệ phần trăm doanh thu so với khung giờ đạt doanh thu cao nhất (0% - 100%)
     private Integer pct;
+
+    // Các hàm getter tương thích hỗ trợ xuất báo cáo Excel & phân tích
+    public String getTimeSlot() {
+        return hour;
+    }
+
+    public Integer getPercentage() {
+        return pct;
+    }
+
+    public Boolean getIsPeak() {
+        return pct != null && pct == 100 && revenue != null && revenue.compareTo(BigDecimal.ZERO) > 0;
+    }
 }

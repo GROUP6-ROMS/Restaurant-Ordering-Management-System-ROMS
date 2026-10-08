@@ -56,23 +56,23 @@ public class ReportController {
     }
 
     /**
-     * GET /api/admin/reports/export/csv
-     * Tải xuống file báo cáo Excel (CSV UTF-8 có BOM)
+     * GET /api/admin/reports/export/excel (hoặc /api/admin/reports/export/csv)
+     * Tải xuống file báo cáo Excel chuyên nghiệp (.xls định dạng bảng biểu, màu sắc và định dạng số)
      */
-    @GetMapping("/export/csv")
+    @GetMapping({"/export/excel", "/export/csv"})
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<byte[]> exportReportCsv(
+    public ResponseEntity<byte[]> exportReportExcel(
             @RequestParam(defaultValue = "TODAY") ReportTimeframe timeframe,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        byte[] csvData = reportService.exportReportCsv(timeframe, startDate, endDate);
+        byte[] excelData = reportService.exportReportExcel(timeframe, startDate, endDate);
 
-        String filename = "ROMS_BaoCaoDoanhThu_" + LocalDate.now() + ".csv";
+        String filename = "ROMS_BaoCaoDoanhThu_" + timeframe + "_" + LocalDate.now() + ".xls";
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-                .body(csvData);
+                .contentType(MediaType.parseMediaType("application/vnd.ms-excel; charset=UTF-8"))
+                .body(excelData);
     }
 }
