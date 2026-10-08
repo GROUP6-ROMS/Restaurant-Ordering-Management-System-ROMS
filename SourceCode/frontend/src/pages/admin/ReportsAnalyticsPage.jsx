@@ -71,21 +71,132 @@ export default function ReportsAnalyticsPage() {
     }
   }, [timeframe]);
 
-  // Hàm xử lý xuất file Excel (CSV UTF-8 có BOM)
+  // Hàm xử lý xuất file Excel (.xls) định dạng bảng biểu màu sắc, căn lề và số liệu kế toán chuyên nghiệp
   const handleExportExcel = async () => {
     try {
       showToast('Đang kết xuất báo cáo Excel...');
       const sDate = (timeframe === 'CUSTOM') ? customStartDate : null;
       const eDate = (timeframe === 'CUSTOM') ? customEndDate : null;
 
-      const response = await reportApi.exportReportCsv(timeframe, sDate, eDate);
+      try {
+        // 1. Thử tải file Excel từ API Backend
+        const response = await reportApi.exportReportExcel(timeframe, sDate, eDate);
+        const blob = new Blob([response.data], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.xls`);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+        showToast('Đã tải xuống tệp báo cáo Excel thành công!');
+        return;
+      } catch (apiErr) {
+        console.warn('API tải Excel lỗi, tự động kết xuất trực tiếp từ dữ liệu hiện tại:', apiErr);
+      }
 
-      // Tạo đường dẫn blob và kích hoạt tải xuống tự động trên trình duyệt
-      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      // 2. Dự phòng an toàn (Fallback): Kết xuất file Excel bảng biểu cực đẹp trực tiếp từ dữ liệu trên màn hình
+      const formatNum = (n) => Number(n || 0).toLocaleString('vi-VN');
+      const curDateStr = new Date().toLocaleDateString('vi-VN');
+
+      let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
+  <meta charset="UTF-8">
+  <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>BaoCaoDoanhThu_ROMS</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11pt; color: #1F1B1A; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 22px; }
+    .banner { background-color: #9D4124; color: #FFFFFF; font-size: 16pt; font-weight: bold; text-align: center; height: 42px; vertical-align: middle; }
+    .meta { font-size: 10pt; color: #56423D; font-style: italic; text-align: center; height: 24px; }
+    .sec-title { background-color: #56423D; color: #FFFFFF; font-size: 12pt; font-weight: bold; padding: 6px 10px; height: 30px; vertical-align: middle; }
+    .th-header { background-color: #EFEBE9; color: #3E2723; font-weight: bold; text-align: center; border: 1px solid #D7CCC8; height: 28px; }
+    .th-accent { background-color: #9D4124; color: #FFFFFF; font-weight: bold; text-align: center; border: 1px solid #7D311A; height: 28px; }
+    td { border: 1px solid #E0E0E0; padding: 6px 10px; vertical-align: middle; }
+    .td-left { text-align: left; }
+    .td-center { text-align: center; }
+    .td-right { text-align: right; mso-number-format:"\\#\\,\\#\\#0"; }
+    .td-money { text-align: right; font-weight: bold; color: #9D4124; mso-number-format:"\\#\\,\\#\\#0\\ \\\"₫\\\"\"; }
+    .row-even { background-color: #FAF7F5; }
+    .row-hl { background-color: #FFF3E0; font-weight: bold; }
+    .row-total { background-color: #FFECB3; font-weight: bold; border-top: 2px solid #FFA000; }
+  </style>
+</head>
+<body>
+  <table>
+    <tr><th colspan="6" class="banner">HỆ THỐNG QUẢN LÝ NHÀ HÀNG ROMS - BÁO CÁO DOANH THU & VẬN HÀNH</th></tr>
+    <tr><td colspan="6" class="meta">Kỳ báo cáo: <b>${timeframe}</b> | Ngày xuất: ${curDateStr}</td></tr>
+  </table>
+
+  <table>
+    <tr><th colspan="4" class="sec-title">1. CÁC CHỈ SỐ HOẠT ĐỘNG CHÍNH (KEY METRICS & KPIs)</th></tr>
+    <tr><th class="th-header">Chỉ Số Đánh Giá</th><th class="th-header">Giá Trị Thực Tế</th><th class="th-header">Đơn Vị</th><th class="th-header">Xu Hướng So Với Kỳ Trước</th></tr>
+    <tr class="row-hl"><td class="td-left">Tổng Doanh Thu Thuần</td><td class="td-money">${formatNum(kpi.totalRevenue)} ₫</td><td class="td-center">VNĐ</td><td class="td-center">${kpi.revenueTrend || '-'}</td></tr>
+    <tr><td class="td-left">Tổng Lượt Bàn Hoàn Tất Phục Vụ</td><td class="td-right">${kpi.totalTables || 0}</td><td class="td-center">Bàn</td><td class="td-center">-</td></tr>
+    <tr class="row-even"><td class="td-left">Tổng Lượt Khách Hàng</td><td class="td-right">${kpi.totalGuests || 0}</td><td class="td-center">Khách</td><td class="td-center">-</td></tr>
+    <tr><td class="td-left">Giá Trị Trung Bình Mỗi Bàn (AOV)</td><td class="td-money">${formatNum(kpi.averageOrderValue)} ₫</td><td class="td-center">VNĐ/bàn</td><td class="td-center">${kpi.aovTrend || '-'}</td></tr>
+  </table>
+
+  <table>
+    <tr><th colspan="5" class="sec-title">2. CƠ CẤU PHƯƠNG THỨC THANH TOÁN (PAYMENT METHODS)</th></tr>
+    <tr><th class="th-header">STT</th><th class="th-header">Phương Thức Thanh Toán</th><th class="th-header">Số Lượng Hóa Đơn</th><th class="th-header">Tổng Số Tiền (VNĐ)</th><th class="th-header">Tỷ Trọng (%)</th></tr>
+    ${paymentMethods.map((pm, i) => `
+    <tr${i % 2 === 1 ? ' class="row-even"' : ''}>
+      <td class="td-center">${i + 1}</td>
+      <td class="td-left">${pm.label || pm.method}</td>
+      <td class="td-right">${pm.billCount || 0}</td>
+      <td class="td-money">${formatNum(pm.totalAmount)} ₫</td>
+      <td class="td-center">${pm.percentage || 0}%</td>
+    </tr>`).join('')}
+  </table>
+
+  <table>
+    <tr><th colspan="6" class="sec-title">3. TOP MÓN ĂN BÁN CHẠY NHẤT (BESTSELLER DISHES)</th></tr>
+    <tr><th class="th-accent">Hạng</th><th class="th-accent">Tên Món Ăn</th><th class="th-accent">Danh Mục</th><th class="th-accent">Số Lượng Bán</th><th class="th-accent">Doanh Thu Món (VNĐ)</th><th class="th-accent">Xu Hướng</th></tr>
+    ${bestsellers.map((dish, i) => `
+    <tr${dish.rank <= 3 ? ' class="row-hl"' : (i % 2 === 1 ? ' class="row-even"' : '')}>
+      <td class="td-center"><b>#${dish.rank || (i + 1)}</b></td>
+      <td class="td-left"><b>${dish.name}</b></td>
+      <td class="td-left">${dish.category}</td>
+      <td class="td-right">${dish.sold || 0}</td>
+      <td class="td-money">${formatNum(dish.revenue)} ₫</td>
+      <td class="td-center">${dish.trend || '-'}</td>
+    </tr>`).join('')}
+  </table>
+
+  ${hourlyList.length > 0 ? `
+  <table>
+    <tr><th colspan="4" class="sec-title">4. PHÂN TÍCH DOANH THU THEO KHUNG GIỜ (HOURLY TIMELINE)</th></tr>
+    <tr><th class="th-header">Khung Giờ Hoạt Động</th><th class="th-header">Doanh Thu (VNĐ)</th><th class="th-header">Tỷ Lệ Giờ Đỉnh</th><th class="th-header">Ghi Chú</th></tr>
+    ${hourlyList.map(hr => {
+      const isPeak = (hr.pct === 100 || hr.isPeak) && (hr.revenue > 0);
+      return `
+    <tr>
+      <td class="td-center">${hr.hour || hr.timeSlot || ''}</td>
+      <td class="td-money">${formatNum(hr.revenue)} ₫</td>
+      <td class="td-center">${hr.pct != null ? hr.pct : (hr.percentage != null ? hr.percentage : 0)}%</td>
+      <td class="td-center">${isPeak ? '<b style="color:#BA1A1A;">GIỜ CAO ĐIỂM (PEAK)</b>' : 'Bình thường'}</td>
+    </tr>`;
+    }).join('')}
+  </table>` : ''}
+
+  <br/>
+  <table>
+    <tr>
+      <td colspan="3" style="border:none; text-align:center;"><b>Người Lập Báo Cáo</b><br/><br/><br/><br/>(Ký và ghi rõ họ tên)</td>
+      <td colspan="3" style="border:none; text-align:center;"><b>Quản Lý Nhà Hàng</b><br/><br/><br/><br/>(Ký và đóng dấu)</td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      // Sử dụng Uint8Array nhị phân cho 3 bytes BOM UTF-8 (EF BB BF) để đảm bảo 100% không bao giờ lỗi font tiếng Việt '??'
+      const utf8Bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const blob = new Blob([utf8Bom, html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.xls`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
@@ -97,11 +208,6 @@ export default function ReportsAnalyticsPage() {
     }
   };
 
-  // Hàm mở hộp thoại in báo cáo trình duyệt (Print dialog)
-  const handlePrintReport = () => {
-    window.print();
-  };
-
   // Các dữ liệu dự phòng an toàn từ API
   const kpi = reportData?.kpi || {
     totalRevenue: 63120000,
@@ -109,8 +215,7 @@ export default function ReportsAnalyticsPage() {
     totalTables: 86,
     totalGuests: 242,
     averageOrderValue: 733950,
-    aovTrend: '+4.2%',
-    avgServiceDurationMinutes: 13.5
+    aovTrend: '+4.2%'
   };
 
   const hourlyList = reportData?.hourlyData || [];
@@ -211,48 +316,29 @@ export default function ReportsAnalyticsPage() {
             })}
           </div>
 
-          {/* Nút Xuất Excel */}
+          {/* Nút Xuất Excel Chuyên Nghiệp */}
           <button
             type="button"
             onClick={handleExportExcel}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
-              borderRadius: '12px',
-              background: '#FFFFFF',
-              border: '1px solid #EAE0DE',
-              fontWeight: 700,
-              fontSize: '0.82rem',
-              color: '#56423D',
-              cursor: 'pointer'
-            }}
-          >
-            <Icon name="table_view" size={18} />
-            Xuất Excel
-          </button>
-
-          {/* Nút In Báo Cáo */}
-          <button
-            type="button"
-            onClick={handlePrintReport}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
+              gap: '8px',
+              padding: '10px 18px',
               borderRadius: '12px',
               background: '#9D4124',
               border: 'none',
               fontWeight: 700,
-              fontSize: '0.82rem',
+              fontSize: '0.84rem',
               color: '#FFFFFF',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(157, 65, 36, 0.25)',
+              transition: 'all 0.15s ease'
             }}
+            title="Tải xuống tệp báo cáo Excel định dạng bảng biểu màu sắc chuẩn (.xls)"
           >
-            <Icon name="picture_as_pdf" size={18} />
-            In Báo Cáo
+            <Icon name="table_view" size={18} />
+            <span>Xuất Excel</span>
           </button>
         </div>
       </div>
@@ -424,22 +510,6 @@ export default function ReportsAnalyticsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
             <Icon name="trending_up" size={16} />
             <span>{kpi.aovTrend} so với kỳ trước</span>
-          </div>
-        </div>
-
-        {/* KPI 4: Thời Gian Phục Vụ Trung Bình */}
-        <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '20px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B' }}>Thời Gian Phục Vụ TB</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEF3C7', color: '#78350F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="schedule" size={20} />
-            </div>
-          </div>
-          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.75rem', color: '#1F1B1A' }}>
-            {kpi.avgServiceDurationMinutes} phút
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
-            <span>Nhanh hơn KPI chuẩn (15p)</span>
           </div>
         </div>
       </div>

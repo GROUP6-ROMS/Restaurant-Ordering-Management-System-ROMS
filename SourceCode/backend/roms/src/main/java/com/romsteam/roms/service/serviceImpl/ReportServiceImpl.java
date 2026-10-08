@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.text.NumberFormat;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -59,7 +60,7 @@ public class ReportServiceImpl implements ReportService {
 
         // 4. Lấy danh sách phiên ăn COMPLETED của kỳ hiện tại
         List<DiningSession> currentSessions = diningSessionRepository.findByStatusAndEndTimeBetween(
-                SessionStatus.COMPLETE, currentRange.startDateTime, currentRange.endDateTime
+                SessionStatus.COMPLETED, currentRange.startDateTime, currentRange.endDateTime
         );
 
         // 5. Tính toán các chỉ số KPI
@@ -103,61 +104,137 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
-    public byte[] exportReportCsv(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate) {
+    public byte[] exportReportExcel(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate) {
         ReportSummaryResponse summary = getReportSummary(timeframe, startDate, endDate);
+        NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi-VN"));
 
         StringBuilder sb = new StringBuilder();
-        // 1. Ký tự Byte Order Mark (BOM) UTF-8 để Microsoft Excel nhận diện 100% tiếng Việt có dấu
+        // Thêm ký tự Byte Order Mark (BOM) UTF-8 để Microsoft Excel nhận diện 100% tiếng Việt có dấu
         sb.append('\uFEFF');
 
-        // Định dạng số tiền có phân cách hàng nghìn (ví dụ: 35,220,000)
-        java.text.DecimalFormat moneyFormat = new java.text.DecimalFormat("#,###");
+        sb.append("<html xmlns:o=\"urn:schemas-microsoft-com:office:office\" ")
+                .append("xmlns:x=\"urn:schemas-microsoft-com:office:excel\" ")
+                .append("xmlns=\"http://www.w3.org/TR/REC-html40\">\n");
+        sb.append("<head>\n");
+        sb.append("<meta http-equiv=\"content-type\" content=\"application/vnd.ms-excel; charset=UTF-8\">\n");
+        sb.append("<meta charset=\"UTF-8\">\n");
+        sb.append("<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>")
+                .append("<x:Name>BaoCaoDoanhThu_ROMS</x:Name>")
+                .append("<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>")
+                .append("</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->\n");
+        sb.append("<style>\n");
+        sb.append("  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11pt; color: #1F1B1A; }\n");
+        sb.append("  table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }\n");
+        sb.append("  .banner { background-color: #9D4124; color: #FFFFFF; font-size: 16pt; font-weight: bold; text-align: center; height: 42px; vertical-align: middle; }\n");
+        sb.append("  .meta { font-size: 10pt; color: #56423D; font-style: italic; text-align: center; height: 24px; }\n");
+        sb.append("  .sec-title { background-color: #56423D; color: #FFFFFF; font-size: 12pt; font-weight: bold; padding: 6px 10px; height: 30px; vertical-align: middle; }\n");
+        sb.append("  .th-header { background-color: #EFEBE9; color: #3E2723; font-weight: bold; text-align: center; border: 1px solid #D7CCC8; height: 28px; vertical-align: middle; }\n");
+        sb.append("  .th-accent { background-color: #9D4124; color: #FFFFFF; font-weight: bold; text-align: center; border: 1px solid #7D311A; height: 28px; vertical-align: middle; }\n");
+        sb.append("  td { border: 1px solid #E0E0E0; padding: 6px 10px; vertical-align: middle; }\n");
+        sb.append("  .td-left { text-align: left; }\n");
+        sb.append("  .td-center { text-align: center; }\n");
+        sb.append("  .td-right { text-align: right; mso-number-format:\"\\#\\,\\#\\#0\"; }\n");
+        sb.append("  .td-money { text-align: right; font-weight: bold; color: #9D4124; mso-number-format:\"\\#\\,\\#\\#0\\ \\\"₫\\\"\"; }\n");
+        sb.append("  .row-even { background-color: #FAF7F5; }\n");
+        sb.append("  .row-hl { background-color: #FFF3E0; font-weight: bold; }\n");
+        sb.append("  .row-total { background-color: #FFECB3; font-weight: bold; border-top: 2px solid #FFA000; }\n");
+        sb.append("</style>\n");
+        sb.append("</head>\n");
+        sb.append("<body>\n");
 
-        // --- TIÊU ĐỀ BÁO CÁO ---
-        sb.append("\"BÁO CÁO DOANH THU & HIỆU SUẤT VẬN HÀNH NHÀ HÀNG ROMS\",,,,,\n");
-        sb.append("\"Thời gian thống kê:\",\"").append(summary.getStartDate()).append(" - ").append(summary.getEndDate()).append("\",,,,\n\n");
+        // 1. BANNER TIÊU ĐỀ
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"6\" class=\"banner\">HỆ THỐNG QUẢN LÝ NHÀ HÀNG ROMS - BÁO CÁO DOANH THU & VẬN HÀNH</th></tr>\n");
+        sb.append("  <tr><td colspan=\"6\" class=\"meta\">Kỳ báo cáo: <b>").append(timeframe).append("</b> (Từ ").append(summary.getStartDate()).append(" đến ").append(summary.getEndDate()).append(") | Ngày xuất: ").append(LocalDate.now()).append("</td></tr>\n");
+        sb.append("</table>\n");
 
-        // --- 1. BẢNG TỔNG HỢP KPI ---
-        sb.append("\"1. CÁC CHỈ SỐ HOẠT ĐỘNG CHÍNH (KPIs)\",,\n");
-        sb.append("\"Chỉ số\",\"Giá trị\",\"Xu hướng so với kỳ trước\"\n");
+        // 2. CÁC CHỈ SỐ KPI CHÍNH
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"4\" class=\"sec-title\">1. CÁC CHỈ SỐ HOẠT ĐỘNG CHÍNH (KEY METRICS & KPIs)</th></tr>\n");
+        sb.append("  <tr><th class=\"th-header\">Chỉ Số Đánh Giá</th><th class=\"th-header\">Giá Trị Thực Tế</th><th class=\"th-header\">Đơn Vị</th><th class=\"th-header\">Xu Hướng So Với Kỳ Trước</th></tr>\n");
+        sb.append("  <tr class=\"row-hl\"><td class=\"td-left\">Tổng Doanh Thu Thuần</td><td class=\"td-money\">").append(nf.format(summary.getKpi().getTotalRevenue())).append(" ₫</td><td class=\"td-center\">VNĐ</td><td class=\"td-center\">").append(summary.getKpi().getRevenueTrend()).append("</td></tr>\n");
+        sb.append("  <tr><td class=\"td-left\">Tổng Lượt Bàn Hoàn Tất Phục Vụ</td><td class=\"td-right\">").append(summary.getKpi().getTotalTables()).append("</td><td class=\"td-center\">Bàn</td><td class=\"td-center\">-</td></tr>\n");
+        sb.append("  <tr class=\"row-even\"><td class=\"td-left\">Tổng Lượt Khách Hàng</td><td class=\"td-right\">").append(summary.getKpi().getTotalGuests()).append("</td><td class=\"td-center\">Khách</td><td class=\"td-center\">-</td></tr>\n");
+        sb.append("  <tr><td class=\"td-left\">Giá Trị Trung Bình Mỗi Bàn (AOV)</td><td class=\"td-money\">").append(nf.format(summary.getKpi().getAverageOrderValue())).append(" ₫</td><td class=\"td-center\">VNĐ/bàn</td><td class=\"td-center\">").append(summary.getKpi().getAovTrend()).append("</td></tr>\n");
+        sb.append("</table>\n");
 
-        BigDecimal rev = summary.getKpi().getTotalRevenue() != null ? summary.getKpi().getTotalRevenue() : BigDecimal.ZERO;
-        sb.append("\"Tổng doanh thu\",\"").append(moneyFormat.format(rev)).append(" VNĐ\",\"").append(summary.getKpi().getRevenueTrend()).append("\"\n");
-
-        sb.append("\"Tổng lượt bàn đã phục vụ\",=\"").append(summary.getKpi().getTotalTables()).append(" bàn\",\n");
-        sb.append("\"Tổng số lượt khách\",=\"").append(summary.getKpi().getTotalGuests()).append(" khách\",\n");
-
-        BigDecimal aov = summary.getKpi().getAverageOrderValue() != null ? summary.getKpi().getAverageOrderValue() : BigDecimal.ZERO;
-        sb.append("\"Giá trị trung bình mỗi bàn (AOV)\",\"").append(moneyFormat.format(aov)).append(" VNĐ\",\"").append(summary.getKpi().getAovTrend()).append("\"\n");
-
-        sb.append("\"Thời gian phục vụ trung bình\",=\"").append(summary.getKpi().getAvgServiceDurationMinutes()).append(" phút\",\n\n");
-
-        // --- 2. BẢNG CƠ CẤU PHƯƠNG THỨC THANH TOÁN ---
-        sb.append("\"2. CƠ CẤU PHƯƠNG THỨC THANH TOÁN\",,,\n");
-        sb.append("\"Phương thức\",\"Số hóa đơn\",\"Tổng số tiền\",\"Tỷ lệ đóng góp\"\n");
+        // 3. CƠ CẤU PHƯƠNG THỨC THANH TOÁN
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"5\" class=\"sec-title\">2. CƠ CẤU PHƯƠNG THỨC THANH TOÁN (PAYMENT METHODS)</th></tr>\n");
+        sb.append("  <tr><th class=\"th-header\">STT</th><th class=\"th-header\">Phương Thức Thanh Toán</th><th class=\"th-header\">Số Lượng Hóa Đơn</th><th class=\"th-header\">Tổng Số Tiền (VNĐ)</th><th class=\"th-header\">Tỷ Trọng (%)</th></tr>\n");
+        int pmIdx = 1;
+        long totalBills = 0;
+        BigDecimal totalPmAmount = BigDecimal.ZERO;
         for (PaymentMethodDistributionResponse pm : summary.getPaymentMethods()) {
-            BigDecimal pmTotal = pm.getTotalAmount() != null ? pm.getTotalAmount() : BigDecimal.ZERO;
-            sb.append("\"").append(pm.getLabel()).append("\",=\"")
-                    .append(pm.getBillCount()).append(" đơn\",\"")
-                    .append(moneyFormat.format(pmTotal)).append(" VNĐ\",\"")
-                    .append(pm.getPercentage()).append("%\"\n");
+            totalBills += pm.getBillCount();
+            totalPmAmount = totalPmAmount.add(pm.getTotalAmount());
+            String rowCls = (pmIdx % 2 == 0) ? " class=\"row-even\"" : "";
+            sb.append("  <tr").append(rowCls).append(">")
+                    .append("<td class=\"td-center\">").append(pmIdx++).append("</td>")
+                    .append("<td class=\"td-left\">").append(pm.getLabel()).append("</td>")
+                    .append("<td class=\"td-right\">").append(pm.getBillCount()).append("</td>")
+                    .append("<td class=\"td-money\">").append(nf.format(pm.getTotalAmount())).append(" ₫</td>")
+                    .append("<td class=\"td-center\">").append(pm.getPercentage()).append("%</td>")
+                    .append("</tr>\n");
         }
-        sb.append("\n");
+        sb.append("  <tr class=\"row-total\"><td></td><td class=\"td-left\">TỔNG CỘNG</td><td class=\"td-right\">").append(totalBills).append("</td><td class=\"td-money\">").append(nf.format(totalPmAmount)).append(" ₫</td><td class=\"td-center\">100%</td></tr>\n");
+        sb.append("</table>\n");
 
-        // --- 3. BẢNG TOP MÓN ĂN BÁN CHẠY ---
-        sb.append("\"3. TOP MÓN ĂN BÁN CHẠY NHẤT\",,,,,\n");
-        sb.append("\"Hạng\",\"Tên món ăn\",\"Danh mục\",\"Số lượng đã bán\",\"Doanh thu món\",\"Xu hướng\"\n");
+        // 4. TOP MÓN ĂN BÁN CHẠY NHẤT
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"6\" class=\"sec-title\">3. TOP MÓN ĂN BÁN CHẠY NHẤT (BESTSELLER DISHES)</th></tr>\n");
+        sb.append("  <tr><th class=\"th-accent\">Hạng</th><th class=\"th-accent\">Tên Món Ăn</th><th class=\"th-accent\">Danh Mục</th><th class=\"th-accent\">Số Lượng Bán</th><th class=\"th-accent\">Doanh Thu Món (VNĐ)</th><th class=\"th-accent\">Xu Hướng</th></tr>\n");
         for (BestsellerDishResponse dish : summary.getBestsellers()) {
-            BigDecimal dishRev = dish.getRevenue() != null ? dish.getRevenue() : BigDecimal.ZERO;
-            sb.append("\"").append(dish.getRank()).append("\",\"")
-                    .append(dish.getName()).append("\",\"")
-                    .append(dish.getCategory()).append("\",=\"")
-                    .append(dish.getSold()).append(" suất\",=\"")
-                    .append(moneyFormat.format(dishRev)).append(" VNĐ\",=\"")
-                    .append(dish.getTrend()).append("\"\n");
+            String rankBg = dish.getRank() <= 3 ? " class=\"row-hl\"" : "";
+            sb.append("  <tr").append(rankBg).append(">")
+                    .append("<td class=\"td-center\"><b>#").append(dish.getRank()).append("</b></td>")
+                    .append("<td class=\"td-left\"><b>").append(dish.getName()).append("</b></td>")
+                    .append("<td class=\"td-left\">").append(dish.getCategory()).append("</td>")
+                    .append("<td class=\"td-right\">").append(dish.getSold()).append("</td>")
+                    .append("<td class=\"td-money\">").append(nf.format(dish.getRevenue())).append(" ₫</td>")
+                    .append("<td class=\"td-center\">").append(dish.getTrend()).append("</td>")
+                    .append("</tr>\n");
+        }
+        sb.append("</table>\n");
+
+        // 5. DOANH THU THEO KHUNG GIỜ
+        if (summary.getHourlyData() != null && !summary.getHourlyData().isEmpty()) {
+            sb.append("<table>\n");
+            sb.append("  <tr><th colspan=\"4\" class=\"sec-title\">4. PHÂN TÍCH DOANH THU THEO KHUNG GIỜ (HOURLY TIMELINE)</th></tr>\n");
+            sb.append("  <tr><th class=\"th-header\">Khung Giờ Hoạt Động</th><th class=\"th-header\">Doanh Thu (VNĐ)</th><th class=\"th-header\">Tỷ Lệ Giờ Đỉnh</th><th class=\"th-header\">Ghi Chú</th></tr>\n");
+            for (HourlyRevenueResponse hr : summary.getHourlyData()) {
+                boolean isPeak = hr.getPct() != null && hr.getPct() == 100 && hr.getRevenue() != null && hr.getRevenue().compareTo(BigDecimal.ZERO) > 0;
+                String note = isPeak ? "<b style=\"color:#BA1A1A;\">GIỜ CAO ĐIỂM (PEAK)</b>" : "Bình thường";
+                sb.append("  <tr>")
+                        .append("<td class=\"td-center\">").append(hr.getHour() != null ? hr.getHour() : "").append("</td>")
+                        .append("<td class=\"td-money\">").append(nf.format(hr.getRevenue() != null ? hr.getRevenue() : BigDecimal.ZERO)).append(" ₫</td>")
+                        .append("<td class=\"td-center\">").append(hr.getPct() != null ? hr.getPct() : 0).append("%</td>")
+                        .append("<td class=\"td-center\">").append(note).append("</td>")
+                        .append("</tr>\n");
+            }
+            sb.append("</table>\n");
         }
 
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
+        // 6. CHỮ KÝ XÁC NHẬN CHÂN TRANG
+        sb.append("<br/>\n");
+        sb.append("<table>\n");
+        sb.append("  <tr><td colspan=\"3\" style=\"border:none; text-align:center;\"><b>Người Lập Báo Cáo</b><br/><br/><br/><br/>(Ký và ghi rõ họ tên)</td>")
+                .append("<td colspan=\"3\" style=\"border:none; text-align:center;\"><b>Quản Lý Nhà Hàng</b><br/><br/><br/><br/>(Ký và đóng dấu)</td></tr>\n");
+        sb.append("</table>\n");
+
+        sb.append("</body>\n</html>");
+
+        byte[] contentBytes = sb.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] result = new byte[bom.length + contentBytes.length];
+        System.arraycopy(bom, 0, result, 0, bom.length);
+        System.arraycopy(contentBytes, 0, result, bom.length, contentBytes.length);
+        return result;
+    }
+
+    @Override
+    public byte[] exportReportCsv(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate) {
+        return exportReportExcel(timeframe, startDate, endDate);
     }
 
     // ===================================================================
@@ -256,28 +333,6 @@ public class ReportServiceImpl implements ReportService {
 
         String aovTrend = formatTrendPercentage(currentAov, prevAov);
 
-        // Tính thời gian phục vụ trung bình (tính bằng phút)
-        double avgDuration = 0.0;
-        if (!currentSessions.isEmpty()) {
-            double totalMinutes = 0;
-            int countWithTime = 0;
-            for (DiningSession s : currentSessions) {
-                if (s.getStartTime() != null && s.getEndTime() != null) {
-                    long minutes = Duration.between(s.getStartTime(), s.getEndTime()).toMinutes();
-                    if (minutes > 0) {
-                        totalMinutes += minutes;
-                        countWithTime++;
-                    }
-                }
-            }
-            if (countWithTime > 0) {
-                avgDuration = Math.round((totalMinutes / countWithTime) * 10.0) / 10.0;
-            }
-        }
-        if (avgDuration == 0.0) {
-            avgDuration = 13.5; // Giá trị tiêu chuẩn giả định nếu bàn kết thúc tức thì
-        }
-
         return KpiReportResponse.builder()
                 .totalRevenue(currentRev)
                 .revenueTrend(revTrend)
@@ -285,7 +340,6 @@ public class ReportServiceImpl implements ReportService {
                 .totalGuests(totalGuests)
                 .averageOrderValue(currentAov)
                 .aovTrend(aovTrend)
-                .avgServiceDurationMinutes(avgDuration)
                 .totalBills((long) currentBills.size())
                 .build();
     }
@@ -296,8 +350,8 @@ public class ReportServiceImpl implements ReportService {
     private List<HourlyRevenueResponse> calculateHourlyBreakdown(List<Bill> bills) {
         // Định nghĩa 9 khung giờ hoạt động của nhà hàng
         String[] slots = {
-            "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00", "13:00 - 14:00",
-            "14:00 - 17:00", "17:00 - 18:00", "18:00 - 19:30", "19:30 - 21:00", "21:00 - 22:30"
+                "10:00 - 11:00", "11:00 - 12:00", "12:00 - 13:00", "13:00 - 14:00",
+                "14:00 - 17:00", "17:00 - 18:00", "18:00 - 19:30", "19:30 - 21:00", "21:00 - 22:30"
         };
 
         Map<String, BigDecimal> revenueMap = new LinkedHashMap<>();
@@ -331,8 +385,8 @@ public class ReportServiceImpl implements ReportService {
             int pct = 0;
             if (maxRevenue.compareTo(BigDecimal.ZERO) > 0) {
                 pct = rev.multiply(BigDecimal.valueOf(100))
-                         .divide(maxRevenue, 0, RoundingMode.HALF_UP)
-                         .intValue();
+                        .divide(maxRevenue, 0, RoundingMode.HALF_UP)
+                        .intValue();
             }
 
             result.add(HourlyRevenueResponse.builder()

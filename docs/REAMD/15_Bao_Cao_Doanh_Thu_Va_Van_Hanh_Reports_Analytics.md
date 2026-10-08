@@ -2,7 +2,7 @@
 
 > **Mục tiêu:** Xây dựng hoàn chỉnh tính năng **Báo Cáo Doanh Thu & Vận Hành Nhà Hàng** cho màn hình Quản trị viên (`http://localhost:5173/admin/reports` - SCR-24) song song ở cả hai phía:
 > 1. **Phía Backend (Spring Boot 3.4.5 + Java 21 + Spring Data JPA + Lombok):** Xây dựng hệ thống API thống kê tổng hợp số liệu kinh doanh động theo nhiều mốc thời gian (`TODAY`, `YESTERDAY`, `WEEK`, `MONTH`, `CUSTOM`), phân tích doanh thu theo khung giờ cao điểm, cơ cấu phương thức thanh toán, xếp hạng món bán chạy nhất và hiệu suất phục vụ bàn.
-> 2. **Phía Frontend (React 19 + Vite + Axios + Material Symbols):** Thay thế toàn bộ Mock Data cứng bằng kết nối API thời gian thực, bộ lọc thời gian linh hoạt (kèm Date Picker), 3 góc nhìn báo cáo (Doanh thu, Món ăn, Vận hành), tích hợp tính năng **Xuất file Excel tiếng Việt (.csv UTF-8 BOM)** và **In phiếu báo cáo A4 chuyên nghiệp**.
+> 2. **Phía Frontend (React 19 + Vite + Axios + Material Symbols):** Thay thế toàn bộ Mock Data cứng bằng kết nối API thời gian thực, bộ lọc thời gian linh hoạt (kèm Date Picker), 3 góc nhìn báo cáo (Doanh thu, Món ăn, Vận hành), tích hợp tính năng **Xuất file Excel báo cáo chuyên nghiệp (.xls định dạng bảng biểu màu sắc, căn lề và chuẩn số liệu kế toán)**.
 > 
 > **Cam kết:** Toàn bộ code đều có **chú thích (comment) chi tiết 100% từng dòng** nhằm phục vụ việc học tập, nắm vững kiến thức kiến trúc hệ thống và luồng dữ liệu.
 
@@ -21,8 +21,6 @@
      $$\text{Total Revenue} = \sum \text{Bill.finalAmount} \quad (\text{với } \text{Bill.status} = \text{PAID})$$
    - **Giá trị trung bình mỗi bàn (AOV - Average Order Value):**
      $$\text{AOV} = \frac{\text{Tổng Doanh Thu}}{\text{Tổng Số Lượt Bàn Đã Thanh Toán}}$$
-   - **Thời gian phục vụ trung bình (Average Service Duration):**
-     $$\text{Avg Service Duration} = \frac{\sum (\text{DiningSession.endTime} - \text{DiningSession.startTime})}{\text{Tổng Số Phiên Ăn Hoàn Thành}} \quad (\text{đơn vị: phút})$$
    - **Tỷ lệ tăng trưởng so với kỳ trước (Growth Trend %):**
      $$\text{Trend \%} = \frac{\text{Giá trị kỳ hiện tại} - \text{Giá trị kỳ trước}}{\text{Giá trị kỳ trước}} \times 100\%$$
      *(Ví dụ: Xem hôm nay thì so sánh với hôm qua; Xem 7 ngày qua thì so sánh với 7 ngày trước đó).*
@@ -73,11 +71,11 @@
         ┌─────────────────────────────────────────────────────────────────┘
         ▼
 [Frontend: ReportsAnalyticsPage.jsx]
-  ├─ 1. Render 4 Thẻ KPI (Doanh thu, Lượt bàn, AOV, Thời gian phục vụ) kèm % Trend
+  ├─ 1. Render 3 Thẻ KPI chính (Tổng Doanh Thu, Tổng Lượt Bàn & Khách, Giá Trị Trung Bình AOV) kèm % Trend
   ├─ 2. Vẽ Biểu đồ Doanh thu theo Khung giờ (Thanh tiến trình CSS gradient & Nhãn Giờ Đỉnh)
   ├─ 3. Render Khối Cơ cấu Phương thức Thanh toán (VietQR, Tiền mặt, Thẻ POS)
   ├─ 4. Render Bảng Top 5 Món Bán Chạy Nhất (kèm Huy hiệu xếp hạng)
-  └─ 5. Xử lý xuất báo cáo Excel (CSV UTF-8 BOM) hoặc In phiếu A4 khi bấm nút
+  └─ 5. Xử lý xuất báo cáo Excel (.xls định dạng bảng biểu sang trọng) khi bấm nút Xuất Excel
 ```
 
 ---
@@ -125,7 +123,7 @@ Tạo các DTO đóng gói dữ liệu thống kê bên trong package `com.romst
 
 #### 1. File `KpiReportResponse.java`
 - **Tạo mới file tại đường dẫn:** `SourceCode/backend/roms/src/main/java/com/romsteam/roms/dto/response/KpiReportResponse.java`
-- **Nhiệm vụ:** Chứa số liệu của 4 thẻ KPI trên đầu màn hình báo cáo.
+- **Nhiệm vụ:** Chứa số liệu của 3 thẻ KPI trên đầu màn hình báo cáo.
 
 ```java
 package com.romsteam.roms.dto.response;
@@ -163,9 +161,6 @@ public class KpiReportResponse {
 
     // Tỷ lệ tăng/giảm giá trị trung bình trên bàn so với kỳ trước (Ví dụ: "+4.2%")
     private String aovTrend;
-
-    // Thời gian phục vụ trung bình một bàn (tính theo phút)
-    private Double avgServiceDurationMinutes;
 
     // Tổng số lượng hóa đơn thanh toán thành công
     private Long totalBills;
@@ -209,6 +204,19 @@ public class HourlyRevenueResponse {
 
     // Tỷ lệ phần trăm doanh thu so với khung giờ đạt doanh thu cao nhất (0% - 100%)
     private Integer pct;
+
+    // Các hàm getter tương thích hỗ trợ xuất báo cáo Excel & phân tích
+    public String getTimeSlot() {
+        return hour;
+    }
+
+    public Integer getPercentage() {
+        return pct;
+    }
+
+    public Boolean getIsPeak() {
+        return pct != null && pct == 100 && revenue != null && revenue.compareTo(BigDecimal.ZERO) > 0;
+    }
 }
 ```
 
@@ -407,7 +415,7 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
 #### 2. Cập nhật `DiningSessionRepository.java`
 - **Đường dẫn:** `SourceCode/backend/roms/src/main/java/com/romsteam/roms/repository/DiningSessionRepository.java`
-- **Thêm các hàm truy vấn phiên ăn theo thời gian phục vụ:**
+- **Thêm các hàm truy vấn phiên ăn theo khoảng thời gian:**
 
 ```java
 package com.romsteam.roms.repository;
@@ -524,11 +532,16 @@ public interface ReportService {
     List<BestsellerDishResponse> getTopBestsellers(ReportTimeframe timeframe, int limit, LocalDate startDate, LocalDate endDate);
 
     /**
-     * Xuất dữ liệu báo cáo sang định dạng CSV UTF-8 có BOM (mở trực tiếp bằng Microsoft Excel không lỗi font tiếng Việt)
+     * Xuất dữ liệu báo cáo sang định dạng Excel (.xls chuẩn bảng biểu XML/HTML với màu sắc, căn lề và định dạng số)
      * @param timeframe Khoảng thời gian lọc
      * @param startDate Ngày bắt đầu tùy chỉnh
      * @param endDate Ngày kết thúc tùy chỉnh
-     * @return Mảng byte chứa nội dung file CSV
+     * @return Mảng byte chứa nội dung file Excel chuyên nghiệp
+     */
+    byte[] exportReportExcel(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate);
+
+    /**
+     * Tương thích ngược: Xuất CSV
      */
     byte[] exportReportCsv(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate);
 }
@@ -560,6 +573,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.text.NumberFormat;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -644,50 +658,137 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
-    public byte[] exportReportCsv(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate) {
+    public byte[] exportReportExcel(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate) {
         ReportSummaryResponse summary = getReportSummary(timeframe, startDate, endDate);
+        NumberFormat nf = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi-VN"));
 
         StringBuilder sb = new StringBuilder();
-        // Thêm ký tự Byte Order Mark (BOM) UTF-8 để Microsoft Excel nhận diện chính xác tiếng Việt có dấu
+        // Thêm ký tự Byte Order Mark (BOM) UTF-8 để Microsoft Excel nhận diện 100% tiếng Việt có dấu
         sb.append('\uFEFF');
 
-        // Tiêu đề báo cáo
-        sb.append("BÁO CÁO DOANH THU & HIỆU SUẤT VẬN HÀNH NHÀ HÀNG ROMS\n");
-        sb.append("Thời gian thống kê:;").append(summary.getStartDate()).append(" - ").append(summary.getEndDate()).append("\n\n");
+        sb.append("<html xmlns:o=\"urn:schemas-microsoft-com:office:office\" ")
+          .append("xmlns:x=\"urn:schemas-microsoft-com:office:excel\" ")
+          .append("xmlns=\"http://www.w3.org/TR/REC-html40\">\n");
+        sb.append("<head>\n");
+        sb.append("<meta http-equiv=\"content-type\" content=\"application/vnd.ms-excel; charset=UTF-8\">\n");
+        sb.append("<meta charset=\"UTF-8\">\n");
+        sb.append("<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>")
+          .append("<x:Name>BaoCaoDoanhThu_ROMS</x:Name>")
+          .append("<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>")
+          .append("</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->\n");
+        sb.append("<style>\n");
+        sb.append("  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11pt; color: #1F1B1A; }\n");
+        sb.append("  table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }\n");
+        sb.append("  .banner { background-color: #9D4124; color: #FFFFFF; font-size: 16pt; font-weight: bold; text-align: center; height: 42px; vertical-align: middle; }\n");
+        sb.append("  .meta { font-size: 10pt; color: #56423D; font-style: italic; text-align: center; height: 24px; }\n");
+        sb.append("  .sec-title { background-color: #56423D; color: #FFFFFF; font-size: 12pt; font-weight: bold; padding: 6px 10px; height: 30px; vertical-align: middle; }\n");
+        sb.append("  .th-header { background-color: #EFEBE9; color: #3E2723; font-weight: bold; text-align: center; border: 1px solid #D7CCC8; height: 28px; vertical-align: middle; }\n");
+        sb.append("  .th-accent { background-color: #9D4124; color: #FFFFFF; font-weight: bold; text-align: center; border: 1px solid #7D311A; height: 28px; vertical-align: middle; }\n");
+        sb.append("  td { border: 1px solid #E0E0E0; padding: 6px 10px; vertical-align: middle; }\n");
+        sb.append("  .td-left { text-align: left; }\n");
+        sb.append("  .td-center { text-align: center; }\n");
+        sb.append("  .td-right { text-align: right; mso-number-format:\"\\#\\,\\#\\#0\"; }\n");
+        sb.append("  .td-money { text-align: right; font-weight: bold; color: #9D4124; mso-number-format:\"\\#\\,\\#\\#0\\ \\\"₫\\\"\"; }\n");
+        sb.append("  .row-even { background-color: #FAF7F5; }\n");
+        sb.append("  .row-hl { background-color: #FFF3E0; font-weight: bold; }\n");
+        sb.append("  .row-total { background-color: #FFECB3; font-weight: bold; border-top: 2px solid #FFA000; }\n");
+        sb.append("</style>\n");
+        sb.append("</head>\n");
+        sb.append("<body>\n");
 
-        // 1. Bảng tóm tắt chỉ số KPI
-        sb.append("1. CÁC CHỈ SỐ HOẠT ĐỘNG CHÍNH (KPIs)\n");
-        sb.append("Chỉ số;Giá trị;Xu hướng so với kỳ trước\n");
-        sb.append("Tổng doanh thu;").append(summary.getKpi().getTotalRevenue()).append(" VND;").append(summary.getKpi().getRevenueTrend()).append("\n");
-        sb.append("Tổng lượt bàn đã phục vụ;").append(summary.getKpi().getTotalTables()).append(" bàn;\n");
-        sb.append("Tổng số lượt khách;").append(summary.getKpi().getTotalGuests()).append(" khách;\n");
-        sb.append("Giá trị trung bình mỗi bàn (AOV);").append(summary.getKpi().getAverageOrderValue()).append(" VND;").append(summary.getKpi().getAovTrend()).append("\n");
-        sb.append("Thời gian phục vụ trung bình;").append(summary.getKpi().getAvgServiceDurationMinutes()).append(" phút;\n\n");
+        // 1. BANNER TIÊU ĐỀ
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"6\" class=\"banner\">HỆ THỐNG QUẢN LÝ NHÀ HÀNG ROMS - BÁO CÁO DOANH THU & VẬN HÀNH</th></tr>\n");
+        sb.append("  <tr><td colspan=\"6\" class=\"meta\">Kỳ báo cáo: <b>").append(timeframe).append("</b> (Từ ").append(summary.getStartDate()).append(" đến ").append(summary.getEndDate()).append(") | Ngày xuất: ").append(LocalDate.now()).append("</td></tr>\n");
+        sb.append("</table>\n");
 
-        // 2. Bảng cơ cấu phương thức thanh toán
-        sb.append("2. CƠ CẤU PHƯƠNG THỨC THANH TOÁN\n");
-        sb.append("Phương thức;Số hóa đơn;Tổng số tiền (VND);Tỷ lệ đóng góp\n");
+        // 2. CÁC CHỈ SỐ KPI CHÍNH
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"4\" class=\"sec-title\">1. CÁC CHỈ SỐ HOẠT ĐỘNG CHÍNH (KEY METRICS & KPIs)</th></tr>\n");
+        sb.append("  <tr><th class=\"th-header\">Chỉ Số Đánh Giá</th><th class=\"th-header\">Giá Trị Thực Tế</th><th class=\"th-header\">Đơn Vị</th><th class=\"th-header\">Xu Hướng So Với Kỳ Trước</th></tr>\n");
+        sb.append("  <tr class=\"row-hl\"><td class=\"td-left\">Tổng Doanh Thu Thuần</td><td class=\"td-money\">").append(nf.format(summary.getKpi().getTotalRevenue())).append(" ₫</td><td class=\"td-center\">VNĐ</td><td class=\"td-center\">").append(summary.getKpi().getRevenueTrend()).append("</td></tr>\n");
+        sb.append("  <tr><td class=\"td-left\">Tổng Lượt Bàn Hoàn Tất Phục Vụ</td><td class=\"td-right\">").append(summary.getKpi().getTotalTables()).append("</td><td class=\"td-center\">Bàn</td><td class=\"td-center\">-</td></tr>\n");
+        sb.append("  <tr class=\"row-even\"><td class=\"td-left\">Tổng Lượt Khách Hàng</td><td class=\"td-right\">").append(summary.getKpi().getTotalGuests()).append("</td><td class=\"td-center\">Khách</td><td class=\"td-center\">-</td></tr>\n");
+        sb.append("  <tr><td class=\"td-left\">Giá Trị Trung Bình Mỗi Bàn (AOV)</td><td class=\"td-money\">").append(nf.format(summary.getKpi().getAverageOrderValue())).append(" ₫</td><td class=\"td-center\">VNĐ/bàn</td><td class=\"td-center\">").append(summary.getKpi().getAovTrend()).append("</td></tr>\n");
+        sb.append("</table>\n");
+
+        // 3. CƠ CẤU PHƯƠNG THỨC THANH TOÁN
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"5\" class=\"sec-title\">2. CƠ CẤU PHƯƠNG THỨC THANH TOÁN (PAYMENT METHODS)</th></tr>\n");
+        sb.append("  <tr><th class=\"th-header\">STT</th><th class=\"th-header\">Phương Thức Thanh Toán</th><th class=\"th-header\">Số Lượng Hóa Đơn</th><th class=\"th-header\">Tổng Số Tiền (VNĐ)</th><th class=\"th-header\">Tỷ Trọng (%)</th></tr>\n");
+        int pmIdx = 1;
+        long totalBills = 0;
+        BigDecimal totalPmAmount = BigDecimal.ZERO;
         for (PaymentMethodDistributionResponse pm : summary.getPaymentMethods()) {
-            sb.append(pm.getLabel()).append(";")
-              .append(pm.getBillCount()).append(";")
-              .append(pm.getTotalAmount()).append(";")
-              .append(pm.getPercentage()).append("%\n");
+            totalBills += pm.getBillCount();
+            totalPmAmount = totalPmAmount.add(pm.getTotalAmount());
+            String rowCls = (pmIdx % 2 == 0) ? " class=\"row-even\"" : "";
+            sb.append("  <tr").append(rowCls).append(">")
+              .append("<td class=\"td-center\">").append(pmIdx++).append("</td>")
+              .append("<td class=\"td-left\">").append(pm.getLabel()).append("</td>")
+              .append("<td class=\"td-right\">").append(pm.getBillCount()).append("</td>")
+              .append("<td class=\"td-money\">").append(nf.format(pm.getTotalAmount())).append(" ₫</td>")
+              .append("<td class=\"td-center\">").append(pm.getPercentage()).append("%</td>")
+              .append("</tr>\n");
         }
-        sb.append("\n");
+        sb.append("  <tr class=\"row-total\"><td></td><td class=\"td-left\">TỔNG CỘNG</td><td class=\"td-right\">").append(totalBills).append("</td><td class=\"td-money\">").append(nf.format(totalPmAmount)).append(" ₫</td><td class=\"td-center\">100%</td></tr>\n");
+        sb.append("</table>\n");
 
-        // 3. Bảng Top món bán chạy
-        sb.append("3. TOP MÓN ĂN BÁN CHẠY NHẤT\n");
-        sb.append("Hạng;Tên món ăn;Danh mục;Số lượng đã bán;Doanh thu món (VND);Xu hướng\n");
+        // 4. TOP MÓN ĂN BÁN CHẠY NHẤT
+        sb.append("<table>\n");
+        sb.append("  <tr><th colspan=\"6\" class=\"sec-title\">3. TOP MÓN ĂN BÁN CHẠY NHẤT (BESTSELLER DISHES)</th></tr>\n");
+        sb.append("  <tr><th class=\"th-accent\">Hạng</th><th class=\"th-accent\">Tên Món Ăn</th><th class=\"th-accent\">Danh Mục</th><th class=\"th-accent\">Số Lượng Bán</th><th class=\"th-accent\">Doanh Thu Món (VNĐ)</th><th class=\"th-accent\">Xu Hướng</th></tr>\n");
         for (BestsellerDishResponse dish : summary.getBestsellers()) {
-            sb.append(dish.getRank()).append(";")
-              .append(dish.getName()).append(";")
-              .append(dish.getCategory()).append(";")
-              .append(dish.getSold()).append(";")
-              .append(dish.getRevenue()).append(";")
-              .append(dish.getTrend()).append("\n");
+            String rankBg = dish.getRank() <= 3 ? " class=\"row-hl\"" : "";
+            sb.append("  <tr").append(rankBg).append(">")
+              .append("<td class=\"td-center\"><b>#").append(dish.getRank()).append("</b></td>")
+              .append("<td class=\"td-left\"><b>").append(dish.getName()).append("</b></td>")
+              .append("<td class=\"td-left\">").append(dish.getCategory()).append("</td>")
+              .append("<td class=\"td-right\">").append(dish.getSold()).append("</td>")
+              .append("<td class=\"td-money\">").append(nf.format(dish.getRevenue())).append(" ₫</td>")
+              .append("<td class=\"td-center\">").append(dish.getTrend()).append("</td>")
+              .append("</tr>\n");
+        }
+        sb.append("</table>\n");
+
+        // 5. DOANH THU THEO KHUNG GIỜ
+        if (summary.getHourlyData() != null && !summary.getHourlyData().isEmpty()) {
+            sb.append("<table>\n");
+            sb.append("  <tr><th colspan=\"4\" class=\"sec-title\">4. PHÂN TÍCH DOANH THU THEO KHUNG GIỜ (HOURLY TIMELINE)</th></tr>\n");
+            sb.append("  <tr><th class=\"th-header\">Khung Giờ Hoạt Động</th><th class=\"th-header\">Doanh Thu (VNĐ)</th><th class=\"th-header\">Tỷ Lệ Giờ Đỉnh</th><th class=\"th-header\">Ghi Chú</th></tr>\n");
+            for (HourlyRevenueResponse hr : summary.getHourlyData()) {
+                boolean isPeak = hr.getPct() != null && hr.getPct() == 100 && hr.getRevenue() != null && hr.getRevenue().compareTo(BigDecimal.ZERO) > 0;
+                String note = isPeak ? "<b style=\"color:#BA1A1A;\">GIỜ CAO ĐIỂM (PEAK)</b>" : "Bình thường";
+                sb.append("  <tr>")
+                  .append("<td class=\"td-center\">").append(hr.getHour() != null ? hr.getHour() : "").append("</td>")
+                  .append("<td class=\"td-money\">").append(nf.format(hr.getRevenue() != null ? hr.getRevenue() : BigDecimal.ZERO)).append(" ₫</td>")
+                  .append("<td class=\"td-center\">").append(hr.getPct() != null ? hr.getPct() : 0).append("%</td>")
+                  .append("<td class=\"td-center\">").append(note).append("</td>")
+                  .append("</tr>\n");
+            }
+            sb.append("</table>\n");
         }
 
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
+        // 6. CHỮ KÝ XÁC NHẬN CHÂN TRANG
+        sb.append("<br/>\n");
+        sb.append("<table>\n");
+        sb.append("  <tr><td colspan=\"3\" style=\"border:none; text-align:center;\"><b>Người Lập Báo Cáo</b><br/><br/><br/><br/>(Ký và ghi rõ họ tên)</td>")
+          .append("<td colspan=\"3\" style=\"border:none; text-align:center;\"><b>Quản Lý Nhà Hàng</b><br/><br/><br/><br/>(Ký và đóng dấu)</td></tr>\n");
+        sb.append("</table>\n");
+
+        sb.append("</body>\n</html>");
+
+        byte[] contentBytes = sb.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] result = new byte[bom.length + contentBytes.length];
+        System.arraycopy(bom, 0, result, 0, bom.length);
+        System.arraycopy(contentBytes, 0, result, bom.length, contentBytes.length);
+        return result;
+    }
+
+    @Override
+    public byte[] exportReportCsv(ReportTimeframe timeframe, LocalDate startDate, LocalDate endDate) {
+        return exportReportExcel(timeframe, startDate, endDate);
     }
 
     // ===================================================================
@@ -786,28 +887,6 @@ public class ReportServiceImpl implements ReportService {
 
         String aovTrend = formatTrendPercentage(currentAov, prevAov);
 
-        // Tính thời gian phục vụ trung bình (tính bằng phút)
-        double avgDuration = 0.0;
-        if (!currentSessions.isEmpty()) {
-            double totalMinutes = 0;
-            int countWithTime = 0;
-            for (DiningSession s : currentSessions) {
-                if (s.getStartTime() != null && s.getEndTime() != null) {
-                    long minutes = Duration.between(s.getStartTime(), s.getEndTime()).toMinutes();
-                    if (minutes > 0) {
-                        totalMinutes += minutes;
-                        countWithTime++;
-                    }
-                }
-            }
-            if (countWithTime > 0) {
-                avgDuration = Math.round((totalMinutes / countWithTime) * 10.0) / 10.0;
-            }
-        }
-        if (avgDuration == 0.0) {
-            avgDuration = 13.5; // Giá trị tiêu chuẩn giả định nếu bàn kết thúc tức thì
-        }
-
         return KpiReportResponse.builder()
                 .totalRevenue(currentRev)
                 .revenueTrend(revTrend)
@@ -815,7 +894,6 @@ public class ReportServiceImpl implements ReportService {
                 .totalGuests(totalGuests)
                 .averageOrderValue(currentAov)
                 .aovTrend(aovTrend)
-                .avgServiceDurationMinutes(avgDuration)
                 .totalBills((long) currentBills.size())
                 .build();
     }
@@ -1097,24 +1175,24 @@ public class ReportController {
     }
 
     /**
-     * GET /api/admin/reports/export/csv
-     * Tải xuống file báo cáo Excel (CSV UTF-8 có BOM)
+     * GET /api/admin/reports/export/excel (hoặc /api/admin/reports/export/csv)
+     * Tải xuống file báo cáo Excel chuyên nghiệp (.xls định dạng bảng biểu, màu sắc và định dạng số)
      */
-    @GetMapping("/export/csv")
+    @GetMapping({"/export/excel", "/export/csv"})
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<byte[]> exportReportCsv(
+    public ResponseEntity<byte[]> exportReportExcel(
             @RequestParam(defaultValue = "TODAY") ReportTimeframe timeframe,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        byte[] csvData = reportService.exportReportCsv(timeframe, startDate, endDate);
+        byte[] excelData = reportService.exportReportExcel(timeframe, startDate, endDate);
 
-        String filename = "ROMS_BaoCaoDoanhThu_" + LocalDate.now() + ".csv";
+        String filename = "ROMS_BaoCaoDoanhThu_" + timeframe + "_" + LocalDate.now() + ".xls";
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-                .body(csvData);
+                .contentType(MediaType.parseMediaType("application/vnd.ms-excel; charset=UTF-8"))
+                .body(excelData);
     }
 }
 ```
@@ -1126,7 +1204,7 @@ public class ReportController {
 > 💡 **LƯU Ý QUAN TRỌNG VỀ SSMS INTELLISENSE (XÓA BỎ GẠCH ĐỎ 93 ERRORS):**
 > - Khi bạn mở bảng CSDL trong **SQL Server Management Studio (SSMS)**, nếu thấy SSMS gạch chân đỏ toàn bộ các cột (`table_number`, `capacity`, `name`, `price`, `status`...) và hiện danh sách lỗi *Invalid column name* trong bảng *Error List*: **Đây là hiện tượng IntelliSense Cache cũ của SSMS chưa được đồng bộ mới khi Hibernate vừa tạo bảng**.
 > - **Cách khắc phục:** Trong cửa sổ soạn thảo SSMS, bấm tổ hợp phím **`Ctrl + Shift + R`** (hoặc vào menu **Edit -> IntelliSense -> Refresh Local Cache**). Toàn bộ các vệt gạch đỏ giả lập sẽ biến mất ngay lập tức!
-> - Ngoài ra, bảng `restaurant_tables` trong Entity `RestaurantTable.java` **không có trường `zone`**, do đó câu lệnh `INSERT` dưới đây đã được tinh chỉnh chuẩn 100% theo đúng cấu trúc bảng của hệ thống.
+> - Bảng `restaurant_tables` trong Entity `RestaurantTable.java` có trường `zone` (bắt buộc `NOT NULL`, quy định phân khu vực `'ZONE_1'`, `'ZONE_2'`, `'VIP'`) và `name`, do đó câu lệnh `INSERT` dưới đây đã được cung cấp đầy đủ các trường để tương thích chuẩn xác 100% với CSDL.
 
 - **Nhiệm vụ:** Chèn dữ liệu mẫu các bàn ăn, món ăn, phiên ăn (`dining_sessions`), đơn hàng (`orders`), chi tiết món (`order_items`) và hóa đơn thanh toán (`bills`) phân bổ qua nhiều khung giờ trong ngày hôm nay.
 - **Thực thi:** Mở **SQL Server Management Studio (SSMS)**, mở Query mới và thực thi script sau:
@@ -1153,19 +1231,19 @@ DELETE FROM dining_sessions WHERE session_token LIKE 'SEED-SESSION-TODAY%';
 
 -- 1. Bàn ăn
 IF NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE table_number = 'B01')
-    INSERT INTO restaurant_tables (table_number, capacity, status, qr_token, is_active, created_at, updated_at)
+    INSERT INTO restaurant_tables (table_number, name, zone, capacity, status, qr_token, is_active, created_at, updated_at)
     VALUES 
-    ('B01', 4, 'AVAILABLE', 'QR_TABLE_B01', 1, GETDATE(), GETDATE()),
-    ('B02', 4, 'AVAILABLE', 'QR_TABLE_B02', 1, GETDATE(), GETDATE()),
-    ('B03', 6, 'AVAILABLE', 'QR_TABLE_B03', 1, GETDATE(), GETDATE()),
-    ('B04', 8, 'AVAILABLE', 'QR_TABLE_B04', 1, GETDATE(), GETDATE());
+    ('B01', N'Bàn B01 (Sảnh)',     'ZONE_1', 4, 'AVAILABLE', 'QR_TABLE_B01', 1, GETDATE(), GETDATE()),
+    ('B02', N'Bàn B02 (Sảnh)',     'ZONE_1', 4, 'AVAILABLE', 'QR_TABLE_B02', 1, GETDATE(), GETDATE()),
+    ('B03', N'Bàn B03 (Ban công)', 'ZONE_2', 6, 'AVAILABLE', 'QR_TABLE_B03', 1, GETDATE(), GETDATE()),
+    ('B04', N'Bàn B04 (Ban công)', 'ZONE_2', 8, 'AVAILABLE', 'QR_TABLE_B04', 1, GETDATE(), GETDATE());
 
 -- 2. Danh mục món ăn
 DECLARE @CatId BIGINT = (SELECT TOP 1 id FROM categories);
 IF @CatId IS NULL
 BEGIN
     INSERT INTO categories (name, description, display_order, is_active, created_at, updated_at)
-    VALUES ('Mon Chinh', 'Cac mon an chinh', 1, 1, GETDATE(), GETDATE());
+    VALUES (N'Món Chính', N'Các món ăn chính đặc sắc', 1, 1, GETDATE(), GETDATE());
     SET @CatId = SCOPE_IDENTITY();
 END
 
@@ -1174,11 +1252,11 @@ IF NOT EXISTS (SELECT 1 FROM menu_items)
 BEGIN
     INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
     VALUES 
-    (@CatId, 'Bo Wagyu Nuong Da Muoi', 'Bo thuong hang nuong da muoi', 350000.00, 1, 1, 1, GETDATE(), GETDATE()),
-    (@CatId, 'Ca Hoi Ap Chao Bo Toi',  'Ca hoi Nauy sot bo toi',       290000.00, 1, 2, 1, GETDATE(), GETDATE()),
-    (@CatId, 'Cocktail Signature',     'Thuc uong pha che dac biet',    160000.00, 1, 3, 1, GETDATE(), GETDATE()),
-    (@CatId, 'Sup Hai San Hoang Kim',  'Sup bao ngu hai san',           140000.00, 1, 4, 1, GETDATE(), GETDATE()),
-    (@CatId, 'Banh Mousse Socola',     'Trang mieng socola Bi',         115000.00, 1, 5, 1, GETDATE(), GETDATE());
+    (@CatId, N'Bò Wagyu Nướng Đá Muối', N'Bò thượng hạng nướng đá muối Himalaya', 350000.00, 1, 1, 1, GETDATE(), GETDATE()),
+    (@CatId, N'Cá Hồi Áp Chảo Sốt Bơ Tỏi',  N'Cá hồi Nauy sốt bơ tỏi thơm lừng',       290000.00, 1, 2, 1, GETDATE(), GETDATE()),
+    (@CatId, N'Cocktail Signature Hoàng Gia', N'Thức uống pha chế đặc biệt hoàng gia', 160000.00, 1, 3, 1, GETDATE(), GETDATE()),
+    (@CatId, N'Súp Hải Sản Hoàng Kim',  N'Súp bào ngư hải sản thượng hạng',           140000.00, 1, 4, 1, GETDATE(), GETDATE()),
+    (@CatId, N'Bánh Mousse Socola Bỉ',     N'Tráng miệng socola Bỉ béo ngậy',         115000.00, 1, 5, 1, GETDATE(), GETDATE());
 END
 
 -- Lấy ID dữ liệu liên kết
@@ -1203,9 +1281,9 @@ DECLARE @TodayStr VARCHAR(10) = CONVERT(VARCHAR(10), GETDATE(), 120);
 DECLARE @Start1 DATETIME2 = CAST(@TodayStr + ' 10:45:00' AS DATETIME2);
 DECLARE @End1   DATETIME2 = CAST(@TodayStr + ' 11:30:00' AS DATETIME2);
 
--- Chú ý: Trạng thái phiên ăn theo CHECK Constraint CSDL phải là 'COMPLETE'
+-- Chú ý: Trạng thái phiên ăn theo CHECK Constraint CSDL phải là 'COMPLETED'
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
-VALUES (@Table1Id, 'SEED-SESSION-TODAY-01', 'COMPLETE', 4, @Start1, @End1, 1, GETDATE(), GETDATE());
+VALUES (@Table1Id, 'SEED-SESSION-TODAY-01', 'COMPLETED', 4, @Start1, @End1, 1, GETDATE(), GETDATE());
 DECLARE @Session1Id BIGINT = SCOPE_IDENTITY();
 
 INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
@@ -1228,7 +1306,7 @@ DECLARE @Start2 DATETIME2 = CAST(@TodayStr + ' 17:55:00' AS DATETIME2);
 DECLARE @End2   DATETIME2 = CAST(@TodayStr + ' 18:45:00' AS DATETIME2);
 
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
-VALUES (@Table2Id, 'SEED-SESSION-TODAY-02', 'COMPLETE', 6, @Start2, @End2, 1, GETDATE(), GETDATE());
+VALUES (@Table2Id, 'SEED-SESSION-TODAY-02', 'COMPLETED', 6, @Start2, @End2, 1, GETDATE(), GETDATE());
 DECLARE @Session2Id BIGINT = SCOPE_IDENTITY();
 
 INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
@@ -1251,7 +1329,7 @@ DECLARE @Start3 DATETIME2 = CAST(@TodayStr + ' 19:30:00' AS DATETIME2);
 DECLARE @End3   DATETIME2 = CAST(@TodayStr + ' 20:15:00' AS DATETIME2);
 
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
-VALUES (@Table3Id, 'SEED-SESSION-TODAY-03', 'COMPLETE', 3, @Start3, @End3, 1, GETDATE(), GETDATE());
+VALUES (@Table3Id, 'SEED-SESSION-TODAY-03', 'COMPLETED', 3, @Start3, @End3, 1, GETDATE(), GETDATE());
 DECLARE @Session3Id BIGINT = SCOPE_IDENTITY();
 
 INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
@@ -1319,20 +1397,25 @@ const reportApi = {
   },
 
   /**
-   * Tải xuống file báo cáo Excel (CSV UTF-8 BOM)
+   * Tải xuống file báo cáo Excel (.xls định dạng bảng biểu chuẩn có màu sắc và định dạng số)
    * @param {string} timeframe - Mốc thời gian
    * @param {string} startDate - Ngày bắt đầu
    * @param {string} endDate   - Ngày kết thúc
    */
-  exportReportCsv: (timeframe = 'TODAY', startDate = null, endDate = null) => {
+  exportReportExcel: (timeframe = 'TODAY', startDate = null, endDate = null) => {
     const params = { timeframe };
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
 
-    return axiosClient.get('/admin/reports/export/csv', {
+    return axiosClient.get('/admin/reports/export/excel', {
       params,
       responseType: 'blob' // Nhận dữ liệu dưới dạng binary blob để tải file về máy
     });
+  },
+
+  // Giữ lại alias để tương thích ngược
+  exportReportCsv: (timeframe = 'TODAY', startDate = null, endDate = null) => {
+    return reportApi.exportReportExcel(timeframe, startDate, endDate);
   }
 };
 
@@ -1344,7 +1427,7 @@ export default reportApi;
 ### Bước F2: Nâng Cấp Hoàn Chỉnh `ReportsAnalyticsPage.jsx`
 
 - **Tệp chỉnh sửa:** `SourceCode/frontend/src/pages/admin/ReportsAnalyticsPage.jsx`
-- **Nhiệm vụ:** Thay thế toàn bộ mảng dữ liệu tĩnh bằng gọi API động, thêm bộ chọn ngày Custom, 3 tab phân loại báo cáo, chức năng xuất Excel và in phiếu A4.
+- **Nhiệm vụ:** Thay thế toàn bộ mảng dữ liệu tĩnh bằng gọi API động, thêm bộ chọn ngày Custom, 3 tab phân loại báo cáo, và chức năng xuất Excel bảng biểu chuyên nghiệp (loại bỏ nút In báo cáo).
 
 ```jsx
 import React, { useState, useEffect } from 'react';
@@ -1420,21 +1503,132 @@ export default function ReportsAnalyticsPage() {
     }
   }, [timeframe]);
 
-  // Hàm xử lý xuất file Excel (CSV UTF-8 có BOM)
+  // Hàm xử lý xuất file Excel (.xls) định dạng bảng biểu màu sắc, căn lề và số liệu kế toán chuyên nghiệp
   const handleExportExcel = async () => {
     try {
       showToast('Đang kết xuất báo cáo Excel...');
       const sDate = (timeframe === 'CUSTOM') ? customStartDate : null;
       const eDate = (timeframe === 'CUSTOM') ? customEndDate : null;
 
-      const response = await reportApi.exportReportCsv(timeframe, sDate, eDate);
+      try {
+        // 1. Thử tải file Excel từ API Backend
+        const response = await reportApi.exportReportExcel(timeframe, sDate, eDate);
+        const blob = new Blob([response.data], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.xls`);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+        showToast('Đã tải xuống tệp báo cáo Excel thành công!');
+        return;
+      } catch (apiErr) {
+        console.warn('API tải Excel lỗi, tự động kết xuất trực tiếp từ dữ liệu hiện tại:', apiErr);
+      }
 
-      // Tạo đường dẫn blob và kích hoạt tải xuống tự động trên trình duyệt
-      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      // 2. Dự phòng an toàn (Fallback): Kết xuất file Excel bảng biểu cực đẹp trực tiếp từ dữ liệu trên màn hình
+      const formatNum = (n) => Number(n || 0).toLocaleString('vi-VN');
+      const curDateStr = new Date().toLocaleDateString('vi-VN');
+      
+      let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
+  <meta charset="UTF-8">
+  <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>BaoCaoDoanhThu_ROMS</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11pt; color: #1F1B1A; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 22px; }
+    .banner { background-color: #9D4124; color: #FFFFFF; font-size: 16pt; font-weight: bold; text-align: center; height: 42px; vertical-align: middle; }
+    .meta { font-size: 10pt; color: #56423D; font-style: italic; text-align: center; height: 24px; }
+    .sec-title { background-color: #56423D; color: #FFFFFF; font-size: 12pt; font-weight: bold; padding: 6px 10px; height: 30px; vertical-align: middle; }
+    .th-header { background-color: #EFEBE9; color: #3E2723; font-weight: bold; text-align: center; border: 1px solid #D7CCC8; height: 28px; }
+    .th-accent { background-color: #9D4124; color: #FFFFFF; font-weight: bold; text-align: center; border: 1px solid #7D311A; height: 28px; }
+    td { border: 1px solid #E0E0E0; padding: 6px 10px; vertical-align: middle; }
+    .td-left { text-align: left; }
+    .td-center { text-align: center; }
+    .td-right { text-align: right; mso-number-format:"\\#\\,\\#\\#0"; }
+    .td-money { text-align: right; font-weight: bold; color: #9D4124; mso-number-format:"\\#\\,\\#\\#0\\ \\\"₫\\\"\"; }
+    .row-even { background-color: #FAF7F5; }
+    .row-hl { background-color: #FFF3E0; font-weight: bold; }
+    .row-total { background-color: #FFECB3; font-weight: bold; border-top: 2px solid #FFA000; }
+  </style>
+</head>
+<body>
+  <table>
+    <tr><th colspan="6" class="banner">HỆ THỐNG QUẢN LÝ NHÀ HÀNG ROMS - BÁO CÁO DOANH THU & VẬN HÀNH</th></tr>
+    <tr><td colspan="6" class="meta">Kỳ báo cáo: <b>${timeframe}</b> | Ngày xuất: ${curDateStr}</td></tr>
+  </table>
+
+  <table>
+    <tr><th colspan="4" class="sec-title">1. CÁC CHỈ SỐ HOẠT ĐỘNG CHÍNH (KEY METRICS & KPIs)</th></tr>
+    <tr><th class="th-header">Chỉ Số Đánh Giá</th><th class="th-header">Giá Trị Thực Tế</th><th class="th-header">Đơn Vị</th><th class="th-header">Xu Hướng So Với Kỳ Trước</th></tr>
+    <tr class="row-hl"><td class="td-left">Tổng Doanh Thu Thuần</td><td class="td-money">${formatNum(kpi.totalRevenue)} ₫</td><td class="td-center">VNĐ</td><td class="td-center">${kpi.revenueTrend || '-'}</td></tr>
+    <tr><td class="td-left">Tổng Lượt Bàn Hoàn Tất Phục Vụ</td><td class="td-right">${kpi.totalTables || 0}</td><td class="td-center">Bàn</td><td class="td-center">-</td></tr>
+    <tr class="row-even"><td class="td-left">Tổng Lượt Khách Hàng</td><td class="td-right">${kpi.totalGuests || 0}</td><td class="td-center">Khách</td><td class="td-center">-</td></tr>
+    <tr><td class="td-left">Giá Trị Trung Bình Mỗi Bàn (AOV)</td><td class="td-money">${formatNum(kpi.averageOrderValue)} ₫</td><td class="td-center">VNĐ/bàn</td><td class="td-center">${kpi.aovTrend || '-'}</td></tr>
+  </table>
+
+  <table>
+    <tr><th colspan="5" class="sec-title">2. CƠ CẤU PHƯƠNG THỨC THANH TOÁN (PAYMENT METHODS)</th></tr>
+    <tr><th class="th-header">STT</th><th class="th-header">Phương Thức Thanh Toán</th><th class="th-header">Số Lượng Hóa Đơn</th><th class="th-header">Tổng Số Tiền (VNĐ)</th><th class="th-header">Tỷ Trọng (%)</th></tr>
+    ${paymentMethods.map((pm, i) => `
+    <tr${i % 2 === 1 ? ' class="row-even"' : ''}>
+      <td class="td-center">${i + 1}</td>
+      <td class="td-left">${pm.label || pm.method}</td>
+      <td class="td-right">${pm.billCount || 0}</td>
+      <td class="td-money">${formatNum(pm.totalAmount)} ₫</td>
+      <td class="td-center">${pm.percentage || 0}%</td>
+    </tr>`).join('')}
+  </table>
+
+  <table>
+    <tr><th colspan="6" class="sec-title">3. TOP MÓN ĂN BÁN CHẠY NHẤT (BESTSELLER DISHES)</th></tr>
+    <tr><th class="th-accent">Hạng</th><th class="th-accent">Tên Món Ăn</th><th class="th-accent">Danh Mục</th><th class="th-accent">Số Lượng Bán</th><th class="th-accent">Doanh Thu Món (VNĐ)</th><th class="th-accent">Xu Hướng</th></tr>
+    ${bestsellers.map((dish, i) => `
+    <tr${dish.rank <= 3 ? ' class="row-hl"' : (i % 2 === 1 ? ' class="row-even"' : '')}>
+      <td class="td-center"><b>#${dish.rank || (i + 1)}</b></td>
+      <td class="td-left"><b>${dish.name}</b></td>
+      <td class="td-left">${dish.category}</td>
+      <td class="td-right">${dish.sold || 0}</td>
+      <td class="td-money">${formatNum(dish.revenue)} ₫</td>
+      <td class="td-center">${dish.trend || '-'}</td>
+    </tr>`).join('')}
+  </table>
+
+  ${hourlyList.length > 0 ? `
+  <table>
+    <tr><th colspan="4" class="sec-title">4. PHÂN TÍCH DOANH THU THEO KHUNG GIỜ (HOURLY TIMELINE)</th></tr>
+    <tr><th class="th-header">Khung Giờ Hoạt Động</th><th class="th-header">Doanh Thu (VNĐ)</th><th class="th-header">Tỷ Lệ Giờ Đỉnh</th><th class="th-header">Ghi Chú</th></tr>
+    ${hourlyList.map(hr => {
+      const isPeak = (hr.pct === 100 || hr.isPeak) && (hr.revenue > 0);
+      return `
+    <tr>
+      <td class="td-center">${hr.hour || hr.timeSlot || ''}</td>
+      <td class="td-money">${formatNum(hr.revenue)} ₫</td>
+      <td class="td-center">${hr.pct != null ? hr.pct : (hr.percentage != null ? hr.percentage : 0)}%</td>
+      <td class="td-center">${isPeak ? '<b style="color:#BA1A1A;">GIỜ CAO ĐIỂM (PEAK)</b>' : 'Bình thường'}</td>
+    </tr>`;
+    }).join('')}
+  </table>` : ''}
+
+  <br/>
+  <table>
+    <tr>
+      <td colspan="3" style="border:none; text-align:center;"><b>Người Lập Báo Cáo</b><br/><br/><br/><br/>(Ký và ghi rõ họ tên)</td>
+      <td colspan="3" style="border:none; text-align:center;"><b>Quản Lý Nhà Hàng</b><br/><br/><br/><br/>(Ký và đóng dấu)</td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      // Sử dụng Uint8Array nhị phân cho 3 bytes BOM UTF-8 (EF BB BF) để đảm bảo 100% không bao giờ lỗi font tiếng Việt '??'
+      const utf8Bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const blob = new Blob([utf8Bom, html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.xls`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
@@ -1446,11 +1640,6 @@ export default function ReportsAnalyticsPage() {
     }
   };
 
-  // Hàm mở hộp thoại in báo cáo trình duyệt (Print dialog)
-  const handlePrintReport = () => {
-    window.print();
-  };
-
   // Các dữ liệu dự phòng an toàn từ API
   const kpi = reportData?.kpi || {
     totalRevenue: 63120000,
@@ -1458,8 +1647,7 @@ export default function ReportsAnalyticsPage() {
     totalTables: 86,
     totalGuests: 242,
     averageOrderValue: 733950,
-    aovTrend: '+4.2%',
-    avgServiceDurationMinutes: 13.5
+    aovTrend: '+4.2%'
   };
 
   const hourlyList = reportData?.hourlyData || [];
@@ -1560,48 +1748,29 @@ export default function ReportsAnalyticsPage() {
             })}
           </div>
 
-          {/* Nút Xuất Excel */}
+          {/* Nút Xuất Excel Chuyên Nghiệp */}
           <button
             type="button"
             onClick={handleExportExcel}
+            title="Tải xuống tệp báo cáo Excel định dạng bảng biểu màu sắc chuẩn (.xls)"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '8px 16px',
-              borderRadius: '12px',
-              background: '#FFFFFF',
-              border: '1px solid #EAE0DE',
-              fontWeight: 700,
-              fontSize: '0.82rem',
-              color: '#56423D',
-              cursor: 'pointer'
-            }}
-          >
-            <Icon name="table_view" size={18} />
-            Xuất Excel
-          </button>
-
-          {/* Nút In Báo Cáo */}
-          <button
-            type="button"
-            onClick={handlePrintReport}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
+              padding: '8px 18px',
               borderRadius: '12px',
               background: '#9D4124',
               border: 'none',
               fontWeight: 700,
               fontSize: '0.82rem',
               color: '#FFFFFF',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(157, 65, 36, 0.25)',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Icon name="picture_as_pdf" size={18} />
-            In Báo Cáo
+            <Icon name="table_view" size={18} />
+            <span>Xuất Excel</span>
           </button>
         </div>
       </div>
@@ -1723,7 +1892,7 @@ export default function ReportsAnalyticsPage() {
       {/* KPI Cards Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
         gap: '16px'
       }}>
         {/* KPI 1: Tổng Doanh Thu */}
@@ -1773,22 +1942,6 @@ export default function ReportsAnalyticsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
             <Icon name="trending_up" size={16} />
             <span>{kpi.aovTrend} so với kỳ trước</span>
-          </div>
-        </div>
-
-        {/* KPI 4: Thời Gian Phục Vụ Trung Bình */}
-        <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '20px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B' }}>Thời Gian Phục Vụ TB</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEF3C7', color: '#78350F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="schedule" size={20} />
-            </div>
-          </div>
-          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.75rem', color: '#1F1B1A' }}>
-            {kpi.avgServiceDurationMinutes} phút
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
-            <span>Nhanh hơn KPI chuẩn (15p)</span>
           </div>
         </div>
       </div>
@@ -2082,8 +2235,7 @@ export default function ReportsAnalyticsPage() {
    - Bấm chuyển đổi giữa các chip thời gian: **Hôm Nay**, **Hôm Qua**, **7 Ngày Qua**, **Tháng Này**, **Tùy Chỉnh**. Quan sát số liệu doanh thu, lượt bàn và biểu đồ cập nhật mượt mà.
    - Khi chọn **Tùy Chỉnh**: Chọn từ ngày ... đến ngày ... rồi bấm **Áp Dụng Lọc**.
    - Bấm chuyển giữa 3 Tab: **Doanh Thu & Dòng Tiền**, **Món Ăn & Tiêu Thụ**, **Vận Hành Bàn & Hiệu Suất**.
-   - Bấm nút **Xuất Excel**: Kiểm tra file `.csv` được tải về máy, mở bằng Microsoft Excel xem tiếng Việt có dấu hiển thị rõ ràng, không bị lỗi font nhờ mã hóa BOM UTF-8.
-   - Bấm nút **In Báo Cáo**: Cửa sổ in trình duyệt hiện lên, căn chỉnh chuẩn trang giấy A4.
+   - Bấm nút **Xuất Excel**: Kiểm tra file `.xls` được tải về máy. Mở bằng Microsoft Excel để kiểm tra: file hiển thị đầy đủ bảng biểu có màu sắc thương hiệu ROMS, kẻ viền ô rõ ràng, căn lề chuẩn kế toán, định dạng số tiền hàng nghìn có dấu phẩy (`#,##0 ₫`) và tiếng Việt không bị lỗi font nhờ mã hóa UTF-8 BOM.
 
 ---
 
@@ -2092,10 +2244,390 @@ export default function ReportsAnalyticsPage() {
 | Tình huống / Lỗi | Nguyên nhân | Cách khắc phục |
 |:---|:---|:---|
 | **Lỗi `403 Forbidden` khi gọi API `/api/admin/reports/**`** | Tài khoản đăng nhập không có quyền `ROLE_MANAGER` hoặc chưa gắn kèm Bearer Token trong Header. | Đảm bảo đăng nhập bằng tài khoản Quản lý (`MGR-001`), kiểm tra `localStorage.getItem('roms_token')` có tồn tại chuỗi JWT hợp lệ. |
-| **Số liệu Doanh thu hiển thị `0₫`** | Trong CSDL chưa có hóa đơn nào có trạng thái `status = 'PAID'` trong khoảng thời gian được chọn. | Chạy script SQL `seed_reports_sample_data.sql` ở Bước B6 để nạp các hóa đơn mẫu có trạng thái `PAID` và thời gian thanh toán `payment_time` trong ngày hôm nay. |
-| **Mở file CSV bằng Excel bị lỗi font tiếng Việt** | Thiếu ký tự Byte Order Mark (BOM `\uFEFF`) ở đầu chuỗi nhị phân khi kết xuất file CSV. | Trong `ReportServiceImpl.java`, đảm bảo dòng `sb.append('\uFEFF');` được gọi trước khi ghi nội dung văn bản tiếng Việt. |
+| **Số liệu Doanh thu hiển thị `0₫`** | Trong CSDL chưa có hóa đơn nào có trạng thái `status = 'PAID'` trong khoảng thời gian được chọn. | Chạy script SQL ở **Mục 6 bên dưới** để nạp các hóa đơn mẫu có trạng thái `PAID` và thời gian thanh toán `payment_time` trong ngày hôm nay, hôm qua và trong tuần. |
+| **Mở file Excel bị lỗi font tiếng Việt** | Thiếu ký tự Byte Order Mark (BOM `\uFEFF`) ở đầu chuỗi nhị phân khi kết xuất file Excel. | Trong `ReportServiceImpl.java`, đảm bảo dòng `sb.append('\uFEFF');` được gọi trước khi ghi nội dung văn bản tiếng Việt. |
 | **Biểu đồ không hiển thị tỷ lệ % cột** | Doanh thu của tất cả các khung giờ đều bằng 0 dẫn đến phép chia cho 0. | Code đã xử lý kiểm tra `maxRevenue.compareTo(BigDecimal.ZERO) > 0` trước khi chia tỷ lệ phần trăm `pct`, đảm bảo an toàn tuyệt đối tránh `ArithmeticException`. |
 | **Lệch giờ hiển thị giữa Frontend và Backend** | Máy chủ Backend chạy múi giờ UTC thay vì giờ Việt Nam (GMT+7 / `Asia/Ho_Chi_Minh`). | Thêm cấu hình JVM `-Duser.timezone=Asia/Ho_Chi_Minh` khi chạy Spring Boot hoặc dùng `LocalDateTime` tương thích múi giờ máy cục bộ. |
+
+---
+
+## 6. Toàn Bộ Script SQL Nạp Dữ Liệu Mẫu Đầy Đủ (Tài Khoản, Bàn, Thực Đơn, Đơn Hàng & Báo Cáo)
+
+> 💡 **HƯỚNG DẪN THỰC THI NHANH TRONG SQL SERVER MANAGEMENT STUDIO (SSMS):**
+> 1. Nếu bạn vừa khởi động lại backend với cấu hình `spring.jpa.hibernate.ddl-auto=create`, toàn bộ các bảng trong CSDL `ROMS_DB` sẽ bị xóa trắng và tạo lại rỗng.
+> 2. Mở **SSMS**, kết nối tới database server của bạn, mở một cửa sổ **New Query** mới.
+> 3. Dán toàn bộ script SQL bên dưới và nhấn **F5** (hoặc nút **Execute**).
+> 4. Nếu thấy SSMS gạch chân đỏ các cột do cache cũ của IntelliSense, chỉ cần bấm **`Ctrl + Shift + R`** để làm mới cache.
+
+```sql
+-- ================================================================================================
+-- PHỤ LỤC: TOÀN BỘ SCRIPT SQL NẠP DỮ LIỆU MẪU KIỂM THỬ BÁO CÁO & ĐĂNG NHẬP (FULL SEED DATA)
+-- Tương thích 100% CSDL Microsoft SQL Server & Hibernate ddl-auto=create
+-- ================================================================================================
+USE ROMS_DB;
+GO
+
+-- 0. Hủy giao dịch treo nếu có
+IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+GO
+
+BEGIN TRANSACTION;
+
+-- Đảm bảo cấu trúc cột luôn hỗ trợ 100% tiếng Việt Unicode (NVARCHAR) kể cả khi Hibernate ddl-auto từng tạo kiểu VARCHAR
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'menu_items' AND COLUMN_NAME = 'name' AND DATA_TYPE = 'varchar')
+    ALTER TABLE menu_items ALTER COLUMN name NVARCHAR(150) NOT NULL;
+
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'menu_items' AND COLUMN_NAME = 'description' AND DATA_TYPE = 'varchar')
+    ALTER TABLE menu_items ALTER COLUMN description NVARCHAR(500) NULL;
+
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'categories' AND COLUMN_NAME = 'name' AND DATA_TYPE = 'varchar')
+    ALTER TABLE categories ALTER COLUMN name NVARCHAR(100) NOT NULL;
+
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'categories' AND COLUMN_NAME = 'description' AND DATA_TYPE = 'varchar')
+    ALTER TABLE categories ALTER COLUMN description NVARCHAR(255) NULL;
+
+-- Dọn dẹp dữ liệu kiểm thử cũ để có thể chạy lại script nhiều lần không bị trùng lặp
+DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE order_code LIKE 'ORD-SEED%');
+DELETE FROM orders WHERE order_code LIKE 'ORD-SEED%';
+DELETE FROM bills WHERE bill_code LIKE 'BILL-SEED%';
+DELETE FROM dining_sessions WHERE session_token LIKE 'SEED-SESSION%';
+
+-- ================================================================================================
+-- 1. NẠP TÀI KHOẢN NHÂN VIÊN (STAFFS) - ĐĂNG NHẬP VỚI MÃ PIN: 123456
+-- Chuỗi BCrypt Hash cho mã PIN 123456: $2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92
+-- ================================================================================================
+IF NOT EXISTS (SELECT 1 FROM staffs WHERE username = 'MGR-001')
+    INSERT INTO staffs (username, pin_code, full_name, phone, role, is_active, is_on_shift, created_at, updated_at)
+    VALUES ('MGR-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Dương Trọng', '0901000001', 'MANAGER', 1, 0, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM staffs WHERE username = 'EMP-001')
+    INSERT INTO staffs (username, pin_code, full_name, phone, role, is_active, is_on_shift, created_at, updated_at)
+    VALUES ('EMP-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Phạm Minh Đức', '0901000002', 'WAITER', 1, 0, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM staffs WHERE username = 'KDS-001')
+    INSERT INTO staffs (username, pin_code, full_name, phone, role, is_active, is_on_shift, created_at, updated_at)
+    VALUES ('KDS-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Ngô Viết Bảo Huy', '0901000003', 'KITCHEN', 1, 0, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM staffs WHERE username = 'CSH-001')
+    INSERT INTO staffs (username, pin_code, full_name, phone, role, is_active, is_on_shift, created_at, updated_at)
+    VALUES ('CSH-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Đỗ Võ Thanh Trung', '0901000004', 'CASHIER', 1, 0, GETDATE(), GETDATE());
+
+-- ================================================================================================
+-- 2. PHÂN CA LÀM VIỆC (STAFF_SCHEDULES) CHO HÔM NAY
+-- ================================================================================================
+DECLARE @TodayDate DATE = CAST(GETDATE() AS DATE);
+DECLARE @EmpId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'EMP-001');
+DECLARE @KdsId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'KDS-001');
+DECLARE @CshId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'CSH-001');
+
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TodayDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+    VALUES (@EmpId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+
+IF @KdsId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @KdsId AND work_date = @TodayDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+    VALUES (@KdsId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+
+IF @CshId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @CshId AND work_date = @TodayDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+    VALUES (@CshId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+
+-- ================================================================================================
+-- 3. BÀN ĂN (RESTAURANT_TABLES)
+-- ================================================================================================
+IF NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE table_number = 'B01')
+    INSERT INTO restaurant_tables (table_number, name, zone, capacity, status, qr_token, is_active, created_at, updated_at)
+    VALUES 
+    ('B01', N'Bàn B01 (Sảnh)',      'ZONE_1', 4, 'AVAILABLE', 'QR_TABLE_B01', 1, GETDATE(), GETDATE()),
+    ('B02', N'Bàn B02 (Sảnh)',      'ZONE_1', 4, 'AVAILABLE', 'QR_TABLE_B02', 1, GETDATE(), GETDATE()),
+    ('B03', N'Bàn B03 (Ban công)',  'ZONE_2', 6, 'AVAILABLE', 'QR_TABLE_B03', 1, GETDATE(), GETDATE()),
+    ('B04', N'Bàn B04 (Ban công)',  'ZONE_2', 8, 'AVAILABLE', 'QR_TABLE_B04', 1, GETDATE(), GETDATE()),
+    ('B05', N'Bàn B05 (Phòng VIP)', 'VIP',    4, 'AVAILABLE', 'QR_TABLE_B05', 1, GETDATE(), GETDATE()),
+    ('B06', N'Bàn B06 (Phòng VIP)', 'VIP',    2, 'AVAILABLE', 'QR_TABLE_B06', 1, GETDATE(), GETDATE());
+
+-- ================================================================================================
+-- 4. DANH MỤC (CATEGORIES) & MÓN ĂN THỰC ĐƠN (MENU_ITEMS)
+-- ================================================================================================
+IF NOT EXISTS (SELECT 1 FROM categories WHERE name = N'Món Chính')
+    INSERT INTO categories (name, description, display_order, is_active, created_at, updated_at)
+    VALUES (N'Món Chính', N'Các món ăn chính đặc sắc', 1, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM categories WHERE name = N'Khai Vị')
+    INSERT INTO categories (name, description, display_order, is_active, created_at, updated_at)
+    VALUES (N'Khai Vị', N'Các món khai vị tươi ngon', 2, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM categories WHERE name = N'Đồ Uống')
+    INSERT INTO categories (name, description, display_order, is_active, created_at, updated_at)
+    VALUES (N'Đồ Uống', N'Nước ép, cocktail hảo hạng', 3, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM categories WHERE name = N'Tráng Miệng')
+    INSERT INTO categories (name, description, display_order, is_active, created_at, updated_at)
+    VALUES (N'Tráng Miệng', N'Bánh và đồ ngọt cao cấp', 4, 1, GETDATE(), GETDATE());
+
+DECLARE @CatMainId BIGINT = (SELECT TOP 1 id FROM categories WHERE name = N'Món Chính');
+DECLARE @CatAppId  BIGINT = (SELECT TOP 1 id FROM categories WHERE name = N'Khai Vị');
+DECLARE @CatDrkId  BIGINT = (SELECT TOP 1 id FROM categories WHERE name = N'Đồ Uống');
+DECLARE @CatDesId  BIGINT = (SELECT TOP 1 id FROM categories WHERE name = N'Tráng Miệng');
+IF @CatAppId IS NULL SET @CatAppId = @CatMainId;
+IF @CatDrkId IS NULL SET @CatDrkId = @CatMainId;
+IF @CatDesId IS NULL SET @CatDesId = @CatMainId;
+
+IF NOT EXISTS (SELECT 1 FROM menu_items WHERE name = N'Bò Wagyu Nướng Đá Muối')
+    INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
+    VALUES (@CatMainId, N'Bò Wagyu Nướng Đá Muối', N'Bò thượng hạng nướng đá muối Himalaya', 350000.00, 1, 1, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM menu_items WHERE name = N'Cá Hồi Áp Chảo Sốt Bơ Tỏi')
+    INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
+    VALUES (@CatMainId, N'Cá Hồi Áp Chảo Sốt Bơ Tỏi', N'Cá hồi Nauy áp chảo sốt bơ tỏi thơm lừng', 290000.00, 1, 2, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM menu_items WHERE name = N'Cocktail Signature Hoàng Gia')
+    INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
+    VALUES (@CatDrkId, N'Cocktail Signature Hoàng Gia', N'Thức uống pha chế đặc biệt phong vị hoàng gia', 160000.00, 1, 3, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM menu_items WHERE name = N'Súp Hải Sản Hoàng Kim')
+    INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
+    VALUES (@CatAppId, N'Súp Hải Sản Hoàng Kim', N'Súp bào ngư hải sản thượng hạng', 140000.00, 1, 4, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM menu_items WHERE name = N'Bánh Mousse Socola Bỉ')
+    INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
+    VALUES (@CatDesId, N'Bánh Mousse Socola Bỉ', N'Tráng miệng socola Bỉ đậm vị béo ngậy', 115000.00, 1, 5, 1, GETDATE(), GETDATE());
+
+IF NOT EXISTS (SELECT 1 FROM menu_items WHERE name = N'Tôm Hùm Nướng Phô Mai')
+    INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
+    VALUES (@CatMainId, N'Tôm Hùm Nướng Phô Mai', N'Tôm hùm Nha Trang đút lò phô mai Mozzarella', 480000.00, 1, 6, 1, GETDATE(), GETDATE());
+
+-- Đảm bảo toàn bộ tên món ăn và danh mục có sẵn được cập nhật chuẩn tiếng Việt Unicode có dấu (sửa lỗi '??' hoặc mất dấu trước đó)
+UPDATE menu_items SET name = N'Bò Wagyu Nướng Đá Muối', description = N'Bò thượng hạng nướng đá muối Himalaya' WHERE name LIKE N'%Wagyu%';
+UPDATE menu_items SET name = N'Cá Hồi Áp Chảo Sốt Bơ Tỏi', description = N'Cá hồi Nauy áp chảo sốt bơ tỏi thơm lừng' WHERE name LIKE N'%Hồi%' OR name LIKE N'%Hoi%';
+UPDATE menu_items SET name = N'Cocktail Signature Hoàng Gia', description = N'Thức uống pha chế đặc biệt phong vị hoàng gia' WHERE name LIKE N'%Cocktail%';
+UPDATE menu_items SET name = N'Súp Hải Sản Hoàng Kim', description = N'Súp bào ngư hải sản thượng hạng' WHERE name LIKE N'%Hải Sản%' OR name LIKE N'%Hai San%';
+UPDATE menu_items SET name = N'Bánh Mousse Socola Bỉ', description = N'Tráng miệng socola Bỉ đậm vị béo ngậy' WHERE name LIKE N'%Mousse%';
+UPDATE menu_items SET name = N'Tôm Hùm Nướng Phô Mai', description = N'Tôm hùm Nha Trang đút lò phô mai Mozzarella' WHERE name LIKE N'%Tôm Hùm%' OR name LIKE N'%Tom Hum%';
+
+UPDATE categories SET name = N'Món Chính', description = N'Các món ăn chính đặc sắc' WHERE name LIKE N'%Chính%' OR name LIKE N'%Chinh%';
+UPDATE categories SET name = N'Khai Vị', description = N'Các món khai vị tươi ngon' WHERE name LIKE N'%Khai%';
+UPDATE categories SET name = N'Đồ Uống', description = N'Nước ép, cocktail hảo hạng' WHERE name LIKE N'%Uống%' OR name LIKE N'%Uong%';
+UPDATE categories SET name = N'Tráng Miệng', description = N'Bánh và đồ ngọt cao cấp' WHERE name LIKE N'%Miệng%' OR name LIKE N'%Mieng%';
+
+-- ================================================================================================
+-- LẤY CÁC ID DỮ LIỆU ĐỂ TẠO PHIÊN ĂN VÀ ĐƠN HÀNG MẪU
+-- ================================================================================================
+DECLARE @T1 BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B01');
+DECLARE @T2 BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B02');
+DECLARE @T3 BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B03');
+DECLARE @T4 BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B04');
+DECLARE @T5 BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B05');
+IF @T2 IS NULL SET @T2 = @T1;
+IF @T3 IS NULL SET @T3 = @T1;
+IF @T4 IS NULL SET @T4 = @T1;
+IF @T5 IS NULL SET @T5 = @T1;
+
+DECLARE @DishWagyu    BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name LIKE N'%Wagyu%');
+DECLARE @DishSalmon   BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name LIKE N'%Hồi%');
+DECLARE @DishCocktail BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name LIKE N'%Cocktail%');
+DECLARE @DishSoup     BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name LIKE N'%Súp%');
+DECLARE @DishMousse   BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name LIKE N'%Mousse%');
+DECLARE @DishLobster  BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name LIKE N'%Tôm Hùm%');
+
+-- Fallback nếu không tìm thấy chính xác
+IF @DishWagyu IS NULL SET @DishWagyu = (SELECT TOP 1 id FROM menu_items ORDER BY id ASC);
+IF @DishSalmon IS NULL SET @DishSalmon = @DishWagyu;
+IF @DishCocktail IS NULL SET @DishCocktail = @DishWagyu;
+IF @DishSoup IS NULL SET @DishSoup = @DishWagyu;
+IF @DishMousse IS NULL SET @DishMousse = @DishWagyu;
+IF @DishLobster IS NULL SET @DishLobster = @DishWagyu;
+
+-- Chuỗi ngày hôm nay và các ngày trước
+DECLARE @TodayStr VARCHAR(10) = CONVERT(VARCHAR(10), GETDATE(), 120);
+DECLARE @YestStr  VARCHAR(10) = CONVERT(VARCHAR(10), DATEADD(DAY, -1, GETDATE()), 120);
+DECLARE @Day2Str  VARCHAR(10) = CONVERT(VARCHAR(10), DATEADD(DAY, -2, GETDATE()), 120);
+DECLARE @Day3Str  VARCHAR(10) = CONVERT(VARCHAR(10), DATEADD(DAY, -3, GETDATE()), 120);
+
+DECLARE @Sid BIGINT, @Oid BIGINT;
+
+-- ================================================================================================
+-- 5. HÔM NAY (TODAY) - TỔNG ~ 44.120.000₫ (KHUNG GIỜ TRƯA, CHIỀU, TỐI CAO ĐIỂM)
+-- ================================================================================================
+-- [Đợt 1 - Hôm Nay] 11:30 Trưa - B01 - VietQR (7.820.000₫)
+DECLARE @S1 DATETIME2 = CAST(@TodayStr + ' 10:45:00' AS DATETIME2);
+DECLARE @E1 DATETIME2 = CAST(@TodayStr + ' 11:30:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T1, 'SEED-SESSION-T1', 'COMPLETED', 4, @S1, @E1, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-T1', 7820000.00, 'SERVED', @S1, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishWagyu, 16, 350000.00, 5600000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSalmon, 6, 290000.00, 1740000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishCocktail, 3, 160000.00, 480000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-T1', 7820000.00, 0.00, 0.00, 7820000.00, 'BANK_TRANSFER', 'PAID', @E1, GETDATE(), GETDATE());
+
+-- [Đợt 2 - Hôm Nay] 14:30 Chiều - B05 - Tiền mặt (3.400.000₫)
+DECLARE @S2 DATETIME2 = CAST(@TodayStr + ' 13:45:00' AS DATETIME2);
+DECLARE @E2 DATETIME2 = CAST(@TodayStr + ' 14:30:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T5, 'SEED-SESSION-T2', 'COMPLETED', 2, @S2, @E2, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-T2', 3400000.00, 'SERVED', @S2, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishSalmon, 8, 290000.00, 2320000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSoup, 6, 140000.00, 840000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishMousse, 2, 120000.00, 240000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-T2', 3400000.00, 0.00, 0.00, 3400000.00, 'CASH', 'PAID', @E2, GETDATE(), GETDATE());
+
+-- [Đợt 3 - Hôm Nay] 18:45 Tối Cao Điểm (PEAK) - B02 - VietQR (14.800.000₫)
+DECLARE @S3 DATETIME2 = CAST(@TodayStr + ' 17:55:00' AS DATETIME2);
+DECLARE @E3 DATETIME2 = CAST(@TodayStr + ' 18:45:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T2, 'SEED-SESSION-T3', 'COMPLETED', 6, @S3, @E3, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-T3', 14800000.00, 'SERVED', @S3, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishWagyu, 24, 350000.00, 8400000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSalmon, 18, 290000.00, 5220000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishCocktail, 7, 160000.00, 1180000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-T3', 14800000.00, 0.00, 0.00, 14800000.00, 'BANK_TRANSFER', 'PAID', @E3, GETDATE(), GETDATE());
+
+-- [Đợt 4 - Hôm Nay] 20:15 Tối - B03 - Tiền mặt (12.600.000₫)
+DECLARE @S4 DATETIME2 = CAST(@TodayStr + ' 19:30:00' AS DATETIME2);
+DECLARE @E4 DATETIME2 = CAST(@TodayStr + ' 20:15:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T3, 'SEED-SESSION-T4', 'COMPLETED', 5, @S4, @E4, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-T4', 12600000.00, 'SERVED', @S4, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishWagyu, 8, 350000.00, 2800000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSalmon, 12, 290000.00, 3480000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishCocktail, 39, 160000.00, 6320000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-T4', 12600000.00, 0.00, 0.00, 12600000.00, 'CASH', 'PAID', @E4, GETDATE(), GETDATE());
+
+-- [Đợt 5 - Hôm Nay] 21:30 Tối Muộn - B04 - Thẻ POS (5.500.000₫)
+DECLARE @S5 DATETIME2 = CAST(@TodayStr + ' 20:45:00' AS DATETIME2);
+DECLARE @E5 DATETIME2 = CAST(@TodayStr + ' 21:30:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T4, 'SEED-SESSION-T5', 'COMPLETED', 3, @S5, @E5, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-T5', 5500000.00, 'SERVED', @S5, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishLobster, 8, 480000.00, 3840000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSoup, 8, 140000.00, 1120000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishMousse, 4, 135000.00, 540000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-T5', 5500000.00, 0.00, 0.00, 5500000.00, 'CARD', 'PAID', @E5, GETDATE(), GETDATE());
+
+-- ================================================================================================
+-- 6. HÔM QUA (YESTERDAY) - TỔNG ~ 26.000.000₫ (ĐỂ TÍNH TOÁN SO SÁNH TĂNG TRƯỞNG TREND %)
+-- ================================================================================================
+-- [Đợt 1 - Hôm Qua] Trưa 12:00 - B01 - VietQR (9.800.000₫)
+DECLARE @SY1 DATETIME2 = CAST(@YestStr + ' 11:15:00' AS DATETIME2);
+DECLARE @EY1 DATETIME2 = CAST(@YestStr + ' 12:00:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T1, 'SEED-SESSION-Y1', 'COMPLETED', 4, @SY1, @EY1, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-Y1', 9800000.00, 'SERVED', @SY1, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishWagyu, 20, 350000.00, 7000000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSalmon, 8, 290000.00, 2320000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishCocktail, 3, 160000.00, 480000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-Y1', 9800000.00, 0.00, 0.00, 9800000.00, 'BANK_TRANSFER', 'PAID', @EY1, GETDATE(), GETDATE());
+
+-- [Đợt 2 - Hôm Qua] Tối 19:00 - B02 - Tiền mặt (11.200.000₫)
+DECLARE @SY2 DATETIME2 = CAST(@YestStr + ' 18:10:00' AS DATETIME2);
+DECLARE @EY2 DATETIME2 = CAST(@YestStr + ' 19:00:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T2, 'SEED-SESSION-Y2', 'COMPLETED', 5, @SY2, @EY2, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-Y2', 11200000.00, 'SERVED', @SY2, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishWagyu, 18, 350000.00, 6300000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishCocktail, 25, 160000.00, 4000000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishMousse, 7, 128000.00, 900000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-Y2', 11200000.00, 0.00, 0.00, 11200000.00, 'CASH', 'PAID', @EY2, GETDATE(), GETDATE());
+
+-- [Đợt 3 - Hôm Qua] Tối 20:30 - B03 - Thẻ POS (5.000.000₫)
+DECLARE @SY3 DATETIME2 = CAST(@YestStr + ' 19:45:00' AS DATETIME2);
+DECLARE @EY3 DATETIME2 = CAST(@YestStr + ' 20:30:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T3, 'SEED-SESSION-Y3', 'COMPLETED', 3, @SY3, @EY3, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-Y3', 5000000.00, 'SERVED', @SY3, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishSalmon, 12, 290000.00, 3480000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSoup, 8, 140000.00, 1120000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishMousse, 3, 133000.00, 400000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-Y3', 5000000.00, 0.00, 0.00, 5000000.00, 'CARD', 'PAID', @EY3, GETDATE(), GETDATE());
+
+-- ================================================================================================
+-- 7. CÁC NGÀY TRƯỚC TRONG TUẦN (WEEK) - ĐỂ KIỂM THỬ BỘ LỌC 7 NGÀY & THÁNG
+-- ================================================================================================
+-- Ngày -2
+DECLARE @SD2 DATETIME2 = CAST(@Day2Str + ' 18:30:00' AS DATETIME2);
+DECLARE @ED2 DATETIME2 = CAST(@Day2Str + ' 19:30:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T1, 'SEED-SESSION-W1', 'COMPLETED', 4, @SD2, @ED2, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-W1', 8500000.00, 'SERVED', @SD2, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishWagyu, 15, 350000.00, 5250000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishSalmon, 8, 290000.00, 2320000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishCocktail, 5, 160000.00, 800000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishMousse, 1, 130000.00, 130000.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-W1', 8500000.00, 0.00, 0.00, 8500000.00, 'BANK_TRANSFER', 'PAID', @ED2, GETDATE(), GETDATE());
+
+-- Ngày -3
+DECLARE @SD3 DATETIME2 = CAST(@Day3Str + ' 12:15:00' AS DATETIME2);
+DECLARE @ED3 DATETIME2 = CAST(@Day3Str + ' 13:15:00' AS DATETIME2);
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
+VALUES (@T2, 'SEED-SESSION-W2', 'COMPLETED', 6, @SD3, @ED3, 1, GETDATE(), GETDATE());
+SET @Sid = SCOPE_IDENTITY();
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Sid, 'ORD-SEED-W2', 13500000.00, 'SERVED', @SD3, GETDATE(), GETDATE());
+SET @Oid = SCOPE_IDENTITY();
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at) VALUES
+(@Oid, @DishLobster, 15, 480000.00, 7200000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishWagyu, 12, 350000.00, 4200000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishCocktail, 13, 160000.00, 2080000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Oid, @DishMousse, 0, 120000.00, 0.00, 'SERVED', GETDATE(), GETDATE());
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Sid, 'BILL-SEED-W2', 13500000.00, 0.00, 0.00, 13500000.00, 'CASH', 'PAID', @ED3, GETDATE(), GETDATE());
+
+COMMIT TRANSACTION;
+
+PRINT N'====================================================================================';
+PRINT N'✅ ĐÃ NẠP THÀNH CÔNG DỮ LIỆU MẪU TOÀN DIỆN CHO HỆ THỐNG ROMS!';
+PRINT N'   - 4 Tài khoản nhân viên (MGR-001, EMP-001, KDS-001, CSH-001 | PIN: 123456)';
+PRINT N'   - 6 Bàn ăn (B01 - B06) kèm QR token';
+PRINT N'   - 4 Danh mục & 6 Món ăn thực đơn chuẩn';
+PRINT N'   - Hóa đơn & Đơn hàng đầy đủ cho: HÔM NAY (TODAY), HÔM QUA (YESTERDAY), TRONG TUẦN (WEEK)';
+PRINT N'   - Đầy đủ 3 phương thức thanh toán: BANK_TRANSFER (VietQR), CASH (Tiền mặt), CARD (Thẻ POS)';
+PRINT N'====================================================================================';
+GO
+```
 
 ---
 

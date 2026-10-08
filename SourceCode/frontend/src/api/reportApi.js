@@ -30,6 +30,23 @@ const reportApi = {
     },
 
     /**
+     * Tải xuống file báo cáo Excel chuyên nghiệp (.xls định dạng bảng biểu, màu sắc)
+     * @param {string} timeframe - Mốc thời gian
+     * @param {string} startDate - Ngày bắt đầu
+     * @param {string} endDate   - Ngày kết thúc
+     */
+    exportReportExcel: (timeframe = 'TODAY', startDate = null, endDate = null) => {
+        const params = { timeframe };
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+
+        return axiosClient.get('/admin/reports/export/excel', {
+            params,
+            responseType: 'blob' // Nhận dữ liệu dưới dạng binary blob để tải file về máy
+        });
+    },
+
+    /**
      * Tải xuống file báo cáo Excel (CSV UTF-8 BOM)
      * @param {string} timeframe - Mốc thời gian
      * @param {string} startDate - Ngày bắt đầu

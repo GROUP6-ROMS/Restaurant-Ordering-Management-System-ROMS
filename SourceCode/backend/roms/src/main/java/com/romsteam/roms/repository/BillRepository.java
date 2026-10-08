@@ -29,7 +29,7 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     // Tính tổng doanh thu của các hóa đơn đã thanh toán trong khoảng thời gian
     @Query("SELECT COALESCE(SUM(b.finalAmount), 0) FROM Bill b " +
-           "WHERE b.status = :status AND b.paymentTime BETWEEN :start AND :end")
+            "WHERE b.status = :status AND b.paymentTime BETWEEN :start AND :end")
     BigDecimal sumFinalAmountByStatusAndPaymentTimeBetween(
             @Param("status") BillStatus status,
             @Param("start") LocalDateTime start,

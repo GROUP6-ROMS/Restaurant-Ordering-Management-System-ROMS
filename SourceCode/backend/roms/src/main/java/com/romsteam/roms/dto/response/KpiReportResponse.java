@@ -34,9 +34,6 @@ public class KpiReportResponse {
     // Tỷ lệ tăng/giảm giá trị trung bình trên bàn so với kỳ trước (Ví dụ: "+4.2%")
     private String aovTrend;
 
-    // Thời gian phục vụ trung bình một bàn (tính theo phút)
-    private Double avgServiceDurationMinutes;
-
     // Tổng số lượng hóa đơn thanh toán thành công
     private Long totalBills;
 }
