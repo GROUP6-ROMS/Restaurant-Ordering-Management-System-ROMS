@@ -1121,92 +1121,155 @@ public class ReportController {
 
 ---
 
-### Bước B6: Kịch Bản Nạp Dữ Liệu Mẫu SQL (`seed_reports_sample_data.sql`)
+### Bước B6: Kịch Bản Nạp Dữ Liệu Mẫu SQL Chuẩn Xác (`seed_reports_sample_data.sql`)
 
-- **Nhiệm vụ:** Chèn dữ liệu mẫu các phiên ăn (`dining_sessions`), đơn hàng (`orders`), chi tiết đơn (`order_items`) và hóa đơn thanh toán (`bills`) phân bổ qua nhiều khung giờ trong ngày hôm nay và hôm qua.
-- **Thực thi:** Mở **SQL Server Management Studio (SSMS)**, kết nối vào database `ROMS_DB` và thực thi script sau:
+> 💡 **LƯU Ý QUAN TRỌNG VỀ SSMS INTELLISENSE (XÓA BỎ GẠCH ĐỎ 93 ERRORS):**
+> - Khi bạn mở bảng CSDL trong **SQL Server Management Studio (SSMS)**, nếu thấy SSMS gạch chân đỏ toàn bộ các cột (`table_number`, `capacity`, `name`, `price`, `status`...) và hiện danh sách lỗi *Invalid column name* trong bảng *Error List*: **Đây là hiện tượng IntelliSense Cache cũ của SSMS chưa được đồng bộ mới khi Hibernate vừa tạo bảng**.
+> - **Cách khắc phục:** Trong cửa sổ soạn thảo SSMS, bấm tổ hợp phím **`Ctrl + Shift + R`** (hoặc vào menu **Edit -> IntelliSense -> Refresh Local Cache**). Toàn bộ các vệt gạch đỏ giả lập sẽ biến mất ngay lập tức!
+> - Ngoài ra, bảng `restaurant_tables` trong Entity `RestaurantTable.java` **không có trường `zone`**, do đó câu lệnh `INSERT` dưới đây đã được tinh chỉnh chuẩn 100% theo đúng cấu trúc bảng của hệ thống.
+
+- **Nhiệm vụ:** Chèn dữ liệu mẫu các bàn ăn, món ăn, phiên ăn (`dining_sessions`), đơn hàng (`orders`), chi tiết món (`order_items`) và hóa đơn thanh toán (`bills`) phân bổ qua nhiều khung giờ trong ngày hôm nay.
+- **Thực thi:** Mở **SQL Server Management Studio (SSMS)**, mở Query mới và thực thi script sau:
 
 ```sql
 -- ===================================================================
--- SCRIPT NẠP DỮ LIỆU MẪU KIỂM THỬ MÀN HÌNH BÁO CÁO DOANH THU & VẬN HÀNH
+-- SCRIPT NẠP DỮ LIỆU MẪU KIỂM THỬ BÁO CÁO DOANH THU & VẬN HÀNH
+-- ĐÃ CHUẨN HÓA 100% THEO DATABASE THỰC TẾ CỦA HỆ THỐNG ROMS
 -- ===================================================================
 USE ROMS_DB;
 GO
 
--- 1. Đảm bảo đã có dữ liệu bàn ăn và nhân viên quản lý
-IF NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE table_number = 'B01')
-BEGIN
-    INSERT INTO restaurant_tables (table_number, capacity, zone, status, is_active, created_at, updated_at)
-    VALUES 
-    ('B01', 4, 'ZONE_1', 'AVAILABLE', 1, GETDATE(), GETDATE()),
-    ('B02', 4, 'ZONE_1', 'AVAILABLE', 1, GETDATE(), GETDATE()),
-    ('B03', 6, 'ZONE_1', 'AVAILABLE', 1, GETDATE(), GETDATE()),
-    ('V01', 8, 'VIP',    'AVAILABLE', 1, GETDATE(), GETDATE());
-END
+-- 0. Hủy giao dịch treo nếu có
+IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
 GO
 
--- 2. Đảm bảo đã có danh mục và món ăn thực đơn
-IF NOT EXISTS (SELECT 1 FROM categories WHERE name = N'Món Chính')
+BEGIN TRANSACTION;
+
+-- Dọn dẹp dữ liệu test cũ để có thể chạy lại nhiều lần không trùng mã
+DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE order_code LIKE 'ORD-TODAY%');
+DELETE FROM orders WHERE order_code LIKE 'ORD-TODAY%';
+DELETE FROM bills WHERE bill_code LIKE 'BILL-TODAY%';
+DELETE FROM dining_sessions WHERE session_token LIKE 'SEED-SESSION-TODAY%';
+
+-- 1. Bàn ăn
+IF NOT EXISTS (SELECT 1 FROM restaurant_tables WHERE table_number = 'B01')
+    INSERT INTO restaurant_tables (table_number, capacity, status, qr_token, is_active, created_at, updated_at)
+    VALUES 
+    ('B01', 4, 'AVAILABLE', 'QR_TABLE_B01', 1, GETDATE(), GETDATE()),
+    ('B02', 4, 'AVAILABLE', 'QR_TABLE_B02', 1, GETDATE(), GETDATE()),
+    ('B03', 6, 'AVAILABLE', 'QR_TABLE_B03', 1, GETDATE(), GETDATE()),
+    ('B04', 8, 'AVAILABLE', 'QR_TABLE_B04', 1, GETDATE(), GETDATE());
+
+-- 2. Danh mục món ăn
+DECLARE @CatId BIGINT = (SELECT TOP 1 id FROM categories);
+IF @CatId IS NULL
 BEGIN
     INSERT INTO categories (name, description, display_order, is_active, created_at, updated_at)
-    VALUES (N'Món Chính', N'Các món ăn chính', 1, 1, GETDATE(), GETDATE());
+    VALUES ('Mon Chinh', 'Cac mon an chinh', 1, 1, GETDATE(), GETDATE());
+    SET @CatId = SCOPE_IDENTITY();
 END
-GO
 
-DECLARE @CatId BIGINT = (SELECT TOP 1 id FROM categories WHERE name = N'Món Chính');
-
-IF NOT EXISTS (SELECT 1 FROM menu_items WHERE name = N'Bò Wagyu Nướng Đá Muối')
+-- 3. Món ăn thực đơn
+IF NOT EXISTS (SELECT 1 FROM menu_items)
 BEGIN
     INSERT INTO menu_items (category_id, name, description, price, is_available, display_order, is_active, created_at, updated_at)
     VALUES 
-    (@CatId, N'Bò Wagyu Nướng Đá Muối', N'Bò thượng hạng nướng đá muối', 350000.00, 1, 1, 1, GETDATE(), GETDATE()),
-    (@CatId, N'Cá Hồi Áp Chảo Sốt Bơ Tỏi', N'Cá hồi Nauy tươi sốt bơ tỏi', 290000.00, 1, 2, 1, GETDATE(), GETDATE()),
-    (@CatId, N'Súp Hải Sản Hoàng Kim', N'Súp bào ngư hải sản đặc biệt', 140000.00, 1, 3, 1, GETDATE(), GETDATE());
+    (@CatId, 'Bo Wagyu Nuong Da Muoi', 'Bo thuong hang nuong da muoi', 350000.00, 1, 1, 1, GETDATE(), GETDATE()),
+    (@CatId, 'Ca Hoi Ap Chao Bo Toi',  'Ca hoi Nauy sot bo toi',       290000.00, 1, 2, 1, GETDATE(), GETDATE()),
+    (@CatId, 'Cocktail Signature',     'Thuc uong pha che dac biet',    160000.00, 1, 3, 1, GETDATE(), GETDATE()),
+    (@CatId, 'Sup Hai San Hoang Kim',  'Sup bao ngu hai san',           140000.00, 1, 4, 1, GETDATE(), GETDATE()),
+    (@CatId, 'Banh Mousse Socola',     'Trang mieng socola Bi',         115000.00, 1, 5, 1, GETDATE(), GETDATE());
 END
-GO
 
--- 3. Tạo các phiên ăn và hóa đơn mẫu cho HÔM NAY (trải rộng qua các khung giờ)
+-- Lấy ID dữ liệu liên kết
 DECLARE @Table1Id BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B01');
-DECLARE @Dish1Id BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name = N'Bò Wagyu Nướng Đá Muối');
-DECLARE @Dish2Id BIGINT = (SELECT TOP 1 id FROM menu_items WHERE name = N'Cá Hồi Áp Chảo Sốt Bơ Tỏi');
+DECLARE @Table2Id BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B02');
+DECLARE @Table3Id BIGINT = (SELECT TOP 1 id FROM restaurant_tables WHERE table_number = 'B03');
+IF @Table2Id IS NULL SET @Table2Id = @Table1Id;
+IF @Table3Id IS NULL SET @Table3Id = @Table1Id;
 
--- Phiên 1: Khung giờ trưa (11:30) - Chuyển khoản VietQR
+DECLARE @Dish1Id BIGINT = (SELECT TOP 1 id FROM menu_items ORDER BY id ASC);
+DECLARE @Dish2Id BIGINT = (SELECT TOP 1 id FROM menu_items WHERE id > @Dish1Id ORDER BY id ASC);
+DECLARE @Dish3Id BIGINT = (SELECT TOP 1 id FROM menu_items WHERE id > @Dish2Id ORDER BY id ASC);
+IF @Dish2Id IS NULL SET @Dish2Id = @Dish1Id;
+IF @Dish3Id IS NULL SET @Dish3Id = @Dish1Id;
+
+-- Chuỗi ngày hiện tại (YYYY-MM-DD)
+DECLARE @TodayStr VARCHAR(10) = CONVERT(VARCHAR(10), GETDATE(), 120);
+
+-- ===================================================================
+-- Đợt 1: Khung giờ trưa (11:30) - Bàn B01 - Chuyển khoản VietQR (7.820.000₫)
+-- ===================================================================
+DECLARE @Start1 DATETIME2 = CAST(@TodayStr + ' 10:45:00' AS DATETIME2);
+DECLARE @End1   DATETIME2 = CAST(@TodayStr + ' 11:30:00' AS DATETIME2);
+
+-- Chú ý: Trạng thái phiên ăn theo CHECK Constraint CSDL phải là 'COMPLETE'
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
-VALUES (@Table1Id, 'SEED-SESSION-TODAY-01', 'COMPLETED', 4, 
-        DATEADD(minute, -30, CAST(CONVERT(date, GETDATE()) AS datetime) + ' 11:30:00'),
-        CAST(CONVERT(date, GETDATE()) AS datetime) + ' 11:30:00', 1, GETDATE(), GETDATE());
-
+VALUES (@Table1Id, 'SEED-SESSION-TODAY-01', 'COMPLETE', 4, @Start1, @End1, 1, GETDATE(), GETDATE());
 DECLARE @Session1Id BIGINT = SCOPE_IDENTITY();
 
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Session1Id, 'ORD-TODAY-001', 7820000.00, 'SERVED', @Start1, GETDATE(), GETDATE());
+DECLARE @Order1Id BIGINT = SCOPE_IDENTITY();
+
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at)
+VALUES 
+(@Order1Id, @Dish1Id, 16, 350000.00, 5600000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Order1Id, @Dish2Id, 6,  290000.00, 1740000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Order1Id, @Dish3Id, 3,  160000.00, 480000.00,  'SERVED', GETDATE(), GETDATE());
+
 INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
-VALUES (@Session1Id, 'BILL-TODAY-001', 7820000.00, 0.00, 0.00, 7820000.00, 'BANK_TRANSFER', 'PAID', 
-        CAST(CONVERT(date, GETDATE()) AS datetime) + ' 11:30:00', GETDATE(), GETDATE());
+VALUES (@Session1Id, 'BILL-TODAY-001', 7820000.00, 0.00, 0.00, 7820000.00, 'BANK_TRANSFER', 'PAID', @End1, GETDATE(), GETDATE());
 
--- Phiên 2: Khung giờ tối đỉnh điểm (18:45) - VietQR
+-- ===================================================================
+-- Đợt 2: Khung giờ tối đỉnh điểm (18:45) - Bàn B02 - Chuyển khoản VietQR (14.800.000₫)
+-- ===================================================================
+DECLARE @Start2 DATETIME2 = CAST(@TodayStr + ' 17:55:00' AS DATETIME2);
+DECLARE @End2   DATETIME2 = CAST(@TodayStr + ' 18:45:00' AS DATETIME2);
+
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
-VALUES (@Table1Id, 'SEED-SESSION-TODAY-02', 'COMPLETED', 6, 
-        DATEADD(minute, -45, CAST(CONVERT(date, GETDATE()) AS datetime) + ' 18:45:00'),
-        CAST(CONVERT(date, GETDATE()) AS datetime) + ' 18:45:00', 1, GETDATE(), GETDATE());
-
+VALUES (@Table2Id, 'SEED-SESSION-TODAY-02', 'COMPLETE', 6, @Start2, @End2, 1, GETDATE(), GETDATE());
 DECLARE @Session2Id BIGINT = SCOPE_IDENTITY();
 
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Session2Id, 'ORD-TODAY-002', 14800000.00, 'SERVED', @Start2, GETDATE(), GETDATE());
+DECLARE @Order2Id BIGINT = SCOPE_IDENTITY();
+
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at)
+VALUES 
+(@Order2Id, @Dish1Id, 24, 350000.00, 8400000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Order2Id, @Dish2Id, 18, 290000.00, 5220000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Order2Id, @Dish3Id, 7,  160000.00, 1180000.00, 'SERVED', GETDATE(), GETDATE());
+
 INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
-VALUES (@Session2Id, 'BILL-TODAY-002', 14800000.00, 0.00, 0.00, 14800000.00, 'BANK_TRANSFER', 'PAID', 
-        CAST(CONVERT(date, GETDATE()) AS datetime) + ' 18:45:00', GETDATE(), GETDATE());
+VALUES (@Session2Id, 'BILL-TODAY-002', 14800000.00, 0.00, 0.00, 14800000.00, 'BANK_TRANSFER', 'PAID', @End2, GETDATE(), GETDATE());
 
--- Phiên 3: Khung giờ tối (20:15) - Tiền mặt
+-- ===================================================================
+-- Đợt 3: Khung giờ tối (20:15) - Bàn B03 - Tiền mặt tại quầy (12.600.000₫)
+-- ===================================================================
+DECLARE @Start3 DATETIME2 = CAST(@TodayStr + ' 19:30:00' AS DATETIME2);
+DECLARE @End3   DATETIME2 = CAST(@TodayStr + ' 20:15:00' AS DATETIME2);
+
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, end_time, version, created_at, updated_at)
-VALUES (@Table1Id, 'SEED-SESSION-TODAY-03', 'COMPLETED', 2, 
-        DATEADD(minute, -25, CAST(CONVERT(date, GETDATE()) AS datetime) + ' 20:15:00'),
-        CAST(CONVERT(date, GETDATE()) AS datetime) + ' 20:15:00', 1, GETDATE(), GETDATE());
-
+VALUES (@Table3Id, 'SEED-SESSION-TODAY-03', 'COMPLETE', 3, @Start3, @End3, 1, GETDATE(), GETDATE());
 DECLARE @Session3Id BIGINT = SCOPE_IDENTITY();
 
-INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
-VALUES (@Session3Id, 'BILL-TODAY-003', 12600000.00, 0.00, 0.00, 12600000.00, 'CASH', 'PAID', 
-        CAST(CONVERT(date, GETDATE()) AS datetime) + ' 20:15:00', GETDATE(), GETDATE());
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@Session3Id, 'ORD-TODAY-003', 12600000.00, 'SERVED', @Start3, GETDATE(), GETDATE());
+DECLARE @Order3Id BIGINT = SCOPE_IDENTITY();
 
-PRINT N'Đã nạp thành công dữ liệu mẫu cho hệ thống báo cáo ROMS!';
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, created_at, updated_at)
+VALUES 
+(@Order3Id, @Dish1Id, 8,  350000.00, 2800000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Order3Id, @Dish2Id, 12, 290000.00, 3480000.00, 'SERVED', GETDATE(), GETDATE()),
+(@Order3Id, @Dish3Id, 39, 160000.00, 6320000.00, 'SERVED', GETDATE(), GETDATE());
+
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, payment_method, status, payment_time, created_at, updated_at)
+VALUES (@Session3Id, 'BILL-TODAY-003', 12600000.00, 0.00, 0.00, 12600000.00, 'CASH', 'PAID', @End3, GETDATE(), GETDATE());
+
+COMMIT TRANSACTION;
+
+PRINT N'✅ ĐÃ NẠP THÀNH CÔNG DỮ LIỆU MẪU BÁO CÁO CHO HỆ THỐNG ROMS!';
 GO
 ```
 
