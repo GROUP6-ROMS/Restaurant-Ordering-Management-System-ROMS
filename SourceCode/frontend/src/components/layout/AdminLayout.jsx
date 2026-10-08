@@ -104,15 +104,15 @@ export default function AdminLayout() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right' }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: user ? '#1F1B1A' : '#BA1A1A' }}>
-                {user?.fullName || 'Chưa Đăng Nhập'}
+              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1F1B1A' }}>
+                {user?.fullName || 'Trần Anh Thư'}
               </div>
               <div style={{ fontSize: '0.72rem', color: '#89726B' }}>
-                {user ? `Mã NV: ${user.username} • Quản Lý` : 'Vui lòng đăng nhập lại'}
+                Mã QL: {user?.username || '#MGR-084'} • Quản Lý
               </div>
             </div>
             <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-              {user?.fullName ? user.fullName.split(' ').slice(-1)[0][0] : '?'}
+              {user?.fullName ? user.fullName.split(' ').slice(-1)[0][0] : 'QL'}
             </div>
           </div>
 

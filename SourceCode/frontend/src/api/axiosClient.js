@@ -16,19 +16,4 @@ axiosClient.interceptors.request.use((config) => {
     return config;
 });
 
-// Interceptor: Bắt lỗi 401 (hết hạn Token hoặc chưa đăng nhập)
-axiosClient.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response && error.response.status === 401) {
-            localStorage.removeItem('roms_token');
-            localStorage.removeItem('roms_user');
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
-            }
-        }
-        return Promise.reject(error);
-    }
-);
-
 export default axiosClient;
