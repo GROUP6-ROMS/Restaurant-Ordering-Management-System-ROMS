@@ -2313,24 +2313,44 @@ IF NOT EXISTS (SELECT 1 FROM staffs WHERE username = 'CSH-001')
     VALUES ('CSH-001', '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8bfJTNWjWqqsmfh92', N'Đỗ Võ Thanh Trung', '0901000004', 'CASHIER', 1, 0, GETDATE(), GETDATE());
 
 -- ================================================================================================
--- 2. PHÂN CA LÀM VIỆC (STAFF_SCHEDULES) CHO HÔM NAY
+-- 2. PHÂN CA LÀM VIỆC FULL 24H (STAFF_SCHEDULES) CHO HÔM NAY VÀ NGÀY MAI
+-- (Đảm bảo tất cả nhân viên EMP-001, KDS-001, CSH-001 có đủ 2 ca MORNING & EVENING để nhóm test 24/7)
 -- ================================================================================================
 DECLARE @TodayDate DATE = CAST(GETDATE() AS DATE);
+DECLARE @TomorrowDate DATE = DATEADD(DAY, 1, @TodayDate);
 DECLARE @EmpId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'EMP-001');
 DECLARE @KdsId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'KDS-001');
 DECLARE @CshId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'CSH-001');
 
+-- (A) Phục vụ EMP-001: Xếp full 2 ca (Sáng MORNING 00:00-14:00 & Tối EVENING 14:00-24:00) cho hôm nay và ngày mai
 IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TodayDate AND shift_type = 'MORNING')
-    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
-    VALUES (@EmpId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TodayDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TodayDate, 'EVENING', GETDATE(), GETDATE());
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TomorrowDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TomorrowDate, 'MORNING', GETDATE(), GETDATE());
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TomorrowDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TomorrowDate, 'EVENING', GETDATE(), GETDATE());
 
+-- (B) Bếp KDS-001: Xếp full 2 ca cho hôm nay và ngày mai (để test KDS bất kỳ lúc nào)
 IF @KdsId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @KdsId AND work_date = @TodayDate AND shift_type = 'MORNING')
-    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
-    VALUES (@KdsId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@KdsId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+IF @KdsId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @KdsId AND work_date = @TodayDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@KdsId, @TodayDate, 'EVENING', GETDATE(), GETDATE());
+IF @KdsId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @KdsId AND work_date = @TomorrowDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@KdsId, @TomorrowDate, 'MORNING', GETDATE(), GETDATE());
+IF @KdsId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @KdsId AND work_date = @TomorrowDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@KdsId, @TomorrowDate, 'EVENING', GETDATE(), GETDATE());
 
+-- (C) Thu ngân CSH-001: Xếp full 2 ca cho hôm nay và ngày mai (để test POS bất kỳ lúc nào)
 IF @CshId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @CshId AND work_date = @TodayDate AND shift_type = 'MORNING')
-    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
-    VALUES (@CshId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@CshId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+IF @CshId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @CshId AND work_date = @TodayDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@CshId, @TodayDate, 'EVENING', GETDATE(), GETDATE());
+IF @CshId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @CshId AND work_date = @TomorrowDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@CshId, @TomorrowDate, 'MORNING', GETDATE(), GETDATE());
+IF @CshId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @CshId AND work_date = @TomorrowDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@CshId, @TomorrowDate, 'EVENING', GETDATE(), GETDATE());
 
 -- ================================================================================================
 -- 3. BÀN ĂN (RESTAURANT_TABLES)

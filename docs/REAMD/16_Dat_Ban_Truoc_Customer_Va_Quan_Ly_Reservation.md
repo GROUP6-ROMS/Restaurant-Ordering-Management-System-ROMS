@@ -3172,7 +3172,37 @@ BEGIN
     ALTER TABLE reservations ADD requested_zone NVARCHAR(50) NULL;
 END;
 
--- 2. Thêm dữ liệu mẫu kiểm thử
+-- 2. Phân ca làm việc Full 24h (staff_schedules) cho hôm nay và ngày mai
+-- Giúp nhóm test đăng nhập duyệt và xử lý đặt bàn bất kỳ lúc nào trong ngày (24/7)
+DECLARE @TodayDate DATE = CAST(GETDATE() AS DATE);
+DECLARE @TomorrowDate DATE = DATEADD(DAY, 1, @TodayDate);
+DECLARE @EmpId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'EMP-001');
+DECLARE @KdsId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'KDS-001');
+DECLARE @CshId BIGINT = (SELECT TOP 1 id FROM staffs WHERE username = 'CSH-001');
+
+-- (A) Phục vụ EMP-001 (Ca Sáng MORNING 00:00-14:00 & Ca Tối EVENING 14:00-24:00)
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TodayDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TodayDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TodayDate, 'EVENING', GETDATE(), GETDATE());
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TomorrowDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TomorrowDate, 'MORNING', GETDATE(), GETDATE());
+IF @EmpId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @EmpId AND work_date = @TomorrowDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@EmpId, @TomorrowDate, 'EVENING', GETDATE(), GETDATE());
+
+-- (B) Bếp KDS-001
+IF @KdsId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @KdsId AND work_date = @TodayDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@KdsId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+IF @KdsId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @KdsId AND work_date = @TodayDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@KdsId, @TodayDate, 'EVENING', GETDATE(), GETDATE());
+
+-- (C) Thu ngân CSH-001
+IF @CshId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @CshId AND work_date = @TodayDate AND shift_type = 'MORNING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@CshId, @TodayDate, 'MORNING', GETDATE(), GETDATE());
+IF @CshId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM staff_schedules WHERE staff_id = @CshId AND work_date = @TodayDate AND shift_type = 'EVENING')
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES (@CshId, @TodayDate, 'EVENING', GETDATE(), GETDATE());
+
+-- 3. Thêm dữ liệu mẫu kiểm thử đặt bàn (reservations)
 INSERT INTO reservations (booking_code, customer_name, customer_phone, customer_email, guest_count, reservation_time, requested_zone, status, note, created_at)
 VALUES 
 ('RES-20261009-1001', N'Trần Thị Thu Hà', '0988123456', 'ha.tran@gmail.com', 4, DATEADD(hour, 2, GETDATE()), 'ZONE_1', 'PENDING', N'Khách đề nghị bàn gần cửa sổ, chuẩn bị ghế trẻ em', GETDATE()),

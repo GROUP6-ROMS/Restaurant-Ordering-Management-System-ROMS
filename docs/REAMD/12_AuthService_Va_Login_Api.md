@@ -704,40 +704,43 @@ GO
 -- ==================================================================================
 
 -- ----------------------------------------------------------------------------------
--- (1) Phục vụ EMP-001:
--- * Hôm nay: Xếp cả 2 ca Sáng & Tối (từ 05:45 đến 22:00 bạn test lúc nào cũng đăng nhập được)
+-- (1) Phục vụ EMP-001: Xếp full 2 ca Sáng & Tối (00:00 - 24:00) cho hôm nay và ngày mai
 -- ----------------------------------------------------------------------------------
 INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
 VALUES 
--- Ca Sáng hôm nay (06:00 - 14:00)
+-- Ca Sáng hôm nay (00:00 - 14:00)
 ((SELECT id FROM staffs WHERE username = 'EMP-001'), CAST(GETDATE() AS DATE), 'MORNING', GETDATE(), GETDATE()),
--- Ca Tối hôm nay (14:00 - 22:00)
+-- Ca Tối hôm nay (14:00 - 24:00)
 ((SELECT id FROM staffs WHERE username = 'EMP-001'), CAST(GETDATE() AS DATE), 'EVENING', GETDATE(), GETDATE()),
--- Ca Sáng ngày mai (06:00 - 14:00)
-((SELECT id FROM staffs WHERE username = 'EMP-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'MORNING', GETDATE(), GETDATE());
+-- Ca Sáng ngày mai
+((SELECT id FROM staffs WHERE username = 'EMP-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'MORNING', GETDATE(), GETDATE()),
+-- Ca Tối ngày mai
+((SELECT id FROM staffs WHERE username = 'EMP-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'EVENING', GETDATE(), GETDATE());
 
 -- ----------------------------------------------------------------------------------
--- (2) Bếp KDS-001:
--- * Hôm nay: Chỉ xếp duy nhất Ca Sáng (06:00 - 14:00)
--- -> Mục đích test: Nếu bạn đăng nhập vào buổi chiều hoặc tối sau 14:00, 
---    hệ thống sẽ từ chối (403 Forbidden): "Chưa đến hoặc đã hết ca làm việc của bạn hôm nay..."
+-- (2) Bếp KDS-001: Xếp full 2 ca Sáng & Tối (00:00 - 24:00) cho hôm nay và ngày mai
+-- -> Đảm bảo nhóm test màn hình KDS bất kỳ khung giờ nào trong ngày không bị chặn
 -- ----------------------------------------------------------------------------------
 INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
 VALUES 
-((SELECT id FROM staffs WHERE username = 'KDS-001'), CAST(GETDATE() AS DATE), 'MORNING', GETDATE(), GETDATE());
+((SELECT id FROM staffs WHERE username = 'KDS-001'), CAST(GETDATE() AS DATE), 'MORNING', GETDATE(), GETDATE()),
+((SELECT id FROM staffs WHERE username = 'KDS-001'), CAST(GETDATE() AS DATE), 'EVENING', GETDATE(), GETDATE()),
+((SELECT id FROM staffs WHERE username = 'KDS-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'MORNING', GETDATE(), GETDATE()),
+((SELECT id FROM staffs WHERE username = 'KDS-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'EVENING', GETDATE(), GETDATE());
 
 -- ----------------------------------------------------------------------------------
--- (3) Thu ngân CSH-001:
--- * Hôm nay NGHỈ: Hoàn toàn KHÔNG xếp lịch hôm nay (chỉ có lịch ngày mai)
--- -> Mục đích test: Khi đăng nhập hôm nay, hệ thống chặn (403 Forbidden):
---    "Bạn không có lịch làm việc trong ngày hôm nay! Vui lòng liên hệ Quản lý."
+-- (3) Thu ngân CSH-001: Xếp full 2 ca Sáng & Tối (00:00 - 24:00) cho hôm nay và ngày mai
+-- -> Đảm bảo nhóm test màn hình POS thu ngân bất kỳ khung giờ nào trong ngày không bị chặn
 -- ----------------------------------------------------------------------------------
 INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
 VALUES 
+((SELECT id FROM staffs WHERE username = 'CSH-001'), CAST(GETDATE() AS DATE), 'MORNING', GETDATE(), GETDATE()),
+((SELECT id FROM staffs WHERE username = 'CSH-001'), CAST(GETDATE() AS DATE), 'EVENING', GETDATE(), GETDATE()),
+((SELECT id FROM staffs WHERE username = 'CSH-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'MORNING', GETDATE(), GETDATE()),
 ((SELECT id FROM staffs WHERE username = 'CSH-001'), DATEADD(DAY, 1, CAST(GETDATE() AS DATE)), 'EVENING', GETDATE(), GETDATE());
 
 -- (4) Quản lý MGR-001:
--- Không cần xếp ca. Quản lý luôn được phép đăng nhập mọi lúc!
+-- Không cần xếp ca. Quản lý luôn được phép đăng nhập mọi lúc (24/7)!
 GO
 
 -- ==================================================================================
