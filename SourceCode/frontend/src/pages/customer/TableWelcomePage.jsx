@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { tableApi } from '../../api/tableApi';
 import Icon from '../../components/common/Icon';
 import RomsLogo from '../../components/common/RomsLogo';
 
@@ -11,12 +12,17 @@ export default function TableWelcomePage() {
 
   const rawTable = searchParams.get('table') || '5';
   const tableNumberFormatted = rawTable.padStart(2, '0');
-  const tokenParam = searchParams.get('token') || `table-${tableNumberFormatted}-secret-token`;
+  const tokenParam = searchParams.get('token');
 
   const [guestCount, setGuestCount] = useState(tableInfo?.guestCount || 4);
   const [toastMessage, setToastMessage] = useState(null);
   const [copiedWifi, setCopiedWifi] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+
+  // State xác thực mã QR thời gian thực từ Backend
+  const [isVerifying, setIsVerifying] = useState(!!tokenParam);
+  const [verifiedTable, setVerifiedTable] = useState(null);
+  const [verifyError, setVerifyError] = useState(null);
 
   // Clock
   useEffect(() => {
@@ -28,6 +34,34 @@ export default function TableWelcomePage() {
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Xác thực mã QR Token với CSDL qua Backend API
+  useEffect(() => {
+    const verifyToken = async () => {
+      if (tokenParam) {
+        try {
+          setIsVerifying(true);
+          setVerifyError(null);
+          const res = await tableApi.verifyQr(tokenParam);
+          if (res.data && res.data.success) {
+            const tData = res.data.data;
+            setVerifiedTable(tData);
+            if (tData.capacity) setGuestCount(tData.capacity);
+          }
+        } catch (err) {
+          console.error('Lỗi xác thực mã QR:', err);
+          const msg = err.response?.data?.message || 'Mã QR này không hợp lệ hoặc đã bị thay đổi!';
+          setVerifyError(msg);
+        } finally {
+          setIsVerifying(false);
+        }
+      } else {
+        setIsVerifying(false);
+      }
+    };
+
+    verifyToken();
+  }, [tokenParam]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -42,19 +76,131 @@ export default function TableWelcomePage() {
   };
 
   const handleCallStaff = () => {
-    showToast(`Đã rung chuông! Nhân viên đang đến hỗ trợ Bàn ${tableNumberFormatted}.`);
+    const tableLabel = verifiedTable?.code || `Bàn ${tableNumberFormatted}`;
+    showToast(`Đã rung chuông! Nhân viên đang đến hỗ trợ ${tableLabel}.`);
   };
 
   const handleStartDining = () => {
     const info = {
-      tableNumber: `BÀN ${tableNumberFormatted}`,
-      tableId: parseInt(rawTable, 10) || 5,
+      tableNumber: verifiedTable?.code || `BÀN ${tableNumberFormatted}`,
+      tableId: verifiedTable?.id || parseInt(rawTable, 10) || 5,
+      tableName: verifiedTable?.name || '',
+      zoneName: verifiedTable?.zoneName || '',
       guestCount,
-      token: tokenParam
+      token: tokenParam || `table-${tableNumberFormatted}-token`
     };
     setTableInfo(info);
     navigate('/dining/menu');
   };
+
+  // Màn hình đang kiểm tra mã QR
+  if (isVerifying) {
+    return (
+      <div style={{
+        minHeight: '100dvh',
+        background: '#FAFAF8',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          width: '50px',
+          height: '50px',
+          borderRadius: '50%',
+          border: '4px solid #F0E6E4',
+          borderTopColor: '#9D4124',
+          animation: 'spin 0.8s linear infinite',
+          marginBottom: '16px'
+        }} />
+        <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, color: '#1F1B1A', margin: '0 0 6px' }}>
+          Đang Xác Thực Bàn Ăn...
+        </h3>
+        <p style={{ margin: 0, fontSize: '0.85rem', color: '#89726B' }}>
+          Vui lòng đợi giây lát trong khi hệ thống kết nối phiên gọi món.
+        </p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // Màn hình cảnh báo mã QR hết hạn hoặc không hợp lệ
+  if (verifyError) {
+    return (
+      <div style={{
+        minHeight: '100dvh',
+        background: '#FAFAF8',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          width: '72px',
+          height: '72px',
+          borderRadius: '50%',
+          background: '#FFDBC9',
+          color: '#BA1A1A',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '18px'
+        }}>
+          <Icon name="qr_code_scanner" size={38} />
+        </div>
+        <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, color: '#1F1B1A', margin: '0 0 8px', fontSize: '1.35rem' }}>
+          Mã QR Không Còn Hiệu Lực
+        </h2>
+        <p style={{ margin: '0 0 24px', fontSize: '0.88rem', color: '#89726B', maxWidth: '340px', lineHeight: 1.5 }}>
+          {verifyError}
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '300px' }}>
+          <button
+            type="button"
+            onClick={handleCallStaff}
+            style={{
+              padding: '13px',
+              borderRadius: '12px',
+              background: '#9D4124',
+              color: '#FFFFFF',
+              border: 'none',
+              fontWeight: 800,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(157,65,36,0.25)'
+            }}
+          >
+            <Icon name="notifications_active" size={20} />
+            Gọi Nhân Viên Hỗ Trợ
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '12px',
+              borderRadius: '12px',
+              background: '#FFFFFF',
+              color: '#56423D',
+              border: '1px solid #EAE0DE',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer'
+            }}
+          >
+            Thử Lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -154,10 +300,13 @@ export default function TableWelcomePage() {
             letterSpacing: '0.04em'
           }}>
             <Icon name="table_restaurant" size={18} fill={1} />
-            <span>BÀN {tableNumberFormatted}</span>
+            <span>{verifiedTable?.code || `BÀN ${tableNumberFormatted}`}</span>
           </div>
           <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1F1B1A' }}>
-            Table {tableNumberFormatted} <span style={{ fontWeight: 500, color: '#89726B', fontSize: '0.78rem' }}>• {guestCount} Chỗ ngồi</span>
+            {verifiedTable?.name || `Table ${tableNumberFormatted}`}
+            <span style={{ fontWeight: 500, color: '#89726B', fontSize: '0.78rem' }}>
+              {verifiedTable?.zoneName ? ` • ${verifiedTable.zoneName}` : ''} • {guestCount} Chỗ ngồi
+            </span>
           </span>
         </div>
       </header>

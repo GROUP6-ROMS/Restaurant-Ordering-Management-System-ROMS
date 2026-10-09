@@ -43,6 +43,25 @@ export default function TableManagementPage() {
     capacity: 4
   });
 
+  // State Modal Chỉnh Sửa Bàn Ăn (Update Table)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTableData, setEditTableData] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    code: '',
+    name: '',
+    zone: 'ZONE_1',
+    capacity: 4
+  });
+
+  // State Modal Xác Nhận Xóa Bàn Ăn (Delete Table)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingTable, setDeletingTable] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // State Modal In Tem Bàn Hàng Loạt Khổ Giấy A4 (Batch QR Print Sheet)
+  const [showBatchQrModal, setShowBatchQrModal] = useState(false);
+  const [batchFilterZone, setBatchFilterZone] = useState('ALL');
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -201,6 +220,84 @@ export default function TableManagementPage() {
   };
 
   // ===================================================================
+  // 5.1. MỞ MODAL CHỈNH SỬA THÔNG TIN BÀN
+  // ===================================================================
+  const handleOpenEditModal = (table) => {
+    setEditTableData(table);
+    setEditFormData({
+      code: table.code || table.tableNumber || '',
+      name: table.name || '',
+      zone: table.zone || 'ZONE_1',
+      capacity: table.capacity || 4
+    });
+    setShowEditModal(true);
+  };
+
+  // ===================================================================
+  // 5.2. LƯU CHỈNH SỬA THÔNG TIN BÀN ĂN
+  // ===================================================================
+  const handleUpdateTable = async (e) => {
+    e.preventDefault();
+    if (!editTableData || !editFormData.code.trim()) return;
+
+    try {
+      const payload = {
+        tableNumber: editFormData.code.trim().toUpperCase(),
+        name: editFormData.name.trim() || `Bàn ${editFormData.code.trim().toUpperCase()}`,
+        zone: editFormData.zone,
+        capacity: parseInt(editFormData.capacity) || 4
+      };
+
+      const res = await tableApi.updateTable(editTableData.id, payload);
+      if (res.data && res.data.success) {
+        showToast(`Đã cập nhật thông tin bàn: ${payload.tableNumber}!`);
+        setShowEditModal(false);
+        setEditTableData(null);
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi cập nhật bàn:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi cập nhật thông tin bàn!';
+      showToast(errMsg);
+    }
+  };
+
+  // ===================================================================
+  // 5.3. MỞ MODAL XÁC NHẬN XÓA BÀN ĂN
+  // ===================================================================
+  const handleOpenDeleteModal = (table) => {
+    if (table.status === 'OCCUPIED') {
+      showToast('Bàn đang có khách phục vụ, không thể xóa!');
+      return;
+    }
+    setDeletingTable(table);
+    setShowDeleteModal(true);
+  };
+
+  // ===================================================================
+  // 5.4. XÁC NHẬN XÓA BÀN ĂN
+  // ===================================================================
+  const handleConfirmDelete = async () => {
+    if (!deletingTable) return;
+    try {
+      setDeleteLoading(true);
+      const res = await tableApi.deleteTable(deletingTable.id);
+      if (res.data && res.data.success) {
+        showToast(`Đã xóa bàn ${deletingTable.code || deletingTable.name}!`);
+        setShowDeleteModal(false);
+        setDeletingTable(null);
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi xóa bàn:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi xóa bàn ăn!';
+      showToast(errMsg);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // ===================================================================
   // 6. LÀM MỚI MÃ QR TOKEN CHO BÀN
   // ===================================================================
   const handleRefreshQrToken = async (id) => {
@@ -252,6 +349,12 @@ export default function TableManagementPage() {
   const availableTables = selectedZone === 'ALL' && summary ? summary.availableTables : kpiTables.filter(t => t.status === 'AVAILABLE').length;
   const reservedTables = selectedZone === 'ALL' && summary ? summary.reservedTables : kpiTables.filter(t => t.status === 'RESERVED').length;
   const blockedTables = selectedZone === 'ALL' && summary ? summary.blockedTables : kpiTables.filter(t => t.status === 'BLOCKED').length;
+
+  // Lọc danh sách bàn cho Modal In Tem Mã QR Hàng Loạt Khổ A4
+  const batchFilteredTables = tables.filter(t => {
+    if (batchFilterZone === 'ALL') return true;
+    return t.zone === batchFilterZone;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -321,7 +424,8 @@ export default function TableManagementPage() {
 
           <button
             type="button"
-            onClick={() => showToast('Đang tạo tệp PDF chứa mã QR của tất cả các bàn...')}
+            onClick={() => setShowBatchQrModal(true)}
+            title="Mở bảng in tem mã QR toàn bộ các bàn trong nhà hàng (Khổ A4)"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -333,11 +437,12 @@ export default function TableManagementPage() {
               fontWeight: 700,
               fontSize: '0.85rem',
               color: '#56423D',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Icon name="download" size={18} />
-            Xuất Tất Cả Mã QR
+            <Icon name="print" size={18} />
+            Xuất & In Tất Cả Mã QR
           </button>
 
           <button
@@ -706,6 +811,51 @@ export default function TableManagementPage() {
                       <Icon name="tune" size={15} />
                       Đổi TT
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(t)}
+                      title="Chỉnh sửa thông tin bàn (Mã số, Tên bàn, Khu vực, Sức chứa)"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        background: '#FFF8F6',
+                        border: '1px solid #EAE0DE',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: '#56423D',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Icon name="edit" size={15} />
+                      Sửa
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDeleteModal(t)}
+                      title={t.status === 'OCCUPIED' ? 'Không thể xóa bàn đang có khách phục vụ' : 'Xóa bàn ăn khỏi sơ đồ'}
+                      disabled={t.status === 'OCCUPIED'}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        background: t.status === 'OCCUPIED' ? '#F5F5F4' : '#FFDAD6',
+                        border: t.status === 'OCCUPIED' ? '1px solid #E5E5E5' : '1px solid #FFB4AB',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: t.status === 'OCCUPIED' ? '#A8A29E' : '#BA1A1A',
+                        cursor: t.status === 'OCCUPIED' ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <Icon name="delete" size={15} />
+                      Xóa
+                    </button>
                   </div>
 
                   <div style={{ display: 'flex', gap: '4px' }}>
@@ -988,6 +1138,34 @@ export default function TableManagementPage() {
                 In Tem Mã QR
               </button>
             </div>
+
+            {/* Nút Mở Thử Nghiệm Gọi Món Trực Tiếp Trên Máy Tính */}
+            <a
+              href={`/dining/welcome?table=${selectedQrTable.id}&token=${selectedQrTable.qrToken}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '11px',
+                borderRadius: '12px',
+                background: '#FDF7F5',
+                border: '1.5px dashed #9D4124',
+                color: '#9D4124',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                textDecoration: 'none',
+                marginTop: '12px',
+                boxSizing: 'border-box',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Icon name="open_in_new" size={17} />
+              Mở Thử Nghiệm Gọi Món (Tab Mới)
+            </a>
           </div>
         </div>
       )}
@@ -1381,6 +1559,302 @@ export default function TableManagementPage() {
         </div>
       )}
 
+      {/* MODAL 4: CHỈNH SỬA THÔNG TIN BÀN ĂN */}
+      {showEditModal && editTableData && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Icon name="edit" size={24} style={{ color: '#9D4124' }} />
+                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
+                  Chỉnh Sửa Bàn {editTableData.code}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F6ECEA', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateTable} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                  Mã Bàn (VD: T-01, VIP-04) <span style={{ color: '#BA1A1A' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nhập mã bàn..."
+                  value={editFormData.code}
+                  onChange={(e) => setEditFormData({ ...editFormData, code: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #EAE0DE',
+                    background: '#FDF7F5',
+                    fontSize: '0.88rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                  Tên Hiển Thị (Tùy chọn)
+                </label>
+                <input
+                  type="text"
+                  placeholder="VD: Bàn Cạnh Cửa Sổ, Phòng Sen Vàng"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #EAE0DE',
+                    background: '#FDF7F5',
+                    fontSize: '0.88rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                    Khu Vực Phục Vụ
+                  </label>
+                  <select
+                    value={editFormData.zone}
+                    onChange={(e) => setEditFormData({ ...editFormData, zone: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #EAE0DE',
+                      background: '#FFFFFF',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="ZONE_1">Tầng 1 - Sảnh Chính</option>
+                    <option value="ZONE_2">Tầng 2 - Ban Công</option>
+                    <option value="VIP">Phòng VIP</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                    Sức Chứa (Khách)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={editFormData.capacity}
+                    onChange={(e) => setEditFormData({ ...editFormData, capacity: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #EAE0DE',
+                      background: '#FDF7F5',
+                      fontSize: '0.88rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#F0E6E4',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    color: '#56423D',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1.5,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#9D4124',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    color: '#FFFFFF',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(157, 65, 36, 0.3)'
+                  }}
+                >
+                  Lưu Thay Đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: XÁC NHẬN XÓA BÀN ĂN */}
+      {showDeleteModal && deletingTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '420px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#FFDAD6',
+              color: '#BA1A1A',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <Icon name="warning" size={30} />
+            </div>
+
+            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.3rem', color: '#1F1B1A', margin: '0 0 8px' }}>
+              Xác Nhận Xóa Bàn?
+            </h3>
+
+            <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: '#56423D', lineHeight: 1.45 }}>
+              Bạn có chắc chắn muốn xóa <strong>{deletingTable.code}</strong> ({deletingTable.name}) khỏi hệ thống nhà hàng không?
+            </p>
+
+            <div style={{
+              background: '#FFF8F6',
+              border: '1px solid #FFDBC9',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              textAlign: 'left',
+              fontSize: '0.78rem',
+              color: '#753400',
+              marginBottom: '20px',
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'flex-start'
+            }}>
+              <Icon name="info" size={18} style={{ color: '#BA1A1A', flexShrink: 0, marginTop: '1px' }} />
+              <div>
+                Bàn sẽ được ẩn khỏi sơ đồ phục vụ và mã QR sẽ bị vô hiệu hóa. Lịch sử hóa đơn cũ vẫn được bảo toàn trong báo cáo doanh thu.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletingTable(null);
+                }}
+                disabled={deleteLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#F0E6E4',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#56423D',
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading}
+                style={{
+                  flex: 1.5,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#BA1A1A',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#FFFFFF',
+                  cursor: deleteLoading ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(186, 26, 26, 0.3)'
+                }}
+              >
+                {deleteLoading ? (
+                  <>
+                    <Icon name="sync" size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                    Đang xóa...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="delete" size={18} />
+                    Xác Nhận Xóa
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ============================================================= */}
       {/* DRAWER: XEM NHANH ORDER VÀ TIẾN ĐỘ BẾP TẠI BÀN               */}
       {/* ============================================================= */}
@@ -1510,6 +1984,242 @@ export default function TableManagementPage() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: IN TEM BÀN MÃ QR TOÀN NHÀ HÀNG (KHỔ GIẤY A4) */}
+      {showBatchQrModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 1100,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          padding: '20px',
+          overflowY: 'auto'
+        }}>
+          {/* Header thanh công cụ in ấn (ẩn khi in thực tế qua CSS no-print) */}
+          <div className="no-print" style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            maxWidth: '1000px',
+            width: '100%',
+            marginBottom: '16px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: '#FFDBC9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#9D4124'
+              }}>
+                <Icon name="print" size={24} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1F1B1A' }}>
+                  Bản In Tem Mã QR Toàn Nhà Hàng (Chuẩn Khổ A4)
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#89726B' }}>
+                  Đang hiển thị {batchFilteredTables.length} tem bàn • Sẵn sàng in hoặc Lưu dạng PDF
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {/* Lọc theo khu vực */}
+              <select
+                value={batchFilterZone}
+                onChange={(e) => setBatchFilterZone(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  color: '#56423D',
+                  background: '#FDF7F5',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="ALL">Tất Cả Khu Vực ({tables.length})</option>
+                <option value="ZONE_1">Tầng 1 - Sảnh Chính</option>
+                <option value="ZONE_2">Tầng 2 - Ban Công</option>
+                <option value="VIP">Phòng VIP</option>
+              </select>
+
+              {/* Nút Kích hoạt In Ấn / Lưu PDF */}
+              <button
+                type="button"
+                onClick={() => window.print()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  background: '#9D4124',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(157,65,36,0.25)'
+                }}
+              >
+                <Icon name="local_printshop" size={18} />
+                In Ngay / Lưu PDF (A4)
+              </button>
+
+              {/* Nút Đóng */}
+              <button
+                type="button"
+                onClick={() => setShowBatchQrModal(false)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  background: '#F6ECEA',
+                  border: '1px solid #EAE0DE',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  color: '#56423D',
+                  cursor: 'pointer'
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+
+          {/* Style tag điều khiển in ấn của trình duyệt */}
+          <style>{`
+            @media print {
+              body * {
+                visibility: hidden;
+              }
+              #batch-qr-print-sheet, #batch-qr-print-sheet * {
+                visibility: visible;
+              }
+              #batch-qr-print-sheet {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 10mm;
+                background: #FFFFFF !important;
+              }
+              .no-print {
+                display: none !important;
+              }
+              .qr-card-item {
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
+            }
+          `}</style>
+
+          {/* Vùng chứa tem in ấn (Khổ A4) */}
+          <div
+            id="batch-qr-print-sheet"
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '20px',
+              padding: '30px',
+              maxWidth: '1000px',
+              width: '100%',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.2)'
+            }}
+          >
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '20px'
+            }}>
+              {batchFilteredTables.map((t) => (
+                <div
+                  key={t.id}
+                  className="qr-card-item"
+                  style={{
+                    border: '2px dashed #9D4124',
+                    borderRadius: '18px',
+                    padding: '18px 16px',
+                    textAlign: 'center',
+                    background: '#FFFFFF',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Top Badge */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9D4124', background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px' }}>
+                      ROMS RESTAURANT
+                    </span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#89726B' }}>
+                      {t.zoneName}
+                    </span>
+                  </div>
+
+                  {/* Mã bàn to nổi bật */}
+                  <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: '1.8rem', fontWeight: 900, color: '#1F1B1A', margin: '4px 0 2px' }}>
+                    {t.code}
+                  </h2>
+                  <div style={{ fontSize: '0.8rem', color: '#56423D', fontWeight: 600, marginBottom: '12px' }}>
+                    {t.name} • {t.capacity} Chỗ ngồi
+                  </div>
+
+                  {/* Ảnh QR */}
+                  <div style={{
+                    background: '#FDF7F5',
+                    padding: '12px',
+                    borderRadius: '14px',
+                    display: 'inline-block',
+                    marginBottom: '8px'
+                  }}>
+                    <img
+                      src={t.qrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=http://192.168.0.92:5173/dining/welcome?table=${t.id}%26token=${t.qrToken}`}
+                      alt={`Mã QR ${t.code}`}
+                      style={{ width: '170px', height: '170px', display: 'block', borderRadius: '8px' }}
+                    />
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#89726B', marginTop: '4px', fontWeight: 600 }}>
+                      Token: {t.qrToken}
+                    </span>
+                  </div>
+
+                  {/* 3 Bước Hướng dẫn */}
+                  <div style={{ fontSize: '0.72rem', color: '#56423D', lineHeight: 1.35, margin: '6px 0', textAlign: 'left', background: '#FAF6F5', padding: '8px 12px', borderRadius: '8px' }}>
+                    <div><strong>1.</strong> Mở camera điện thoại quét mã QR</div>
+                    <div><strong>2.</strong> Chọn món ăn & đồ uống yêu thích</div>
+                    <div><strong>3.</strong> Bấm gửi đơn & nhân viên phục vụ tận bàn</div>
+                  </div>
+
+                  {/* Footer WiFi */}
+                  <div style={{ fontSize: '0.68rem', color: '#89726B', fontWeight: 600, borderTop: '1px solid #F0E6E4', paddingTop: '6px', marginTop: '6px' }}>
+                    📶 WiFi: <strong>dine2025</strong> | Mật khẩu: <strong>12345678</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

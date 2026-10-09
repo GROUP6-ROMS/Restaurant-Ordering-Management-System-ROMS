@@ -16,6 +16,11 @@ export const tableApi = {
         return axiosClient.post('/admin/tables', data);
     },
 
+    // Chỉnh sửa thông tin bàn (Mã bàn, Tên hiển thị, Khu vực, Sức chứa)
+    updateTable: (id, data) => {
+        return axiosClient.put(`/admin/tables/${id}`, data);
+    },
+
     // Cập nhật trạng thái bàn (Khóa bàn, Đặt trước, Bàn trống...)
     updateStatus: (id, data) => {
         return axiosClient.patch(`/admin/tables/${id}/status`, data);
@@ -33,6 +38,9 @@ export const tableApi = {
 
     // Khách hàng xác thực QR code
     verifyCustomerQr: (qrToken) => {
+        return axiosClient.post('/customer/tables/verify-qr', { qrToken });
+    },
+    verifyQr: (qrToken) => {
         return axiosClient.post('/customer/tables/verify-qr', { qrToken });
     },
     // Xem nhanh danh sách món đang gọi tại bàn
