@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { waiterApi } from '../../api/waiterApi';
 import Icon from '../common/Icon';
 import RomsLogo from '../common/RomsLogo';
 
@@ -11,6 +12,7 @@ export default function StaffLayout() {
   const [time, setTime] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [waiterCallingCount, setWaiterCallingCount] = useState(0);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -49,6 +51,28 @@ export default function StaffLayout() {
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Lấy số lượng chuông gọi phục vụ thời gian thực
+  useEffect(() => {
+    if (user?.role !== 'WAITER') return;
+
+    const fetchCallingCount = async () => {
+      try {
+        const res = await waiterApi.getTables();
+        if (res.data && res.data.success) {
+          const list = res.data.data || [];
+          const count = list.filter(t => t.calling || t.status === 'CALLING').length;
+          setWaiterCallingCount(count);
+        }
+      } catch (err) {
+        // bỏ qua lỗi nếu token chưa sẵn sàng
+      }
+    };
+
+    fetchCallingCount();
+    const interval = setInterval(fetchCallingCount, 5000);
+    return () => clearInterval(interval);
+  }, [user?.role]);
 
   const handleTriggerLogout = () => {
     // If manager or admin, logout directly
@@ -274,13 +298,13 @@ export default function StaffLayout() {
         overflow: 'auto',
         background: '#FFF8F6',
         width: '100%',
-        paddingBottom: user?.role === 'WAITER' ? '70px' : '0'
+        paddingBottom: (isMobile && user?.role === 'WAITER') ? '70px' : '0'
       }}>
         <Outlet />
       </main>
 
-      {/* Mobile Bottom Navigation Bar exclusively for WAITER */}
-      {user?.role === 'WAITER' && (
+      {/* Mobile Bottom Navigation Bar exclusively for WAITER on Mobile Devices (< 768px) */}
+      {isMobile && user?.role === 'WAITER' && (
         <nav style={{
           position: 'fixed',
           bottom: 0,
@@ -294,16 +318,24 @@ export default function StaffLayout() {
           justifyContent: 'space-around',
           zIndex: 90,
           boxShadow: '0 -3px 12px rgba(0,0,0,0.06)',
-          padding: '0 6px'
+          padding: '0 12px'
         }}>
           {[
-            { path: '/waiter/floor-plan', label: 'Sơ Đồ Bàn', icon: 'table_restaurant' },
-            { path: '/waiter/floor-plan?filter=CALLING', label: 'Cần Hỗ Trợ', icon: 'notifications_active', badge: 2 },
-            { path: '/waiter/order?table=T-04', label: 'Gọi Thêm Món', icon: 'add_shopping_cart' },
+            {
+              path: '/waiter/floor-plan',
+              label: 'Sơ Đồ Bàn',
+              icon: 'table_restaurant',
+              isActive: location.pathname === '/waiter/floor-plan' && !location.search.includes('filter=CALLING')
+            },
+            {
+              path: '/waiter/floor-plan?filter=CALLING',
+              label: 'Cần Hỗ Trợ',
+              icon: 'notifications_active',
+              badge: waiterCallingCount > 0 ? waiterCallingCount : null,
+              isActive: location.pathname === '/waiter/floor-plan' && location.search.includes('filter=CALLING')
+            },
           ].map(tab => {
-            const isTabActive = tab.path.includes('filter')
-              ? location.search.includes('filter=CALLING')
-              : location.pathname === tab.path.split('?')[0] && !location.search.includes('filter=CALLING');
+            const isTabActive = tab.isActive;
 
             return (
               <button
@@ -320,9 +352,9 @@ export default function StaffLayout() {
                   border: isTabActive ? '1px solid #FFDBC9' : '1px solid transparent',
                   color: isTabActive ? '#9D4124' : '#89726B',
                   fontWeight: isTabActive ? 800 : 600,
-                  fontSize: '0.72rem',
+                  fontSize: '0.74rem',
                   cursor: 'pointer',
-                  padding: '5px 12px',
+                  padding: '6px 20px',
                   borderRadius: '12px',
                   position: 'relative',
                   transition: 'all 0.15s ease'
@@ -365,9 +397,9 @@ export default function StaffLayout() {
               border: '1px solid transparent',
               color: '#BA1A1A',
               fontWeight: 600,
-              fontSize: '0.72rem',
+              fontSize: '0.74rem',
               cursor: 'pointer',
-              padding: '5px 12px',
+              padding: '6px 20px',
               borderRadius: '12px'
             }}
           >

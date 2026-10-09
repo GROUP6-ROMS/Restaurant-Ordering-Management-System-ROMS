@@ -19,6 +19,9 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     // Kiểm tra xem mã bàn đã tồn tại chưa (tránh trùng khi thêm mới)
     boolean existsByTableNumber(String tableNumber);
 
+    // Kiểm tra xem mã bàn đã tồn tại ở bàn khác chưa (tránh trùng khi chỉnh sửa)
+    boolean existsByTableNumberAndIdNot(String tableNumber, Long id);
+
     // Xác thực mã bí mật gắn trong QR Code khi khách quét bàn
     Optional<RestaurantTable> findByQrToken(String qrToken);
 
@@ -44,6 +47,9 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     // ===================================================================
     // CÁC HÀM TRUY VẤN PHỤC VỤ 5 THẺ KPI THỐNG KÊ TRÊN ĐẦU TRANG
     // ===================================================================
+
+    // Đếm tổng số lượng bàn đang hoạt động kinh doanh (loại trừ bàn đã xóa mềm)
+    long countByIsActiveTrue();
 
     // Đếm số lượng bàn theo trạng thái cụ thể
     long countByStatusAndIsActiveTrue(TableStatus status);

@@ -1,6 +1,7 @@
 package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.UpdateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.TableOrdersResponse;
@@ -56,6 +57,16 @@ public class AdminTableController {
         TableResponse newTable = tableService.createTable(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(newTable, "Thêm bàn mới thành công!"));
+    }
+
+    // 4.1. PUT /api/admin/tables/{id} - Chỉnh sửa thông tin bàn ăn (Chỉ Quản lý)
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<TableResponse>> updateTable(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTableRequest request) {
+        TableResponse updated = tableService.updateTable(id, request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật thông tin bàn thành công!"));
     }
 
     // 5. PATCH /api/admin/tables/{id}/status - Đổi trạng thái bàn (Khóa, Mở, Đặt chỗ)

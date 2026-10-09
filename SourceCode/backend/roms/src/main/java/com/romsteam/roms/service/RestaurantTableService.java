@@ -1,6 +1,7 @@
 package com.romsteam.roms.service;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.UpdateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
 import com.romsteam.roms.dto.response.TableOrdersResponse;
 import com.romsteam.roms.dto.response.TableResponse;
@@ -22,6 +23,9 @@ public interface RestaurantTableService {
 
     // 4. Thêm bàn mới
     TableResponse createTable(CreateTableRequest request);
+
+    // 4.1. Chỉnh sửa thông tin bàn (Mã bàn, Tên hiển thị, Khu vực, Sức chứa)
+    TableResponse updateTable(Long id, UpdateTableRequest request);
 
     // 5. Cập nhật trạng thái bàn (Khóa, Mở, Đặt chỗ, Dọn dẹp)
     TableResponse updateTableStatus(Long id, UpdateTableStatusRequest request);

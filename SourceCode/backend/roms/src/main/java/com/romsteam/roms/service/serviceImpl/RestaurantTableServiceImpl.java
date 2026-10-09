@@ -1,6 +1,7 @@
 package com.romsteam.roms.service.serviceImpl;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.UpdateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
 import com.romsteam.roms.dto.response.TableOrdersResponse;
 import com.romsteam.roms.dto.response.TableResponse;
@@ -18,11 +19,14 @@ import com.romsteam.roms.repository.OrderRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
 import com.romsteam.roms.service.RestaurantTableService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,13 +39,16 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
     private final DiningSessionRepository diningSessionRepository;
     private final OrderRepository orderRepository;
 
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendBaseUrl;
+
     // ===================================================================
     // 1. TÍNH TOÁN DỮ LIỆU 5 THẺ KPI THỐNG KÊ
     // ===================================================================
     @Override
     @Transactional(readOnly = true)
     public TableSummaryResponse getTableSummary() {
-        long totalTables = tableRepository.count();
+        long totalTables = tableRepository.countByIsActiveTrue();
         int totalSeats = tableRepository.sumTotalCapacity();
 
         long occupiedTables = tableRepository.countByStatusAndIsActiveTrue(TableStatus.OCCUPIED);
@@ -134,6 +141,50 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
         RestaurantTable saved = tableRepository.save(newTable);
         return mapToTableResponse(saved);
+    }
+
+    // ===================================================================
+    // 4.1. CHỈNH SỬA THÔNG TIN BÀN ĂN (MÃ BÀN, TÊN BÀN, KHU VỰC, SỨC CHỨA)
+    // ===================================================================
+    @Override
+    @Transactional
+    public TableResponse updateTable(Long id, UpdateTableRequest request) {
+        RestaurantTable table = tableRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn ăn không tồn tại với ID: " + id));
+
+        String cleanCode = request.getTableNumber().trim().toUpperCase();
+
+        // Kiểm tra xem mã bàn mới có bị trùng với bàn khác không
+        if (tableRepository.existsByTableNumberAndIdNot(cleanCode, id)) {
+            throw new AppException("Mã bàn '" + cleanCode + "' đã tồn tại ở một bàn khác trong hệ thống!", HttpStatus.CONFLICT);
+        }
+
+        // Nếu bàn đang phục vụ khách, không cho phép giảm sức chứa xuống dưới số khách hiện tại
+        if (table.getStatus() == TableStatus.OCCUPIED) {
+            Optional<DiningSession> activeSession = diningSessionRepository.findByTableIdAndStatus(id, SessionStatus.ACTIVE);
+            if (activeSession.isPresent()) {
+                int currentGuests = activeSession.get().getGuestCount() != null ? activeSession.get().getGuestCount() : 1;
+                if (request.getCapacity() < currentGuests) {
+                    throw new AppException(
+                            String.format("Không thể giảm sức chứa xuống %d chỗ vì bàn đang có %d khách đang ngồi dùng bữa!",
+                                    request.getCapacity(), currentGuests),
+                            HttpStatus.BAD_REQUEST
+                    );
+                }
+            }
+        }
+
+        String displayName = (request.getName() != null && !request.getName().trim().isEmpty())
+                ? request.getName().trim()
+                : "Bàn " + cleanCode;
+
+        table.setTableNumber(cleanCode);
+        table.setName(displayName);
+        table.setZone(request.getZone());
+        table.setCapacity(request.getCapacity());
+
+        RestaurantTable updated = tableRepository.save(table);
+        return mapToTableResponse(updated);
     }
 
     // ===================================================================
@@ -275,9 +326,15 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             }
         }
 
-        // Tạo URL ảnh mã QR (sử dụng API QR server chuẩn hoặc domain hệ thống)
+        // Tạo link gọi món thực tế dẫn tới màn hình chào bàn của khách
+        String baseUrl = (frontendBaseUrl != null && !frontendBaseUrl.trim().isEmpty())
+                ? frontendBaseUrl.trim()
+                : "http://localhost:5173";
+        String targetDiningUrl = baseUrl + "/dining/welcome?table=" + table.getId() + "&token=" + table.getQrToken();
+
+        // Tạo URL ảnh mã QR (sử dụng API QR server chuẩn mã hóa UTF-8)
         String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" +
-                "https://roms.restaurant/dining/welcome?table=" + table.getId() + "%26token=" + table.getQrToken();
+                URLEncoder.encode(targetDiningUrl, StandardCharsets.UTF_8);
 
         return TableResponse.builder()
                 .id(table.getId())
@@ -387,4 +444,5 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .items(items)
                 .build();
     }
+    
 }
