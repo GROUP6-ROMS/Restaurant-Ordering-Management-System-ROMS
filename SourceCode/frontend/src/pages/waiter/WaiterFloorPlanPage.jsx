@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { MOCK_TABLES, MOCK_MENU_ITEMS } from '../../mock/mockData';
+import { waiterApi } from '../../api/waiterApi';
 
 // Material Symbols Icon helper
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -20,162 +20,75 @@ function Icon({ name, size = 20, fill = 0, style = {} }) {
   );
 }
 
-// Initial rich tables matching Stitch Waiter terminal
-const INITIAL_TABLES = [
-  {
-    id: 1,
-    tableNumber: "01",
-    label: "Bàn 01",
-    zone: "Tầng 1",
-    seats: 4,
-    status: "AVAILABLE",
-    statusNote: "Vừa hoàn tất setup & sát khuẩn bàn ăn.",
-    duration: null,
-    orderTotal: 0,
-    items: [],
-    calling: false
-  },
-  {
-    id: 2,
-    tableNumber: "02",
-    label: "Bàn 02",
-    zone: "Tầng 1",
-    seats: 4,
-    status: "OCCUPIED",
-    statusNote: "Đang ăn & chờ món phở áp chảo",
-    duration: "45 phút",
-    orderTotal: 540000,
-    items: [
-      { name: "Phở Áp Chảo Bò Giòn", qty: 2, status: "COOKING", note: "Bếp đang nấu KDS ~4m" },
-      { name: "Gỏi Cuốn Tôm Thịt", qty: 2, status: "SERVED", note: "Đã ra bàn" },
-      { name: "Trà Đào Cam Sả", qty: 2, status: "SERVED", note: "Đã ra bàn" }
-    ],
-    calling: false
-  },
-  {
-    id: 4,
-    tableNumber: "04",
-    label: "Bàn 04",
-    zone: "Tầng 1",
-    seats: 6,
-    status: "CALLING",
-    statusNote: "Yêu cầu thêm đá lạnh & đũa muỗng",
-    duration: "32 phút",
-    orderTotal: 685000,
-    items: [
-      { name: "Bò Né Chảo Gang ROMS", qty: 2, status: "SERVED", note: "Bánh mì giòn • Trứng lòng đào" },
-      { name: "Cơm Chiên Hải Sản Hoàng Kim", qty: 1, status: "COOKING", note: "Bếp đang nấu • KDS còn 3m" },
-      { name: "Trà Ô Long TEA+ Chai 455ml", qty: 2, status: "SERVED", note: "Ướp lạnh" },
-      { name: "Bia Tiger Crystal Lon 330ml", qty: 1, status: "WAITER_PENDING", note: "Waiter lấy từ tủ mát" }
-    ],
-    calling: true,
-    callTime: "1m 40s trước"
-  },
-  {
-    id: 5,
-    tableNumber: "05",
-    label: "Bàn 05",
-    zone: "Tầng 1",
-    seats: 4,
-    status: "AWAITING_PAYMENT",
-    statusNote: "Đã in tạm tính - Chờ khách quẹt thẻ POS",
-    duration: "1 giờ 10m",
-    orderTotal: 1280000,
-    items: [
-      { name: "Bò Bít Tết Sốt Tiêu Đen ROMS", qty: 2, status: "SERVED", note: "Chín vừa" },
-      { name: "Rượu Vang Đỏ Chai", qty: 1, status: "SERVED", note: "Đã dùng" }
-    ],
-    calling: false
-  },
-  {
-    id: 7,
-    tableNumber: "07",
-    label: "Bàn 07",
-    zone: "Tầng 1",
-    seats: 2,
-    status: "CALLING",
-    statusNote: "Khách gọi thanh toán & đóng gói mang về",
-    duration: "52 phút",
-    orderTotal: 320000,
-    items: [
-      { name: "Nem Rán Hải Sản", qty: 2, status: "SERVED", note: "Đã xong" },
-      { name: "Nước Ép Dưa Hấu Bạc Hà", qty: 2, status: "SERVED", note: "Đã xong" }
-    ],
-    calling: true,
-    callTime: "2m 15s trước"
-  },
-  {
-    id: 8,
-    tableNumber: "08",
-    label: "Bàn 08",
-    zone: "Tầng 1",
-    seats: 4,
-    status: "RESERVED",
-    statusNote: "Giờ đặt: 12:30 • Tiệc sinh nhật 4 người - Khách: Anh Hoàng",
-    duration: "Đến trong 15p",
-    orderTotal: 0,
-    items: [],
-    calling: false,
-    reservationInfo: "Anh Hoàng (0901xxx) • Tiệc 4 người"
-  },
-  {
-    id: 9,
-    tableNumber: "09",
-    label: "Bàn 09",
-    zone: "Tầng 1",
-    seats: 4,
-    status: "FOOD_READY",
-    statusNote: "Quầy Pass có món nóng chờ bưng ra bàn!",
-    duration: "28 phút",
-    orderTotal: 490000,
-    items: [
-      { name: "Phở Tái Lăn Hà Nội", qty: 1, status: "READY", note: "Quầy Pass sẵn sàng" },
-      { name: "Cà Phê Muối ROMS", qty: 1, status: "READY", note: "Quầy Pass sẵn sàng" }
-    ],
-    calling: false
-  },
-  {
-    id: 10,
-    tableNumber: "10",
-    label: "Bàn 10",
-    zone: "Tầng 1",
-    seats: 8,
-    status: "OCCUPIED",
-    statusNote: "Khách đặt: Chị Thảo • 6 khách • Phục vụ món chính lượt 2",
-    duration: "1 giờ 35m",
-    orderTotal: 2890000,
-    items: [
-      { name: "Sườn Nướng BBQ Tảng", qty: 2, status: "SERVED", note: "Đã lên bàn" },
-      { name: "Bò Wagyu Nướng Tảng", qty: 1, status: "SERVED", note: "Đã lên bàn" },
-      { name: "Mì Ý Tôm Hùm", qty: 2, status: "COOKING", note: "KDS đang hoàn tất" }
-    ],
-    calling: false
-  },
-  {
-    id: 12,
-    tableNumber: "12",
-    label: "Bàn 12",
-    zone: "Tầng 1",
-    seats: 4,
-    status: "DIRTY",
-    statusNote: "Khách thanh toán rời đi 10 phút trước. Cần thu dọn đĩa & set ly.",
-    duration: "10m trước",
-    orderTotal: 0,
-    items: [],
-    calling: false
-  }
-];
-
 export default function WaiterFloorPlanPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [tables, setTables] = useState(INITIAL_TABLES);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tables, setTables] = useState([]);
+  const [menuCatalog, setMenuCatalog] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('ALL');
-  const [selectedZone, setSelectedZone] = useState('Tầng 1 (Sảnh Chính)');
-  const [selectedTable, setSelectedTable] = useState(INITIAL_TABLES[2]); // Default Bàn 04
+  const [selectedZone, setSelectedZone] = useState('ALL');
+  const [selectedTable, setSelectedTable] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
-  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+
+  // Tải sơ đồ bàn thật từ Backend API
+  const loadFloorPlan = async () => {
+    try {
+      const zoneParam = selectedZone === 'ALL' ? undefined : selectedZone;
+      const res = await waiterApi.getTables(zoneParam);
+      if (res.data && res.data.success) {
+        const rawTables = res.data.data || [];
+        const mappedTables = rawTables.map(t => ({
+          ...t,
+          label: t.name || `Bàn ${t.tableNumber}`,
+          seats: t.capacity || 4,
+          zone: t.zoneName || t.zone,
+          orderTotal: typeof t.orderTotal === 'number' ? t.orderTotal : Number(t.orderTotal || 0),
+          items: (t.items || []).map(item => ({
+            ...item,
+            name: item.name || 'Món ăn',
+            qty: item.quantity || 1,
+            note: item.note || (item.status === 'READY' ? 'Quầy Pass sẵn sàng' : item.status === 'COOKING' ? 'Bếp đang nấu KDS' : 'Đã lên bàn')
+          }))
+        }));
+        setTables(mappedTables);
+        setSelectedTable(prev => {
+          if (!prev && mappedTables.length > 0) return mappedTables[0];
+          if (prev) {
+            const found = mappedTables.find(t => t.id === prev.id);
+            return found || (mappedTables.length > 0 ? mappedTables[0] : null);
+          }
+          return mappedTables[0] || null;
+        });
+      }
+    } catch (err) {
+      console.error("Lỗi tải sơ đồ bàn phục vụ:", err);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFloorPlan();
+    // Thiết lập chu kỳ cập nhật tự động 5s/lần (Polling)
+    const timer = setInterval(loadFloorPlan, 5000);
+    return () => clearInterval(timer);
+  }, [selectedZone]);
+
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const res = await waiterApi.getMenu();
+        if (res.data && res.data.success) {
+          setMenuCatalog(res.data.data || []);
+        }
+      } catch (err) {
+        console.error("Lỗi tải thực đơn món:", err);
+      }
+    };
+    fetchMenu();
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -185,12 +98,20 @@ export default function WaiterFloorPlanPage() {
 
   useEffect(() => {
     const urlFilter = searchParams.get('filter');
-    if (urlFilter) {
-      setActiveFilter(urlFilter);
-    }
+    setActiveFilter(urlFilter || 'ALL');
   }, [searchParams]);
 
+  const handleFilterChange = (filterId) => {
+    setActiveFilter(filterId);
+    if (filterId === 'ALL') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ filter: filterId });
+    }
+  };
+
   // Modals
+  const [showTableModal, setShowTableModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState('');
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -221,15 +142,28 @@ export default function WaiterFloorPlanPage() {
     return true;
   });
 
+  // Thống kê số lượng chuông gọi và món chờ bưng thời gian thực
+  const callingCount = tables.filter(t => t.calling || t.status === 'CALLING').length;
+  const readyFoodCount = tables.reduce((acc, t) => acc + (t.readyItems || 0), 0);
+
   // Actions
   const handleSelectTable = (table) => {
     setSelectedTable(table);
-    if (isMobile) {
-      setShowMobileDrawer(true);
-    }
+    setShowTableModal(true);
   };
 
-  const handleResolveCall = (tableId) => {
+  const handleResolveCall = async (tableId) => {
+    const target = tables.find(t => t.id === tableId);
+    if (target?.activeRequestId) {
+      try {
+        await waiterApi.resolveRequest(target.activeRequestId);
+        showToast(`Đã xử lý xong yêu cầu hỗ trợ của ${target.label || target.tableNumber}!`);
+        await loadFloorPlan();
+        return;
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Lỗi xử lý yêu cầu chuông');
+      }
+    }
     setTables(prev => prev.map(t => {
       if (t.id === tableId) {
         return { ...t, status: 'OCCUPIED', calling: false };
@@ -239,67 +173,42 @@ export default function WaiterFloorPlanPage() {
     if (selectedTable && selectedTable.id === tableId) {
       setSelectedTable(prev => ({ ...prev, status: 'OCCUPIED', calling: false }));
     }
-    showToast(`Đã xử lý xong yêu cầu hỗ trợ của Bàn ${selectedTable.tableNumber}!`);
+    showToast(`Đã xử lý xong yêu cầu hỗ trợ!`);
   };
 
-  const handleOpenTable = (tableId) => {
-    setTables(prev => prev.map(t => {
-      if (t.id === tableId) {
-        return {
-          ...t,
-          status: 'OCCUPIED',
-          duration: '0 phút',
-          statusNote: 'Khách vừa vào bàn',
-          orderTotal: 0,
-          items: []
-        };
-      }
-      return t;
-    }));
-    showToast(`Đã mở phiên phục vụ cho Bàn ${selectedTable?.tableNumber || tableId}!`);
-  };
-
-  const handleCleanTable = (tableId) => {
-    setTables(prev => prev.map(t => {
-      if (t.id === tableId) {
-        return {
-          ...t,
-          status: 'AVAILABLE',
-          statusNote: 'Bàn vừa dọn sạch sẽ, sẵn sàng đón khách',
-          orderTotal: 0,
-          items: []
-        };
-      }
-      return t;
-    }));
-    if (selectedTable && selectedTable.id === tableId) {
-      setSelectedTable(prev => ({ ...prev, status: 'AVAILABLE', statusNote: 'Bàn vừa dọn sạch sẽ, sẵn sàng đón khách' }));
+  const handleOpenTable = async (tableId) => {
+    const target = tables.find(t => t.id === tableId);
+    try {
+      await waiterApi.openTable(tableId, { guestCount: target?.seats || 4 });
+      showToast(`Đã mở phiên phục vụ cho ${target?.label || target?.tableNumber || tableId}!`);
+      await loadFloorPlan();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi mở phiên phục vụ bàn');
     }
-    showToast(`Bàn đã dọn xong và chuyển sang trạng thái Sẵn Sàng!`);
   };
 
-  const handleConfirmDeliverFood = (tableId) => {
-    setTables(prev => prev.map(t => {
-      if (t.id === tableId) {
-        return {
-          ...t,
-          status: 'OCCUPIED',
-          items: t.items.map(item => ({ ...item, status: 'SERVED', note: 'Đã lên bàn' }))
-        };
-      }
-      return t;
-    }));
-    if (selectedTable && selectedTable.id === tableId) {
-      setSelectedTable(prev => ({
-        ...prev,
-        status: 'OCCUPIED',
-        items: prev.items.map(item => ({ ...item, status: 'SERVED', note: 'Đã lên bàn' }))
-      }));
+  const handleCleanTable = async (tableId) => {
+    try {
+      await waiterApi.cleanTable(tableId);
+      showToast(`Bàn đã dọn xong và chuyển sang trạng thái Sẵn Sàng!`);
+      await loadFloorPlan();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi cập nhật dọn bàn');
     }
-    showToast(`Đã xác nhận bưng món xong cho Bàn ${selectedTable.tableNumber}!`);
   };
 
-  const handleExecuteTransfer = () => {
+  const handleConfirmDeliverFood = async (tableId) => {
+    try {
+      await waiterApi.deliverFood(tableId);
+      const target = tables.find(t => t.id === tableId);
+      showToast(`Đã xác nhận bưng món xong cho ${target?.label || target?.tableNumber || tableId}!`);
+      await loadFloorPlan();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi cập nhật bưng món');
+    }
+  };
+
+  const handleExecuteTransfer = async () => {
     if (!transferTargetId) {
       showToast('Vui lòng chọn bàn muốn chuyển đến!');
       return;
@@ -307,51 +216,51 @@ export default function WaiterFloorPlanPage() {
     const targetTable = tables.find(t => t.id === parseInt(transferTargetId));
     if (!targetTable) return;
 
-    setTables(prev => prev.map(t => {
-      if (t.id === selectedTable.id) {
-        return { ...t, status: 'DIRTY', statusNote: 'Khách vừa chuyển sang bàn khác', items: [], orderTotal: 0, calling: false };
-      }
-      if (t.id === targetTable.id) {
-        return {
-          ...t,
-          status: selectedTable.status === 'CALLING' ? 'OCCUPIED' : selectedTable.status,
-          duration: selectedTable.duration,
-          orderTotal: selectedTable.orderTotal,
-          items: selectedTable.items,
-          statusNote: `Chuyển từ Bàn ${selectedTable.tableNumber}`
-        };
-      }
-      return t;
-    }));
-
-    setShowTransferModal(false);
-    showToast(`Đã chuyển toàn bộ hóa đơn từ Bàn ${selectedTable.tableNumber} sang Bàn ${targetTable.tableNumber}!`);
+    try {
+      await waiterApi.transferTable({
+        sourceTableId: selectedTable.id,
+        targetTableId: parseInt(transferTargetId),
+        reason: 'Khách yêu cầu chuyển bàn'
+      });
+      setShowTransferModal(false);
+      showToast(`Đã chuyển toàn bộ hóa đơn từ ${selectedTable.label || selectedTable.tableNumber} sang ${targetTable.label || targetTable.tableNumber}!`);
+      await loadFloorPlan();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi chuyển bàn');
+    }
   };
 
-  const handleQuickAddDish = (dish) => {
+  const handleQuickAddDish = async (dish) => {
     if (!selectedTable) return;
-    const newItem = {
-      name: dish.name,
-      qty: 1,
-      status: 'COOKING',
-      note: 'Bếp KDS đang nấu'
-    };
-    setTables(prev => prev.map(t => {
-      if (t.id === selectedTable.id) {
-        return {
-          ...t,
-          orderTotal: t.orderTotal + dish.price,
-          items: [...t.items, newItem]
-        };
+    try {
+      const payload = {
+        items: [
+          {
+            menuItemId: dish.id,
+            quantity: 1,
+            note: 'Waiter gọi nhanh tại bàn'
+          }
+        ],
+        note: 'Waiter gọi nhanh tại bàn'
+      };
+      const res = await waiterApi.addOrder(selectedTable.id, payload);
+      if (res.data && res.data.success) {
+        showToast(`Đã gửi [${dish.name}] vào bếp cho ${selectedTable.label || selectedTable.tableNumber}!`);
+        await loadFloorPlan();
       }
-      return t;
-    }));
-    setSelectedTable(prev => ({
-      ...prev,
-      orderTotal: prev.orderTotal + dish.price,
-      items: [...prev.items, newItem]
-    }));
-    showToast(`Đã gửi [${dish.name}] vào bếp cho Bàn ${selectedTable.tableNumber}!`);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi gọi thêm món');
+    }
+  };
+
+  const handleRequestPayment = async (tableId) => {
+    try {
+      await waiterApi.requestPayment(tableId);
+      showToast('Đã gửi thông báo yêu cầu thanh toán sang Quầy Thu Ngân POS!');
+      await loadFloorPlan();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi gửi yêu cầu thanh toán');
+    }
   };
 
   const getStatusBadge = (t) => {
@@ -490,44 +399,78 @@ export default function WaiterFloorPlanPage() {
     return '#9D4124';
   };
 
-  const renderTableDrawer = (table, isBottomSheet = false) => {
-    if (!table) return null;
+  const renderTableDetailModal = (table) => {
+    if (!table || !showTableModal) return null;
     return (
-      <div style={{
-        background: '#FFFFFF',
-        borderRadius: isBottomSheet ? '0' : '20px',
-        padding: isBottomSheet ? '0' : '20px',
-        boxShadow: isBottomSheet ? 'none' : '0 4px 20px rgba(0,0,0,0.06)',
-        border: isBottomSheet ? 'none' : '1px solid #F0E6E4'
-      }}>
-        {/* Drawer Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: isBottomSheet ? '1.25rem' : '1.4rem', color: '#9D4124', margin: 0 }}>
-                {table.label}
-              </h3>
-              {getStatusBadge(table)}
-            </div>
-            <span style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '2px', display: 'block' }}>
-              {table.zone} • {table.seats} chỗ
-            </span>
-          </div>
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1100,
+          background: 'rgba(31, 27, 26, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: isMobile ? 'flex-end' : 'center',
+          justifyContent: 'center',
+          padding: isMobile ? '0' : '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}
+        onClick={() => setShowTableModal(false)}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: '#FFFFFF',
+            borderRadius: isMobile ? '24px 24px 0 0' : '24px',
+            padding: isMobile ? '16px 18px 24px' : '24px 28px',
+            width: '100%',
+            maxWidth: '560px',
+            maxHeight: isMobile ? '85vh' : '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          {/* Drag Handle on Mobile */}
+          {isMobile && (
+            <div style={{
+              width: '44px',
+              height: '5px',
+              borderRadius: '3px',
+              background: '#D6C3BF',
+              margin: '0 auto 4px auto'
+            }} />
+          )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.72rem', color: '#89726B', display: 'block' }}>Giờ vào</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A' }}>
-                {table.duration ? `${table.duration} trước` : 'Chưa có'}
+          {/* Modal Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: isMobile ? '1.3rem' : '1.5rem', color: '#9D4124', margin: 0 }}>
+                  {table.label}
+                </h3>
+                {getStatusBadge(table)}
+              </div>
+              <span style={{ fontSize: '0.82rem', color: '#89726B', marginTop: '4px', display: 'block' }}>
+                {table.zone} • {table.seats} chỗ {table.actualGuests ? `• ${table.actualGuests} khách đang ngồi` : ''}
               </span>
             </div>
-            {isBottomSheet && (
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '0.72rem', color: '#89726B', display: 'block' }}>Giờ vào</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1F1B1A' }}>
+                  {table.duration ? `${table.duration} trước` : 'Chưa có'}
+                </span>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowMobileDrawer(false)}
+                onClick={() => setShowTableModal(false)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '50%',
                   border: '1px solid #EAE0DE',
                   background: '#FFF8F6',
@@ -537,256 +480,357 @@ export default function WaiterFloorPlanPage() {
                   cursor: 'pointer',
                   color: '#56423D'
                 }}
+                title="Đóng bảng chi tiết"
               >
-                <Icon name="close" size={18} />
+                <Icon name="close" size={20} />
               </button>
+            </div>
+          </div>
+
+          {/* Service Call Banner if active */}
+          {table.calling && (
+            <div style={{
+              background: '#FFF8F6',
+              border: '1px solid #FFCDD2',
+              padding: '12px 16px',
+              borderRadius: '14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#BA1A1A', fontWeight: 800, fontSize: '0.82rem' }}>
+                  <Icon name="priority_high" size={18} />
+                  YÊU CẦU CẦN HỖ TRỢ KHẨN
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#89726B' }}>{table.callTime}</span>
+              </div>
+              <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#1F1B1A', fontWeight: 600 }}>
+                {table.statusNote || table.callNote || 'Khách yêu cầu hỗ trợ'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  handleResolveCall(table.id);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '9px',
+                  borderRadius: '10px',
+                  background: '#9D4124',
+                  color: '#FFF',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="done_all" size={18} /> Đã Xử Lý Xong Yêu Cầu
+              </button>
+            </div>
+          )}
+
+          {/* Food Ready Banner if active */}
+          {table.status === 'FOOD_READY' && (
+            <div style={{
+              background: '#F7FEE7',
+              border: '1px solid #D9F99D',
+              padding: '12px 16px',
+              borderRadius: '14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#365314', fontWeight: 800, fontSize: '0.82rem' }}>
+                  <Icon name="soup_kitchen" size={18} />
+                  BẾP ĐÃ NẤU XONG MÓN!
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#4D7C0F' }}>{table.readyItems || 1} món sẵn sàng</span>
+              </div>
+              <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#1F1B1A' }}>
+                Quầy Pass có món nóng đã hoàn thành. Vui lòng nhận món và bưng lên bàn cho khách!
+              </p>
+              <button
+                type="button"
+                onClick={() => handleConfirmDeliverFood(table.id)}
+                style={{
+                  width: '100%',
+                  padding: '9px',
+                  borderRadius: '10px',
+                  background: '#596232',
+                  color: '#FFF',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="room_service" size={18} /> Xác Nhận Đã Bưng Món Lên Bàn
+              </button>
+            </div>
+          )}
+
+          {/* Real-time Order Ticket Summary */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#1F1B1A' }}>
+                Danh sách món ăn ({table.items.length} món)
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#89726B' }}>
+                {table.items.filter(i => i.status === 'SERVED').length}/{table.items.length} món đã lên bàn
+              </span>
+            </div>
+
+            {table.items.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#89726B', fontSize: '0.85rem', background: '#FCF1EF', borderRadius: '14px' }}>
+                {table.status === 'AVAILABLE' ? 'Bàn đang trống, chưa có món nào được gọi' : 'Bàn chưa có món ăn nào được gọi'}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+                {table.items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: '#FFF8F6',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #F6ECEA'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <span style={{
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '6px',
+                        background: '#F0E6E4',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        color: '#9D4124',
+                        flexShrink: 0
+                      }}>
+                        {item.qty}x
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.name}
+                        </div>
+                        {item.note && (
+                          <div style={{ fontSize: '0.72rem', color: '#89726B' }}>
+                            {item.note}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                      {item.subtotal > 0 && (
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#56423D' }}>
+                          {item.subtotal.toLocaleString('vi-VN')}₫
+                        </span>
+                      )}
+                      {item.status === 'SERVED' && (
+                        <span style={{ color: '#596232', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <Icon name="check_circle" size={14} /> Đã ra
+                        </span>
+                      )}
+                      {item.status === 'COOKING' && (
+                        <span style={{ color: '#994703', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <Icon name="microwave" size={14} /> Bếp nấu
+                        </span>
+                      )}
+                      {item.status === 'READY' && (
+                        <span style={{ color: '#596232', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px', background: '#DCFCE7', padding: '2px 6px', borderRadius: '4px' }}>
+                          <Icon name="soup_kitchen" size={14} /> Quầy Pass
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Subtotal Banner */}
+            {table.orderTotal > 0 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: '#F6ECEA',
+                padding: '12px 18px',
+                borderRadius: '14px',
+                marginTop: '12px',
+                border: '1px solid #FFDBC9'
+              }}>
+                <span style={{ fontSize: '0.88rem', color: '#56423D', fontWeight: 700 }}>Tổng tiền tạm tính:</span>
+                <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.25rem', color: '#9D4124' }}>
+                  {table.orderTotal.toLocaleString('vi-VN')}₫
+                </span>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Service Call Banner if active */}
-        {table.calling && (
-          <div style={{
-            background: '#FFF8F6',
-            border: '1px solid #FFCDD2',
-            padding: '12px 14px',
-            borderRadius: '14px',
-            marginBottom: '16px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#BA1A1A', fontWeight: 800, fontSize: '0.82rem' }}>
-                <Icon name="priority_high" size={18} />
-                YÊU CẦU CẦN HỖ TRỢ KHẨN
-              </div>
-              <span style={{ fontSize: '0.72rem', color: '#89726B' }}>{table.callTime}</span>
-            </div>
-            <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: '#1F1B1A' }}>
-              {table.statusNote}
-            </p>
-            <button
-              type="button"
-              onClick={() => handleResolveCall(table.id)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '10px',
-                background: '#9D4124',
-                color: '#FFF',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              <Icon name="done_all" size={18} /> Đã Xử Lý Xong Yêu Cầu
-            </button>
-          </div>
-        )}
-
-        {/* Real-time Order Ticket Summary */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#1F1B1A' }}>
-              Món của {table.label}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: '#89726B' }}>
-              {table.items.length} món
-            </span>
-          </div>
-
-          {table.items.length === 0 ? (
-            <div style={{ padding: '16px', textAlign: 'center', color: '#89726B', fontSize: '0.82rem', background: '#FCF1EF', borderRadius: '12px' }}>
-              Bàn chưa có món ăn nào được gọi
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: isBottomSheet ? '200px' : '220px', overflowY: 'auto' }}>
-              {table.items.map((item, idx) => (
-                <div
-                  key={idx}
+          {/* Action Buttons Grid */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {table.status === 'AVAILABLE' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenTable(table.id);
+                  setShowTableModal(false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  borderRadius: '14px',
+                  background: '#059669',
+                  color: '#FFF',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(5, 150, 105, 0.3)'
+                }}
+              >
+                <Icon name="add_circle" size={20} /> Mở Bàn Đón Khách Ngay
+              </button>
+            ) : table.status === 'DIRTY' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  handleCleanTable(table.id);
+                  setShowTableModal(false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  borderRadius: '14px',
+                  background: '#56423D',
+                  color: '#FFF',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="mop" size={20} /> Đã Dọn Xong & Sẵn Sàng Đón Khách
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOrderModal(true);
+                  }}
                   style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '14px',
+                    background: '#9D4124',
+                    color: '#FFF',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.92rem',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: '#FFF8F6',
-                    padding: '8px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #F6ECEA'
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(157, 65, 36, 0.28)'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                    <span style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '6px',
-                      background: '#F0E6E4',
+                  <Icon name="restaurant_menu" size={20} /> Gọi Thêm Món Vào Bàn
+                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTransferModal(true);
+                    }}
+                    style={{
+                      padding: '11px',
+                      borderRadius: '12px',
+                      background: '#FFF8F6',
+                      border: '1px solid #F0E6E4',
+                      color: '#1F1B1A',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      color: '#9D4124',
-                      flexShrink: 0
-                    }}>
-                      {item.qty}x
-                    </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {item.name}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#89726B' }}>
-                        {item.note}
-                      </div>
-                    </div>
-                  </div>
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Icon name="swap_horiz" size={18} style={{ color: '#9D4124' }} />
+                    Chuyển Bàn
+                  </button>
 
-                  {item.status === 'SERVED' && (
-                    <span style={{ color: '#596232', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                      <Icon name="check_circle" size={14} /> Đã ra
-                    </span>
-                  )}
-                  {item.status === 'COOKING' && (
-                    <span style={{ color: '#994703', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                      <Icon name="microwave" size={14} /> Bếp nấu
-                    </span>
-                  )}
-                  {item.status === 'READY' && (
-                    <span style={{ color: '#596232', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                      <Icon name="soup_kitchen" size={14} /> Quầy Pass
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRequestPayment(table.id)}
+                    style={{
+                      padding: '11px',
+                      borderRadius: '12px',
+                      background: '#FFDBC9',
+                      border: '1px solid #FFB68C',
+                      color: '#753400',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Icon name="point_of_sale" size={18} style={{ color: '#994703' }} />
+                    Báo Thu Ngân
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {/* Subtotal */}
-          {table.orderTotal > 0 && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: '#F6ECEA',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              marginTop: '10px'
-            }}>
-              <span style={{ fontSize: '0.82rem', color: '#56423D', fontWeight: 600 }}>Tạm tính hóa đơn:</span>
-              <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#9D4124' }}>
-                {table.orderTotal.toLocaleString('vi-VN')}₫
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Fast Action Buttons Grid */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#89726B' }}>
-            Tác vụ phục vụ nhanh
-          </span>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (isBottomSheet) setShowMobileDrawer(false);
-              navigate(`/waiter/order?table=${encodeURIComponent(table.label)}`);
-            }}
-            style={{
-              width: '100%',
-              padding: '11px',
-              borderRadius: '12px',
-              background: '#9D4124',
-              color: '#FFF',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.88rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(157, 65, 36, 0.25)'
-            }}
-          >
-            <Icon name="restaurant_menu" size={18} /> Gọi Thêm Món
-          </button>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                if (isBottomSheet) setShowMobileDrawer(false);
-                setShowTransferModal(true);
-              }}
-              style={{
-                padding: '10px',
-                borderRadius: '12px',
-                background: '#FFF8F6',
-                border: '1px solid #F0E6E4',
-                color: '#1F1B1A',
-                fontWeight: 700,
-                fontSize: '0.8rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              <Icon name="swap_horiz" size={18} style={{ color: '#9D4124' }} />
-              Chuyển Bàn
-            </button>
-
-            <button
-              type="button"
-              onClick={() => showToast(`Đã báo quầy Thu Ngân chuẩn bị thanh toán cho ${table.label}!`)}
-              style={{
-                padding: '10px',
-                borderRadius: '12px',
-                background: '#FFDBC9',
-                border: '1px solid #FFB68C',
-                color: '#753400',
-                fontWeight: 700,
-                fontSize: '0.8rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              <Icon name="point_of_sale" size={18} style={{ color: '#994703' }} />
-              Báo Thu Ngân
-            </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQrModal(true);
+                  }}
+                  style={{
+                    padding: '9px',
+                    borderRadius: '10px',
+                    background: '#FCF1EF',
+                    border: '1px solid #EAE0DE',
+                    color: '#56423D',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Icon name="qr_code_2" size={16} /> Xem Mã QR Khách Quét Đặt Món
+                </button>
+              </>
+            )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (isBottomSheet) setShowMobileDrawer(false);
-              setShowQrModal(true);
-            }}
-            style={{
-              padding: '8px',
-              borderRadius: '10px',
-              background: '#FCF1EF',
-              border: '1px solid #EAE0DE',
-              color: '#56423D',
-              fontWeight: 600,
-              fontSize: '0.78rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            <Icon name="qr_code_2" size={18} style={{ color: '#9D4124' }} />
-            Mã QR Đặt Món {table.label}
-          </button>
         </div>
       </div>
     );
@@ -843,7 +887,8 @@ export default function WaiterFloorPlanPage() {
               value={selectedZone}
               onChange={(e) => {
                 setSelectedZone(e.target.value);
-                showToast(`Chuyển khu vực: ${e.target.value}`);
+                const zoneText = e.target.options[e.target.selectedIndex].text;
+                showToast(`Chuyển khu vực: ${zoneText}`);
               }}
               style={{
                 border: 'none',
@@ -856,9 +901,10 @@ export default function WaiterFloorPlanPage() {
                 width: '100%'
               }}
             >
-              <option value="Tầng 1 (Sảnh Chính)">Tầng 1 (Sảnh Chính - 14 Bàn)</option>
-              <option value="Sân Vườn Terrace">Sân Vườn Terrace (8 Bàn)</option>
-              <option value="Phòng VIP Tầng 2">Phòng VIP Tầng 2 (4 Phòng)</option>
+              <option value="ALL">Tất Cả Khu Vực</option>
+              <option value="ZONE_1">Tầng 1 - Sảnh Chính</option>
+              <option value="ZONE_2">Tầng 2 - Ban Công</option>
+              <option value="VIP">Phòng VIP</option>
             </select>
           </div>
 
@@ -887,13 +933,13 @@ export default function WaiterFloorPlanPage() {
             <div style={{ lineHeight: 1.1 }}>
               {!isMobile && <div style={{ fontSize: '0.72rem', color: '#89726B' }}>Bếp đang lên món</div>}
               <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.88rem', color: '#994703' }}>
-                12 <span style={{ fontSize: '0.72rem', fontWeight: 500, color: '#56423D' }}>món</span>
+                {readyFoodCount} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: '#56423D' }}>món</span>
               </div>
             </div>
           </div>
 
           <div
-            onClick={() => setActiveFilter('CALLING')}
+            onClick={() => handleFilterChange('CALLING')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -912,7 +958,7 @@ export default function WaiterFloorPlanPage() {
             <div style={{ lineHeight: 1.1 }}>
               {!isMobile && <div style={{ fontSize: '0.72rem', fontWeight: 700 }}>Chuông gọi</div>}
               <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.88rem' }}>
-                2 <span style={{ fontSize: '0.72rem', fontWeight: 500 }}>gọi</span>
+                {callingCount} <span style={{ fontSize: '0.72rem', fontWeight: 500 }}>gọi</span>
               </div>
             </div>
           </div>
@@ -944,7 +990,7 @@ export default function WaiterFloorPlanPage() {
               <button
                 key={f.id}
                 type="button"
-                onClick={() => setActiveFilter(f.id)}
+                onClick={() => handleFilterChange(f.id)}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1025,21 +1071,29 @@ export default function WaiterFloorPlanPage() {
         </div>
       </div>
 
-      {/* 3. Primary Split-Screen Body (68% Table Map & 32% Management Drawer) */}
+      {/* 3. Sơ đồ bàn Full-Width với các ô bàn lớn, thoáng, chạm để mở Popup chi tiết */}
       <div style={{
-        display: isMobile ? 'flex' : 'grid',
-        flexDirection: isMobile ? 'column' : undefined,
-        gridTemplateColumns: isMobile ? undefined : 'repeat(12, 1fr)',
-        gap: isMobile ? '12px' : '20px',
-        padding: isMobile ? '12px' : '20px',
-        alignItems: 'flex-start'
+        width: '100%',
+        padding: isMobile ? '12px' : '20px 24px',
+        boxSizing: 'border-box'
       }}>
-        {/* Left Pane (8 cols on desktop, full width on mobile): Table Cards Grid */}
-        <div style={{ gridColumn: isMobile ? undefined : 'span 8', width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {initialLoading ? (
+          <div style={{ padding: '60px 20px', textAlign: 'center', color: '#89726B' }}>
+            <Icon name="sync" size={32} style={{ color: '#9D4124', marginBottom: '12px' }} />
+            <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1F1B1A' }}>Đang nạp dữ liệu sơ đồ bàn từ CSDL...</div>
+            <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>Hệ thống đang đồng bộ phiên ăn và tiến độ Bếp</div>
+          </div>
+        ) : filteredTables.length === 0 ? (
+          <div style={{ padding: '60px 20px', textAlign: 'center', color: '#89726B', background: '#FFFFFF', borderRadius: '16px', border: '1px dashed #E0D4D1' }}>
+            <Icon name="table_restaurant" size={40} style={{ color: '#C0B0AD', marginBottom: '12px' }} />
+            <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#1F1B1A' }}>Không tìm thấy bàn nào phù hợp</div>
+            <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>Vui lòng chọn khu vực khác hoặc thay đổi bộ lọc trạng thái.</div>
+          </div>
+        ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(150px, 1fr))' : 'repeat(auto-fill, minmax(240px, 1fr))',
-            gap: isMobile ? '10px' : '14px'
+            gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(160px, 1fr))' : 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: isMobile ? '12px' : '18px'
           }}>
             {filteredTables.map(t => {
               const isSelected = selectedTable?.id === t.id;
@@ -1220,7 +1274,7 @@ export default function WaiterFloorPlanPage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          showToast(`Đã báo thu ngân mang POS sang Bàn ${t.tableNumber}!`);
+                          handleRequestPayment(t.id);
                         }}
                         style={{
                           width: '100%',
@@ -1280,64 +1334,10 @@ export default function WaiterFloorPlanPage() {
               );
             })}
           </div>
-        </div>
-
-        {/* Right Rail (4 cols): Table Focus & Quick Actions Drawer on Desktop */}
-        {!isMobile && (
-          <div style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '16px', position: 'sticky', top: '80px' }}>
-            {selectedTable ? (
-              renderTableDrawer(selectedTable, false)
-            ) : (
-              <div style={{ background: '#FFF', borderRadius: '16px', padding: '30px', textAlign: 'center', color: '#89726B' }}>
-                Chọn một bàn trong sơ đồ để xem thông tin chi tiết
-              </div>
-            )}
-          </div>
         )}
       </div>
-
-      {/* Mobile Bottom Sheet Drawer for Selected Table */}
-      {isMobile && showMobileDrawer && selectedTable && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1100,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-end',
-            background: 'rgba(31, 27, 26, 0.55)',
-            backdropFilter: 'blur(3px)'
-          }}
-          onClick={() => setShowMobileDrawer(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#FFFFFF',
-              borderRadius: '24px 24px 0 0',
-              padding: '12px 18px 24px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              boxShadow: '0 -10px 40px rgba(0,0,0,0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}
-          >
-            {/* Drag Handle Pill */}
-            <div style={{
-              width: '44px',
-              height: '5px',
-              borderRadius: '3px',
-              background: '#D6C3BF',
-              margin: '0 auto 6px auto'
-            }} />
-
-            {renderTableDrawer(selectedTable, true)}
-          </div>
-        </div>
-      )}
+      {/* MODAL CHI TIẾT BÀN & TẠM TÍNH (Popup Center Desktop / Bottom Sheet Mobile) */}
+      {showTableModal && selectedTable && renderTableDetailModal(selectedTable)}
 
       {/* MODAL 1: Quick Order at Table */}
       {showOrderModal && (
@@ -1380,7 +1380,13 @@ export default function WaiterFloorPlanPage() {
             </div>
 
             <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-              {MOCK_MENU_ITEMS.filter(item => item.isAvailable).map(dish => (
+              {menuCatalog.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px 20px', color: '#89726B' }}>
+                  <Icon name="restaurant_menu" size={32} style={{ color: '#D1C2BE', marginBottom: '8px' }} />
+                  <div>Đang tải thực đơn hoặc chưa có món ăn...</div>
+                </div>
+              ) : (
+                menuCatalog.filter(item => item.isAvailable).map(dish => (
                 <div
                   key={dish.id}
                   style={{
@@ -1424,7 +1430,7 @@ export default function WaiterFloorPlanPage() {
                     <Icon name="add" size={16} /> Thêm
                   </button>
                 </div>
-              ))}
+              )))}
             </div>
 
             <button
