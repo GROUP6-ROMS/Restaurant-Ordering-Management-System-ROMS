@@ -48,6 +48,7 @@
 | **17** | [17_Hoan_Thien_Ma_QR_Va_In_Tem_Ban_Toan_Dien.md](17_Hoan_Thien_Ma_QR_Va_In_Tem_Ban_Toan_Dien.md) | **Full-Stack**: Hoàn thiện in tem mã QR cho toàn bộ bàn ăn, quản lý token bàn và định tuyến khách hàng. |
 | **18** | [18_Hoan_Thien_Goi_Mon_Tai_Ban_Va_Van_Hanh_Waiter.md](18_Hoan_Thien_Goi_Mon_Tai_Ban_Va_Van_Hanh_Waiter.md) | **Full-Stack (Backend & Frontend)**: Nghiệp vụ trạm phục vụ bàn (Waiter Floor Plan), mở bàn, gọi thêm món tại bàn, bảo toàn dữ liệu qua polling 5s, chuyển bàn và yêu cầu thanh toán POS. |
 | **19** | [19_Hoan_Thien_Man_Hinh_Bep_KDS_Va_Lien_Thong_Don_Mon.md](19_Hoan_Thien_Man_Hinh_Bep_KDS_Va_Lien_Thong_Don_Mon.md) | **Full-Stack (Backend & Frontend)**: Màn hình Bếp KDS (Kitchen Display System), xóa bỏ 100% Mock, liên thông đơn món Waiter $\leftrightarrow$ KDS $\leftrightarrow$ POS, tick hoàn thành từng món, ưu tiên Hỏa Tốc (RUSH), chuông âm báo Web Audio Chime, polling 5s và Script SQL sinh dữ liệu test phong phú. |
+| **20** | [20_Quan_Ly_Thuc_Don_Va_Mon_An_Admin_Menu.md](20_Quan_Ly_Thuc_Don_Va_Mon_An_Admin_Menu.md) | **Full-Stack (Backend & Frontend)**: Quản lý Thực đơn & Món ăn (`http://localhost:5173/admin/menu`). Xóa bỏ 100% Mock, nâng cấp Entity `MenuItem` chuẩn F&B (SKU, giá vốn `costPrice`, trạm Bếp/Phục vụ, `tag`), 3 KPI vận hành (Món đang bán, 86'd cảnh báo hết hàng, biên lợi nhuận TB), bộ lọc đa tiêu chí, panel cấu hình tính lãi tức thì, modal thêm món, modal quản lý danh mục và đồng bộ KDS/POS. |
 
 ---
 
