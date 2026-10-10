@@ -44,5 +44,15 @@ export const waiterApi = {
     // 9. Lấy danh mục món ăn từ CSDL
     getMenu: () => {
         return axiosClient.get('/waiter/menu');
+    },
+
+    // 10. Lấy danh mục khu vực bàn động
+    getZones: () => {
+        return axiosClient.get('/waiter/zones');
+    },
+
+    // 11. Hủy đặt bàn (RESERVED -> AVAILABLE)
+    cancelReservation: (tableId) => {
+        return axiosClient.post(`/waiter/tables/${tableId}/cancel-reservation`);
     }
 };

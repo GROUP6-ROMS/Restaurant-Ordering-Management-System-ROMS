@@ -6,7 +6,9 @@ import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.WaiterMenuItemResponse;
 import com.romsteam.roms.dto.response.WaiterTableResponse;
+import com.romsteam.roms.dto.response.ZoneResponse;
 import com.romsteam.roms.service.WaiterService;
+import com.romsteam.roms.service.ZoneService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +23,18 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/waiter")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('WAITER', 'MANAGER')")
+@PreAuthorize("hasAnyRole('WAITER', 'MANAGER', 'KITCHEN')")
 public class WaiterController {
 
     private final WaiterService waiterService;
+    private final ZoneService zoneService;
+
+    // 0. GET /api/waiter/zones - Lấy danh sách các khu vực bàn động
+    @GetMapping("/zones")
+    public ResponseEntity<ApiResponse<List<ZoneResponse>>> getZones() {
+        List<ZoneResponse> zones = zoneService.getAllZones();
+        return ResponseEntity.ok(ApiResponse.success(zones, "Lấy danh sách khu vực thành công!"));
+    }
 
     // 1. GET /api/waiter/tables - Lấy sơ đồ bàn kèm tiến độ món & chuông gọi
     @GetMapping("/tables")
@@ -42,6 +52,13 @@ public class WaiterController {
         if (request == null) request = new OpenTableRequest();
         WaiterTableResponse response = waiterService.openTableSession(id, request);
         return ResponseEntity.ok(ApiResponse.success(response, "Đã mở bàn đón khách thành công!"));
+    }
+
+    // 2.1. POST /api/waiter/tables/{id}/cancel-reservation - Hủy đặt bàn (RESERVED -> AVAILABLE)
+    @PostMapping("/tables/{id}/cancel-reservation")
+    public ResponseEntity<ApiResponse<WaiterTableResponse>> cancelReservation(@PathVariable Long id) {
+        WaiterTableResponse response = waiterService.cancelReservation(id);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã hủy đặt bàn thành công!"));
     }
 
     // 3. POST /api/waiter/tables/{id}/clean - Hoàn tất dọn bàn (DIRTY -> AVAILABLE)

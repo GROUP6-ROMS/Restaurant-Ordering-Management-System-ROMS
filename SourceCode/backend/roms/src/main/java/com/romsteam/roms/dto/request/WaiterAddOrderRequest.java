@@ -1,6 +1,7 @@
 package com.romsteam.roms.dto.request;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -36,6 +37,7 @@ public class WaiterAddOrderRequest {
 
         // Số lượng gọi thêm (tối thiểu là 1)
         @NotNull(message = "Số lượng không được để trống!")
+        @Min(value = 1, message = "Số lượng gọi món phải từ 1 trở lên!")
         private Integer quantity;
 
         // Ghi chú chi tiết cho món (ví dụ: "Ít cay", "Không hành", "Ướp lạnh kèm đá")
