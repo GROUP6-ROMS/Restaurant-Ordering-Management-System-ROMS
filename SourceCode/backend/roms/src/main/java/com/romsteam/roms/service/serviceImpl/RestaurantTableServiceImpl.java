@@ -10,13 +10,18 @@ import com.romsteam.roms.entity.DiningSession;
 import com.romsteam.roms.entity.Order;
 import com.romsteam.roms.entity.OrderItem;
 import com.romsteam.roms.entity.RestaurantTable;
+import com.romsteam.roms.entity.enums.OrderItemStatus;
+import com.romsteam.roms.entity.enums.OrderStatus;
 import com.romsteam.roms.entity.enums.SessionStatus;
 import com.romsteam.roms.entity.enums.TableStatus;
 import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.exception.ResourceNotFoundException;
+import java.time.LocalDateTime;
+import com.romsteam.roms.entity.Zone;
 import com.romsteam.roms.repository.DiningSessionRepository;
 import com.romsteam.roms.repository.OrderRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
+import com.romsteam.roms.repository.ZoneRepository;
 import com.romsteam.roms.service.RestaurantTableService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +43,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
     private final RestaurantTableRepository tableRepository;
     private final DiningSessionRepository diningSessionRepository;
     private final OrderRepository orderRepository;
+    private final ZoneRepository zoneRepository;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendBaseUrl;
@@ -197,19 +203,42 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .orElseThrow(() -> new ResourceNotFoundException("Bàn ăn không tồn tại với ID: " + id));
 
         TableStatus targetStatus = request.getStatus();
+        Optional<DiningSession> activeSessionOpt = diningSessionRepository.findByTableIdAndStatus(id, SessionStatus.ACTIVE);
 
-        // Không cho phép tự ý chuyển bàn OCCUPIED sang AVAILABLE nếu phiên ăn chưa kết thúc
-        if (table.getStatus() == TableStatus.OCCUPIED && targetStatus == TableStatus.AVAILABLE) {
-            Optional<DiningSession> activeSession = diningSessionRepository.findByTableIdAndStatus(id, SessionStatus.ACTIVE);
-            if (activeSession.isPresent()) {
-                throw new AppException("Bàn đang có khách ngồi ăn và chưa hoàn tất thanh toán hóa đơn!", HttpStatus.BAD_REQUEST);
+        // 1. Nếu bàn đang OCCUPIED và muốn chuyển sang trạng thái khác (AVAILABLE, BLOCKED, RESERVED, DIRTY)
+        if (table.getStatus() == TableStatus.OCCUPIED && targetStatus != TableStatus.OCCUPIED) {
+            if (activeSessionOpt.isPresent()) {
+                DiningSession activeSession = activeSessionOpt.get();
+                List<Order> orders = orderRepository.findBySessionId(activeSession.getId());
+                boolean hasActiveOrders = orders.stream().anyMatch(o -> o.getStatus() != OrderStatus.CANCELLED);
+                if (hasActiveOrders) {
+                    throw new AppException("Bàn đang có đơn gọi món chưa hoàn tất thanh toán! Vui lòng thanh toán hóa đơn POS hoặc hủy đơn trước khi đổi trạng thái bàn.", HttpStatus.BAD_REQUEST);
+                }
+                // Đóng phiên ăn an toàn nếu chuyển về Trống, Đã dọn hoặc Khóa (khi không còn đơn món dở dang)
+                activeSession.setStatus(SessionStatus.COMPLETED);
+                activeSession.setEndTime(LocalDateTime.now());
+                diningSessionRepository.save(activeSession);
             }
         }
 
-        table.setStatus(targetStatus);
-
-        // Xử lý các thông tin phụ thuộc theo trạng thái đích
-        if (targetStatus == TableStatus.BLOCKED) {
+        // 2. Nếu chuyển sang OCCUPIED (Đang phục vụ)
+        if (targetStatus == TableStatus.OCCUPIED) {
+            if (activeSessionOpt.isEmpty()) {
+                String sessionToken = "sess-" + table.getTableNumber().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
+                DiningSession newSession = new DiningSession();
+                newSession.setTable(table);
+                newSession.setSessionToken(sessionToken);
+                newSession.setStatus(SessionStatus.ACTIVE);
+                int guests = (request.getGuestsCount() != null && request.getGuestsCount() > 0) ? request.getGuestsCount() : table.getCapacity();
+                newSession.setGuestCount(guests);
+                newSession.setStartTime(LocalDateTime.now());
+                newSession.setNote("Quản lý mở bàn trực tiếp");
+                diningSessionRepository.save(newSession);
+            }
+            table.setBlockedReason(null);
+            table.setReservationInfo(null);
+            table.setReservedTime(null);
+        } else if (targetStatus == TableStatus.BLOCKED) {
             table.setBlockedReason(request.getBlockedReason() != null ? request.getBlockedReason() : "Bảo trì thiết bị");
             table.setReservationInfo(null);
             table.setReservedTime(null);
@@ -223,6 +252,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             table.setReservedTime(null);
         }
 
+        table.setStatus(targetStatus);
         RestaurantTable updated = tableRepository.save(table);
         return mapToTableResponse(updated);
     }
@@ -260,6 +290,11 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             throw new AppException("Bàn ăn này hiện đang tạm ngưng phục vụ!", HttpStatus.FORBIDDEN);
         }
 
+        if (table.getStatus() == TableStatus.BLOCKED) {
+            String reason = table.getBlockedReason() != null ? table.getBlockedReason() : "Bảo trì kỹ thuật";
+            throw new AppException("Bàn ăn này hiện đang tạm khóa (" + reason + ")! Vui lòng liên hệ nhân viên phục vụ.", HttpStatus.FORBIDDEN);
+        }
+
         return mapToTableResponse(table);
     }
 
@@ -278,19 +313,28 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
         // Soft-delete: đổi isActive sang false để bảo toàn lịch sử hóa đơn
         table.setIsActive(false);
+        // Giải phóng mã hiệu bàn để tránh xung đột Unique Constraint khi tạo lại bàn trùng mã số sau này
+        table.setTableNumber(table.getTableNumber() + "_DEL_" + table.getId());
         tableRepository.save(table);
     }
 
     // ===================================================================
     // HÀM HELPER: ÁNH XẠ ENTITY SANG DTO VÀ TÍNH TIỀN HÓA ĐƠN THỜI GIAN THỰC
     // ===================================================================
+    private String resolveZoneName(String zoneCode) {
+        if (zoneCode == null) return "Chưa phân khu";
+        return zoneRepository.findByZoneCode(zoneCode)
+                .map(Zone::getName)
+                .orElseGet(() -> switch (zoneCode) {
+                    case "ZONE_1" -> "Tầng 1 - Sảnh Chính";
+                    case "ZONE_2" -> "Tầng 2 - Ban Công";
+                    case "VIP" -> "Phòng VIP";
+                    default -> zoneCode;
+                });
+    }
+
     private TableResponse mapToTableResponse(RestaurantTable table) {
-        String zoneName = switch (table.getZone()) {
-            case "ZONE_1" -> "Tầng 1 - Sảnh Chính";
-            case "ZONE_2" -> "Tầng 2 - Ban Công";
-            case "VIP" -> "Phòng VIP";
-            default -> table.getZone();
-        };
+        String zoneName = resolveZoneName(table.getZone());
 
         String statusText = switch (table.getStatus()) {
             case AVAILABLE -> "Bàn Trống";
@@ -304,6 +348,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         Integer guests = 0;
         BigDecimal currentBill = BigDecimal.ZERO;
         String timeIn = null;
+        Long durationMinutes = 0L;
         Long activeSessionId = null;
 
         // Nếu bàn đang OCCUPIED -> tìm phiên ăn ACTIVE để lấy thông tin khách và tổng tiền
@@ -315,13 +360,17 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 guests = session.getGuestCount() != null ? session.getGuestCount() : table.getCapacity();
                 if (session.getStartTime() != null) {
                     timeIn = session.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+                    durationMinutes = Math.max(0, java.time.Duration.between(session.getStartTime(), LocalDateTime.now()).toMinutes());
                 }
 
-                // Tính tổng hóa đơn từ tất cả các đơn hàng thuộc phiên ăn này
+                // Tính tổng hóa đơn từ tất cả các đơn hàng thuộc phiên ăn này (chỉ tính món không bị hủy)
                 List<Order> orders = orderRepository.findBySessionId(session.getId());
                 currentBill = orders.stream()
-                        .map(Order::getTotalAmount)
-                        .filter(amount -> amount != null)
+                        .filter(o -> o.getStatus() != OrderStatus.CANCELLED)
+                        .flatMap(o -> o.getItems() != null ? o.getItems().stream() : java.util.stream.Stream.empty())
+                        .filter(item -> item.getStatus() != OrderItemStatus.CANCELLED)
+                        .map(OrderItem::getSubtotal)
+                        .filter(java.util.Objects::nonNull)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
             }
         }
@@ -348,6 +397,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .guests(guests)
                 .currentBill(currentBill)
                 .timeIn(timeIn)
+                .durationMinutes(durationMinutes)
                 .activeSessionId(activeSessionId)
                 .reservationInfo(table.getReservationInfo())
                 .reservedTime(table.getReservedTime())
@@ -370,7 +420,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                     .tableId(table.getId())
                     .tableNumber(table.getTableNumber())
                     .tableName(table.getName())
-                    .zoneName(table.getZone())
+                    .zoneName(resolveZoneName(table.getZone()))
                     .totalAmount(BigDecimal.ZERO)
                     .totalItems(0)
                     .items(Collections.emptyList())
@@ -385,6 +435,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         int pending = 0, cooking = 0, ready = 0, served = 0;
 
         for (Order order : orders) {
+            if (order.getStatus() == OrderStatus.CANCELLED) continue;
             if (order.getItems() != null) {
                 for (OrderItem item : order.getItems()) {
                     String statusStr = item.getStatus() != null ? item.getStatus().name() : "PENDING";
@@ -402,7 +453,9 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                     else if ("SERVED".equals(statusStr)) served += item.getQuantity();
 
                     BigDecimal subtotal = item.getSubtotal() != null ? item.getSubtotal() : BigDecimal.ZERO;
-                    totalAmount = totalAmount.add(subtotal);
+                    if (item.getStatus() != OrderItemStatus.CANCELLED) {
+                        totalAmount = totalAmount.add(subtotal);
+                    }
 
                     items.add(TableOrdersResponse.OrderItemDetail.builder()
                             .orderItemId(item.getId())
@@ -429,7 +482,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .tableId(table.getId())
                 .tableNumber(table.getTableNumber())
                 .tableName(table.getName())
-                .zoneName(table.getZone())
+                .zoneName(resolveZoneName(table.getZone()))
                 .sessionId(session.getId())
                 .sessionToken(session.getSessionToken())
                 .guestCount(session.getGuestCount())

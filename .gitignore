@@ -1,6 +1,10 @@
 # Scratch directory
 scratch/
 
+# IDE files
+.idea/
+*.iml
+
 # Office temporary files
 ~$*.pptx
 ~$*.docx

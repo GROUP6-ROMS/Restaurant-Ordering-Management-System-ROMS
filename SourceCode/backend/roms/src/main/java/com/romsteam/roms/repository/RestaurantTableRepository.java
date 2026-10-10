@@ -57,6 +57,8 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     // Đếm tổng số bàn theo từng phân khu
     long countByZoneAndIsActiveTrue(String zone);
 
+    long countByZone(String zone);
+
     // Tính tổng số chỗ ngồi (sức chứa) của toàn bộ các bàn đang hoạt động
     @Query("SELECT COALESCE(SUM(t.capacity), 0) FROM RestaurantTable t WHERE t.isActive = true")
     Integer sumTotalCapacity();

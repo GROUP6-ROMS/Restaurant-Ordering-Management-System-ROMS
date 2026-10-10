@@ -25,6 +25,7 @@ public class TableResponse {
     private Integer guests;           // Số khách thực tế đang ngồi
     private BigDecimal currentBill;   // Hóa đơn hiện tại (VND)
     private String timeIn;            // Thời gian vào ngồi (ví dụ: "18:45")
+    private Long durationMinutes;     // Số phút đã ngồi dùng bữa
     private Long activeSessionId;     // ID phiên ăn đang diễn ra
 
     // Thông tin nếu bàn Đã Đặt hoặc Khóa

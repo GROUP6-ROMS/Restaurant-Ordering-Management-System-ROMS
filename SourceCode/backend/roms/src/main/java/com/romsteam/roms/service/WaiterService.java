@@ -35,4 +35,7 @@ public interface WaiterService {
 
     // 9. Lấy danh mục thực đơn món ăn từ CSDL cho Waiter
     List<WaiterMenuItemResponse> getMenuCatalog();
+
+    // 10. Hủy đặt bàn (RESERVED -> AVAILABLE)
+    WaiterTableResponse cancelReservation(Long tableId);
 }
