@@ -179,28 +179,28 @@ public class ReservationServiceImpl implements ReservationService {
         Reservation res = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt bàn #" + reservationId));
 
-        // Lấy các bàn AVAILABLE, ưu tiên đúng zone và sức chứa >= guestCount
-        List<RestaurantTable> tables = tableRepository.findAvailableTablesForReservation(
-                res.getRequestedZone(),
-                res.getGuestCount()
-        );
+        // Lấy toàn bộ các bàn đang trống (AVAILABLE) đang hoạt động trong nhà hàng
+        // Quản lý có thể linh hoạt chọn bất kỳ bàn nào còn trống mà không bị ràng buộc sức chứa hay khu vực
+        List<RestaurantTable> tables = tableRepository.findByStatusAndIsActiveTrue(TableStatus.AVAILABLE);
+        tables.sort(Comparator.comparing(RestaurantTable::getTableNumber));
 
-        // Nếu khu vực khách chọn không còn bàn trống, trả về toàn bộ bàn AVAILABLE còn lại để Quản lý linh hoạt tư vấn đổi khu vực
-        if (tables.isEmpty()) {
-            tables = tableRepository.findAvailableTablesForReservation(null, res.getGuestCount());
-        }
+        return tables.stream().map(t -> {
+            String zName = "Sảnh Chính";
+            if ("ZONE_2".equals(t.getZone())) zName = "Ban Công";
+            else if ("VIP".equals(t.getZone())) zName = "Phòng VIP";
 
-        return tables.stream().map(t -> TableResponse.builder()
-                .id(t.getId())
-                .code(t.getTableNumber())
-                .tableNumber(t.getTableNumber())
-                .name(t.getName())
-                .zone(t.getZone())
-                .capacity(t.getCapacity())
-                .status(t.getStatus())
-                .isActive(t.getIsActive())
-                .build()
-        ).collect(Collectors.toList());
+            return TableResponse.builder()
+                    .id(t.getId())
+                    .code(t.getTableNumber())
+                    .tableNumber(t.getTableNumber())
+                    .name(t.getName())
+                    .zone(t.getZone())
+                    .zoneName(zName)
+                    .capacity(t.getCapacity())
+                    .status(t.getStatus())
+                    .isActive(t.getIsActive())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     // ===================================================================
