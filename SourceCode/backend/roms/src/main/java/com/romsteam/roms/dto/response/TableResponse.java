@@ -14,6 +14,7 @@ public class TableResponse {
 
     private Long id;
     private String code;          // Mã bàn (tableNumber)
+    private String tableNumber;   // Mã bàn (alias)
     private String name;          // Tên bàn hiển thị
     private String zone;          // ZONE_1, ZONE_2, VIP
     private String zoneName;      // Tầng 1 - Sảnh Chính, Tầng 2 - Ban Công, Phòng VIP

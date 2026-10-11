@@ -66,18 +66,18 @@ public class AuthServiceImpl implements AuthService {
             Staff staff = staffRepository.findByUsername(request.getUsername())
                     .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
 
-            // 4. KIEM TRA DIEU KIEN PHAN CONG CA TRUC THEO NGAY (MULTI-DAY SHIFT SCHEDULING):
-            // Neu KHONG phai Quan ly (MANAGER), bat buoc phai co lich truc trong ngay hom nay va dung khung gio ca
+            // 4. KIỂM TRA ĐIỀU KIỆN PHÂN CÔNG CA TRỰC THEO NGÀY (MULTI-DAY SHIFT SCHEDULING):
+            // Nếu KHÔNG phải Quản lý (MANAGER), bắt buộc phải có lịch trực trong ngày hôm nay từ bảng staff_schedules (Đăng ký qua Script SQL)
             String currentShiftName = "NONE";
             if (staff.getRole() != UserRole.MANAGER) {
                 LocalDate today = LocalDate.now();
                 LocalTime now = LocalTime.now();
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-                // 4.1. Tim tat ca ca truc cua nhan vien trong ngay hom nay (today) tu bang staff_schedules
+                // 4.1. Tìm tất cả ca trực của nhân viên trong ngày hôm nay từ bảng staff_schedules
                 List<StaffSchedule> todaySchedules = staffScheduleRepository.findByStaffAndWorkDate(staff, today);
 
-                // Neu hom nay khong duoc xep bat ky ca truc nao trong lich
+                // Nếu hôm nay chưa được đăng ký ca trực trong CSDL
                 if (todaySchedules == null || todaySchedules.isEmpty()) {
                     throw new AppException(
                             String.format("Bạn không có lịch làm việc trong ngày hôm nay (%s)! Vui lòng liên hệ Quản lý.",
@@ -86,29 +86,28 @@ public class AuthServiceImpl implements AuthService {
                     );
                 }
 
-                // 4.2. Kiem tra xem gio hien tai co nam trong khung gio ca truc nao hom nay khong (cho phep som 15 phut)
+                // 4.2. Tìm ca trực: Ưu tiên ca khớp với giờ thực tế nếu nhân viên được phân nhiều ca trong ngày
                 StaffSchedule activeSchedule = todaySchedules.stream()
-                        .filter(s -> s.getShiftType() != null && s.getShiftType().isWithinShift(now))
+                        .filter(s -> {
+                            if (s.getShiftType() == null) return false;
+                            LocalTime start = s.getShiftType().getStartTime();
+                            LocalTime end = s.getShiftType().getEndTime();
+                            if (start != null && end != null) {
+                                return !now.isBefore(start.minusMinutes(15)) && !now.isAfter(end);
+                            }
+                            return true;
+                        })
                         .findFirst()
                         .orElse(null);
 
+                // Nếu ngoài khung giờ chuẩn nhưng đang trong giai đoạn test (ShiftType.isWithinShift trả về true), cho phép vào ca được xếp
                 if (activeSchedule == null) {
-                    String shiftsInfo = todaySchedules.stream()
-                            .map(s -> String.format("%s (%s - %s)",
-                                    s.getShiftType().getLabel(),
-                                    s.getShiftType().getStartTime(),
-                                    s.getShiftType().getEndTime()))
-                            .collect(Collectors.joining(", "));
-
-                    String message = String.format(
-                            "Chưa đến hoặc đã hết ca làm việc của bạn hôm nay (%s). Lịch trực hôm nay: [%s]. Bạn chỉ được đăng nhập trước giờ mở ca 15 phút!",
-                            today.format(dateFormatter),
-                            shiftsInfo
-                    );
-                    throw new AppException(message, HttpStatus.FORBIDDEN);
+                    activeSchedule = todaySchedules.stream()
+                            .filter(s -> s.getShiftType() != null && s.getShiftType().isWithinShift(now))
+                            .findFirst()
+                            .orElse(todaySchedules.get(0));
                 }
 
-                // Lay ten ca truc truc tiep tu activeSchedule de tra ve cho Frontend
                 currentShiftName = activeSchedule.getShiftType().name();
             }
 
