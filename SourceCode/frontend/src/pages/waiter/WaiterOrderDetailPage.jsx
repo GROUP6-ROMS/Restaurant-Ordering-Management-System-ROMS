@@ -451,7 +451,9 @@ export default function WaiterOrderDetailPage() {
             {tableData.items.map((item, idx) => {
               let statusBadge = { bg: '#E8F5E9', color: '#2E7D32', text: 'Đã lên món' };
               if (item.status === 'COOKING') statusBadge = { bg: '#FFF8E1', color: '#B45309', text: 'Đang nấu (Bếp)' };
+              else if (item.status === 'READY') statusBadge = { bg: '#DCFCE7', color: '#15803D', text: 'Quầy Pass (Sẵn sàng)' };
               else if (item.status === 'WAITER_PREP' || item.status === 'BREWING') statusBadge = { bg: '#DDE8AB', color: '#3B4800', text: 'Waiter lấy nước' };
+              else if (item.status === 'CANCELLED') statusBadge = { bg: '#FFDAD6', color: '#BA1A1A', text: 'Đã hủy' };
 
               return (
                 <div
@@ -498,7 +500,7 @@ export default function WaiterOrderDetailPage() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-end' : 'center', gap: isMobile ? '4px' : '16px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-end' : 'center', gap: isMobile ? '4px' : '12px', flexShrink: 0 }}>
                     <span style={{
                       fontSize: '0.72rem',
                       fontWeight: 700,
@@ -509,6 +511,32 @@ export default function WaiterOrderDetailPage() {
                     }}>
                       {statusBadge.text}
                     </span>
+
+                    {item.status === 'READY' && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await waiterApi.deliverSingleItem(tableData.id, item.id);
+                            fetchTablesAndDetails();
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }}
+                        style={{
+                          background: '#596232',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Bưng đĩa này
+                      </button>
+                    )}
 
                     <span style={{ fontWeight: 800, fontSize: isMobile ? '0.88rem' : '1rem', color: '#1F1B1A', minWidth: isMobile ? 'auto' : '90px', textAlign: 'right' }}>
                       {(item.price * item.qty).toLocaleString('vi-VN')}₫

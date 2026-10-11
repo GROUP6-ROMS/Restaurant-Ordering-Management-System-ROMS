@@ -262,16 +262,18 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
             )}
           </div>
 
-          {/* Ghi chú chung của cả đơn */}
+          {/* Ghi chú chung hoặc cảnh báo chuyển bàn */}
           {order.note && (
             <div style={{
               marginTop: 6, padding: '4px 8px', borderRadius: 6,
-              background: 'rgba(255, 152, 0, 0.1)', color: '#e65100',
+              background: order.note.includes('[CHUYỂN TỪ') ? 'rgba(186, 26, 26, 0.12)' : 'rgba(255, 152, 0, 0.1)',
+              color: order.note.includes('[CHUYỂN TỪ') ? '#BA1A1A' : '#e65100',
               fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
               display: 'flex', alignItems: 'flex-start', gap: 4,
+              border: order.note.includes('[CHUYỂN TỪ') ? '1px dashed #BA1A1A' : 'none',
               wordBreak: 'break-word', whiteSpace: 'pre-wrap', lineHeight: 1.35,
             }}>
-              <Icon name="info" size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+              <Icon name={order.note.includes('[CHUYỂN TỪ') ? 'swap_horiz' : 'info'} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
               <span>{order.note}</span>
             </div>
           )}

@@ -261,6 +261,16 @@ export default function WaiterFloorPlanPage() {
     }
   };
 
+  const handleDeliverSingleItem = async (tableId, itemId, itemName) => {
+    try {
+      await waiterApi.deliverSingleItem(tableId, itemId);
+      showToast(`Đã xác nhận bưng món [${itemName || 'Món ăn'}] lên bàn!`);
+      await loadFloorPlan();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi cập nhật bưng món');
+    }
+  };
+
   const handleExecuteTransfer = async () => {
     if (!transferTargetId) {
       showToast('Vui lòng chọn bàn muốn chuyển đến!');
@@ -901,9 +911,34 @@ export default function WaiterFloorPlanPage() {
                         </span>
                       )}
                       {item.status === 'READY' && (
-                        <span style={{ color: '#596232', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px', background: '#DCFCE7', padding: '2px 6px', borderRadius: '4px' }}>
-                          <Icon name="soup_kitchen" size={14} /> Quầy Pass
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: '#15803D', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px', background: '#DCFCE7', padding: '2px 6px', borderRadius: '4px' }}>
+                            <Icon name="soup_kitchen" size={14} /> Quầy Pass
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeliverSingleItem(table.id, item.orderItemId || item.id, item.name);
+                            }}
+                            title="Xác nhận chỉ vừa bưng riêng đĩa này lên bàn"
+                            style={{
+                              background: '#596232',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}
+                          >
+                            <Icon name="check" size={12} /> Bưng đĩa này
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

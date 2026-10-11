@@ -256,6 +256,19 @@ public class KitchenServiceImpl implements KitchenService {
             }
         }
 
+        String combinedNote = order.getNote() != null ? order.getNote() : "";
+        if (order.getSession() != null && order.getSession().getNote() != null && order.getSession().getNote().contains("[CHUYỂN TỪ")) {
+            String sessionNote = order.getSession().getNote();
+            int startIdx = sessionNote.indexOf("[CHUYỂN TỪ");
+            int endIdx = sessionNote.indexOf("]", startIdx);
+            if (startIdx >= 0 && endIdx >= startIdx) {
+                String transferTag = sessionNote.substring(startIdx, endIdx + 1);
+                if (!combinedNote.contains(transferTag)) {
+                    combinedNote = (transferTag + (combinedNote.isEmpty() ? "" : " - " + combinedNote)).trim();
+                }
+            }
+        }
+
         return KitchenOrderResponse.builder()
                 .id(order.getId())
                 .orderCode(order.getOrderCode())
@@ -265,7 +278,7 @@ public class KitchenServiceImpl implements KitchenService {
                 .zoneName(zoneName)
                 .staffName(staffName)
                 .status(order.getStatus() != null ? order.getStatus().name() : "CONFIRMED")
-                .note(order.getNote())
+                .note(combinedNote.isEmpty() ? null : combinedNote)
                 .isRush(isRush)
                 .startedAt(startedAt)
                 .elapsedSeconds(elapsedSeconds)

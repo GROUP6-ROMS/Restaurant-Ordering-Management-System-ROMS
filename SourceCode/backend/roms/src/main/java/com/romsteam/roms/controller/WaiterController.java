@@ -75,10 +75,19 @@ public class WaiterController {
         return ResponseEntity.ok(ApiResponse.success(null, "Chuyển bàn thành công!"));
     }
 
-    // 5. POST /api/waiter/tables/{id}/deliver - Xác nhận đã bưng món (READY -> SERVED)
+    // 5. POST /api/waiter/tables/{id}/deliver - Xác nhận đã bưng toàn bộ món READY (READY -> SERVED)
     @PostMapping("/tables/{id}/deliver")
     public ResponseEntity<ApiResponse<WaiterTableResponse>> deliverFood(@PathVariable Long id) {
         WaiterTableResponse response = waiterService.confirmDeliverFood(id);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã xác nhận bưng món lên bàn!"));
+    }
+
+    // 5.1. POST /api/waiter/tables/{id}/items/{itemId}/deliver - Xác nhận bưng từng đĩa món riêng lẻ (READY -> SERVED)
+    @PostMapping("/tables/{id}/items/{itemId}/deliver")
+    public ResponseEntity<ApiResponse<WaiterTableResponse>> deliverSingleItem(
+            @PathVariable Long id,
+            @PathVariable Long itemId) {
+        WaiterTableResponse response = waiterService.confirmDeliverSingleItem(id, itemId);
         return ResponseEntity.ok(ApiResponse.success(response, "Đã xác nhận bưng món lên bàn!"));
     }
 
