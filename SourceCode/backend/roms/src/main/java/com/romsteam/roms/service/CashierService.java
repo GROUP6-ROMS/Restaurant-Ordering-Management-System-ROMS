@@ -7,6 +7,8 @@ import com.romsteam.roms.dto.response.*;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
+
 public interface CashierService {
 
     // 1. Lấy danh sách bàn trên POS kèm trạng thái yêu cầu tính tiền (Polling 5s)
@@ -35,4 +37,7 @@ public interface CashierService {
 
     // 9. Xác nhận chốt ca làm việc có Quản lý duyệt mã PIN
     void closeShift(ManagerApprovalRequest request, String cashierUsername);
+
+    // 10. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món hoặc mở nhầm bàn
+    CashierTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request);
 }

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { cashierApi } from '../../api/cashierApi';
 import { waiterApi } from '../../api/waiterApi';
+import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 // Material Symbols Icon helper
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -132,6 +133,12 @@ export default function PosCheckoutPage() {
   const [shiftManagerNote, setShiftManagerNote] = useState('Đã đối soát đầy đủ tiền két và hóa đơn ca trực, chấp thuận chốt sổ bàn giao.');
   const [shiftApprovalError, setShiftApprovalError] = useState(null);
 
+  // Modal Đóng phiên bàn trống (0đ)
+  const [showCloseEmptyModal, setShowCloseEmptyModal] = useState(false);
+  const [closeEmptyReason, setCloseEmptyReason] = useState('Khách rời đi, không dùng món');
+  const [closeEmptyTargetStatus, setCloseEmptyTargetStatus] = useState('AVAILABLE');
+  const [isClosingEmpty, setIsClosingEmpty] = useState(false);
+
   // QA Guards & Kiểm soát rủi ro thanh toán
   const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
   const [showDiningWarningModal, setShowDiningWarningModal] = useState(false);
@@ -140,6 +147,11 @@ export default function PosCheckoutPage() {
 
   // Ref lưu ID các bàn đang yêu cầu thanh toán để kích hoạt chuông ting-ting
   const prevCallingTableIdsRef = useRef(new Set());
+  const selectedTableIdRef = useRef(selectedTableId);
+
+  useEffect(() => {
+    selectedTableIdRef.current = selectedTableId;
+  }, [selectedTableId]);
 
   // Toast notification
   const showToast = (msg) => {
@@ -186,7 +198,30 @@ export default function PosCheckoutPage() {
     fetchMetadata();
   }, []);
 
-  // 2. Tải danh sách bàn POS (Polling 5 giây một lần)
+  // 2. Tải thông tin tạm tính (Bill Preview) khi chọn bàn
+  const fetchBillPreview = useCallback(async (tableId, silent = false) => {
+    if (!tableId) {
+      setBillPreview(null);
+      return;
+    }
+    if (!silent) setIsLoadingBill(true);
+    try {
+      const res = await cashierApi.getBillPreview(tableId);
+      if (res.data?.data) {
+        setBillPreview(res.data.data);
+      } else {
+        setBillPreview(null);
+      }
+    } catch (err) {
+      console.warn(`[Cashier POS] Không thể tải bill preview cho bàn ${tableId}:`, err);
+      // Giữ nguyên hoặc fallback về dữ liệu currentTable ở tầng activeBill
+      setBillPreview(null);
+    } finally {
+      if (!silent) setIsLoadingBill(false);
+    }
+  }, []);
+
+  // 3. Tải danh sách bàn POS (Polling + Đồng bộ tức thời)
   const fetchPosTables = useCallback(async (silent = false) => {
     if (!silent) setIsLoadingTables(true);
     try {
@@ -197,60 +232,132 @@ export default function PosCheckoutPage() {
 
       // Kiểm tra chuông báo tính tiền mới
       const currentCalling = new Set();
-      let hasNewCall = false;
+      let newlyCallingTableId = null;
 
       tables.forEach(t => {
         if (t.isCallingBill || t.status === 'PAYMENT_REQUEST') {
           currentCalling.add(t.id);
           if (!prevCallingTableIdsRef.current.has(t.id)) {
-            hasNewCall = true;
+            newlyCallingTableId = t.id;
           }
         }
       });
 
-      if (hasNewCall) {
+      if (newlyCallingTableId) {
         playBillChime();
-        showToast('🔔 Có bàn mới yêu cầu thanh toán hóa đơn!');
+        const callingTableObj = tables.find(t => t.id === newlyCallingTableId);
+        const callingName = callingTableObj ? (callingTableObj.code || callingTableObj.name) : 'Bàn mới';
+        showToast(`🔔 ${callingName} vừa yêu cầu thanh toán hóa đơn!`);
+        // Tự động chuyển ngay tới bàn vừa gọi tính tiền
+        setSelectedTableId(newlyCallingTableId);
+        selectedTableIdRef.current = newlyCallingTableId;
+        fetchBillPreview(newlyCallingTableId, false);
+      } else {
+        // Cập nhật selectedTableId:
+        let resolvedId = null;
+        setSelectedTableId(prevId => {
+          if (tables.length === 0) return null;
+
+          // 1. Nếu bàn trước đó vẫn nằm trong danh sách và còn đang phục vụ -> Giữ nguyên bàn đang chọn
+          if (prevId) {
+            const prevTable = tables.find(t => t.id === prevId);
+            if (prevTable) {
+              const isStillInUse = prevTable.isCallingBill || prevTable.status === 'PAYMENT_REQUEST' || prevTable.status === 'DRAFT_PRINTED' || prevTable.status === 'OCCUPIED' || prevTable.status === 'DINING';
+              if (isStillInUse) {
+                resolvedId = prevId;
+                return prevId;
+              }
+            }
+          }
+
+          // 2. Nếu có bàn đang gọi tính tiền -> Ưu tiên chọn bàn đó
+          const anyCallingTable = tables.find(t => t.isCallingBill || t.status === 'PAYMENT_REQUEST');
+          if (anyCallingTable) {
+            resolvedId = anyCallingTable.id;
+            return anyCallingTable.id;
+          }
+
+          // 3. Nếu chưa chọn bàn nào và có bàn đang dùng bữa -> Tự động chọn bàn đang dùng bữa đầu tiên
+          const anyActiveTable = tables.find(t => t.status === 'OCCUPIED' || t.status === 'DINING' || t.status === 'DRAFT_PRINTED');
+          if (anyActiveTable) {
+            resolvedId = anyActiveTable.id;
+            return anyActiveTable.id;
+          }
+
+          return null;
+        });
+
+        // Tự động đồng bộ lại bill preview của bàn đang chọn (silent = true) để cập nhật ngay hasPaymentRequest & món mới
+        const targetSyncId = resolvedId || selectedTableIdRef.current;
+        if (targetSyncId) {
+          selectedTableIdRef.current = targetSyncId;
+          fetchBillPreview(targetSyncId, true);
+        }
       }
 
       prevCallingTableIdsRef.current = currentCalling;
-
-      // Cập nhật selectedTableId: Giữ nguyên bàn đang chọn nếu hợp lệ, chuyển bàn nếu có chuông reo mới
-      setSelectedTableId(prevId => {
-        if (tables.length === 0) return null;
-
-        // 1. Nếu bàn trước đó vẫn nằm trong danh sách và còn đang phục vụ -> Giữ nguyên bàn đang chọn
-        if (prevId) {
-          const prevTable = tables.find(t => t.id === prevId);
-          if (prevTable) {
-            const isStillInUse = prevTable.isCallingBill || prevTable.status === 'PAYMENT_REQUEST' || prevTable.status === 'DRAFT_PRINTED' || prevTable.status === 'OCCUPIED' || prevTable.status === 'DINING';
-            if (isStillInUse) return prevId;
-          }
-        }
-
-        // 2. Nếu có chuông reo bàn mới yêu cầu thanh toán -> Tự động chọn bàn đó
-        if (hasNewCall) {
-          const callingTable = tables.find(t => t.isCallingBill || t.status === 'PAYMENT_REQUEST');
-          if (callingTable) return callingTable.id;
-        }
-
-        // 3. Sau khi thanh toán thành công (hoặc chưa chọn bàn) -> Giữ null để giao diện hóa đơn sạch sẽ
-        return null;
-      });
     } catch (err) {
       console.error('Lỗi tải danh sách bàn POS:', err);
     } finally {
       if (!silent) setIsLoadingTables(false);
     }
-  }, [selectedZone]);
+  }, [selectedZone, fetchBillPreview]);
 
+  // Lắng nghe realtime events từ BroadcastChannel & localStorage
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'PAYMENT_REQUEST') {
+        playBillChime();
+        showToast(`🔔 ${event.tableName || 'Bàn mới'} vừa yêu cầu thanh toán hóa đơn!`);
+        if (event.tableId) {
+          setSelectedTableId(event.tableId);
+          selectedTableIdRef.current = event.tableId;
+          fetchBillPreview(event.tableId, false);
+        }
+        fetchPosTables(true);
+      } else if (event?.type === 'TABLE_UPDATE' || event?.type === 'ORDER_UPDATE') {
+        fetchPosTables(true);
+        if (selectedTableIdRef.current) {
+          fetchBillPreview(selectedTableIdRef.current, true);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [fetchPosTables, fetchBillPreview]);
+
+  // Lắng nghe khi người dùng chuyển lại tab Thu Ngân hoặc focus cửa sổ
+  useEffect(() => {
+    const handleTabActive = () => {
+      if (document.visibilityState === 'visible') {
+        fetchPosTables(true);
+        if (selectedTableIdRef.current) {
+          fetchBillPreview(selectedTableIdRef.current, true);
+        }
+      }
+    };
+    window.addEventListener('focus', handleTabActive);
+    document.addEventListener('visibilitychange', handleTabActive);
+    return () => {
+      window.removeEventListener('focus', handleTabActive);
+      document.removeEventListener('visibilitychange', handleTabActive);
+    };
+  }, [fetchPosTables, fetchBillPreview]);
+
+  // Polling chu kỳ 2.5 giây
   useEffect(() => {
     fetchPosTables();
     const interval = setInterval(() => {
       fetchPosTables(true);
-    }, 5000);
+    }, 2500);
     return () => clearInterval(interval);
   }, [fetchPosTables]);
+
+  // Tải chi tiết bill khi chọn bàn mới
+  useEffect(() => {
+    if (selectedTableId) {
+      fetchBillPreview(selectedTableId);
+    }
+  }, [selectedTableId, fetchBillPreview]);
 
   // Phân loại số lượng bàn theo trạng thái nghiệp vụ
   const callingCount = posTables.filter(t => t.isCallingBill || t.status === 'PAYMENT_REQUEST').length;
@@ -275,32 +382,15 @@ export default function PosCheckoutPage() {
     return true; // 'ALL' (Hiện tất cả bàn bao gồm cả bàn trống)
   });
 
-  // Bàn đang được chọn hiện tại (chỉ tìm trong danh sách sau khi lọc)
-  const currentTable = filteredPosTables.find(t => t.id === selectedTableId) || null;
+  // Bàn đang được chọn hiện tại (tìm trong posTables toàn bộ để không bị mất khi đang lọc zone)
+  const currentTable = posTables.find(t => t.id === selectedTableId) || null;
 
-  // 3. Tải thông tin tạm tính (Bill Preview) khi chọn bàn
-  const fetchBillPreview = useCallback(async (tableId) => {
-    if (!tableId) {
-      setBillPreview(null);
-      return;
-    }
-    setIsLoadingBill(true);
-    try {
-      const res = await cashierApi.getBillPreview(tableId);
-      setBillPreview(res.data?.data || null);
-    } catch (err) {
-      // Nếu bàn trống chưa có session active
-      setBillPreview(null);
-    } finally {
-      setIsLoadingBill(false);
-    }
-  }, []);
-
+  // Nếu bàn được chọn thuộc khu vực khác bộ lọc, tự động mở rộng sang ALL để hiển thị thẻ bàn
   useEffect(() => {
-    if (selectedTableId) {
-      fetchBillPreview(selectedTableId);
+    if (currentTable && selectedZone !== 'ALL' && currentTable.zone !== selectedZone) {
+      setSelectedZone('ALL');
     }
-  }, [selectedTableId, fetchBillPreview]);
+  }, [currentTable, selectedZone]);
 
   // 4. Tải lịch sử hóa đơn khi mở Tab HISTORY
   const fetchInvoiceHistory = useCallback(async () => {
@@ -342,8 +432,55 @@ export default function PosCheckoutPage() {
     }
   }, [activePosTab, fetchShiftSummary]);
 
-  // Tính toán số liệu tài chính hóa đơn trực tiếp từ billPreview
-  const rawSubtotal = billPreview ? Number(billPreview.subtotal || 0) : 0;
+  // Chi tiết hóa đơn hiển thị (activeBill): Ưu tiên billPreview chính xác từ API,
+  // nếu chưa tải xong (hoặc đang tải) thì dùng ngay dữ liệu từ currentTable để giao diện không bao giờ bị 0đ / trống món
+  const activeBill = useMemo(() => {
+    if (billPreview) return billPreview;
+    if (!currentTable || (!currentTable.orderTotal && (!currentTable.items || currentTable.items.length === 0))) {
+      return null;
+    }
+    const orderItems = Array.isArray(currentTable.items) ? currentTable.items : [];
+    const tableSubtotal = Number(currentTable.orderTotal || 0);
+    const taxRate = 8.0;
+    const taxAmt = Math.round(tableSubtotal * 0.08);
+
+    const mappedItems = orderItems.map(it => ({
+      orderItemId: it.orderItemId || it.id,
+      itemName: it.itemName || it.name || 'Món ăn',
+      quantity: it.quantity || 1,
+      unitPrice: it.unitPrice || it.price || 0,
+      subtotal: it.subtotal || ((it.unitPrice || it.price || 0) * (it.quantity || 1)),
+      note: it.note || '',
+      status: it.status || 'COOKING'
+    }));
+
+    const unserved = mappedItems.filter(i => i.status === 'PENDING' || i.status === 'COOKING')
+      .reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
+
+    return {
+      tableId: currentTable.id,
+      tableCode: currentTable.code,
+      tableName: currentTable.name,
+      zoneName: currentTable.zoneName,
+      guestCount: currentTable.guestCount || currentTable.capacity || 1,
+      timeIn: currentTable.timeIn || '--:--',
+      durationMinutes: currentTable.durationMinutes || 0,
+      sessionId: currentTable.sessionId,
+      billCode: currentTable.orderCode || `BILL-${currentTable.code}`,
+      subtotal: tableSubtotal,
+      taxRate: taxRate,
+      taxAmount: taxAmt,
+      discountAmount: 0,
+      finalAmount: tableSubtotal + taxAmt,
+      unservedCount: unserved,
+      hasPaymentRequest: Boolean(currentTable.isCallingBill || currentTable.status === 'PAYMENT_REQUEST'),
+      isDraftPrinted: Boolean(currentTable.isDraftPrinted || currentTable.status === 'DRAFT_PRINTED'),
+      items: mappedItems
+    };
+  }, [billPreview, currentTable]);
+
+  // Tính toán số liệu tài chính hóa đơn trực tiếp từ activeBill (hoặc fallback currentTable)
+  const rawSubtotal = activeBill ? Number(activeBill.subtotal || 0) : 0;
   let computedDiscount = 0;
   if (discountType === 'PERCENT' && discountValue > 0) {
     computedDiscount = Math.round((rawSubtotal * discountValue) / 100);
@@ -375,8 +512,35 @@ export default function PosCheckoutPage() {
       showToast(`Đã thêm [${dish.name}] vào ${currentTable.name}`);
       await fetchBillPreview(currentTable.id);
       await fetchPosTables(true);
+      broadcastRealtimeEvent({ type: 'ORDER_UPDATE', tableId: currentTable.id });
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: currentTable.id, status: 'OCCUPIED' });
     } catch (err) {
       showToast(err.response?.data?.message || 'Không thể thêm món vào bàn!');
+    }
+  };
+
+  // Đóng phiên ăn bàn trống (0đ) khi khách không dùng món
+  const handleConfirmCloseEmpty = async () => {
+    if (!currentTable || isClosingEmpty) return;
+    setIsClosingEmpty(true);
+    try {
+      await cashierApi.closeEmptySession(currentTable.id, {
+        reason: closeEmptyReason,
+        targetStatus: closeEmptyTargetStatus
+      });
+      const closedTableId = currentTable.id;
+      const closedTableName = currentTable.name;
+      setShowCloseEmptyModal(false);
+      setSelectedTableId(null);
+      selectedTableIdRef.current = null;
+      setBillPreview(null);
+      showToast(`Đã đóng phiên bàn trống cho ${closedTableName}! Bàn đã sẵn sàng.`);
+      await fetchPosTables(true);
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: closedTableId, status: closeEmptyTargetStatus });
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Có lỗi xảy ra khi đóng phiên bàn trống!');
+    } finally {
+      setIsClosingEmpty(false);
     }
   };
 
@@ -412,7 +576,7 @@ export default function PosCheckoutPage() {
 
   // In phiếu tạm tính (Pre-bill)
   const handlePrintDraftBill = async () => {
-    if (!currentTable || !billPreview || rawSubtotal === 0) {
+    if (!currentTable || !activeBill || rawSubtotal === 0) {
       showToast('Bàn chưa có món ăn để in phiếu tạm tính!');
       return;
     }
@@ -420,12 +584,12 @@ export default function PosCheckoutPage() {
       await cashierApi.markDraftPrinted(currentTable.id);
       setReceiptData({
         isDraft: true,
-        billCode: billPreview.billCode || `PRE-${currentTable.code}`,
+        billCode: activeBill.billCode || `PRE-${currentTable.code}`,
         tableName: currentTable.name,
         zoneName: currentTable.zoneName,
         cashierName: user?.fullName || 'Thu Ngân POS',
         paymentTimeFormatted: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN'),
-        items: billPreview.items.map(i => ({
+        items: activeBill.items.map(i => ({
           name: i.itemName,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
@@ -441,6 +605,7 @@ export default function PosCheckoutPage() {
       setShowDiningWarningModal(false);
       await fetchBillPreview(currentTable.id);
       await fetchPosTables(true);
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: currentTable.id, status: 'DRAFT_PRINTED' });
       showToast(`Đã in phiếu tạm tính cho ${currentTable.name}`);
     } catch (err) {
       showToast('Lỗi khi in phiếu tạm tính!');
@@ -449,7 +614,7 @@ export default function PosCheckoutPage() {
 
   // Chốt thanh toán hóa đơn với đầy đủ kiểm tra an toàn F&B
   const handleInitiateCheckout = () => {
-    if (!currentTable || !billPreview || rawSubtotal === 0) {
+    if (!currentTable || !activeBill || rawSubtotal === 0) {
       showToast('Bàn hiện không có món ăn để thanh toán!');
       return;
     }
@@ -471,8 +636,8 @@ export default function PosCheckoutPage() {
     }
 
     // QA Check 0 & 1: Bàn đang dùng bữa bình thường HOẶC còn món đang nấu
-    const isDiningWithoutRequest = !billPreview.hasPaymentRequest && !billPreview.isDraftPrinted;
-    const hasUnserved = (billPreview.unservedCount || 0) > 0;
+    const isDiningWithoutRequest = !activeBill.hasPaymentRequest && !activeBill.isDraftPrinted;
+    const hasUnserved = (activeBill.unservedCount || 0) > 0;
 
     if (isDiningWithoutRequest || hasUnserved) {
       setConfirmUnservedChecked(false);
@@ -525,7 +690,9 @@ export default function PosCheckoutPage() {
       showToast(`Thanh toán thành công ${currentTable.name}!`);
 
       // Cập nhật lại danh sách bàn và hóa đơn: Tự động gỡ thẻ bàn vừa thanh toán
+      const completedTableId = currentTable.id;
       setSelectedTableId(null);
+      selectedTableIdRef.current = null;
       setBillPreview(null);
       setCashGiven('');
       setCheckoutNote('');
@@ -533,6 +700,7 @@ export default function PosCheckoutPage() {
       setDiscountValue(0);
       setDiscountManagerPin('');
       await fetchPosTables(true);
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: completedTableId, status: 'DIRTY' });
     } catch (err) {
       showToast(err.response?.data?.message || 'Có lỗi xảy ra khi thanh toán hóa đơn!');
     } finally {
@@ -1003,7 +1171,11 @@ export default function PosCheckoutPage() {
                       return (
                         <div
                           key={t.id}
-                          onClick={() => setSelectedTableId(t.id)}
+                          onClick={() => {
+                            setSelectedTableId(t.id);
+                            selectedTableIdRef.current = t.id;
+                            fetchBillPreview(t.id, false);
+                          }}
                           style={{
                             background: isSelected ? '#FFF8F6' : '#FFFFFF',
                             border: borderStyle,
@@ -1214,23 +1386,23 @@ export default function PosCheckoutPage() {
                           {currentTable ? currentTable.name : 'Chưa chọn bàn'}
                         </h3>
                         <span style={{ fontSize: '0.75rem', background: '#F6ECEA', color: '#56423D', padding: '2px 6px', borderRadius: '6px', fontWeight: 600 }}>
-                          {billPreview?.billCode || currentTable?.orderCode || '#ROMS'}
+                          {activeBill?.billCode || currentTable?.orderCode || '#ROMS'}
                         </span>
-                        {billPreview && (
+                        {activeBill && (
                           <span style={{
                             fontSize: '0.68rem',
                             fontWeight: 700,
                             padding: '2px 8px',
                             borderRadius: '9999px',
-                            background: billPreview.hasPaymentRequest ? '#FFDAD6' : (billPreview.isDraftPrinted ? '#FFDBC9' : '#DDE8AB'),
-                            color: billPreview.hasPaymentRequest ? '#93000A' : (billPreview.isDraftPrinted ? '#753400' : '#181E00')
+                            background: activeBill.hasPaymentRequest ? '#FFDAD6' : (activeBill.isDraftPrinted ? '#FFDBC9' : '#DDE8AB'),
+                            color: activeBill.hasPaymentRequest ? '#93000A' : (activeBill.isDraftPrinted ? '#753400' : '#181E00')
                           }}>
-                            {billPreview.hasPaymentRequest ? '🔔 Chờ thanh toán' : (billPreview.isDraftPrinted ? '📄 Đã in tạm tính' : '🍽️ Đang dùng bữa')}
+                            {activeBill.hasPaymentRequest ? '🔔 Chờ thanh toán' : (activeBill.isDraftPrinted ? '📄 Đã in tạm tính' : '🍽️ Đang dùng bữa')}
                           </span>
                         )}
                       </div>
                       <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
-                        {billPreview ? `${billPreview.guestCount} khách • Vào lúc ${billPreview.timeIn} (${billPreview.durationMinutes}p)` : 'Chưa có thông tin phiên ăn'}
+                        {activeBill ? `${activeBill.guestCount} khách • Vào lúc ${activeBill.timeIn} (${activeBill.durationMinutes}p)` : 'Chưa có thông tin phiên ăn'}
                       </span>
                     </div>
                   </div>
@@ -1259,16 +1431,52 @@ export default function PosCheckoutPage() {
 
                 {/* Danh sách món ăn chi tiết */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto', marginBottom: '14px' }}>
-                  {isLoadingBill ? (
+                  {isLoadingBill && !activeBill ? (
                     <div style={{ padding: '20px', textAlign: 'center', color: '#89726B', fontSize: '0.85rem' }}>
                       Đang tải danh sách món ăn từ phiên ăn...
                     </div>
-                  ) : !billPreview || !billPreview.items || billPreview.items.length === 0 ? (
-                    <div style={{ padding: '24px', textAlign: 'center', color: '#89726B', fontSize: '0.85rem' }}>
-                      Bàn hiện đang trống, chưa có món ăn cần tính tiền.
+                  ) : !activeBill || !activeBill.items || activeBill.items.length === 0 ? (
+                    <div style={{
+                      padding: '24px 16px',
+                      textAlign: 'center',
+                      background: '#FFF8F6',
+                      borderRadius: '14px',
+                      border: '1px dashed #EAE0DE',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <Icon name="no_meals" size={32} style={{ color: '#89726B' }} />
+                      <div style={{ color: '#1F1B1A', fontWeight: 700, fontSize: '0.9rem' }}>
+                        Bàn hiện đang trống, chưa có món ăn (0đ)
+                      </div>
+                      <div style={{ color: '#89726B', fontSize: '0.78rem', maxWidth: '320px', lineHeight: 1.4 }}>
+                        Khách chưa gọi món hoặc đã rời đi. Bạn có thể giải phóng bàn ngay hoặc chọn món từ danh mục bên dưới.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCloseEmptyModal(true)}
+                        style={{
+                          marginTop: '6px',
+                          padding: '7px 16px',
+                          borderRadius: '10px',
+                          background: '#FFDAD6',
+                          color: '#93000A',
+                          border: '1px solid #FFB4AB',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Icon name="event_busy" size={16} /> Đóng phiên bàn trống (0đ)
+                      </button>
                     </div>
                   ) : (
-                    billPreview.items.map(item => (
+                    activeBill.items.map(item => (
                       <div
                         key={item.orderItemId}
                         style={{
@@ -1344,7 +1552,7 @@ export default function PosCheckoutPage() {
                 </div>
 
                 {/* Cảnh báo QA F&B: Món đang nấu / Bàn chưa yêu cầu tính tiền */}
-                {billPreview?.unservedCount > 0 && (
+                {activeBill?.unservedCount > 0 && (
                   <div style={{
                     background: '#FFF8E1',
                     border: '1px solid #FFE082',
@@ -1359,10 +1567,10 @@ export default function PosCheckoutPage() {
                     marginBottom: '10px'
                   }}>
                     <Icon name="warning" size={16} style={{ color: '#F57C00' }} />
-                    <span>Còn <strong>{billPreview.unservedCount} phần món</strong> đang chế biến / chờ bếp!</span>
+                    <span>Còn <strong>{activeBill.unservedCount} phần món</strong> đang chế biến / chờ bếp!</span>
                   </div>
                 )}
-                {billPreview && !billPreview.hasPaymentRequest && !billPreview.isDraftPrinted && (
+                {activeBill && !activeBill.hasPaymentRequest && !activeBill.isDraftPrinted && (
                   <div style={{
                     background: '#E8F4FD',
                     border: '1px solid #BEE3F8',
@@ -1576,6 +1784,41 @@ export default function PosCheckoutPage() {
                   const isHighDisc = (discountType === 'PERCENT' && Number(discountValue) > 30) || computedDiscount > 200000;
                   const isPinMissing = isHighDisc && (!discountManagerPin || discountManagerPin.trim().length !== 6);
                   const isBtnDisabled = rawSubtotal === 0 || isSubmittingCheckout || isCashShort || isPinMissing;
+
+                  if (rawSubtotal === 0) {
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowCloseEmptyModal(true)}
+                          style={{
+                            width: '100%',
+                            padding: '13px 20px',
+                            borderRadius: '16px',
+                            background: '#BA1A1A',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            fontFamily: "'Epilogue', sans-serif",
+                            fontWeight: 800,
+                            fontSize: '0.95rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 14px rgba(186, 26, 26, 0.25)',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <Icon name="event_busy" size={20} />
+                          <span>Đóng Phiên Bàn Trống (0đ / Khách Rời Đi)</span>
+                        </button>
+                        <div style={{ fontSize: '0.74rem', color: '#89726B', textAlign: 'center', lineHeight: 1.4 }}>
+                          Bàn chưa có món ăn để xuất hóa đơn. Bấm chọn món từ danh mục bên dưới nếu khách có dùng món.
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <button
@@ -2576,7 +2819,7 @@ export default function PosCheckoutPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
-              {!billPreview.hasPaymentRequest && !billPreview.isDraftPrinted && (
+              {activeBill && !activeBill.hasPaymentRequest && !activeBill.isDraftPrinted && (
                 <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '12px', fontSize: '0.83rem', color: '#92400E', display: 'flex', gap: '10px' }}>
                   <Icon name="restaurant" size={20} style={{ color: '#D97706', flexShrink: 0 }} />
                   <div>
@@ -2585,11 +2828,11 @@ export default function PosCheckoutPage() {
                 </div>
               )}
 
-              {(billPreview.unservedCount || 0) > 0 && (
+              {activeBill && (activeBill.unservedCount || 0) > 0 && (
                 <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '12px', fontSize: '0.83rem', color: '#991B1B', display: 'flex', gap: '10px' }}>
                   <Icon name="soup_kitchen" size={20} style={{ color: '#DC2626', flexShrink: 0 }} />
                   <div>
-                    <strong>Bếp chưa làm xong:</strong> Bàn còn <strong style={{ textDecoration: 'underline' }}>{billPreview.unservedCount} phần món đang chế biến / chờ tiếp nhận</strong>. Khách có thể bị thu tiền cho món chưa được ăn!
+                    <strong>Bếp chưa làm xong:</strong> Bàn còn <strong style={{ textDecoration: 'underline' }}>{activeBill.unservedCount} phần món đang chế biến / chờ tiếp nhận</strong>. Khách có thể bị thu tiền cho món chưa được ăn!
                   </div>
                 </div>
               )}
@@ -2639,6 +2882,155 @@ export default function PosCheckoutPage() {
                 }}
               >
                 Xác Nhận Thanh Toán
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: XÁC NHẬN ĐÓNG PHIÊN BÀN TRỐNG (0đ) */}
+      {showCloseEmptyModal && currentTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '28px',
+            border: '2px solid #BA1A1A',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#FFDAD6', color: '#BA1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="event_busy" size={26} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
+                  Đóng Phiên Bàn Trống (0đ)
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#BA1A1A', fontWeight: 700 }}>
+                  Giải phóng bàn khi khách không dùng món
+                </span>
+              </div>
+            </div>
+
+            <div style={{ background: '#FFF8F6', border: '1px dashed #EAE0DE', borderRadius: '14px', padding: '12px 16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 800, color: '#1F1B1A', fontSize: '1rem' }}>
+                  {currentTable.name} • {currentTable.zoneName}
+                </span>
+                <span style={{ fontSize: '0.78rem', background: '#FFDBC9', color: '#753400', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                  Tổng tiền: 0đ
+                </span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                {activeBill?.guestCount || currentTable.capacity || 4} khách • Giờ vào: {activeBill?.timeIn || '--:--'}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                Lý Do Đóng Bàn <span style={{ color: '#BA1A1A' }}>*</span>
+              </label>
+              <select
+                value={closeEmptyReason}
+                onChange={(e) => setCloseEmptyReason(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #EAE0DE', fontSize: '0.85rem', fontWeight: 600, color: '#1F1B1A', background: '#FFFFFF', outline: 'none' }}
+              >
+                <option value="Khách rời đi, không dùng món">Khách rời đi, không dùng món</option>
+                <option value="Nhân viên mở nhầm bàn">Nhân viên mở nhầm bàn</option>
+                <option value="Khách đổi sang bàn khác">Khách đổi sang bàn khác</option>
+                <option value="Khách hủy hẹn đột xuất">Khách hủy hẹn đột xuất</option>
+                <option value="Lý do khác">Lý do khác</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '8px' }}>
+                Trạng Thái Bàn Sau Khi Đóng:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '10px', border: closeEmptyTargetStatus === 'AVAILABLE' ? '1.5px solid #00875A' : '1px solid #EAE0DE', background: closeEmptyTargetStatus === 'AVAILABLE' ? '#E3FCEF' : '#FFFFFF', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="closeTargetStatus"
+                    value="AVAILABLE"
+                    checked={closeEmptyTargetStatus === 'AVAILABLE'}
+                    onChange={() => setCloseEmptyTargetStatus('AVAILABLE')}
+                    style={{ accentColor: '#00875A' }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: '0.82rem', color: '#006644' }}>Sẵn sàng đón khách ngay (AVAILABLE)</strong>
+                    <div style={{ fontSize: '0.72rem', color: '#5E6C84' }}>Phù hợp khi mở nhầm bàn hoặc khách vừa ngồi chưa dùng đồ</div>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '10px', border: closeEmptyTargetStatus === 'DIRTY' ? '1.5px solid #FF8B00' : '1px solid #EAE0DE', background: closeEmptyTargetStatus === 'DIRTY' ? '#FFF0B3' : '#FFFFFF', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="closeTargetStatus"
+                    value="DIRTY"
+                    checked={closeEmptyTargetStatus === 'DIRTY'}
+                    onChange={() => setCloseEmptyTargetStatus('DIRTY')}
+                    style={{ accentColor: '#FF8B00' }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: '0.82rem', color: '#8A5800' }}>Cần nhân viên dọn dẹp (DIRTY)</strong>
+                    <div style={{ fontSize: '0.72rem', color: '#5E6C84' }}>Báo cho phục vụ ra dọn ly nước/khăn trước khi đón khách mới</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                disabled={isClosingEmpty}
+                onClick={() => setShowCloseEmptyModal(false)}
+                style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#F0E6E4', border: 'none', fontWeight: 700, fontSize: '0.85rem', color: '#56423D', cursor: 'pointer' }}
+              >
+                Quay Lại
+              </button>
+              <button
+                type="button"
+                disabled={isClosingEmpty}
+                onClick={handleConfirmCloseEmpty}
+                style={{
+                  flex: 1.5,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#BA1A1A',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  color: '#FFFFFF',
+                  cursor: isClosingEmpty ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                {isClosingEmpty ? (
+                  <>
+                    <Icon name="sync" size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>Đang Đóng Bàn...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="check" size={18} />
+                    <span>Xác Nhận Đóng Bàn</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

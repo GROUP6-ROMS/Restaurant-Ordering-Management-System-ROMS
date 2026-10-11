@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/common/Icon';
 import { waiterApi } from '../../api/waiterApi';
+import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 export default function WaiterOrderDetailPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -31,14 +32,16 @@ export default function WaiterOrderDetailPage() {
 
         let currentTable = null;
         if (tableCodeParam) {
-          currentTable = list.find(t => 
-            t.tableNumber?.toLowerCase() === tableCodeParam.toLowerCase() ||
-            t.name?.toLowerCase() === tableCodeParam.toLowerCase()
-          );
+          const normParam = tableCodeParam.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          currentTable = list.find(t => {
+            const normNum = (t.tableNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            const normName = (t.name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            return normNum === normParam || normName === normParam || normName.includes(normParam) || String(t.id) === String(tableCodeParam);
+          });
         }
         if (!currentTable) {
-          // Nếu không truyền param hoặc không tìm thấy, lấy bàn OCCUPIED đầu tiên
-          currentTable = list.find(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'CALLING') || list[0];
+          // Nếu không truyền param hoặc không tìm thấy, lấy bàn đang phục vụ đầu tiên
+          currentTable = list.find(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'CALLING' || t.status === 'AWAITING_PAYMENT') || list[0];
         }
 
         if (currentTable) {
@@ -72,8 +75,28 @@ export default function WaiterOrderDetailPage() {
 
   useEffect(() => {
     fetchTablesAndDetails();
-    const interval = setInterval(fetchTablesAndDetails, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchTablesAndDetails, 4000);
+
+    const handleTabActive = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTablesAndDetails();
+      }
+    };
+    window.addEventListener('focus', fetchTablesAndDetails);
+    document.addEventListener('visibilitychange', handleTabActive);
+
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE') {
+        fetchTablesAndDetails();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', fetchTablesAndDetails);
+      document.removeEventListener('visibilitychange', handleTabActive);
+      unsubscribe();
+    };
   }, [tableCodeParam]);
 
   // Tải danh mục thực đơn thật từ CSDL
@@ -113,12 +136,36 @@ export default function WaiterOrderDetailPage() {
 
   const handleRequestPayment = async () => {
     if (!tableData.id) return;
+    if (tableData.items.length === 0) {
+      showToast('Bàn chưa gọi món ăn nào (0đ), không thể gửi yêu cầu tính tiền!');
+      return;
+    }
     try {
       await waiterApi.requestPayment(tableData.id);
       showToast(`Đã gửi yêu cầu thanh toán bàn ${tableData.code} sang Quầy Thu Ngân POS!`);
       await fetchTablesAndDetails();
+      broadcastRealtimeEvent({
+        type: 'PAYMENT_REQUEST',
+        tableId: tableData.id,
+        tableName: tableData.name || `Bàn ${tableData.code}`
+      });
     } catch (err) {
       showToast(err.response?.data?.message || 'Lỗi gửi yêu cầu thanh toán');
+    }
+  };
+
+  const handleCloseEmptyTable = async () => {
+    if (!tableData.id) return;
+    if (!window.confirm(`Xác nhận đóng phiên ăn 0đ và giải phóng bàn ${tableData.code} (Khách không dùng món / Mở nhầm)?`)) {
+      return;
+    }
+    try {
+      await waiterApi.closeEmptySession(tableData.id, { reason: 'Khách không dùng món / Hủy bàn trống', targetStatus: 'AVAILABLE' });
+      showToast(`Đã đóng phiên bàn trống thành công cho bàn ${tableData.code}!`);
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: tableData.id, status: 'AVAILABLE' });
+      navigate('/waiter/floor-plan');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi đóng phiên bàn trống!');
     }
   };
 
@@ -267,14 +314,14 @@ export default function WaiterOrderDetailPage() {
                   title="Chọn bàn khác"
                 >
                   <optgroup label="Bàn đang phục vụ">
-                    {allTables.filter(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'CALLING').map(t => (
+                    {allTables.filter(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'CALLING' || t.status === 'AWAITING_PAYMENT').map(t => (
                       <option key={t.id} value={t.tableNumber}>
-                        {t.name || `Bàn ${t.tableNumber}`} ({t.status === 'FOOD_READY' ? 'Bếp xong' : 'Đang ăn'})
+                        {t.name || `Bàn ${t.tableNumber}`} ({t.status === 'FOOD_READY' ? 'Bếp xong' : t.status === 'AWAITING_PAYMENT' ? 'Chờ thanh toán' : 'Đang ăn'})
                       </option>
                     ))}
                   </optgroup>
                   <optgroup label="Các bàn khác">
-                    {allTables.filter(t => t.status !== 'OCCUPIED' && t.status !== 'FOOD_READY' && t.status !== 'CALLING').map(t => (
+                    {allTables.filter(t => t.status !== 'OCCUPIED' && t.status !== 'FOOD_READY' && t.status !== 'CALLING' && t.status !== 'AWAITING_PAYMENT').map(t => (
                       <option key={t.id} value={t.tableNumber}>
                         {t.name || `Bàn ${t.tableNumber}`} ({t.status === 'AVAILABLE' ? 'Trống' : t.status === 'RESERVED' ? 'Đặt trước' : t.status})
                       </option>
@@ -289,8 +336,31 @@ export default function WaiterOrderDetailPage() {
         {/* Action Buttons (Desktop only - Mobile has sticky action bar) */}
         {!isMobile && (
           <div style={{ display: 'flex', gap: '10px' }}>
+            {tableData.items.length === 0 && (
+              <button
+                type="button"
+                onClick={handleCloseEmptyTable}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 16px',
+                  borderRadius: '12px',
+                  background: '#FFDAD6',
+                  border: '1px solid #FFB4AB',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#93000A',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="event_busy" size={18} />
+                Đóng Bàn 0đ (Khách Rời Đi)
+              </button>
+            )}
             <button
               type="button"
+              disabled={tableData.status === 'AWAITING_PAYMENT'}
               onClick={handleRequestPayment}
               style={{
                 display: 'inline-flex',
@@ -298,16 +368,16 @@ export default function WaiterOrderDetailPage() {
                 gap: '6px',
                 padding: '10px 16px',
                 borderRadius: '12px',
-                background: '#FFFFFF',
-                border: '1px solid #EAE0DE',
+                background: tableData.status === 'AWAITING_PAYMENT' ? '#FFDBC9' : '#FFFFFF',
+                border: tableData.status === 'AWAITING_PAYMENT' ? '1.5px solid #FFB68C' : '1px solid #EAE0DE',
                 fontWeight: 700,
                 fontSize: '0.85rem',
-                color: '#BA1A1A',
-                cursor: 'pointer'
+                color: tableData.status === 'AWAITING_PAYMENT' ? '#753400' : '#BA1A1A',
+                cursor: tableData.status === 'AWAITING_PAYMENT' ? 'default' : 'pointer'
               }}
             >
               <Icon name="point_of_sale" size={18} />
-              Báo Thu Ngân Tính Tiền
+              {tableData.status === 'AWAITING_PAYMENT' ? 'Đã Báo Thu Ngân (Chờ POS)' : 'Báo Thu Ngân Tính Tiền'}
             </button>
 
             <button
@@ -336,7 +406,7 @@ export default function WaiterOrderDetailPage() {
       </div>
 
       {/* Cảnh báo nếu bàn chưa mở phiên phục vụ */}
-      {tableData.status && tableData.status !== 'OCCUPIED' && tableData.status !== 'FOOD_READY' && tableData.status !== 'CALLING' && tableData.status !== 'LOADING' && (
+      {tableData.status && tableData.status !== 'OCCUPIED' && tableData.status !== 'FOOD_READY' && tableData.status !== 'CALLING' && tableData.status !== 'AWAITING_PAYMENT' && tableData.status !== 'LOADING' && (
         <div style={{
           background: '#FFFBEB',
           border: '1px solid #FDE68A',
@@ -667,25 +737,48 @@ export default function WaiterOrderDetailPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
+            {tableData.items.length === 0 && (
+              <button
+                type="button"
+                onClick={handleCloseEmptyTable}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  background: '#FFDAD6',
+                  border: '1px solid #FFB4AB',
+                  color: '#93000A',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="event_busy" size={16} />
+                Đóng 0đ
+              </button>
+            )}
             <button
               type="button"
+              disabled={tableData.status === 'AWAITING_PAYMENT'}
               onClick={handleRequestPayment}
               style={{
                 padding: '9px 12px',
                 borderRadius: '10px',
-                background: '#FFF8F6',
-                border: '1px solid #FFDBC9',
-                color: '#BA1A1A',
+                background: tableData.status === 'AWAITING_PAYMENT' ? '#FFDBC9' : '#FFF8F6',
+                border: tableData.status === 'AWAITING_PAYMENT' ? '1px solid #FFB68C' : '1px solid #FFDBC9',
+                color: tableData.status === 'AWAITING_PAYMENT' ? '#753400' : '#BA1A1A',
                 fontWeight: 700,
                 fontSize: '0.78rem',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                cursor: 'pointer'
+                cursor: tableData.status === 'AWAITING_PAYMENT' ? 'default' : 'pointer'
               }}
             >
               <Icon name="point_of_sale" size={16} />
-              Thu Ngân
+              {tableData.status === 'AWAITING_PAYMENT' ? 'Đã Báo POS' : 'Thu Ngân'}
             </button>
 
             <button

@@ -37,6 +37,27 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
+    // 2.1. Xu ly ngoai le khong tim thay tai nguyen (ResourceNotFoundException -> 404 NOT_FOUND)
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(ResourceNotFoundException ex) {
+        ApiResponse<Void> response = ApiResponse.error(ex.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+    }
+
+    // 2.2. Xu ly ngoai le sai dinh dang kieu du lieu tham so URL/ID (MethodArgumentTypeMismatchException -> 400 BAD_REQUEST)
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatchException(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        ApiResponse<Void> response = ApiResponse.error("Tham số yêu cầu không đúng định dạng: " + ex.getName());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    // 2.3. Xu ly ngoai le tu choi quyen truy cap (AccessDeniedException -> 403 FORBIDDEN)
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(org.springframework.security.access.AccessDeniedException ex) {
+        ApiResponse<Void> response = ApiResponse.error("Bạn không có quyền thực hiện hành động này!");
+        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
+    }
+
     // 3. Xu ly tat ca cac ngoai le he thong khong mong muon khac (NullPointerException, SQL loi ket noi...)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex) {

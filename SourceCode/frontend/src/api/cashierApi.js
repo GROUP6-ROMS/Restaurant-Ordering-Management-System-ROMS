@@ -44,5 +44,10 @@ export const cashierApi = {
   // 9. Chốt ca có mã PIN quản lý
   closeShift: (data) => {
     return axiosClient.post('/cashier/shift/close', data);
+  },
+
+  // 10. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món
+  closeEmptySession: (tableId, data) => {
+    return axiosClient.post(`/cashier/tables/${tableId}/close-empty`, data);
   }
 };

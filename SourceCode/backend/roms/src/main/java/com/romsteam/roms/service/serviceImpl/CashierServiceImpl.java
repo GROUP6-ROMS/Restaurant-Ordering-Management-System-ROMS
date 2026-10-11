@@ -1,6 +1,7 @@
 package com.romsteam.roms.service.serviceImpl;
 
 import com.romsteam.roms.dto.request.CashierCheckoutRequest;
+import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
 import com.romsteam.roms.dto.request.ManagerApprovalRequest;
 import com.romsteam.roms.dto.response.*;
 import com.romsteam.roms.entity.*;
@@ -619,6 +620,72 @@ public class CashierServiceImpl implements CashierService {
                 .itemsSummary(summary)
                 .items(items)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public CashierTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request) {
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
+
+        Optional<DiningSession> sessionOpt = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
+        if (sessionOpt.isPresent()) {
+            DiningSession session = sessionOpt.get();
+            List<Order> orders = orderRepository.findBySessionId(session.getId());
+            BigDecimal subtotal = BigDecimal.ZERO;
+            int nonCancelledItems = 0;
+
+            for (Order order : orders) {
+                if (order.getStatus() == OrderStatus.CANCELLED) continue;
+                if (order.getItems() != null) {
+                    for (OrderItem item : order.getItems()) {
+                        if (item.getStatus() != OrderItemStatus.CANCELLED) {
+                            nonCancelledItems++;
+                            if (item.getSubtotal() != null) {
+                                subtotal = subtotal.add(item.getSubtotal());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Bảo vệ chống thất thoát / gian lận F&B: Chỉ bàn có 0 món hợp lệ hoặc tổng tiền = 0đ mới được đóng 0đ
+            if (nonCancelledItems > 0 || subtotal.compareTo(BigDecimal.ZERO) > 0) {
+                throw new AppException("Bàn đang có " + nonCancelledItems + " món ăn hợp lệ (" + subtotal.toPlainString() + "đ). Không thể đóng phiên bàn trống! Vui lòng thực hiện thanh toán hoặc hủy món có Quản lý duyệt.", HttpStatus.BAD_REQUEST);
+            }
+
+            session.setStatus(SessionStatus.COMPLETED);
+            session.setEndTime(LocalDateTime.now());
+            String reason = (request != null && request.getReason() != null && !request.getReason().trim().isEmpty())
+                    ? request.getReason().trim()
+                    : "Khách không dùng món / Hủy bàn trống";
+            String existingNote = session.getNote() != null ? session.getNote() : "";
+            session.setNote((existingNote + " [EMPTY_SESSION_CLOSED: " + reason + "]").trim());
+            sessionRepository.save(session);
+
+            for (Order order : orders) {
+                if (order.getStatus() != OrderStatus.CANCELLED) {
+                    order.setStatus(OrderStatus.CANCELLED);
+                    orderRepository.save(order);
+                }
+            }
+        }
+
+        // Đóng toàn bộ chuông gọi hoặc yêu cầu bill của bàn này
+        List<ServiceRequest> pendingReqs = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(table.getId(), "PENDING");
+        for (ServiceRequest req : pendingReqs) {
+            req.setStatus("RESOLVED");
+            requestRepository.save(req);
+        }
+
+        TableStatus targetStatus = TableStatus.AVAILABLE;
+        if (request != null && "DIRTY".equalsIgnoreCase(request.getTargetStatus())) {
+            targetStatus = TableStatus.DIRTY;
+        }
+        table.setStatus(targetStatus);
+        tableRepository.save(table);
+
+        return mapToCashierTableResponse(table);
     }
 
     private String resolveZoneName(String zoneCode) {

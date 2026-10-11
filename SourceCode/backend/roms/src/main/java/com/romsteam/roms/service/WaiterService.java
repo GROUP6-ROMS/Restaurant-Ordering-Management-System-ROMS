@@ -41,4 +41,7 @@ public interface WaiterService {
 
     // 11. Xác nhận bưng từng đĩa món riêng lẻ (READY -> SERVED)
     WaiterTableResponse confirmDeliverSingleItem(Long tableId, Long orderItemId);
+
+    // 12. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món hoặc mở nhầm bàn
+    WaiterTableResponse closeEmptySession(Long tableId, com.romsteam.roms.dto.request.CloseEmptySessionRequest request);
 }

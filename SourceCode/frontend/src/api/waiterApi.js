@@ -59,5 +59,10 @@ export const waiterApi = {
     // 11. Hủy đặt bàn (RESERVED -> AVAILABLE)
     cancelReservation: (tableId) => {
         return axiosClient.post(`/waiter/tables/${tableId}/cancel-reservation`);
+    },
+
+    // 12. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món
+    closeEmptySession: (tableId, data) => {
+        return axiosClient.post(`/waiter/tables/${tableId}/close-empty`, data);
     }
 };

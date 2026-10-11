@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { waiterApi } from '../../api/waiterApi';
+import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 import Icon from '../common/Icon';
 import RomsLogo from '../common/RomsLogo';
 
@@ -70,8 +71,28 @@ export default function StaffLayout() {
     };
 
     fetchCallingCount();
-    const interval = setInterval(fetchCallingCount, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchCallingCount, 4000);
+
+    const handleTabActive = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCallingCount();
+      }
+    };
+    window.addEventListener('focus', fetchCallingCount);
+    document.addEventListener('visibilitychange', handleTabActive);
+
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE') {
+        fetchCallingCount();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', fetchCallingCount);
+      document.removeEventListener('visibilitychange', handleTabActive);
+      unsubscribe();
+    };
   }, [user?.role]);
 
   const handleTriggerLogout = () => {

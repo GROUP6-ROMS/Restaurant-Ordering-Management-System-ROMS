@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/kitchen")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('KITCHEN', 'MANAGER', 'WAITER')")
+@PreAuthorize("hasAnyRole('KITCHEN', 'MANAGER', 'WAITER', 'CASHIER', 'ADMIN')")
 public class KitchenController {
 
     private final KitchenService kitchenService;
