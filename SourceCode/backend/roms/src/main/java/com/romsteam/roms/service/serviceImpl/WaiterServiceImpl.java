@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -131,10 +132,22 @@ public class WaiterServiceImpl implements WaiterService {
             throw new AppException("Bàn nguồn hiện không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST);
         }
 
-        // Chuyển phiên ăn sang bàn mới
+        // Chuyển phiên ăn sang bàn mới và gắn tag chuyển bàn
         DiningSession session = activeSessionOpt.get();
+        String transferTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        String transferNote = String.format("[CHUYỂN TỪ %s SANG %s lúc %s]", 
+                sourceTable.getTableNumber(), targetTable.getTableNumber(), transferTime);
+        String currentNote = session.getNote() != null ? session.getNote() : "";
+        session.setNote(currentNote.isEmpty() ? transferNote : currentNote + " " + transferNote);
         session.setTable(targetTable);
         sessionRepository.save(session);
+
+        // Chuyển toàn bộ chuông gọi / yêu cầu thanh toán PENDING từ bàn nguồn sang bàn đích
+        List<ServiceRequest> pendingRequests = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(sourceTable.getId(), "PENDING");
+        for (ServiceRequest req : pendingRequests) {
+            req.setTable(targetTable);
+            requestRepository.save(req);
+        }
 
         // Bàn cũ chuyển thành DIRTY (cần dọn)
         sourceTable.setStatus(TableStatus.DIRTY);
@@ -143,6 +156,34 @@ public class WaiterServiceImpl implements WaiterService {
         // Bàn mới chuyển thành OCCUPIED
         targetTable.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(targetTable);
+    }
+
+    @Override
+    @Transactional
+    public WaiterTableResponse confirmDeliverSingleItem(Long tableId, Long orderItemId) {
+        OrderItem item = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + orderItemId));
+
+        if (item.getStatus() != OrderItemStatus.READY) {
+            throw new AppException("Chỉ có thể xác nhận bưng món khi Bếp/Quầy đã chuẩn bị xong (READY)!", HttpStatus.BAD_REQUEST);
+        }
+
+        item.setStatus(OrderItemStatus.SERVED);
+        orderItemRepository.save(item);
+
+        Order order = item.getOrder();
+        if (order != null && order.getItems() != null) {
+            boolean allServed = order.getItems().stream()
+                    .allMatch(i -> i.getStatus() == OrderItemStatus.SERVED || i.getStatus() == OrderItemStatus.CANCELLED);
+            if (allServed) {
+                order.setStatus(OrderStatus.SERVED);
+                orderRepository.save(order);
+            }
+        }
+
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
+        return mapToWaiterTableResponse(table);
     }
 
     @Override
@@ -218,16 +259,23 @@ public class WaiterServiceImpl implements WaiterService {
         DiningSession activeSession = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE)
                 .orElseThrow(() -> new AppException("Bàn " + table.getTableNumber() + " chưa được mở phiên phục vụ (chưa có khách)! Vui lòng Mở Bàn trước khi gọi món.", HttpStatus.BAD_REQUEST));
 
+        // Nếu bàn trước đó đã in tạm tính, việc gọi thêm món sẽ hủy tag [DRAFT_PRINTED] để Thu ngân in lại bill mới chính xác
+        if (activeSession.getNote() != null && activeSession.getNote().contains("[DRAFT_PRINTED]")) {
+            String cleaned = activeSession.getNote().replace("[DRAFT_PRINTED]", "").trim();
+            activeSession.setNote(cleaned.isEmpty() ? null : cleaned);
+            sessionRepository.save(activeSession);
+        }
+
         String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 10000);
         Order newOrder = new Order();
         newOrder.setSession(activeSession);
         newOrder.setOrderCode(orderCode);
         newOrder.setOrderTime(LocalDateTime.now());
-        newOrder.setStatus(OrderStatus.CONFIRMED);
         newOrder.setNote(request.getNote());
 
         BigDecimal totalOrderAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
+        boolean hasCookingItems = false;
 
         for (WaiterAddOrderRequest.WaiterOrderItemRequest itemReq : request.getItems()) {
             MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
@@ -242,6 +290,15 @@ public class WaiterServiceImpl implements WaiterService {
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(qty));
             totalOrderAmount = totalOrderAmount.add(subtotal);
 
+            // Nhận diện đồ uống đóng chai / pha chế sẵn:
+            boolean isDrink = false;
+            if (menuItem.getCategory() != null && menuItem.getCategory().getName() != null) {
+                String catLower = menuItem.getCategory().getName().toLowerCase();
+                if (catLower.contains("uống") || catLower.contains("drink") || catLower.contains("nước")) {
+                    isDrink = true;
+                }
+            }
+
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(newOrder);
             orderItem.setMenuItem(menuItem);
@@ -249,11 +306,20 @@ public class WaiterServiceImpl implements WaiterService {
             orderItem.setUnitPrice(unitPrice);
             orderItem.setSubtotal(subtotal);
             orderItem.setNote(itemReq.getNote());
-            orderItem.setStatus(OrderItemStatus.COOKING); // Món nấu, Bếp KDS nhận được ngay
+
+            // Đồ uống đóng chai: Sẵn sàng ngay (READY) tại tủ mát/quầy pass để bồi bàn lấy ra bàn
+            // Món ăn xào nấu: Chuyển COOKING vào Bếp KDS
+            if (isDrink) {
+                orderItem.setStatus(OrderItemStatus.READY);
+            } else {
+                orderItem.setStatus(OrderItemStatus.COOKING);
+                hasCookingItems = true;
+            }
 
             orderItems.add(orderItem);
         }
 
+        newOrder.setStatus(hasCookingItems ? OrderStatus.CONFIRMED : OrderStatus.READY);
         newOrder.setTotalAmount(totalOrderAmount);
         newOrder.setItems(orderItems);
 

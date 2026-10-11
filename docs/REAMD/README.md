@@ -48,6 +48,7 @@
 | **17** | [17_Hoan_Thien_Ma_QR_Va_In_Tem_Ban_Toan_Dien.md](17_Hoan_Thien_Ma_QR_Va_In_Tem_Ban_Toan_Dien.md) | **Full-Stack**: Hoàn thiện in tem mã QR cho toàn bộ bàn ăn, quản lý token bàn và định tuyến khách hàng. |
 | **18** | [18_Hoan_Thien_Goi_Mon_Tai_Ban_Va_Van_Hanh_Waiter.md](18_Hoan_Thien_Goi_Mon_Tai_Ban_Va_Van_Hanh_Waiter.md) | **Full-Stack (Backend & Frontend)**: Nghiệp vụ trạm phục vụ bàn (Waiter Floor Plan), mở bàn, gọi thêm món tại bàn, bảo toàn dữ liệu qua polling 5s, chuyển bàn và yêu cầu thanh toán POS. |
 | **19** | [19_Hoan_Thien_Man_Hinh_Bep_KDS_Va_Lien_Thong_Don_Mon.md](19_Hoan_Thien_Man_Hinh_Bep_KDS_Va_Lien_Thong_Don_Mon.md) | **Full-Stack (Backend & Frontend)**: Màn hình Bếp KDS (Kitchen Display System), xóa bỏ 100% Mock, liên thông đơn món Waiter $\leftrightarrow$ KDS $\leftrightarrow$ POS, tick hoàn thành từng món, ưu tiên Hỏa Tốc (RUSH), chuông âm báo Web Audio Chime, polling 5s và Script SQL sinh dữ liệu test phong phú. |
+| **20** | [20_Hoan_Thien_Tram_Thu_Ngan_POS_Va_Thanh_Toan_Hoa_Don.md](20_Hoan_Thien_Tram_Thu_Ngan_POS_Va_Thanh_Toan_Hoa_Don.md) | **Full-Stack (Backend & Frontend)**: Trạm Thu Ngân POS (Cashier Terminal), xóa bỏ 100% Mock, liên thông tiếp nhận yêu cầu tính tiền từ Waiter, xem tạm tính, in phiếu tạm tính, giảm giá, VietQR động chuẩn NAPAS, chốt bill lưu CSDL, tự động đóng phiên và chuyển bàn DIRTY, Lịch sử hóa đơn, Đối soát két tiền và Bàn giao ca có Quản lý duyệt PIN. |
 
 ---
 
