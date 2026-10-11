@@ -26,6 +26,11 @@ export const waiterApi = {
         return axiosClient.post(`/waiter/tables/${tableId}/deliver`);
     },
 
+    // 5.1. Xác nhận đã bưng 1 món riêng lẻ
+    deliverSingleItem: (tableId, itemId) => {
+        return axiosClient.post(`/waiter/tables/${tableId}/items/${itemId}/deliver`);
+    },
+
     // 6. Xử lý xong chuông gọi
     resolveRequest: (requestId) => {
         return axiosClient.patch(`/waiter/requests/${requestId}/resolve`);
@@ -54,5 +59,10 @@ export const waiterApi = {
     // 11. Hủy đặt bàn (RESERVED -> AVAILABLE)
     cancelReservation: (tableId) => {
         return axiosClient.post(`/waiter/tables/${tableId}/cancel-reservation`);
+    },
+
+    // 12. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món
+    closeEmptySession: (tableId, data) => {
+        return axiosClient.post(`/waiter/tables/${tableId}/close-empty`, data);
     }
 };

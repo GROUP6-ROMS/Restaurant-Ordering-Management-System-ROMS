@@ -23,7 +23,7 @@ public class AdminZoneController {
 
     // 1. GET /api/admin/zones - Lấy danh sách tất cả khu vực kèm số lượng bàn
     @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'CASHIER', 'KITCHEN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<ZoneResponse>>> getAllZones() {
         List<ZoneResponse> zones = zoneService.getAllZones();
         return ResponseEntity.ok(ApiResponse.success(zones, "Lấy danh sách khu vực thành công!"));
@@ -31,7 +31,7 @@ public class AdminZoneController {
 
     // 2. GET /api/admin/zones/{id} - Lấy chi tiết 1 khu vực
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'CASHIER', 'KITCHEN', 'ADMIN')")
     public ResponseEntity<ApiResponse<ZoneResponse>> getZoneById(@PathVariable Long id) {
         ZoneResponse zone = zoneService.getZoneById(id);
         return ResponseEntity.ok(ApiResponse.success(zone, "Lấy chi tiết khu vực thành công!"));
