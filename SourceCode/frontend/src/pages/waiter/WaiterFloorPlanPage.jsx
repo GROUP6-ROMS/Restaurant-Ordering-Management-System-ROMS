@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { waiterApi } from '../../api/waiterApi';
+import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 // Material Symbols Icon helper
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -96,6 +97,15 @@ export default function WaiterFloorPlanPage() {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [selectedZone]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE') {
+        loadFloorPlan();
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -399,12 +409,42 @@ export default function WaiterFloorPlanPage() {
   };
 
   const handleRequestPayment = async (tableId) => {
+    const targetTable = tables.find(t => t.id === tableId) || selectedTable;
+    if (targetTable && (targetTable.orderTotal === 0 || !targetTable.items || targetTable.items.length === 0)) {
+      showToast('Bàn chưa gọi món ăn nào (0đ), không thể gửi yêu cầu tính tiền!');
+      return;
+    }
     try {
-      await waiterApi.requestPayment(tableId);
+      const res = await waiterApi.requestPayment(tableId);
       showToast('Đã gửi thông báo yêu cầu thanh toán sang Quầy Thu Ngân POS!');
+      if (res.data?.data) {
+        setSelectedTable(prev => prev && prev.id === tableId ? { ...prev, ...res.data.data, status: 'AWAITING_PAYMENT' } : prev);
+      }
       await loadFloorPlan();
+      broadcastRealtimeEvent({
+        type: 'PAYMENT_REQUEST',
+        tableId: tableId,
+        tableName: targetTable?.label || targetTable?.tableNumber || `Bàn #${tableId}`
+      });
     } catch (err) {
       showToast(err.response?.data?.message || 'Lỗi gửi yêu cầu thanh toán');
+    }
+  };
+
+  const handleCloseEmptyTable = async (tableId) => {
+    const target = tables.find(t => t.id === tableId) || selectedTable;
+    const name = target?.label || target?.tableNumber || `Bàn #${tableId}`;
+    if (!window.confirm(`Xác nhận đóng phiên ăn 0đ và giải phóng ${name} (Khách không dùng món / Mở nhầm)?`)) {
+      return;
+    }
+    try {
+      await waiterApi.closeEmptySession(tableId, { reason: 'Khách không dùng món / Hủy bàn trống', targetStatus: 'AVAILABLE' });
+      showToast(`Đã đóng phiên bàn trống thành công cho ${name}!`);
+      setShowTableModal(false);
+      await loadFloorPlan();
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: tableId, status: 'AVAILABLE' });
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi đóng phiên bàn trống!');
     }
   };
 
@@ -1158,13 +1198,40 @@ export default function WaiterFloorPlanPage() {
 
                   <button
                     type="button"
+                    disabled={table.status === 'AWAITING_PAYMENT'}
                     onClick={() => handleRequestPayment(table.id)}
                     style={{
                       padding: '11px',
                       borderRadius: '12px',
                       background: '#FFDBC9',
-                      border: '1px solid #FFB68C',
+                      border: table.status === 'AWAITING_PAYMENT' ? '1.5px solid #FFB68C' : '1px solid #FFB68C',
                       color: '#753400',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: table.status === 'AWAITING_PAYMENT' ? 'default' : 'pointer',
+                      opacity: table.status === 'AWAITING_PAYMENT' ? 0.85 : 1
+                    }}
+                  >
+                    <Icon name="point_of_sale" size={18} style={{ color: '#994703' }} />
+                    {table.status === 'AWAITING_PAYMENT' ? 'Đã Báo Thu Ngân' : 'Báo Thu Ngân'}
+                  </button>
+                </div>
+
+                {(table.orderTotal === 0 || !table.items || table.items.length === 0) && (
+                  <button
+                    type="button"
+                    onClick={() => handleCloseEmptyTable(table.id)}
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '12px',
+                      background: '#FFDAD6',
+                      border: '1px solid #FFB4AB',
+                      color: '#93000A',
                       fontWeight: 700,
                       fontSize: '0.85rem',
                       display: 'flex',
@@ -1174,10 +1241,10 @@ export default function WaiterFloorPlanPage() {
                       cursor: 'pointer'
                     }}
                   >
-                    <Icon name="point_of_sale" size={18} style={{ color: '#994703' }} />
-                    Báo Thu Ngân
+                    <Icon name="event_busy" size={18} />
+                    Hủy Phiên Bàn Trống (0đ / Khách Rời Đi)
                   </button>
-                </div>
+                )}
 
                 <button
                   type="button"
@@ -1701,30 +1768,57 @@ export default function WaiterFloorPlanPage() {
                     )}
 
                     {t.status === 'AWAITING_PAYMENT' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRequestPayment(t.id);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '7px',
-                          borderRadius: '10px',
-                          background: '#FFDBC9',
-                          color: '#753400',
-                          border: 'none',
-                          fontWeight: 700,
-                          fontSize: '0.78rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Icon name="credit_card" size={16} /> Gọi POS Thu Ngân
-                      </button>
+                      (t.orderTotal === 0 || !t.items || t.items.length === 0) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCloseEmptyTable(t.id);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '7px',
+                            borderRadius: '10px',
+                            background: '#FFDAD6',
+                            color: '#93000A',
+                            border: 'none',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Icon name="event_busy" size={16} /> Hủy Bàn Trống (0đ)
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRequestPayment(t.id);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '7px',
+                            borderRadius: '10px',
+                            background: '#FFDBC9',
+                            color: '#753400',
+                            border: 'none',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Icon name="credit_card" size={16} /> Gọi POS Thu Ngân
+                        </button>
+                      )
                     )}
 
                     {t.status === 'BLOCKED' && (

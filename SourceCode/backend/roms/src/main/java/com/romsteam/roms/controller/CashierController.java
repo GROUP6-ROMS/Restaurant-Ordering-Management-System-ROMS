@@ -1,6 +1,7 @@
 package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.CashierCheckoutRequest;
+import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
 import com.romsteam.roms.dto.request.ManagerApprovalRequest;
 import com.romsteam.roms.dto.response.*;
 import com.romsteam.roms.service.CashierService;
@@ -18,7 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cashier")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('CASHIER', 'MANAGER')")
+@PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'WAITER', 'ADMIN')")
 public class CashierController {
 
     private final CashierService cashierService;
@@ -101,5 +102,14 @@ public class CashierController {
         String cashierUsername = authentication != null ? authentication.getName() : null;
         cashierService.closeShift(request, cashierUsername);
         return ResponseEntity.ok(ApiResponse.success(null, "Quản lý đã phê duyệt chốt ca và bàn giao két tiền"));
+    }
+
+    // 10. POST /api/cashier/tables/{id}/close-empty - Đóng phiên ăn bàn trống (0đ)
+    @PostMapping("/tables/{id}/close-empty")
+    public ResponseEntity<ApiResponse<CashierTableResponse>> closeEmptySession(
+            @PathVariable Long id,
+            @RequestBody(required = false) CloseEmptySessionRequest request) {
+        CashierTableResponse response = cashierService.closeEmptySession(id, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã đóng phiên bàn trống và giải phóng bàn thành công!"));
     }
 }

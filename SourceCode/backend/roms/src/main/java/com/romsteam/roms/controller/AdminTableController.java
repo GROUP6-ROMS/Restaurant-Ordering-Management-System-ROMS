@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/tables")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'WAITER')")
+@PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'CASHIER', 'ADMIN')")
 public class AdminTableController {
 
     private final RestaurantTableService tableService;
