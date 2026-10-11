@@ -8,8 +8,9 @@
 >    - **Khu vực bàn:** Tự động lấy danh sách phân khu động từ CSDL (`GET /api/customer/reservations/zones`), hiển thị tên khu vực, mô tả, huy hiệu và số bàn phục vụ.
 >    - **Xác nhận giữ chỗ:** Gửi yêu cầu đặt bàn với trạng thái `PENDING` (chưa gán số bàn) về hệ thống và hiển thị thông báo: Quản lý sẽ liên hệ trực tiếp qua số điện thoại của khách để xác nhận và xếp bàn.
 > 2. **Phía Quản Lý (Manager Coordination & Table Assignment):**
->    - Màn hình Quản lý Đặt bàn (`/admin/reservations`): Theo dõi danh sách yêu cầu chờ duyệt (`PENDING`), đã xếp bàn (`CONFIRMED`), đã check-in (`COMPLETED`) và đã hủy (`CANCELLED`). Quản lý xem số điện thoại khách trên bảng và tiến hành gọi điện thoại thủ công để xác nhận.
->    - Tính năng **Xác nhận & Xếp bàn**: Sau khi đã gọi điện thoại xác nhận thủ công với khách, Quản lý chọn bàn trống (`AVAILABLE`) phù hợp theo khu vực và số khách -> Cập nhật đơn đặt sang `CONFIRMED` và bàn sang `RESERVED` (kèm thông tin khách hẹn).
+>    - **Tích hợp trực tiếp trên Sơ Đồ Bàn & Quản Lý Khu Vực (`/admin/tables`):** Nút "Duyệt & Set Bàn Đặt" kèm huy hiệu (Badge) số lượng đơn `PENDING` màu đỏ thời gian thực; Thanh Alert Banner cảnh báo nổi bật khi có đơn đặt bàn đang chờ; Modal duyệt danh sách đặt bàn (xem số điện thoại khách để gọi điện thoại trao đổi thủ công) và trực tiếp chọn bất kỳ bàn nào còn trống (`AVAILABLE`) trên sơ đồ (kèm dropdown lọc bàn theo phân khu linh hoạt) để gán cho khách. Khi xếp bàn thành công, bàn trên sơ đồ lập tức chuyển sang trạng thái `RESERVED` màu cam kèm tên khách và giờ hẹn.
+>    - **Màn hình Quản lý Đặt bàn chuyên sâu (`/admin/reservations`):** Theo dõi danh sách yêu cầu chờ duyệt (`PENDING`), đã xếp bàn (`CONFIRMED`), đã check-in (`COMPLETED`) và đã hủy (`CANCELLED`). Quản lý xem số điện thoại khách trên bảng và tiến hành gọi điện thoại thủ công để xác nhận.
+>    - **Tính năng Xác nhận & Xếp bàn:** Sau khi đã gọi điện thoại xác nhận thủ công với khách, Quản lý có thể chọn bất kỳ bàn trống (`AVAILABLE`) nào trong hệ thống (không bị ràng buộc bởi số khách hay khu vực, có dropdown lọc bàn theo khu vực) -> Cập nhật đơn đặt sang `CONFIRMED` và bàn sang `RESERVED` (kèm thông tin khách hẹn).
 > 
 > **Cam kết:** Toàn bộ mã nguồn Backend (Spring Boot 3.4.5, Java 21, JPA, Lombok) và Frontend (React 19, Vite, Axios) đều có **chú thích (comment) chi tiết 100% từng dòng**.
 
@@ -25,11 +26,11 @@
    - Ngày giờ hẹn (`reservationTime`) phải từ thời điểm hiện tại trở đi (không cho phép chọn thời gian trong quá khứ).
 
 2. **Quy trình Quản lý gọi điện thoại xác nhận thủ công (Manual Phone Confirmation):**
-   - Quản lý nhà hàng là người trực tiếp kiểm tra tính xác thực của thông tin đặt chỗ bằng cách xem số điện thoại hiển thị trên màn hình và sử dụng điện thoại thực tế để gọi điện thoại trao đổi, xác nhận trực tiếp với khách hàng.
+   - Quản lý nhà hàng là người trực tiếp kiểm tra tính xác thực của thông tin đặt chỗ bằng cách xem số điện thoại hiển thị trên màn hình và sử dụng điện thoại thực tế để gọi điện thoại trao đổi, xác nhận trực tiếp với khách hàng (không cần nút gọi trên phần mềm).
 
 3. **Gán bàn & Chuyển trạng thái (`CONFIRMED` & `RESERVED`):**
    - Sau khi trao đổi và chốt thông tin thành công qua điện thoại, Quản lý nhấn **"Xác Nhận & Xếp Bàn"**.
-   - Hệ thống gợi ý danh sách các bàn đang trống (`TableStatus.AVAILABLE`), thuộc đúng phân khu yêu cầu (`zone = requestedZone`) và có sức chứa đủ cho đoàn khách (`capacity >= guestCount`).
+   - Hệ thống hiển thị toàn bộ các bàn đang trống (`TableStatus.AVAILABLE`). Quản lý có toàn quyền lựa chọn bất kỳ bàn nào còn trống trong khung giờ đó mà không bị gò bó bởi số lượng khách hay khu vực yêu cầu ban đầu (có kèm dropdown lọc bàn theo từng phân khu để tìm kiếm nhanh).
    - Khi Quản lý chọn bàn:
      - `Reservation.status` chuyển thành `CONFIRMED`, `Reservation.table` trỏ tới bàn đã chọn.
      - `RestaurantTable.status` chuyển thành `TableStatus.RESERVED`.
@@ -711,28 +712,28 @@ public class ReservationServiceImpl implements ReservationService {
         Reservation res = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt bàn #" + reservationId));
 
-        // Lấy các bàn AVAILABLE, ưu tiên đúng zone và sức chứa >= guestCount
-        List<RestaurantTable> tables = tableRepository.findAvailableTablesForReservation(
-                res.getRequestedZone(),
-                res.getGuestCount()
-        );
+        // Lấy toàn bộ các bàn đang trống (AVAILABLE) đang hoạt động trong nhà hàng
+        // Quản lý có thể linh hoạt chọn bất kỳ bàn nào còn trống mà không bị ràng buộc sức chứa hay khu vực
+        List<RestaurantTable> tables = tableRepository.findByStatusAndIsActiveTrue(TableStatus.AVAILABLE);
+        tables.sort(Comparator.comparing(RestaurantTable::getTableNumber));
 
-        // Nếu khu vực khách chọn không còn bàn trống, trả về toàn bộ bàn AVAILABLE còn lại để Quản lý linh hoạt tư vấn đổi khu vực
-        if (tables.isEmpty()) {
-            tables = tableRepository.findAvailableTablesForReservation(null, res.getGuestCount());
-        }
+        return tables.stream().map(t -> {
+            String zName = "Sảnh Chính";
+            if ("ZONE_2".equals(t.getZone())) zName = "Ban Công";
+            else if ("VIP".equals(t.getZone())) zName = "Phòng VIP";
 
-        return tables.stream().map(t -> TableResponse.builder()
-                .id(t.getId())
-                .code(t.getTableNumber())
-                .tableNumber(t.getTableNumber())
-                .name(t.getName())
-                .zone(t.getZone())
-                .capacity(t.getCapacity())
-                .status(t.getStatus())
-                .isActive(t.getIsActive())
-                .build()
-        ).collect(Collectors.toList());
+            return TableResponse.builder()
+                    .id(t.getId())
+                    .code(t.getTableNumber())
+                    .tableNumber(t.getTableNumber())
+                    .name(t.getName())
+                    .zone(t.getZone())
+                    .zoneName(zName)
+                    .capacity(t.getCapacity())
+                    .status(t.getStatus())
+                    .isActive(t.getIsActive())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     // ===================================================================
@@ -2491,13 +2492,172 @@ export default function ReservationPage() {
 
 ---
 
-### Bước F3: Xây Dựng Màn Hình Quản Lý Đặt Bàn Cho Quản Trị Viên `ReservationsPage.jsx`
+### Bước F3: Tích Hợp Chức Năng Duyệt & Set Bàn Đặt Trực Tiếp Vào Trang Sơ Đồ Bàn & Quản Lý Khu Vực (`TableManagementPage.jsx`)
+
+- **File cập nhật:** `SourceCode/frontend/src/pages/admin/TableManagementPage.jsx`
+- **Mục đích:** Giúp Quản lý nhà hàng tối ưu hóa luồng làm việc thực tế: theo dõi tức thì các yêu cầu đặt bàn trực tuyến mới gửi từ website ngay trên sơ đồ bàn, gọi điện thoại xác nhận trực tiếp cho khách qua số điện thoại hiển thị trên màn hình, và trực quan chọn bàn ăn trống (`AVAILABLE`) phù hợp trên sơ đồ để gán cho khách mà không cần phải chuyển sang màn hình khác.
+- **Các thành phần được triển khai:**
+  1. **Tích hợp API và Polling đồng bộ:**
+     - Gọi `reservationApi.getAdminReservations()` trong `loadData()` và vòng lặp tự động cập nhật mỗi 6 giây (`useEffect`), tự động đếm số đơn có trạng thái `PENDING` để cập nhật huy hiệu cảnh báo.
+  2. **Nút Thao Tác Header & Huy Hiệu (Badge) Đơn Chờ:**
+     - Nút **"Duyệt & Set Bàn Đặt"** trên thanh Quick Actions Header với icon `event_seat`.
+     - Badge màu đỏ hiển thị chính xác số lượng đơn `PENDING` đang chờ xếp bàn.
+  3. **Thanh Cảnh Báo Nổi Bật (Real-time Alert Banner):**
+     - Tự động xuất hiện ngay dưới Header khi có đơn `PENDING` (`pendingReservationsCount > 0`).
+     - Thông báo trực quan: *"Có X yêu cầu đặt bàn trực tuyến mới cần được gọi xác nhận & xếp bàn!"* kèm nút *"Xem Danh Sách & Xếp Bàn Ngay"*.
+  4. **Modal 1: Phiếu Đặt Bàn & Điều Phối Xếp Bàn (`showReservationModal`):**
+     - Tab lọc: "Chờ Xếp Bàn" (`PENDING`), "Đã Xếp Bàn" (`CONFIRMED`), "Đã Hủy" (`CANCELLED`), "Tất Cả".
+     - Thanh tìm kiếm theo Tên khách, Số điện thoại hoặc Mã đặt chỗ (`bookingCode`).
+     - Thẻ thông tin từng phiếu đặt: Mã đặt chỗ, Thời gian tạo, Badge trạng thái, Tên khách hàng, Số điện thoại (hiển thị rõ nét kèm icon để quản lý/nhân viên chủ động gọi điện xác nhận ngoài thực tế), Giờ hẹn, Ngày hẹn, Số lượng khách, Khu vực mong muốn, Ghi chú của khách.
+     - Với đơn `CONFIRMED`: Thẻ xanh lá hiển thị thông tin bàn đã xếp (Mã bàn, Tên bàn, Sức chứa) kèm nút "Đổi Bàn".
+     - Với đơn `CANCELLED`: Thẻ đỏ hiển thị lý do hủy.
+     - Với đơn `PENDING`: Nút "Từ Chối / Hủy", nút "Set Bàn / Xếp Bàn Cho Khách" (`#9D4124`) (đã bỏ nút gọi trên giao diện web do nhân viên liên hệ khách bằng điện thoại thực tế).
+  5. **Modal 2: Gợi Ý & Chọn Bàn Khả Dụng Để Gán (`showAssignModal`):**
+     - Gọi API `GET /api/admin/reservations/{id}/available-tables` để tải toàn bộ các bàn đang ở trạng thái trống (`AVAILABLE`) trong nhà hàng. Quản lý có thể chọn bất kỳ bàn trống nào mà không bắt buộc phải đúng số lượng khách hay khu vực ban đầu.
+     - **Dropdown lọc bàn theo khu vực (`assignZoneFilter`):** Cho phép xem "Tất Cả Khu Vực" hoặc lọc theo từng khu vực cụ thể (Sảnh Chính, Ban Công, VIP, Sân Vườn...) kèm số lượng bàn trống của khu vực đó.
+     - Lưới chọn bàn trực quan (Mã bàn, Tên bàn, Sức chứa, Khu vực) dạng card có viền cam nổi bật khi được chọn, kèm huy hiệu nhận diện gợi ý (`✓ Đúng khu vực yêu cầu`, `✓ Sức chứa phù hợp`) để quản lý tham khảo.
+     - Ô nhập ghi chú nội bộ của Quản lý (`assignAdminNote`).
+     - Khi bấm "Xác Nhận Xếp Bàn & Giữ Chỗ", gọi API `PUT /api/admin/reservations/{id}/assign-table`:
+       - Đơn đặt bàn chuyển sang `CONFIRMED`.
+       - Bàn ăn trên sơ đồ chuyển ngay sang màu cam `RESERVED` với thông tin khách và thời gian hẹn.
+       - Cập nhật lại số liệu 5 thẻ KPI và sơ đồ bàn thời gian thực.
+  6. **Modal 3: Xác Nhận Hủy Đơn Đặt Bàn (`showCancelResModal`):**
+     - Cho phép chọn lý do nhanh hoặc nhập lý do hủy cụ thể.
+     - Gọi API `PUT /api/admin/reservations/{id}/cancel` để cập nhật trạng thái `CANCELLED` và tự động giải phóng bàn nếu trước đó đã được gán.
+
+#### Chi tiết các đoạn mã bổ sung vào `TableManagementPage.jsx`:
+
+```jsx
+// 1. Import Service API Đặt Bàn
+import { reservationApi } from '../../api/reservationApi';
+
+// 2. Khai báo State Quản Lý & Set Bàn Cho Đơn Đặt Bàn
+const [reservations, setReservations] = useState([]);
+const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
+const [showReservationModal, setShowReservationModal] = useState(false);
+const [resStatusFilter, setResStatusFilter] = useState('PENDING'); // 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'ALL'
+const [resSearchTerm, setResSearchTerm] = useState('');
+const [resLoading, setResLoading] = useState(false);
+
+// State Modal Xếp Bàn (Set Bàn)
+const [showAssignModal, setShowAssignModal] = useState(false);
+const [selectedResForAssign, setSelectedResForAssign] = useState(null);
+const [availableTablesForAssign, setAvailableTablesForAssign] = useState([]);
+const [selectedAssignTableId, setSelectedAssignTableId] = useState('');
+const [assignAdminNote, setAssignAdminNote] = useState('');
+const [assignZoneFilter, setAssignZoneFilter] = useState('ALL'); // Dropdown lọc bàn theo khu vực ('ALL' | tên zone)
+const [assignLoading, setAssignLoading] = useState(false);
+
+// State Modal Hủy Đơn Đặt Bàn
+const [showCancelResModal, setShowCancelResModal] = useState(false);
+const [selectedResForCancel, setSelectedResForCancel] = useState(null);
+const [cancelResReason, setCancelResReason] = useState('Khách hàng yêu cầu hủy / Không liên lạc được');
+const [cancelResLoading, setCancelResLoading] = useState(false);
+
+// 3. Hàm Tải Dữ Liệu & Đồng Bộ Đơn Đặt Bàn (Được gọi trong loadData & polling 6s)
+const loadReservations = async () => {
+  try {
+    setResLoading(true);
+    const res = await reservationApi.getAdminReservations();
+    const list = res.data || [];
+    setReservations(list);
+    const pendingCount = list.filter(r => r.status === 'PENDING').length;
+    setPendingReservationsCount(pendingCount);
+  } catch (err) {
+    console.warn('Lỗi tải danh sách đặt bàn:', err);
+  } finally {
+    setResLoading(false);
+  }
+};
+
+// 4. Mở Modal Xếp Bàn & Gợi Ý Bàn Trống Khả Dụng
+const handleOpenAssignModal = async (resItem) => {
+  setSelectedResForAssign(resItem);
+  setSelectedAssignTableId('');
+  setAssignAdminNote('');
+  setAssignZoneFilter('ALL');
+  setShowAssignModal(true);
+  setAssignLoading(true);
+  try {
+    const res = await reservationApi.getAvailableTablesForReservation(resItem.id);
+    const availableList = res.data || [];
+    setAvailableTablesForAssign(availableList);
+    if (availableList.length > 0) {
+      // Ưu tiên gợi ý chọn bàn cùng khu vực khách yêu cầu nếu có, hoặc bàn đầu tiên
+      const matched = availableList.find(t => t.zone === resItem.requestedZone);
+      setSelectedAssignTableId(matched ? String(matched.id) : String(availableList[0].id));
+    }
+  } catch (err) {
+    console.error('Lỗi lấy danh sách bàn khả dụng:', err);
+    showToast('Không thể lấy danh sách bàn trống khả dụng!');
+  } finally {
+    setAssignLoading(false);
+  }
+};
+
+// 5. Xác Nhận Xếp Bàn Cho Đơn Đặt Bàn (Gán bàn & Chuyển trạng thái bàn sang RESERVED)
+const handleConfirmAssignTable = async () => {
+  if (!selectedResForAssign || !selectedAssignTableId) {
+    showToast('Vui lòng chọn một bàn ăn trống để xếp cho khách!');
+    return;
+  }
+  try {
+    setAssignLoading(true);
+    const payload = {
+      tableId: Number(selectedAssignTableId),
+      adminNote: assignAdminNote.trim() || undefined
+    };
+    const res = await reservationApi.assignTable(selectedResForAssign.id, payload);
+    if (res.success || res.data) {
+      showToast(`Đã xếp bàn thành công cho khách hàng ${selectedResForAssign.customerName}!`);
+      setShowAssignModal(false);
+      setSelectedResForAssign(null);
+      await loadReservations();
+      await loadData(true);
+    }
+  } catch (err) {
+    console.error('Lỗi xếp bàn:', err);
+    const errMsg = err.response?.data?.message || 'Có lỗi xảy ra khi xếp bàn!';
+    showToast(errMsg);
+  } finally {
+    setAssignLoading(false);
+  }
+};
+
+// 6. Xử Lý Hủy Đơn Đặt Bàn
+const handleConfirmCancelRes = async () => {
+  if (!selectedResForCancel) return;
+  try {
+    setCancelResLoading(true);
+    const res = await reservationApi.cancelReservation(selectedResForCancel.id, {
+      cancelReason: cancelResReason.trim() || 'Quản lý hủy yêu cầu'
+    });
+    if (res.success || res.data) {
+      showToast(`Đã hủy phiếu đặt bàn của ${selectedResForCancel.customerName}!`);
+      setShowCancelResModal(false);
+      setSelectedResForCancel(null);
+      await loadReservations();
+      await loadData(true);
+    }
+  } catch (err) {
+    console.error('Lỗi hủy phiếu đặt bàn:', err);
+    const errMsg = err.response?.data?.message || 'Có lỗi xảy ra khi hủy đơn đặt bàn!';
+    showToast(errMsg);
+  } finally {
+    setCancelResLoading(false);
+  }
+};
+```
+
+---
+
+### Bước F3.1: Màn Hình Quản Lý Đặt Bàn Chuyên Sâu `ReservationsPage.jsx`
 
 - **Tạo mới tại:** `SourceCode/frontend/src/pages/admin/ReservationsPage.jsx`
-- **Mục đích:** Cung cấp giao diện làm việc chuyên nghiệp cho Quản lý nhà hàng:
+- **Mục đích:** Cung cấp giao diện làm việc dạng bảng chuyên sâu cho Quản lý nhà hàng:
   - Xem danh sách yêu cầu đặt bàn dạng bảng với các tab phân loại: `TẤT CẢ`, `CHỜ XÁC NHẬN (PENDING)`, `ĐÃ XẾP BÀN (CONFIRMED)`, `ĐÃ HỦY (CANCELLED)`.
   - Hiển thị rõ số điện thoại và thông tin để Quản lý gọi điện thoại thủ công xác nhận với khách trước khi xếp bàn.
-  - **Nút "Xếp Bàn":** Bật modal chọn danh sách bàn trống khả dụng (lọc theo zone & sức chứa) -> Gán bàn và chuyển trạng thái sang `CONFIRMED`.
+  - **Nút "Xếp Bàn":** Bật modal chọn bất kỳ bàn trống khả dụng (`AVAILABLE`) với dropdown lọc theo khu vực -> Gán bàn và chuyển trạng thái sang `CONFIRMED`.
   - **Nút "Hủy Yêu Cầu":** Nhập lý do (ví dụ không nghe máy, khách đổi ý) và cập nhật `CANCELLED`.
 
 ```jsx

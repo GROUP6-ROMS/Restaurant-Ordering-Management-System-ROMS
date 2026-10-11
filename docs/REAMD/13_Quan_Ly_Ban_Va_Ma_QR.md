@@ -31,6 +31,7 @@ Khi đối chiếu với giao diện thực tế của màn hình Quản lý bà
    - **Thêm Bàn Mới (`POST /api/admin/tables`):** Nhập mã, tên, khu vực, sức chứa. Hệ thống kiểm tra trùng mã và tự động sinh chuỗi bí mật `qrToken` (UUID).
    - **Đổi Trạng Thái Bàn (`PATCH /api/admin/tables/{id}/status`):** Chuyển đổi giữa các trạng thái kèm cập nhật lý do bảo trì hoặc thông tin đặt hẹn.
    - **Tái Tạo Mã QR (`POST /api/admin/tables/{id}/refresh-qr`):** Đổi chuỗi token bảo mật mới khi tem dán tại bàn bị rò rỉ.
+   - **Duyệt & Set Bàn Đặt Trực Tuyến:** Nút "Duyệt & Set Bàn Đặt" kèm huy hiệu (Badge) số lượng đơn `PENDING` và Alert Banner thời gian thực. Quản lý trực tiếp duyệt đơn đặt bàn của khách từ website, gọi điện xác nhận và gán bàn trống (`AVAILABLE`) trên sơ đồ (bàn tự động chuyển sang `RESERVED` màu cam kèm tên khách và giờ hẹn).
    - **Xác Thực Khách Quét QR (`POST /api/customer/tables/verify-qr`):** API công khai cho khách quét mã tại bàn kiểm tra tính hợp lệ trước khi gọi món.
 
 ---

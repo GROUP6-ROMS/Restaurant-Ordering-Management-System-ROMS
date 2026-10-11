@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../../components/common/Icon';
 import { tableApi } from '../../api/tableApi';
 import { zoneApi } from '../../api/zoneApi';
+import { reservationApi } from '../../api/reservationApi';
 
 export default function TableManagementPage() {
   const [tables, setTables] = useState([]);
@@ -77,6 +78,29 @@ export default function TableManagementPage() {
   const [showBatchQrModal, setShowBatchQrModal] = useState(false);
   const [batchFilterZone, setBatchFilterZone] = useState('ALL');
 
+  // State Quản Lý & Set Bàn Cho Đơn Đặt Bàn (Reservation Assignment)
+  const [reservations, setReservations] = useState([]);
+  const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [resStatusFilter, setResStatusFilter] = useState('PENDING'); // 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'ALL'
+  const [resSearchTerm, setResSearchTerm] = useState('');
+  const [resLoading, setResLoading] = useState(false);
+
+  // State Modal Xếp Bàn (Set Bàn)
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedResForAssign, setSelectedResForAssign] = useState(null);
+  const [availableTablesForAssign, setAvailableTablesForAssign] = useState([]);
+  const [selectedAssignTableId, setSelectedAssignTableId] = useState('');
+  const [assignZoneFilter, setAssignZoneFilter] = useState('ALL'); // Lọc bàn trống theo khu vực trong modal
+  const [assignAdminNote, setAssignAdminNote] = useState('');
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  // State Modal Hủy Đơn Đặt Bàn
+  const [showCancelResModal, setShowCancelResModal] = useState(false);
+  const [selectedResForCancel, setSelectedResForCancel] = useState(null);
+  const [cancelResReason, setCancelResReason] = useState('Khách hàng yêu cầu hủy / Không liên lạc được');
+  const [cancelResLoading, setCancelResLoading] = useState(false);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -108,6 +132,17 @@ export default function TableManagementPage() {
       } catch (zoneErr) {
         console.warn('Lỗi tải danh mục khu vực:', zoneErr);
       }
+
+      // Tải danh sách đơn đặt bàn để cập nhật số lượng yêu cầu mới (Pending Badge)
+      try {
+        const resReservations = await reservationApi.getAdminReservations();
+        const resList = resReservations.data || [];
+        setReservations(resList);
+        const pendingCount = resList.filter(r => r.status === 'PENDING').length;
+        setPendingReservationsCount(pendingCount);
+      } catch (resErr) {
+        console.warn('Lỗi tải danh sách đặt bàn:', resErr);
+      }
     } catch (error) {
       if (!silent) {
         console.error('Lỗi khi tải dữ liệu bàn từ backend:', error);
@@ -119,6 +154,110 @@ export default function TableManagementPage() {
       }
     } finally {
       if (!silent) setLoading(false);
+    }
+  };
+
+  // ===================================================================
+  // 1.0. CÁC HÀM XỬ LÝ ĐẶT BÀN & SET BÀN (RESERVATION MANAGEMENT)
+  // ===================================================================
+  const loadReservations = async () => {
+    try {
+      setResLoading(true);
+      const res = await reservationApi.getAdminReservations();
+      const list = res.data || [];
+      setReservations(list);
+      const pendingCount = list.filter(r => r.status === 'PENDING').length;
+      setPendingReservationsCount(pendingCount);
+    } catch (err) {
+      console.warn('Lỗi tải danh sách đặt bàn:', err);
+    } finally {
+      setResLoading(false);
+    }
+  };
+
+  const handleOpenReservationModal = async () => {
+    setShowReservationModal(true);
+    await loadReservations();
+  };
+
+  const handleOpenAssignModal = async (resItem) => {
+    setSelectedResForAssign(resItem);
+    setSelectedAssignTableId('');
+    setAssignZoneFilter('ALL');
+    setAssignAdminNote('');
+    setShowAssignModal(true);
+    setAssignLoading(true);
+    try {
+      const res = await reservationApi.getAvailableTablesForReservation(resItem.id);
+      const availableList = res.data || [];
+      setAvailableTablesForAssign(availableList);
+      if (availableList.length > 0) {
+        // Tự động gợi ý bàn cùng khu vực khách mong muốn nếu có
+        const matched = availableList.find(t => t.zone === resItem.requestedZone);
+        setSelectedAssignTableId(matched ? String(matched.id) : String(availableList[0].id));
+      }
+    } catch (err) {
+      console.error('Lỗi lấy danh sách bàn khả dụng:', err);
+      showToast('Không thể lấy danh sách bàn trống khả dụng!');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleConfirmAssignTable = async () => {
+    if (!selectedResForAssign || !selectedAssignTableId) {
+      showToast('Vui lòng chọn một bàn ăn trống để xếp cho khách!');
+      return;
+    }
+    try {
+      setAssignLoading(true);
+      const payload = {
+        tableId: Number(selectedAssignTableId),
+        adminNote: assignAdminNote.trim() || undefined
+      };
+      const res = await reservationApi.assignTable(selectedResForAssign.id, payload);
+      if (res.success || res.data) {
+        showToast(`Đã xếp bàn thành công cho khách hàng ${selectedResForAssign.customerName}!`);
+        setShowAssignModal(false);
+        setSelectedResForAssign(null);
+        await loadReservations();
+        await loadData(true);
+      }
+    } catch (err) {
+      console.error('Lỗi xếp bàn:', err);
+      const errMsg = err.response?.data?.message || 'Có lỗi xảy ra khi xếp bàn!';
+      showToast(errMsg);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleOpenCancelResModal = (resItem) => {
+    setSelectedResForCancel(resItem);
+    setCancelResReason('Khách hàng yêu cầu hủy / Không liên lạc được');
+    setShowCancelResModal(true);
+  };
+
+  const handleConfirmCancelRes = async () => {
+    if (!selectedResForCancel) return;
+    try {
+      setCancelResLoading(true);
+      const res = await reservationApi.cancelReservation(selectedResForCancel.id, {
+        cancelReason: cancelResReason.trim() || 'Quản lý hủy yêu cầu'
+      });
+      if (res.success || res.data) {
+        showToast(`Đã hủy phiếu đặt bàn của ${selectedResForCancel.customerName}!`);
+        setShowCancelResModal(false);
+        setSelectedResForCancel(null);
+        await loadReservations();
+        await loadData(true);
+      }
+    } catch (err) {
+      console.error('Lỗi hủy phiếu đặt bàn:', err);
+      const errMsg = err.response?.data?.message || 'Có lỗi xảy ra khi hủy đơn đặt bàn!';
+      showToast(errMsg);
+    } finally {
+      setCancelResLoading(false);
     }
   };
 
@@ -715,6 +854,44 @@ export default function TableManagementPage() {
 
           <button
             type="button"
+            onClick={handleOpenReservationModal}
+            title="Xem danh sách đặt bàn trực tuyến và set bàn cho khách"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '12px',
+              background: pendingReservationsCount > 0 ? '#FEF2F2' : '#FFFFFF',
+              border: pendingReservationsCount > 0 ? '1.5px solid #EF4444' : '1px solid #EAE0DE',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              color: pendingReservationsCount > 0 ? '#B91C1C' : '#56423D',
+              cursor: 'pointer',
+              position: 'relative',
+              transition: 'all 0.15s ease',
+              boxShadow: pendingReservationsCount > 0 ? '0 2px 8px rgba(239, 68, 68, 0.2)' : 'none'
+            }}
+          >
+            <Icon name="event_seat" size={18} style={{ color: pendingReservationsCount > 0 ? '#EF4444' : '#9D4124' }} />
+            Duyệt & Set Bàn Đặt
+            {pendingReservationsCount > 0 && (
+              <span style={{
+                background: '#EF4444',
+                color: '#FFFFFF',
+                borderRadius: '999px',
+                padding: '2px 7px',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                lineHeight: 1
+              }}>
+                {pendingReservationsCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowAddModal(true)}
             style={{
               display: 'inline-flex',
@@ -736,6 +913,68 @@ export default function TableManagementPage() {
           </button>
         </div>
       </div>
+
+      {/* Alert Banner cảnh báo có đơn đặt bàn đang chờ xếp bàn */}
+      {pendingReservationsCount > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          padding: '14px 20px',
+          background: 'linear-gradient(90deg, #FEF2F2 0%, #FFF7ED 100%)',
+          border: '1px solid #FCA5A5',
+          borderRadius: '16px',
+          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: '#FEE2E2',
+              color: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Icon name="notifications_active" size={22} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, color: '#991B1B', fontSize: '0.96rem' }}>
+                Có {pendingReservationsCount} yêu cầu đặt bàn trực tuyến mới cần được gọi xác nhận & xếp bàn!
+              </div>
+              <div style={{ color: '#7F1D1D', fontSize: '0.84rem', marginTop: '2px' }}>
+                Khách hàng đã gửi thông tin đặt chỗ từ website. Quản lý vui lòng xác nhận và gán bàn ăn phù hợp trước khi khách đến.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenReservationModal}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              background: '#DC2626',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '12px',
+              fontWeight: 800,
+              fontSize: '0.86rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 10px rgba(220, 38, 38, 0.25)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Icon name="chair" size={18} />
+            Xem Danh Sách & Xếp Bàn Ngay
+          </button>
+        </div>
+      )}
 
       {/* 5 Thẻ KPI Thống Kê Tổng Quan */}
       <div style={{
@@ -3011,6 +3250,1213 @@ export default function TableManagementPage() {
                 }}
               >
                 {zoneActionLoading ? 'Đang xóa...' : 'Xác Nhận Xóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL 1: DUYỆT & QUẢN LÝ DANH SÁCH ĐẶT BÀN TRỰC TUYẾN             */}
+      {/* ================================================================= */}
+      {showReservationModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1050,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '1000px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#FAF7F5'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: '#9D4124',
+                    background: '#FFDBC9',
+                    padding: '2px 8px',
+                    borderRadius: '6px'
+                  }}>
+                    ĐẶT BÀN TRƯỚC
+                  </span>
+                  <span style={{ fontSize: '0.85rem', color: '#89726B', fontWeight: 600 }}>
+                    Tiếp Nhận & Điều Phối
+                  </span>
+                </div>
+                <h2 style={{
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontWeight: 900,
+                  fontSize: '1.45rem',
+                  color: '#1F1B1A',
+                  margin: '4px 0 0'
+                }}>
+                  Phiếu Đặt Bàn & Điều Phối Xếp Bàn
+                </h2>
+                <p style={{ margin: '2px 0 0', color: '#56423D', fontSize: '0.85rem' }}>
+                  Gọi điện xác nhận theo số điện thoại khách hàng, sau đó chọn bàn ăn trống để giữ chỗ trên sơ đồ.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowReservationModal(false)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+
+            {/* Filter Tabs & Search Bar */}
+            <div style={{
+              padding: '14px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              background: '#FFFFFF'
+            }}>
+              {/* Status Filter Tabs */}
+              <div style={{ display: 'flex', gap: '6px', background: '#F5EFEB', padding: '4px', borderRadius: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setResStatusFilter('PENDING')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    background: resStatusFilter === 'PENDING' ? '#9D4124' : 'transparent',
+                    color: resStatusFilter === 'PENDING' ? '#FFFFFF' : '#56423D',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Chờ Xếp Bàn
+                  {pendingReservationsCount > 0 && (
+                    <span style={{
+                      background: resStatusFilter === 'PENDING' ? '#FFFFFF' : '#EF4444',
+                      color: resStatusFilter === 'PENDING' ? '#9D4124' : '#FFFFFF',
+                      borderRadius: '999px',
+                      padding: '1px 6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800
+                    }}>
+                      {pendingReservationsCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setResStatusFilter('CONFIRMED')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    background: resStatusFilter === 'CONFIRMED' ? '#9D4124' : 'transparent',
+                    color: resStatusFilter === 'CONFIRMED' ? '#FFFFFF' : '#56423D',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Đã Xếp Bàn
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setResStatusFilter('CANCELLED')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    background: resStatusFilter === 'CANCELLED' ? '#9D4124' : 'transparent',
+                    color: resStatusFilter === 'CANCELLED' ? '#FFFFFF' : '#56423D',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Đã Hủy
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setResStatusFilter('ALL')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    background: resStatusFilter === 'ALL' ? '#9D4124' : 'transparent',
+                    color: resStatusFilter === 'ALL' ? '#FFFFFF' : '#56423D',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Tất Cả ({reservations.length})
+                </button>
+              </div>
+
+              {/* Search input & Refresh */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#F9F5F3',
+                  border: '1px solid #EAE0DE',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  gap: '6px',
+                  width: '260px'
+                }}>
+                  <Icon name="search" size={18} style={{ color: '#89726B' }} />
+                  <input
+                    type="text"
+                    placeholder="Tìm tên, SĐT, mã đặt..."
+                    value={resSearchTerm}
+                    onChange={(e) => setResSearchTerm(e.target.value)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      outline: 'none',
+                      fontSize: '0.82rem',
+                      color: '#1F1B1A',
+                      width: '100%'
+                    }}
+                  />
+                  {resSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setResSearchTerm('')}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                    >
+                      <Icon name="close" size={14} style={{ color: '#89726B' }} />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={loadReservations}
+                  title="Tải lại danh sách đặt bàn"
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #EAE0DE',
+                    background: '#FFFFFF',
+                    color: '#56423D',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontWeight: 700,
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  <Icon name="refresh" size={16} />
+                  Làm mới
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Reservation Cards List */}
+            <div style={{
+              padding: '20px 24px',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              background: '#FDFBF9'
+            }}>
+              {resLoading ? (
+                <div style={{ padding: '60px', textAlign: 'center', color: '#89726B' }}>
+                  <Icon name="sync" size={32} style={{ animation: 'spin 1s linear infinite' }} />
+                  <div style={{ marginTop: '10px', fontWeight: 600 }}>Đang tải danh sách đặt bàn...</div>
+                </div>
+              ) : (
+                (() => {
+                  const filtered = reservations.filter(r => {
+                    if (resStatusFilter !== 'ALL' && r.status !== resStatusFilter) return false;
+                    if (resSearchTerm.trim()) {
+                      const q = resSearchTerm.trim().toLowerCase();
+                      const codeMatch = (r.bookingCode || '').toLowerCase().includes(q);
+                      const nameMatch = (r.customerName || '').toLowerCase().includes(q);
+                      const phoneMatch = (r.customerPhone || '').toLowerCase().includes(q);
+                      if (!codeMatch && !nameMatch && !phoneMatch) return false;
+                    }
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div style={{
+                        padding: '60px 20px',
+                        textAlign: 'center',
+                        background: '#FFFFFF',
+                        borderRadius: '16px',
+                        border: '1px dashed #EAE0DE'
+                      }}>
+                        <div style={{
+                          width: '64px',
+                          height: '64px',
+                          borderRadius: '50%',
+                          background: '#F5EFEB',
+                          color: '#89726B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 14px'
+                        }}>
+                          <Icon name="event_seat" size={32} />
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#1F1B1A' }}>
+                          Không có đơn đặt bàn nào
+                        </div>
+                        <div style={{ color: '#89726B', fontSize: '0.85rem', marginTop: '4px' }}>
+                          {resStatusFilter === 'PENDING'
+                            ? 'Hiện không có yêu cầu đặt bàn nào đang chờ duyệt xếp bàn.'
+                            : 'Không tìm thấy phiếu đặt bàn phù hợp với bộ lọc hiện tại.'}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((r) => {
+                    const isPending = r.status === 'PENDING';
+                    const isConfirmed = r.status === 'CONFIRMED';
+                    const isCancelled = r.status === 'CANCELLED';
+
+                    return (
+                      <div
+                        key={r.id}
+                        style={{
+                          background: '#FFFFFF',
+                          borderRadius: '16px',
+                          border: isPending ? '1.5px solid #FCA5A5' : '1px solid #EAE0DE',
+                          padding: '16px 20px',
+                          boxShadow: isPending ? '0 4px 14px rgba(239, 68, 68, 0.08)' : '0 2px 6px rgba(0,0,0,0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}
+                      >
+                        {/* Top bar: Code, Time created & Status */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{
+                              fontWeight: 900,
+                              fontFamily: 'monospace',
+                              fontSize: '0.92rem',
+                              color: '#9D4124',
+                              background: '#FFF5F0',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #FFDBC9'
+                            }}>
+                              {r.bookingCode}
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                              Tạo lúc: {r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : 'Mới gửi'}
+                            </span>
+                          </div>
+
+                          {/* Status Badge */}
+                          <div>
+                            {isPending && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#FEF3C7',
+                                color: '#B45309',
+                                border: '1px solid #FCD34D',
+                                padding: '4px 10px',
+                                borderRadius: '999px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800
+                              }}>
+                                <Icon name="schedule" size={14} />
+                                Chờ Xếp Bàn
+                              </span>
+                            )}
+                            {isConfirmed && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#D1FAE5',
+                                color: '#047857',
+                                border: '1px solid #6EE7B7',
+                                padding: '4px 10px',
+                                borderRadius: '999px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800
+                              }}>
+                                <Icon name="check_circle" size={14} />
+                                Đã Giữ Chỗ
+                              </span>
+                            )}
+                            {isCancelled && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#FEE2E2',
+                                color: '#B91C1C',
+                                border: '1px solid #FCA5A5',
+                                padding: '4px 10px',
+                                borderRadius: '999px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800
+                              }}>
+                                <Icon name="cancel" size={14} />
+                                Đã Hủy
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Customer & Booking Details */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                          gap: '12px',
+                          background: '#FAF7F5',
+                          padding: '12px 16px',
+                          borderRadius: '12px'
+                        }}>
+                          {/* Col 1: Customer Info */}
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#89726B', fontWeight: 600 }}>KHÁCH HÀNG</div>
+                            <div style={{ fontWeight: 800, color: '#1F1B1A', fontSize: '0.95rem', marginTop: '2px' }}>
+                              {r.customerName}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                              <Icon name="phone" size={14} style={{ color: '#047857' }} />
+                              <span style={{
+                                fontWeight: 700,
+                                color: '#1F1B1A',
+                                fontSize: '0.88rem'
+                              }}>
+                                {r.customerPhone}
+                              </span>
+                            </div>
+                            {r.customerEmail && (
+                              <div style={{ fontSize: '0.75rem', color: '#89726B', marginTop: '2px' }}>
+                                {r.customerEmail}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Col 2: Date & Time */}
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#89726B', fontWeight: 600 }}>HẸN ĐẾN LÚC</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', fontWeight: 800, color: '#9D4124', fontSize: '1rem' }}>
+                              <Icon name="schedule" size={18} />
+                              {r.formattedTime || (r.reservationTime ? new Date(r.reservationTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '')}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '0.82rem', color: '#56423D', fontWeight: 600 }}>
+                              <Icon name="calendar_today" size={14} />
+                              {r.formattedDate || (r.reservationTime ? new Date(r.reservationTime).toLocaleDateString('vi-VN') : '')}
+                            </div>
+                          </div>
+
+                          {/* Col 3: Guests & Zone */}
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#89726B', fontWeight: 600 }}>QUY MÔ & KHU VỰC</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', fontWeight: 800, color: '#1F1B1A', fontSize: '0.92rem' }}>
+                              <Icon name="groups" size={16} style={{ color: '#9D4124' }} />
+                              {r.guestCount} Khách
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '0.82rem', color: '#56423D' }}>
+                              <Icon name="place" size={14} style={{ color: '#89726B' }} />
+                              Yêu cầu: <strong>{r.requestedZoneName || r.requestedZone || 'Mặc định'}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Customer note if any */}
+                        {r.note && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '8px',
+                            background: '#FFFBEB',
+                            border: '1px solid #FEF3C7',
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            fontSize: '0.82rem',
+                            color: '#92400E'
+                          }}>
+                            <Icon name="chat" size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                            <div>
+                              <strong>Ghi chú của khách:</strong> {r.note}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Confirmed Table Info */}
+                        {isConfirmed && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '8px',
+                            background: '#ECFDF5',
+                            border: '1px solid #A7F3D0',
+                            padding: '10px 14px',
+                            borderRadius: '12px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                background: '#10B981',
+                                color: '#FFFFFF',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <Icon name="table_restaurant" size={18} />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.78rem', color: '#047857', fontWeight: 700 }}>
+                                  BÀN ĂN ĐÃ ĐƯỢC XẾP
+                                </div>
+                                <div style={{ fontWeight: 800, color: '#065F46', fontSize: '0.92rem' }}>
+                                  {r.tableNumber || ('Bàn #' + r.tableId)} {r.tableName ? `(${r.tableName})` : ''} • Sức chứa: {r.tableCapacity || 4} chỗ
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAssignModal(r)}
+                              title="Đổi sang bàn ăn khác"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid #059669',
+                                background: '#FFFFFF',
+                                color: '#059669',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Icon name="sync" size={14} />
+                              Đổi Bàn
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Cancel reason if cancelled */}
+                        {isCancelled && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: '#FEF2F2',
+                            border: '1px solid #FCA5A5',
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            fontSize: '0.82rem',
+                            color: '#991B1B'
+                          }}>
+                            <Icon name="info" size={16} />
+                            <div>
+                              <strong>Lý do hủy:</strong> {r.cancelReason || 'Không có lý do cụ thể'}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Actions for Pending Requests */}
+                        {isPending && (
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            alignItems: 'center',
+                            gap: '10px',
+                            paddingTop: '6px',
+                            borderTop: '1px solid #F0E6E4'
+                          }}>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCancelResModal(r)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                border: '1px solid #EAE0DE',
+                                background: '#FFFFFF',
+                                color: '#BA1A1A',
+                                fontWeight: 700,
+                                fontSize: '0.82rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Icon name="close" size={16} />
+                              Từ Chối / Hủy
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAssignModal(r)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 18px',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: '#9D4124',
+                                color: '#FFFFFF',
+                                fontWeight: 800,
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px rgba(157, 65, 36, 0.25)'
+                              }}
+                            >
+                              <Icon name="table_restaurant" size={18} />
+                              Set Bàn / Xếp Bàn Cho Khách
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '14px 24px',
+              borderTop: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#FAF7F5'
+            }}>
+              <span style={{ fontSize: '0.82rem', color: '#89726B' }}>
+                Tổng cộng: <strong>{reservations.length}</strong> phiếu đặt • Đang chờ xếp bàn: <strong style={{ color: '#EF4444' }}>{pendingReservationsCount}</strong>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setShowReservationModal(false)}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL 2: GỢI Ý & CHỌN BÀN ĂN KHẢ DỤNG ĐỂ GÁN (ASSIGN TABLE MODAL) */}
+      {/* ================================================================= */}
+      {showAssignModal && selectedResForAssign && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '680px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#FAF7F5'
+            }}>
+              <div>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  color: '#9D4124',
+                  background: '#FFDBC9',
+                  padding: '2px 8px',
+                  borderRadius: '6px'
+                }}>
+                  ĐIỀU PHỐI BÀN ĂN
+                </span>
+                <h3 style={{
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontWeight: 900,
+                  fontSize: '1.35rem',
+                  color: '#1F1B1A',
+                  margin: '4px 0 0'
+                }}>
+                  Xếp Bàn Cho Khách: {selectedResForAssign.customerName}
+                </h3>
+                <div style={{ fontSize: '0.82rem', color: '#89726B', marginTop: '2px' }}>
+                  Đơn: {selectedResForAssign.bookingCode} • SĐT: {selectedResForAssign.customerPhone}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setSelectedResForAssign(null);
+                }}
+                disabled={assignLoading}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{
+              padding: '20px 24px',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              {/* Customer Requirement Summary */}
+              <div style={{
+                background: '#FFF5F0',
+                border: '1px solid #FFDBC9',
+                borderRadius: '14px',
+                padding: '14px 18px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '10px',
+                fontSize: '0.85rem'
+              }}>
+                <div>
+                  <div style={{ color: '#89726B', fontSize: '0.75rem', fontWeight: 600 }}>GIỜ HẸN & NGÀY</div>
+                  <div style={{ fontWeight: 800, color: '#9D4124', marginTop: '2px' }}>
+                    {selectedResForAssign.formattedTime || '19:00'} ngày {selectedResForAssign.formattedDate || 'Hôm nay'}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ color: '#89726B', fontSize: '0.75rem', fontWeight: 600 }}>SỐ LƯỢNG KHÁCH</div>
+                  <div style={{ fontWeight: 800, color: '#1F1B1A', marginTop: '2px' }}>
+                    {selectedResForAssign.guestCount} Khách
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ color: '#89726B', fontSize: '0.75rem', fontWeight: 600 }}>KHU VỰC MONG MUỐN</div>
+                  <div style={{ fontWeight: 800, color: '#1F1B1A', marginTop: '2px' }}>
+                    {selectedResForAssign.requestedZoneName || selectedResForAssign.requestedZone || 'Mặc định'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Selector with Zone Filter Dropdown */}
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                  marginBottom: '10px'
+                }}>
+                  <label style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A' }}>
+                    Chọn Bàn Trống (AVAILABLE) Để Gán Cho Đơn Này:
+                  </label>
+
+                  {/* Dropdown Lọc Bàn Theo Phân Khu */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#89726B', fontWeight: 600 }}>Lọc theo khu vực:</span>
+                    <select
+                      value={assignZoneFilter}
+                      onChange={(e) => setAssignZoneFilter(e.target.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1.5px solid #EAE0DE',
+                        background: '#FFFFFF',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color: '#1F1B1A',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="ALL">Tất Cả Khu Vực ({availableTablesForAssign.length} bàn trống)</option>
+                      {zonesList.map(z => {
+                        const count = availableTablesForAssign.filter(t => t.zone === z.zoneCode).length;
+                        return (
+                          <option key={z.zoneCode} value={z.zoneCode}>
+                            {z.name} ({count} bàn trống)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+
+                {assignLoading && availableTablesForAssign.length === 0 ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#89726B' }}>
+                    <Icon name="sync" size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                    <div style={{ marginTop: '6px', fontSize: '0.85rem' }}>Đang tìm kiếm bàn trống khả dụng...</div>
+                  </div>
+                ) : availableTablesForAssign.length === 0 ? (
+                  <div style={{
+                    padding: '20px',
+                    borderRadius: '12px',
+                    background: '#FEF2F2',
+                    border: '1px solid #FCA5A5',
+                    color: '#991B1B',
+                    fontSize: '0.85rem',
+                    textAlign: 'center'
+                  }}>
+                    <Icon name="warning" size={24} style={{ marginBottom: '6px' }} />
+                    <div style={{ fontWeight: 800 }}>Hiện không có bàn trống nào trong hệ thống!</div>
+                    <div style={{ marginTop: '4px', fontSize: '0.8rem' }}>
+                      Vui lòng thanh toán hoặc giải phóng bàn ăn trên sơ đồ trước khi xếp bàn cho khách.
+                    </div>
+                  </div>
+                ) : (
+                  (() => {
+                    const filteredTables = availableTablesForAssign.filter(tbl => {
+                      if (assignZoneFilter !== 'ALL' && tbl.zone !== assignZoneFilter) return false;
+                      return true;
+                    });
+
+                    if (filteredTables.length === 0) {
+                      return (
+                        <div style={{
+                          padding: '24px',
+                          textAlign: 'center',
+                          background: '#FAF7F5',
+                          borderRadius: '12px',
+                          border: '1px dashed #EAE0DE',
+                          color: '#89726B',
+                          fontSize: '0.85rem'
+                        }}>
+                          Khu vực này hiện không còn bàn trống nào. Quản lý có thể chọn khu vực khác hoặc 'Tất Cả Khu Vực'.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                        gap: '10px',
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                        padding: '4px'
+                      }}>
+                        {filteredTables.map((tbl) => {
+                          const isSelected = String(tbl.id) === String(selectedAssignTableId);
+                          const isRequestedZone = tbl.zone === selectedResForAssign.requestedZone;
+                          const isEnoughCapacity = tbl.capacity >= selectedResForAssign.guestCount;
+
+                          return (
+                            <div
+                              key={tbl.id}
+                              onClick={() => setSelectedAssignTableId(String(tbl.id))}
+                              style={{
+                                padding: '12px 14px',
+                                borderRadius: '12px',
+                                border: isSelected ? '2px solid #9D4124' : '1px solid #EAE0DE',
+                                background: isSelected ? '#FFF7ED' : '#FFFFFF',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                position: 'relative',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{
+                                  fontWeight: 900,
+                                  fontSize: '0.95rem',
+                                  color: isSelected ? '#9D4124' : '#1F1B1A'
+                                }}>
+                                  {tbl.code || tbl.tableNumber}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  background: isEnoughCapacity ? '#ECFDF5' : '#FEF3C7',
+                                  color: isEnoughCapacity ? '#047857' : '#B45309',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px'
+                                }}>
+                                  {tbl.capacity} chỗ
+                                </span>
+                              </div>
+
+                              <div style={{ fontSize: '0.78rem', color: '#56423D', fontWeight: 600 }}>
+                                {tbl.name || `Bàn ${tbl.code}`}
+                              </div>
+
+                              <div style={{ fontSize: '0.72rem', color: '#89726B' }}>
+                                Khu vực: {tbl.zoneName || tbl.zone}
+                              </div>
+
+                              {isRequestedZone && (
+                                <div style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  color: '#047857',
+                                  marginTop: '2px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  <Icon name="check" size={12} />
+                                  Đúng khu vực yêu cầu
+                                </div>
+                              )}
+
+                              {isSelected && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  right: '8px',
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '50%',
+                                  background: '#9D4124',
+                                  color: '#FFFFFF',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  <Icon name="check" size={12} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* Admin note */}
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#1F1B1A', marginBottom: '6px' }}>
+                  Ghi Chú Của Quản Lý (Tùy chọn):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Đã gọi điện xác nhận, khách nhờ chuẩn bị ghế em bé..."
+                  value={assignAdminNote}
+                  onChange={(e) => setAssignAdminNote(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #EAE0DE',
+                    fontSize: '0.85rem',
+                    color: '#1F1B1A',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              gap: '10px',
+              background: '#FAF7F5'
+            }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setSelectedResForAssign(null);
+                }}
+                disabled={assignLoading}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy Bỏ
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmAssignTable}
+                disabled={assignLoading || !selectedAssignTableId}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 24px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#9D4124',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  cursor: (assignLoading || !selectedAssignTableId) ? 'not-allowed' : 'pointer',
+                  opacity: (assignLoading || !selectedAssignTableId) ? 0.6 : 1,
+                  boxShadow: '0 4px 12px rgba(157, 65, 36, 0.25)'
+                }}
+              >
+                <Icon name="check_circle" size={18} />
+                {assignLoading ? 'Đang Xếp Bàn...' : 'Xác Nhận Xếp Bàn & Giữ Chỗ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL 3: XÁC NHẬN HỦY ĐƠN ĐẶT BÀN                                 */}
+      {/* ================================================================= */}
+      {showCancelResModal && selectedResForCancel && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)'
+          }}>
+            <div style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              background: '#FFDAD6',
+              color: '#BA1A1A',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 14px'
+            }}>
+              <Icon name="cancel" size={28} />
+            </div>
+
+            <h3 style={{
+              fontFamily: "'Epilogue', sans-serif",
+              fontWeight: 900,
+              fontSize: '1.25rem',
+              color: '#1F1B1A',
+              margin: '0 0 6px',
+              textAlign: 'center'
+            }}>
+              Xác Nhận Hủy Đặt Bàn?
+            </h3>
+
+            <p style={{
+              margin: '0 0 16px',
+              fontSize: '0.85rem',
+              color: '#56423D',
+              textAlign: 'center',
+              lineHeight: 1.45
+            }}>
+              Hủy đơn đặt bàn của khách <strong>{selectedResForCancel.customerName}</strong> ({selectedResForCancel.bookingCode})? Bàn ăn đã gán (nếu có) sẽ được giải phóng về trạng thái trống.
+            </p>
+
+            {/* Quick Reason Selector */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: '0.82rem', color: '#1F1B1A', marginBottom: '6px' }}>
+                Lý Do Hủy Đặt Bàn:
+              </label>
+
+              <select
+                value={cancelResReason}
+                onChange={(e) => setCancelResReason(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  fontSize: '0.85rem',
+                  color: '#1F1B1A',
+                  background: '#FFFFFF',
+                  marginBottom: '8px'
+                }}
+              >
+                <option value="Khách hàng yêu cầu hủy / Không liên lạc được">Khách hàng yêu cầu hủy / Không liên lạc được</option>
+                <option value="Gọi điện nhiều lần khách không nhấc máy">Gọi điện nhiều lần khách không nhấc máy</option>
+                <option value="Nhà hàng đã hết bàn trống vào khung giờ hẹn">Nhà hàng đã hết bàn trống vào khung giờ hẹn</option>
+                <option value="Khách đặt trùng lặp đơn khác">Khách đặt trùng lặp đơn khác</option>
+                <option value="Khác">Lý do khác...</option>
+              </select>
+
+              {cancelResReason === 'Khác' && (
+                <input
+                  type="text"
+                  placeholder="Nhập lý do cụ thể..."
+                  onChange={(e) => setCancelResReason(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #EAE0DE',
+                    fontSize: '0.85rem',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCancelResModal(false);
+                  setSelectedResForCancel(null);
+                }}
+                disabled={cancelResLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Quay Lại
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmCancelRes}
+                disabled={cancelResLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#BA1A1A',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: cancelResLoading ? 'not-allowed' : 'pointer',
+                  opacity: cancelResLoading ? 0.6 : 1
+                }}
+              >
+                {cancelResLoading ? 'Đang Hủy...' : 'Xác Nhận Hủy'}
               </button>
             </div>
           </div>
