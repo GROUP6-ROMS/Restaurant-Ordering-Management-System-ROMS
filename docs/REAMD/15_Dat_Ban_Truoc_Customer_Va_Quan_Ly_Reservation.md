@@ -302,8 +302,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 /**
- * DTO trả về danh sách phân khu bàn được tải động từ Database
+ * DTO trả về danh sách phân khu bàn được tải động từ Database và thông tin quản trị
  */
 @Data
 @Builder
@@ -311,23 +313,36 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ZoneResponse {
 
+    private Long id;
+
     // Mã định danh phân khu lưu trong CSDL (ZONE_1, ZONE_2, VIP)
     private String zoneCode;
 
-    // Tên phân khu hiển thị đẹp trên giao diện (Ví dụ: "Sảnh Chính - Tầng 1")
+    // Tên phân khu
+    private String name;
+
+    // Tên phân khu hiển thị đẹp trên giao diện đặt bàn (Ví dụ: "Sảnh Chính - Tầng 1")
     private String zoneName;
 
     // Mô tả trải nghiệm không gian
     private String description;
+
+    // Thứ tự hiển thị
+    private Integer displayOrder;
 
     // Huy hiệu nổi bật (Ví dụ: "Phổ biến", "View đẹp", "Riêng tư")
     private String badge;
 
     // Tổng số bàn thuộc khu vực này trong CSDL
     private Long totalTables;
+    private Long tableCount;
 
     // Số bàn hiện đang trống và sẵn sàng phục vụ
     private Long availableTables;
+
+    private Boolean isActive;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
 ```
 
@@ -709,6 +724,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         return tables.stream().map(t -> TableResponse.builder()
                 .id(t.getId())
+                .code(t.getTableNumber())
                 .tableNumber(t.getTableNumber())
                 .name(t.getName())
                 .zone(t.getZone())
@@ -849,8 +865,8 @@ public class ReservationServiceImpl implements ReservationService {
 ```java
 package com.romsteam.roms.controller;
 
-import com.romsteam.roms.dto.ApiResponse;
 import com.romsteam.roms.dto.request.CreateReservationRequest;
+import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.ReservationResponse;
 import com.romsteam.roms.dto.response.ZoneResponse;
 import com.romsteam.roms.service.ReservationService;
@@ -879,11 +895,7 @@ public class CustomerReservationController {
     @GetMapping("/zones")
     public ResponseEntity<ApiResponse<List<ZoneResponse>>> getActiveZones() {
         List<ZoneResponse> zones = reservationService.getActiveZones();
-        return ResponseEntity.ok(ApiResponse.<List<ZoneResponse>>builder()
-                .success(true)
-                .message("Lấy danh sách khu vực bàn thành công")
-                .data(zones)
-                .build());
+        return ResponseEntity.ok(ApiResponse.success(zones, "Lấy danh sách khu vực bàn thành công"));
     }
 
     /**
@@ -894,11 +906,8 @@ public class CustomerReservationController {
     public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(
             @Valid @RequestBody CreateReservationRequest request) {
         ReservationResponse response = reservationService.createCustomerReservation(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.<ReservationResponse>builder()
-                .success(true)
-                .message("Yêu cầu đặt bàn của bạn đã được tiếp nhận! Quản lý sẽ gọi điện xác nhận trong ít phút.")
-                .data(response)
-                .build());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Yêu cầu đặt bàn của bạn đã được tiếp nhận! Quản lý sẽ gọi điện xác nhận trong ít phút."));
     }
 }
 ```
@@ -910,9 +919,9 @@ public class CustomerReservationController {
 ```java
 package com.romsteam.roms.controller;
 
-import com.romsteam.roms.dto.ApiResponse;
 import com.romsteam.roms.dto.request.AssignTableReservationRequest;
 import com.romsteam.roms.dto.request.CancelReservationRequest;
+import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.ReservationResponse;
 import com.romsteam.roms.dto.response.TableResponse;
 import com.romsteam.roms.entity.enums.ReservationStatus;
@@ -948,11 +957,7 @@ public class AdminReservationController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) String keyword) {
         List<ReservationResponse> list = reservationService.getReservations(status, date, keyword);
-        return ResponseEntity.ok(ApiResponse.<List<ReservationResponse>>builder()
-                .success(true)
-                .message("Lấy danh sách phiếu đặt bàn thành công")
-                .data(list)
-                .build());
+        return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách phiếu đặt bàn thành công"));
     }
 
     /**
@@ -962,11 +967,7 @@ public class AdminReservationController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ReservationResponse>> getReservationById(@PathVariable Long id) {
         ReservationResponse res = reservationService.getReservationById(id);
-        return ResponseEntity.ok(ApiResponse.<ReservationResponse>builder()
-                .success(true)
-                .message("Lấy chi tiết đơn đặt bàn thành công")
-                .data(res)
-                .build());
+        return ResponseEntity.ok(ApiResponse.success(res, "Lấy chi tiết đơn đặt bàn thành công"));
     }
 
     /**
@@ -976,11 +977,7 @@ public class AdminReservationController {
     @GetMapping("/{id}/available-tables")
     public ResponseEntity<ApiResponse<List<TableResponse>>> getAvailableTables(@PathVariable Long id) {
         List<TableResponse> tables = reservationService.getAvailableTablesForReservation(id);
-        return ResponseEntity.ok(ApiResponse.<List<TableResponse>>builder()
-                .success(true)
-                .message("Lấy danh sách bàn khả dụng thành công")
-                .data(tables)
-                .build());
+        return ResponseEntity.ok(ApiResponse.success(tables, "Lấy danh sách bàn khả dụng thành công"));
     }
 
     /**
@@ -992,11 +989,7 @@ public class AdminReservationController {
             @PathVariable Long id,
             @Valid @RequestBody AssignTableReservationRequest request) {
         ReservationResponse updated = reservationService.assignTableToReservation(id, request);
-        return ResponseEntity.ok(ApiResponse.<ReservationResponse>builder()
-                .success(true)
-                .message("Xếp bàn và xác nhận giữ chỗ thành công cho khách hàng!")
-                .data(updated)
-                .build());
+        return ResponseEntity.ok(ApiResponse.success(updated, "Xếp bàn và xác nhận giữ chỗ thành công cho khách hàng!"));
     }
 
     /**
@@ -1008,11 +1001,7 @@ public class AdminReservationController {
             @PathVariable Long id,
             @Valid @RequestBody CancelReservationRequest request) {
         ReservationResponse cancelled = reservationService.cancelReservation(id, request);
-        return ResponseEntity.ok(ApiResponse.<ReservationResponse>builder()
-                .success(true)
-                .message("Đã cập nhật hủy đơn đặt bàn thành công")
-                .data(cancelled)
-                .build());
+        return ResponseEntity.ok(ApiResponse.success(cancelled, "Đã cập nhật hủy đơn đặt bàn thành công"));
     }
 }
 ```

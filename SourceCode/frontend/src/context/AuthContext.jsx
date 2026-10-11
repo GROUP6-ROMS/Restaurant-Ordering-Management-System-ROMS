@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../api/authApi';
 
 const AuthContext = createContext();
@@ -22,11 +22,11 @@ export function getRoleHome(role) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('roms_user');
+    const saved = sessionStorage.getItem('roms_user') || localStorage.getItem('roms_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [token, setToken] = useState(() => localStorage.getItem('roms_token') || null);
+  const [token, setToken] = useState(() => sessionStorage.getItem('roms_token') || localStorage.getItem('roms_token') || null);
 
   const login = async (username, pinCode) => {
     try {
@@ -38,6 +38,9 @@ export function AuthProvider({ children }) {
       const { id, fullName, role, assignedShift, isOnShift } = resData;
       const userData = { id, username: resData.username || username, fullName, role, assignedShift, isOnShift };
 
+      // Lưu sessionStorage (độc lập từng tab khi test nhiều tài khoản song song)
+      sessionStorage.setItem('roms_token', authToken);
+      sessionStorage.setItem('roms_user', JSON.stringify(userData));
       localStorage.setItem('roms_token', authToken);
       localStorage.setItem('roms_user', JSON.stringify(userData));
 
@@ -61,6 +64,9 @@ export function AuthProvider({ children }) {
     } finally {
       setUser(null);
       setToken(null);
+      // Chỉ đăng xuất tab hiện tại khỏi sessionStorage
+      sessionStorage.removeItem('roms_user');
+      sessionStorage.removeItem('roms_token');
       localStorage.removeItem('roms_user');
       localStorage.removeItem('roms_token');
     }

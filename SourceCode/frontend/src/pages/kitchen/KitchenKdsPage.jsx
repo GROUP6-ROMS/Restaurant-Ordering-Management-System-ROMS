@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MOCK_ACTIVE_ORDERS } from '../../mock/mockData';
+import { kitchenApi } from '../../api/kitchenApi';
 
 // Icon Material Symbols
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -18,16 +18,18 @@ function Icon({ name, size = 20, fill = 0, style = {} }) {
   );
 }
 
-// Dong ho dem thoi gian - tra ve so giay da troi qua
+// Đồng hồ đếm thời gian - trả về số giây đã trôi qua
 function useElapsedSeconds(startTimeString) {
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
     const getElapsed = () => {
       if (!startTimeString) return 0;
-      const now = new Date();
       const start = new Date(startTimeString);
-      return Math.floor((now - start) / 1000);
+      if (isNaN(start.getTime())) return 0;
+      const now = new Date();
+      const diff = Math.floor((now - start) / 1000);
+      return diff >= 0 ? diff : 0;
     };
 
     setSeconds(getElapsed());
@@ -38,21 +40,87 @@ function useElapsedSeconds(startTimeString) {
   return seconds;
 }
 
-// Format so giay thanh MM:SS
+// Format số giây thành MM:SS
 function formatTime(totalSeconds) {
+  if (isNaN(totalSeconds) || totalSeconds < 0) return '00:00';
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// Định dạng thời gian đặt món (HH:mm)
+function formatOrderTime(timeString) {
+  if (!timeString) return '';
+  try {
+    const d = new Date(timeString);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+// Singleton Web Audio API Context (Tránh chạm giới hạn 6 hardware contexts của Chromium)
+let sharedAudioCtx = null;
+function getAudioContext() {
+  if (!sharedAudioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      sharedAudioCtx = new AudioContextClass();
+    }
+  }
+  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume().catch(() => {});
+  }
+  return sharedAudioCtx;
+}
+
+// Bộ tổng hợp âm thanh Web Audio API (Synthesizer Chime)
+function playKitchenChime() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Nốt thứ nhất (D5 ~ 587.33 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0.2, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
+
+    // Nốt thứ hai (A5 ~ 880 Hz) - tạo tiếng chuông "Ding-Dong" êm ái
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.18);
+    gain2.gain.setValueAtTime(0.2, now + 0.18);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.18);
+    osc2.stop(now + 0.7);
+  } catch (e) {
+    console.warn('Audio Context không thể phát âm thanh tự động:', e);
+  }
+}
+
 // --- KDS Ticket Card ---
-function KdsTicketCard({ order, onUpdateStatus }) {
+function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemStatus, onToggleRush }) {
   const elapsedSeconds = useElapsedSeconds(order.startedAt);
-  const isOverdue = elapsedSeconds > 15 * 60; // Tre hon 15 phut
-  const isUrgent = elapsedSeconds > 10 * 60;  // Canh bao sau 10 phut
+  const isOverdue = elapsedSeconds > 15 * 60; // Trễ hơn 15 phút (Overdue SLA)
+  const isUrgent = elapsedSeconds > 10 * 60;  // Cảnh báo sau 10 phút
+  const isOrderUpdating = actionLoadingId === `order-${order.id}`;
 
   const getStatusConfig = (status) => {
     switch (status) {
+      case 'SUBMITTED':
+      case 'CONFIRMED':
       case 'PENDING':
         return {
           label: 'Chờ tiếp nhận',
@@ -63,7 +131,7 @@ function KdsTicketCard({ order, onUpdateStatus }) {
           nextStatus: 'COOKING',
           nextLabel: 'Bắt đầu nấu',
           nextIcon: 'local_fire_department',
-          nextBg: 'var(--secondary)',
+          nextBg: 'var(--secondary, #825345)',
           nextColor: '#fff',
         };
       case 'COOKING':
@@ -76,25 +144,25 @@ function KdsTicketCard({ order, onUpdateStatus }) {
           nextStatus: 'READY',
           nextLabel: 'Xác nhận xong món',
           nextIcon: 'check_circle',
-          nextBg: 'var(--tertiary-container)',
+          nextBg: 'var(--tertiary-container, #2e7d32)',
           nextColor: '#fff',
         };
       case 'READY':
         return {
           label: 'Sẵn sàng phục vụ',
-          borderColor: 'var(--tertiary-container)',
-          headerBg: 'var(--tertiary-fixed)',
-          timerBg: 'var(--tertiary-container)',
+          borderColor: 'var(--tertiary-container, #2e7d32)',
+          headerBg: 'var(--tertiary-fixed, #e8f5e9)',
+          timerBg: 'var(--tertiary-container, #2e7d32)',
           timerColor: '#fff',
-          nextStatus: 'SERVED',
-          nextLabel: 'Đã lên bàn',
+          nextStatus: null,
+          nextLabel: 'Chờ phục vụ bưng món',
           nextIcon: 'table_restaurant',
           nextBg: 'var(--surface-container)',
           nextColor: 'var(--on-surface)',
         };
       default:
         return {
-          label: 'Đã phục vụ',
+          label: 'Đã hoàn tất',
           borderColor: 'var(--outline-variant)',
           headerBg: 'var(--surface-container)',
           timerBg: 'var(--surface-container-high)',
@@ -114,30 +182,37 @@ function KdsTicketCard({ order, onUpdateStatus }) {
     <article style={{
       background: 'var(--surface)',
       borderRadius: 18,
-      border: `1px solid var(--outline-variant)`,
-      borderTop: `4px solid ${isOverdue ? 'var(--error)' : cfg.borderColor}`,
-      boxShadow: isOverdue
-        ? '0 0 0 0 rgba(189, 89, 58, 0.25)'
+      border: `1px solid ${order.isRush ? 'var(--error)' : 'var(--outline-variant)'}`,
+      borderTop: `5px solid ${order.isRush ? 'var(--error)' : isOverdue ? 'var(--error)' : cfg.borderColor}`,
+      boxShadow: order.isRush
+        ? '0 0 0 2px rgba(186, 26, 26, 0.2), 0 4px 12px rgba(186, 26, 26, 0.15)'
+        : isOverdue
+        ? '0 0 0 1px rgba(189, 89, 58, 0.25), 0 4px 12px rgba(189, 89, 58, 0.15)'
         : 'var(--shadow-sm)',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      animation: isOverdue ? 'none' : undefined,
+      transition: 'all 0.2s ease',
+      opacity: isOrderUpdating ? 0.7 : 1,
     }}>
 
       {/* --- Header card --- */}
       <div style={{
-        background: isOverdue ? 'var(--primary-fixed)' : cfg.headerBg,
+        background: order.isRush
+          ? '#ffebee'
+          : isOverdue
+          ? 'var(--primary-fixed)'
+          : cfg.headerBg,
         borderBottom: '1px solid var(--outline-variant)',
         padding: '12px 14px',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{
               fontFamily: 'Epilogue', fontWeight: 800, fontSize: 22,
-              color: 'var(--primary)', lineHeight: 1,
+              color: order.isRush ? 'var(--error)' : 'var(--primary)', lineHeight: 1,
               letterSpacing: '-0.02em',
             }}>
-              Bàn {order.tableNumber}
+              {order.tableNumber ? `Bàn ${order.tableNumber}` : 'Mang Về'}
             </span>
             <span style={{
               fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
@@ -145,16 +220,63 @@ function KdsTicketCard({ order, onUpdateStatus }) {
               background: 'var(--primary-container)', color: '#fff',
               letterSpacing: '0.04em',
             }}>
-              #{order.id}
+              #{order.orderCode || order.id}
             </span>
+
+            {/* Badge RUSH nếu là đơn hỏa tốc */}
+            {order.isRush && (
+              <span style={{
+                fontFamily: 'JetBrains Mono', fontSize: 10, fontWeight: 800,
+                padding: '2px 6px', borderRadius: 4,
+                background: 'var(--error, #ba1a1a)', color: '#fff',
+                display: 'inline-flex', alignItems: 'center', gap: 2,
+                letterSpacing: '0.04em',
+              }}>
+                <Icon name="bolt" size={12} fill={1} />
+                RUSH
+              </span>
+            )}
           </div>
+
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 5, marginTop: 3,
+            display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap',
             fontFamily: 'Plus Jakarta Sans', fontSize: 12, color: 'var(--on-surface-variant)',
           }}>
-            <Icon name="person" size={13} style={{ color: 'var(--primary)' }} />
-            Phục vụ: <strong style={{ color: 'var(--on-surface)', fontWeight: 600 }}>{order.staffName || 'Trần Minh B'}</strong>
+            {order.zoneName && (
+              <span style={{
+                padding: '1px 6px', borderRadius: 4,
+                background: 'rgba(0,0,0,0.05)', fontSize: 11, fontWeight: 600,
+              }}>
+                {order.zoneName}
+              </span>
+            )}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="person" size={13} style={{ color: 'var(--primary)' }} />
+              {order.staffName || 'Khách quét QR'}
+            </span>
+            {order.startedAt && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--outline)' }}>
+                <Icon name="schedule" size={13} />
+                {formatOrderTime(order.startedAt)}
+              </span>
+            )}
           </div>
+
+          {/* Ghi chú chung hoặc cảnh báo chuyển bàn */}
+          {order.note && (
+            <div style={{
+              marginTop: 6, padding: '4px 8px', borderRadius: 6,
+              background: order.note.includes('[CHUYỂN TỪ') ? 'rgba(186, 26, 26, 0.12)' : 'rgba(255, 152, 0, 0.1)',
+              color: order.note.includes('[CHUYỂN TỪ') ? '#BA1A1A' : '#e65100',
+              fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
+              display: 'flex', alignItems: 'flex-start', gap: 4,
+              border: order.note.includes('[CHUYỂN TỪ') ? '1px dashed #BA1A1A' : 'none',
+              wordBreak: 'break-word', whiteSpace: 'pre-wrap', lineHeight: 1.35,
+            }}>
+              <Icon name={order.note.includes('[CHUYỂN TỪ') ? 'swap_horiz' : 'info'} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{order.note}</span>
+            </div>
+          )}
         </div>
 
         {/* Timer */}
@@ -162,11 +284,17 @@ function KdsTicketCard({ order, onUpdateStatus }) {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '4px 10px', borderRadius: 8,
-            background: isOverdue ? 'var(--error)' : isUrgent ? 'var(--primary)' : cfg.timerBg,
-            color: isOverdue ? '#fff' : isUrgent ? '#fff' : cfg.timerColor,
+            background: order.isRush
+              ? 'var(--error)'
+              : isOverdue
+              ? 'var(--error)'
+              : isUrgent
+              ? 'var(--primary)'
+              : cfg.timerBg,
+            color: '#fff',
             boxShadow: 'var(--shadow-xs)',
           }}>
-            {isOverdue && <Icon name="warning" size={14} fill={1} />}
+            {(isOverdue || order.isRush) && <Icon name="warning" size={14} fill={1} />}
             <span style={{ fontFamily: 'JetBrains Mono', fontWeight: 700, fontSize: 15, letterSpacing: '0.04em' }}>
               {formatTime(elapsedSeconds)}
             </span>
@@ -179,89 +307,139 @@ function KdsTicketCard({ order, onUpdateStatus }) {
         </div>
       </div>
 
-      {/* --- Danh sach mon an trong ticket --- */}
+      {/* --- Danh sách món ăn trong ticket --- */}
       <div style={{ padding: '12px 14px', background: 'var(--surface)', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {order.items.map((item, idx) => (
-          <div
-            key={item.id}
-            style={{
-              paddingBottom: idx < order.items.length - 1 ? 10 : 0,
-              borderBottom: idx < order.items.length - 1 ? '1px solid var(--outline-variant)' : 'none',
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-              opacity: item.status === 'READY' ? 0.55 : 1,
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  fontFamily: 'Epilogue', fontWeight: 700, fontSize: 16,
-                  color: item.status === 'READY' ? 'var(--outline)' : 'var(--primary)',
-                  textDecoration: item.status === 'READY' ? 'line-through' : 'none',
-                }}>
-                  {item.quantity}x
-                </span>
-                <span style={{
-                  fontFamily: 'Epilogue', fontWeight: 700, fontSize: 15,
-                  color: item.status === 'READY' ? 'var(--on-surface-variant)' : 'var(--on-surface)',
-                  textDecoration: item.status === 'READY' ? 'line-through' : 'none',
-                }}>
-                  {item.name}
-                </span>
-                {item.variant && (
+        {order.items && order.items.map((item, idx) => {
+          const isCancelled = item.status === 'CANCELLED';
+          const isServed = item.status === 'SERVED';
+          const isReady = item.status === 'READY';
+          const isDone = isReady || isServed;
+          const isItemUpdating = actionLoadingId === `item-${item.id}`;
+
+          return (
+            <div
+              key={item.id}
+              style={{
+                paddingBottom: idx < order.items.length - 1 ? 10 : 0,
+                borderBottom: idx < order.items.length - 1 ? '1px solid var(--outline-variant)' : 'none',
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
+                opacity: isServed ? 0.45 : isCancelled ? 0.55 : 1,
+                transition: 'opacity 0.2s ease',
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{
-                    padding: '1px 6px', borderRadius: 4,
-                    background: 'var(--surface-container-high)',
-                    color: 'var(--on-surface-variant)',
-                    fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 600,
-                    border: '1px solid var(--outline-variant)',
+                    fontFamily: 'Epilogue', fontWeight: 700, fontSize: 16,
+                    color: isCancelled ? '#ba1a1a' : isServed ? 'var(--outline)' : 'var(--primary)',
+                    textDecoration: isServed || isCancelled ? 'line-through' : 'none',
                   }}>
-                    {item.variant}
+                    {item.quantity}x
                   </span>
+                  <span style={{
+                    fontFamily: 'Epilogue', fontWeight: 700, fontSize: 15,
+                    color: isCancelled ? '#ba1a1a' : isServed ? 'var(--on-surface-variant)' : 'var(--on-surface)',
+                    textDecoration: isServed || isCancelled ? 'line-through' : 'none',
+                  }}>
+                    {item.name}
+                  </span>
+
+                  {/* Badge phân biệt trạng thái món rõ nét theo chuẩn F&B */}
+                  {isCancelled && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                      background: '#ffebee', color: '#ba1a1a', border: '1px solid #ffcdd2',
+                      display: 'inline-flex', alignItems: 'center', gap: 2,
+                    }}>
+                      <Icon name="cancel" size={11} fill={1} />
+                      ĐÃ HỦY
+                    </span>
+                  )}
+                  {isServed && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                      background: 'var(--surface-container-high)', color: 'var(--on-surface-variant)',
+                      display: 'inline-flex', alignItems: 'center', gap: 2,
+                    }}>
+                      <Icon name="done_all" size={12} style={{ color: 'var(--primary)' }} />
+                      ĐÃ LÊN BÀN
+                    </span>
+                  )}
+                  {isReady && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                      background: 'rgba(46, 125, 50, 0.12)', color: '#2e7d32', border: '1px solid rgba(46, 125, 50, 0.25)',
+                      display: 'inline-flex', alignItems: 'center', gap: 2,
+                    }}>
+                      <Icon name="check_circle" size={11} fill={1} />
+                      ĐÃ XONG (CHỜ BƯNG)
+                    </span>
+                  )}
+                </div>
+
+                {/* Ghi chú bếp cho từng món (chống vỡ layout chữ dài) */}
+                {item.note && (
+                  <div style={{ marginTop: 4, paddingLeft: 28, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'flex-start', gap: 4,
+                      padding: '2px 8px', borderRadius: 4,
+                      background: 'var(--surface-container-low)',
+                      color: 'var(--primary)',
+                      fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
+                      border: '1px solid var(--outline-variant)', lineHeight: 1.35,
+                    }}>
+                      <Icon name="report" size={12} style={{ flexShrink: 0, marginTop: 2 }} />
+                      <span>{item.note}</span>
+                    </span>
+                  </div>
                 )}
               </div>
-              {/* Ghi chu bep - amber colored */}
-              {item.note && (
-                <div style={{ marginTop: 5, paddingLeft: 28 }}>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '2px 8px', borderRadius: 4,
-                    background: 'var(--surface-container-low)',
-                    color: 'var(--primary)',
-                    fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
-                    border: '1px solid var(--outline-variant)',
-                  }}>
-                    <Icon name="report" size={12} />
-                    {item.note}
-                  </span>
-                </div>
-              )}
+
+              {/* Checkbox item - Click đổi trạng thái món sang READY hoặc COOKING */}
+              <input
+                type="checkbox"
+                checked={isDone}
+                disabled={isServed || isCancelled || isItemUpdating}
+                onChange={() => onToggleItemStatus(order.id, item.id, item.status)}
+                title={
+                  isCancelled
+                    ? "Món đã bị hủy"
+                    : isServed
+                    ? "Món đã được phục vụ lên bàn"
+                    : isReady
+                    ? "Bấm để nấu lại món này"
+                    : "Bấm xác nhận đã xong món này"
+                }
+                style={{
+                  width: 22, height: 22, marginTop: 2, accentColor: 'var(--primary)',
+                  cursor: isServed || isCancelled || isItemUpdating ? 'not-allowed' : 'pointer',
+                  opacity: isItemUpdating ? 0.5 : 1,
+                }}
+              />
             </div>
-            {/* Checkbox item */}
-            <input
-              type="checkbox"
-              checked={item.status === 'READY'}
-              onChange={() => {}}
-              style={{ width: 18, height: 18, marginTop: 2, accentColor: 'var(--primary)', cursor: 'pointer' }}
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* --- Footer actions --- */}
-      {cfg.nextStatus && (
-        <div style={{
-          padding: '10px 12px',
-          background: 'var(--surface-container)',
-          borderTop: '1px solid var(--outline-variant)',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
+      <div style={{
+        padding: '10px 12px',
+        background: 'var(--surface-container)',
+        borderTop: '1px solid var(--outline-variant)',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        {cfg.nextStatus ? (
           <button
+            type="button"
+            disabled={isOrderUpdating}
             onClick={() => onUpdateStatus(order.id, cfg.nextStatus)}
             style={{
               flex: 1, height: 44, borderRadius: 12,
               background: isOverdue ? 'var(--error)' : cfg.nextBg,
               color: cfg.nextColor,
-              border: 'none', cursor: 'pointer',
+              border: 'none',
+              cursor: isOrderUpdating ? 'not-allowed' : 'pointer',
+              opacity: isOrderUpdating ? 0.6 : 1,
               fontFamily: 'Epilogue', fontWeight: 700, fontSize: 13,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               transition: 'all 0.15s ease',
@@ -270,40 +448,97 @@ function KdsTicketCard({ order, onUpdateStatus }) {
             <Icon name={cfg.nextIcon} size={18} fill={1} />
             {isOverdue ? 'CHUYỂN GIAO MÓN (OVERDUE)' : cfg.nextLabel.toUpperCase()}
           </button>
-          <button
-            style={{
-              height: 44, padding: '0 12px', borderRadius: 12,
-              background: 'var(--surface-container-lowest)',
-              border: '1px solid var(--outline-variant)',
-              color: 'var(--primary)', cursor: 'pointer',
-              fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <Icon name="bolt" size={16} />
-            RUSH
-          </button>
-        </div>
-      )}
+        ) : (
+          <div style={{
+            flex: 1, height: 44, borderRadius: 12,
+            background: 'var(--surface-container-high)',
+            color: 'var(--on-surface-variant)',
+            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            <Icon name="check_circle" size={18} fill={1} style={{ color: 'var(--tertiary, #2e7d32)' }} />
+            TOÀN BỘ ĐÃ XONG (CHỜ BƯNG)
+          </div>
+        )}
+
+        {/* Nút RUSH */}
+        <button
+          type="button"
+          disabled={isOrderUpdating}
+          onClick={() => onToggleRush(order.id)}
+          title={order.isRush ? "Hủy chế độ hỏa tốc" : "Đánh dấu đơn hỏa tốc (RUSH)"}
+          style={{
+            height: 44, padding: '0 12px', borderRadius: 12,
+            background: order.isRush ? 'var(--error, #ba1a1a)' : 'var(--surface-container-lowest)',
+            border: `1px solid ${order.isRush ? 'var(--error, #ba1a1a)' : 'var(--outline-variant)'}`,
+            color: order.isRush ? '#fff' : 'var(--primary)',
+            cursor: isOrderUpdating ? 'not-allowed' : 'pointer',
+            opacity: isOrderUpdating ? 0.6 : 1,
+            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
+            display: 'flex', alignItems: 'center', gap: 4,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <Icon name="bolt" size={16} fill={order.isRush ? 1 : 0} />
+          RUSH
+        </button>
+      </div>
     </article>
   );
 }
 
 // ====================================================
-// KitchenKdsPage - Man hinh bep KDS (SCR-15 Stitch)
-// Light warm Terracotta theme (KHONG dark - Stitch dung Light)
+// KitchenKdsPage - Màn hình bếp KDS (SCR-15 Stitch)
+// Dữ liệu thời gian thực từ CSDL SQL Server qua REST API
 // ====================================================
 export default function KitchenKdsPage() {
-  const [orders, setOrders] = useState(() => {
-    // Tao mock orders voi timestamp thuc te
-    return MOCK_ACTIVE_ORDERS.map((o, i) => ({
-      ...o,
-      startedAt: new Date(Date.now() - (i * 4 + 2) * 60 * 1000).toISOString(),
-    }));
-  });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState(null);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
+  // Lưu cài đặt âm thanh vào localStorage
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('roms_kds_sound');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const prevOrderIdsRef = useRef(new Set());
+  const isInitialLoadRef = useRef(true);
+
+  // Hiển thị thông báo phản hồi (Toast)
+  const showToast = (text, isError = false) => {
+    setToastMessage({ text, isError });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Bật/tắt âm thanh chuông bếp & lưu cấu hình
+  const toggleSound = () => {
+    setSoundEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('roms_kds_sound', String(next));
+      } catch {}
+      if (next) {
+        const ctx = getAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+        playKitchenChime();
+      }
+      return next;
+    });
+  };
+
+  // Lắng nghe thay đổi toàn màn hình
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener('fullscreenchange', handleFsChange);
@@ -318,20 +553,133 @@ export default function KitchenKdsPage() {
     }
   };
 
+  // Tải danh sách đơn hàng thực tế từ Backend
+  const loadOrders = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const [ordersRes, summaryRes] = await Promise.all([
+        kitchenApi.getActiveOrders(),
+        kitchenApi.getKitchenSummary(),
+      ]);
 
-  const handleUpdateStatus = (orderId, newStatus) => {
-    setOrders(prev => prev.map(o =>
-      o.id === orderId
-        ? { ...o, status: newStatus, items: o.items.map(i => ({ ...i, status: newStatus })) }
-        : o
-    ));
+      if (ordersRes.data && ordersRes.data.success) {
+        const incomingOrders = ordersRes.data.data || [];
+
+        // Nếu có đơn mới xuất hiện so với lần quét trước -> Phát tiếng chuông Ding-Dong
+        if (!isInitialLoadRef.current && soundEnabled) {
+          const hasNewOrder = incomingOrders.some(o => !prevOrderIdsRef.current.has(o.id));
+          if (hasNewOrder) {
+            playKitchenChime();
+          }
+        }
+
+        prevOrderIdsRef.current = new Set(incomingOrders.map(o => o.id));
+        isInitialLoadRef.current = false;
+        setOrders(incomingOrders);
+      }
+
+      if (summaryRes.data && summaryRes.data.success) {
+        setSummary(summaryRes.data.data);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải dữ liệu KDS:', err);
+    } finally {
+      if (!silent) setLoading(false);
+    }
   };
 
-  const filteredOrders = orders.filter(o => filterStatus === 'ALL' || o.status === filterStatus);
+  // Chu kỳ Polling 5s & đồng bộ khi người dùng focus tab
+  useEffect(() => {
+    loadOrders(false);
+
+    const interval = setInterval(() => {
+      loadOrders(true);
+    }, 5000);
+
+    const handleFocus = () => loadOrders(true);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [soundEnabled]);
+
+  // Cập nhật trạng thái cho cả đơn hàng
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    try {
+      setActionLoadingId(`order-${orderId}`);
+      const res = await kitchenApi.updateOrderStatus(orderId, newStatus);
+      if (res.data && res.data.success) {
+        showToast('Đã cập nhật trạng thái đơn thành công');
+        await loadOrders(true);
+      }
+    } catch (err) {
+      console.error('Lỗi cập nhật trạng thái đơn:', err);
+      showToast('Không thể cập nhật trạng thái đơn. Vui lòng thử lại!', true);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Cập nhật trạng thái từng món ăn riêng lẻ (tick hoàn thành)
+  const handleToggleItemStatus = async (orderId, itemId, currentStatus) => {
+    const nextStatus = (currentStatus === 'READY' || currentStatus === 'SERVED') ? 'COOKING' : 'READY';
+    try {
+      setActionLoadingId(`item-${itemId}`);
+      const res = await kitchenApi.updateItemStatus(itemId, nextStatus);
+      if (res.data && res.data.success) {
+        await loadOrders(true);
+      }
+    } catch (err) {
+      console.error('Lỗi cập nhật trạng thái món:', err);
+      showToast('Không thể cập nhật trạng thái món. Vui lòng thử lại!', true);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Bật/Tắt chế độ ưu tiên hỏa tốc RUSH
+  const handleToggleRush = async (orderId) => {
+    try {
+      setActionLoadingId(`order-${orderId}`);
+      const res = await kitchenApi.toggleRushOrder(orderId);
+      if (res.data && res.data.success) {
+        await loadOrders(true);
+      }
+    } catch (err) {
+      console.error('Lỗi cập nhật ưu tiên RUSH:', err);
+      showToast('Không thể cập nhật chế độ hỏa tốc. Vui lòng thử lại!', true);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Bộ lọc theo trạng thái
+  const filterMatches = (order, filter) => {
+    if (filter === 'ALL') return true;
+    if (filter === 'PENDING') return order.status === 'CONFIRMED' || order.status === 'PENDING' || order.status === 'SUBMITTED';
+    if (filter === 'COOKING') return order.status === 'COOKING';
+    if (filter === 'READY') return order.status === 'READY';
+    return true;
+  };
+
+  // Lọc kết hợp trạng thái + tìm kiếm nhanh (số bàn, mã đơn, tên món)
+  const filteredOrders = orders.filter(order => {
+    if (!filterMatches(order, filterStatus)) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    const matchTable = (order.tableNumber || '').toLowerCase().includes(q) || (order.tableName || '').toLowerCase().includes(q);
+    const matchCode = (order.orderCode || '').toLowerCase().includes(q) || String(order.id).includes(q);
+    const matchItem = order.items && order.items.some(it => (it.name || '').toLowerCase().includes(q));
+    return matchTable || matchCode || matchItem;
+  });
 
   const counts = {
     ALL: orders.length,
-    PENDING: orders.filter(o => o.status === 'PENDING').length,
+    PENDING: orders.filter(o => o.status === 'CONFIRMED' || o.status === 'PENDING' || o.status === 'SUBMITTED').length,
     COOKING: orders.filter(o => o.status === 'COOKING').length,
     READY: orders.filter(o => o.status === 'READY').length,
   };
@@ -340,7 +688,7 @@ export default function KitchenKdsPage() {
     { key: 'ALL', label: 'Tất cả (All)', dotColor: 'var(--primary)' },
     { key: 'PENDING', label: 'Chờ tiếp nhận', dotColor: 'var(--secondary)' },
     { key: 'COOKING', label: 'Đang nấu', dotColor: 'var(--primary-container)' },
-    { key: 'READY', label: 'Sẵn sàng', dotColor: 'var(--tertiary-container)' },
+    { key: 'READY', label: 'Sẵn sàng', dotColor: 'var(--tertiary-container, #2e7d32)' },
   ];
 
   return (
@@ -348,9 +696,8 @@ export default function KitchenKdsPage() {
       display: 'flex', flexDirection: 'column',
       height: '100%', overflow: 'hidden',
       background: 'var(--surface)',
+      position: 'relative',
     }}>
-
-
 
       {/* --- Filter Bar + Metrics --- */}
       <div style={{
@@ -358,57 +705,97 @@ export default function KitchenKdsPage() {
         borderBottom: '1px solid rgba(220, 192, 185, 0.5)',
         padding: '8px 20px',
         display: 'flex', flexWrap: 'wrap',
-        alignItems: 'center', justifyContent: 'space-between', gap: 8,
-        flexShrink: 0, overflowX: 'auto',
+        alignItems: 'center', justifyContent: 'space-between', gap: 10,
+        flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{
-            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
-            color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em',
-            marginRight: 4,
-          }}>
-            Bộ Lọc:
-          </span>
-          {filterOptions.map(opt => {
-            const isActive = filterStatus === opt.key;
-            return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* Ô tìm kiếm nhanh theo Số Bàn / Mã Đơn / Tên Món (Chuẩn F&B Rush Hour) */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Icon name="search" size={16} style={{ position: 'absolute', left: 10, color: 'var(--outline)', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm bàn / mã / món..."
+              style={{
+                padding: '6px 28px 6px 32px',
+                borderRadius: 8,
+                border: '1px solid var(--outline-variant)',
+                background: 'var(--surface)',
+                color: 'var(--on-surface)',
+                fontSize: 12,
+                fontFamily: 'Plus Jakarta Sans',
+                outline: 'none',
+                width: 175,
+                transition: 'all 0.15s ease',
+              }}
+            />
+            {searchQuery && (
               <button
-                key={opt.key}
-                onClick={() => setFilterStatus(opt.key)}
+                type="button"
+                onClick={() => setSearchQuery('')}
+                title="Xóa tìm kiếm"
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 12px', borderRadius: '9999px',
-                  background: isActive ? 'var(--primary)' : 'var(--surface-container)',
-                  color: isActive ? '#fff' : 'var(--on-surface-variant)',
-                  border: isActive ? 'none' : '1px solid var(--outline-variant)',
-                  cursor: 'pointer',
-                  fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 12,
-                  boxShadow: isActive ? 'var(--shadow-xs)' : 'none',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
+                  position: 'absolute', right: 6,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 2, display: 'flex', alignItems: 'center', color: 'var(--outline)'
                 }}
               >
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: isActive ? 'rgba(255,255,255,0.5)' : opt.dotColor,
-                  display: 'inline-block',
-                }} />
-                {opt.label}
-                <span style={{
-                  padding: '0 5px', borderRadius: 4,
-                  background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--surface-container-high)',
-                  color: isActive ? '#fff' : 'var(--on-surface)',
-                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
-                }}>
-                  {counts[opt.key]}
-                </span>
+                <Icon name="close" size={14} />
               </button>
-            );
-          })}
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{
+              fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
+              color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em',
+              marginRight: 2,
+            }}>
+              Lọc:
+            </span>
+            {filterOptions.map(opt => {
+              const isActive = filterStatus === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setFilterStatus(opt.key)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '4px 12px', borderRadius: '9999px',
+                    background: isActive ? 'var(--primary)' : 'var(--surface-container)',
+                    color: isActive ? '#fff' : 'var(--on-surface-variant)',
+                    border: isActive ? 'none' : '1px solid var(--outline-variant)',
+                    cursor: 'pointer',
+                    fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 12,
+                    boxShadow: isActive ? 'var(--shadow-xs)' : 'none',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: isActive ? 'rgba(255,255,255,0.5)' : opt.dotColor,
+                    display: 'inline-block',
+                  }} />
+                  {opt.label}
+                  <span style={{
+                    padding: '0 5px', borderRadius: 4,
+                    background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--surface-container-high)',
+                    color: isActive ? '#fff' : 'var(--on-surface)',
+                    fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+                  }}>
+                    {counts[opt.key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Metrics */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--on-surface-variant)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--on-surface-variant)', flexWrap: 'wrap' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '4px 12px', borderRadius: 8,
@@ -416,32 +803,38 @@ export default function KitchenKdsPage() {
             border: '1px solid var(--outline-variant)',
           }}>
             <Icon name="avg_pace" size={16} style={{ color: 'var(--secondary)' }} />
-            <span style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 500 }}>Thời gian ra món TB:</span>
+            <span style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 500 }}>Ra món TB:</span>
             <strong style={{ fontFamily: 'JetBrains Mono', fontWeight: 700, fontSize: 14, color: 'var(--on-surface)' }}>
-              11m 45s
+              {summary?.avgPrepTime || '0m 00s'}
             </strong>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Icon name="speed" size={16} style={{ color: 'var(--tertiary)' }} />
-            <span>Hiệu suất:</span>
-            <strong style={{ color: 'var(--tertiary)', fontWeight: 700 }}>94.2%</strong>
+            <Icon name="speed" size={16} style={{ color: 'var(--tertiary, #2e7d32)' }} />
+            <span>Hiệu suất SLA:</span>
+            <strong style={{ color: 'var(--tertiary, #2e7d32)', fontWeight: 700 }}>
+              {summary?.performanceRate !== undefined ? `${summary.performanceRate}%` : '100%'}
+            </strong>
           </div>
 
           {/* Quick Audio & Fullscreen Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
+              onClick={toggleSound}
+              title={soundEnabled ? "Bấm để tắt âm thanh chuông bếp" : "Bấm để bật âm thanh chuông bếp"}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '5px 10px', borderRadius: 8,
-                background: 'var(--surface-container-low)',
-                border: '1px solid var(--outline-variant)',
-                color: 'var(--on-surface)', cursor: 'pointer',
+                background: soundEnabled ? 'rgba(46, 125, 50, 0.1)' : 'var(--surface-container-low)',
+                border: `1px solid ${soundEnabled ? 'rgba(46, 125, 50, 0.3)' : 'var(--outline-variant)'}`,
+                color: soundEnabled ? '#2e7d32' : 'var(--on-surface-variant)',
+                cursor: 'pointer',
                 fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 11,
+                transition: 'all 0.15s ease',
               }}
             >
-              <Icon name="volume_up" size={15} style={{ color: 'var(--tertiary)' }} />
-              Âm báo: BẬT
+              <Icon name={soundEnabled ? "volume_up" : "volume_off"} size={15} style={{ color: soundEnabled ? '#2e7d32' : 'var(--outline)' }} />
+              {soundEnabled ? 'Âm báo: BẬT' : 'Âm báo: TẮT'}
             </button>
 
             <button
@@ -456,7 +849,7 @@ export default function KitchenKdsPage() {
                 border: 'none', cursor: 'pointer',
                 fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
                 boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
               }}
             >
               <Icon name={isFullscreen ? "fullscreen_exit" : "fullscreen"} size={15} />
@@ -472,7 +865,23 @@ export default function KitchenKdsPage() {
         padding: '16px 20px',
         background: 'rgba(252, 241, 239, 0.4)',
       }}>
-        {filteredOrders.length === 0 ? (
+        {loading && orders.length === 0 ? (
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            minHeight: 300, gap: 12, textAlign: 'center',
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              border: '3px solid var(--primary-container)',
+              borderTopColor: 'transparent',
+              animation: 'spin 0.8s linear infinite',
+            }} />
+            <p style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 14, color: 'var(--on-surface-variant)' }}>
+              Đang kết nối dữ liệu nhà bếp...
+            </p>
+          </div>
+        ) : filteredOrders.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
@@ -480,16 +889,16 @@ export default function KitchenKdsPage() {
           }}>
             <Icon name="soup_kitchen" size={56} style={{ color: 'var(--outline-variant)' }} />
             <p style={{ fontFamily: 'Epilogue', fontSize: 18, fontWeight: 700, color: 'var(--on-surface-variant)' }}>
-              Hàng đợi trống
+              {searchQuery ? 'Không tìm thấy kết quả phù hợp' : 'Hàng đợi trống'}
             </p>
             <p style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 14, color: 'var(--outline)' }}>
-              Chưa có đơn nào đang chờ chế biến
+              {searchQuery ? `Không có đơn nào khớp với từ khóa "${searchQuery}"` : 'Chưa có đơn nào đang chờ chế biến trong danh mục này'}
             </p>
           </div>
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
             gap: 16,
             paddingBottom: 24,
           }}>
@@ -497,12 +906,32 @@ export default function KitchenKdsPage() {
               <KdsTicketCard
                 key={order.id}
                 order={order}
+                actionLoadingId={actionLoadingId}
                 onUpdateStatus={handleUpdateStatus}
+                onToggleItemStatus={handleToggleItemStatus}
+                onToggleRush={handleToggleRush}
               />
             ))}
           </div>
         )}
       </main>
+
+      {/* --- Toast Thông báo phản hồi người dùng --- */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          padding: '10px 16px', borderRadius: 10,
+          background: toastMessage.isError ? 'var(--error, #ba1a1a)' : 'var(--inverse-surface, #342F2E)',
+          color: '#fff',
+          fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: 600,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          display: 'flex', alignItems: 'center', gap: 8,
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <Icon name={toastMessage.isError ? "error" : "check_circle"} size={18} fill={1} />
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
     </div>
   );
 }

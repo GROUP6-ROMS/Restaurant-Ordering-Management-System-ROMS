@@ -57,7 +57,20 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     // Đếm tổng số bàn theo từng phân khu
     long countByZoneAndIsActiveTrue(String zone);
 
+    long countByZone(String zone);
+
     // Tính tổng số chỗ ngồi (sức chứa) của toàn bộ các bàn đang hoạt động
     @Query("SELECT COALESCE(SUM(t.capacity), 0) FROM RestaurantTable t WHERE t.isActive = true")
     Integer sumTotalCapacity();
+
+    // Lấy danh sách toàn bộ các mã phân khu DISTINCT đang hoạt động trong CSDL
+    @Query("SELECT DISTINCT t.zone FROM RestaurantTable t WHERE t.isActive = true ORDER BY t.zone ASC")
+    List<String> findDistinctActiveZones();
+
+    // Tìm các bàn trống (AVAILABLE) thuộc khu vực cụ thể và có sức chứa đủ cho số khách yêu cầu
+    @Query("SELECT t FROM RestaurantTable t WHERE t.isActive = true AND t.status = 'AVAILABLE' AND " +
+            "(:zone IS NULL OR t.zone = :zone) AND t.capacity >= :minCapacity " +
+            "ORDER BY t.capacity ASC, t.tableNumber ASC")
+    List<RestaurantTable> findAvailableTablesForReservation(@Param("zone") String zone,
+                                                            @Param("minCapacity") Integer minCapacity);
 }

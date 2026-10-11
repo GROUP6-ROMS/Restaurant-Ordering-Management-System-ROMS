@@ -1,18 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../../components/common/Icon';
 import { tableApi } from '../../api/tableApi';
-
-const ZONES = [
-  { id: 'ALL', name: 'Tất Cả Khu Vực' },
-  { id: 'ZONE_1', name: 'Tầng 1 - Sảnh Chính' },
-  { id: 'ZONE_2', name: 'Tầng 2 - Ban Công' },
-  { id: 'VIP', name: 'Phòng VIP' },
-];
+import { zoneApi } from '../../api/zoneApi';
 
 export default function TableManagementPage() {
   const [tables, setTables] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Danh sách các khu vực động tải từ backend
+  const [zonesList, setZonesList] = useState([
+    { id: 1, zoneCode: 'ZONE_1', name: 'Tầng 1 - Sảnh Chính' },
+    { id: 2, zoneCode: 'ZONE_2', name: 'Tầng 2 - Ban Công' },
+    { id: 3, zoneCode: 'VIP', name: 'Phòng VIP' },
+  ]);
+
+  // State Modal Quản Lý Khu Vực (Zone CRUD)
+  const [showZoneModal, setShowZoneModal] = useState(false);
+  const [zoneModalMode, setZoneModalMode] = useState('LIST'); // 'LIST' | 'CREATE' | 'EDIT'
+  const [zoneFormData, setZoneFormData] = useState({
+    zoneCode: '',
+    name: '',
+    description: '',
+    displayOrder: 0
+  });
+  const [editingZoneId, setEditingZoneId] = useState(null);
+  const [deletingZone, setDeletingZone] = useState(null);
+  const [showDeleteZoneConfirm, setShowDeleteZoneConfirm] = useState(false);
+  const [zoneActionLoading, setZoneActionLoading] = useState(false);
 
   const [selectedZone, setSelectedZone] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -70,11 +85,9 @@ export default function TableManagementPage() {
   // ===================================================================
   // 1. TẢI DỮ LIỆU TỪ BACKEND QUA API
   // ===================================================================
-  const loadData = async () => {
+  const loadData = async (silent = false) => {
     try {
-      setLoading(true);
-
-
+      if (!silent) setLoading(true);
 
       const resTables = await tableApi.getTables();
       if (resTables.data && resTables.data.success) {
@@ -86,21 +99,179 @@ export default function TableManagementPage() {
       if (resSummary.data && resSummary.data.success) {
         setSummary(resSummary.data.data);
       }
+      // Tải danh sách khu vực động từ backend
+      try {
+        const resZones = await zoneApi.getZones();
+        if (resZones.data && resZones.data.success && resZones.data.data) {
+          setZonesList(resZones.data.data);
+        }
+      } catch (zoneErr) {
+        console.warn('Lỗi tải danh mục khu vực:', zoneErr);
+      }
     } catch (error) {
-      console.error('Lỗi khi tải dữ liệu bàn từ backend:', error);
-      const errMsg = error.response?.data?.message
-        || (error.response?.status === 401 || error.response?.status === 403
-            ? 'Chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng đăng nhập lại!'
-            : 'Không thể kết nối đến máy chủ Backend!');
-      showToast(errMsg);
+      if (!silent) {
+        console.error('Lỗi khi tải dữ liệu bàn từ backend:', error);
+        const errMsg = error.response?.data?.message
+          || (error.response?.status === 401 || error.response?.status === 403
+              ? 'Chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng đăng nhập lại!'
+              : 'Không thể kết nối đến máy chủ Backend!');
+        showToast(errMsg);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  // Tự động gọi API khi khởi tạo trang hoặc thay đổi khu vực / trạng thái
+  // ===================================================================
+  // 1.1. CÁC HÀM XỬ LÝ QUẢN LÝ KHU VỰC (ZONE CRUD)
+  // ===================================================================
+  const handleOpenZoneModal = async () => {
+    setShowZoneModal(true);
+    setZoneModalMode('LIST');
+    setZoneFormData({ zoneCode: '', name: '', description: '', displayOrder: 0 });
+    setEditingZoneId(null);
+    try {
+      const res = await zoneApi.getZones();
+      if (res.data && res.data.success) {
+        setZonesList(res.data.data || []);
+      }
+    } catch (e) {
+      console.warn('Lỗi refresh danh sách khu vực:', e);
+    }
+  };
+
+  const handleStartCreateZone = () => {
+    setZoneFormData({
+      zoneCode: '',
+      name: '',
+      description: '',
+      displayOrder: zonesList.length + 1
+    });
+    setZoneModalMode('CREATE');
+  };
+
+  const handleStartEditZone = (zone) => {
+    setEditingZoneId(zone.id);
+    setZoneFormData({
+      zoneCode: zone.zoneCode,
+      name: zone.name,
+      description: zone.description || '',
+      displayOrder: zone.displayOrder || 0
+    });
+    setZoneModalMode('EDIT');
+  };
+
+  const handleSaveZone = async (e) => {
+    e.preventDefault();
+    if (!zoneFormData.name.trim()) {
+      showToast('Vui lòng nhập tên khu vực!');
+      return;
+    }
+
+    try {
+      setZoneActionLoading(true);
+      if (zoneModalMode === 'CREATE') {
+        if (!zoneFormData.zoneCode.trim()) {
+          showToast('Vui lòng nhập mã khu vực (ví dụ: ZONE_3, ROOFTOP)!');
+          setZoneActionLoading(false);
+          return;
+        }
+        const payload = {
+          zoneCode: zoneFormData.zoneCode.trim().toUpperCase(),
+          name: zoneFormData.name.trim(),
+          description: zoneFormData.description.trim() || null,
+          displayOrder: parseInt(zoneFormData.displayOrder) || 0
+        };
+        const res = await zoneApi.createZone(payload);
+        if (res.data && res.data.success) {
+          showToast(`Đã tạo thành công khu vực: ${payload.name}!`);
+        }
+      } else if (zoneModalMode === 'EDIT') {
+        const payload = {
+          name: zoneFormData.name.trim(),
+          description: zoneFormData.description.trim() || null,
+          displayOrder: parseInt(zoneFormData.displayOrder) || 0
+        };
+        const res = await zoneApi.updateZone(editingZoneId, payload);
+        if (res.data && res.data.success) {
+          showToast('Cập nhật khu vực thành công!');
+        }
+      }
+
+      await loadData();
+      const resZ = await zoneApi.getZones();
+      if (resZ.data && resZ.data.success) {
+        setZonesList(resZ.data.data || []);
+      }
+      setZoneModalMode('LIST');
+    } catch (error) {
+      console.error('Lỗi lưu khu vực:', error);
+      const errMsg = error.response?.data?.message || 'Có lỗi xảy ra khi lưu khu vực!';
+      showToast(errMsg);
+    } finally {
+      setZoneActionLoading(false);
+    }
+  };
+
+  const handleConfirmDeleteZone = (zone) => {
+    setDeletingZone(zone);
+    setShowDeleteZoneConfirm(true);
+  };
+
+  const handleDeleteZone = async () => {
+    if (!deletingZone) return;
+    try {
+      setZoneActionLoading(true);
+      const res = await zoneApi.deleteZone(deletingZone.id);
+      if (res.data && res.data.success) {
+        showToast(`Đã xóa khu vực: ${deletingZone.name}!`);
+        setShowDeleteZoneConfirm(false);
+        setDeletingZone(null);
+
+        if (selectedZone === deletingZone.zoneCode) {
+          setSelectedZone('ALL');
+        }
+
+        await loadData();
+        const resZ = await zoneApi.getZones();
+        if (resZ.data && resZ.data.success) {
+          setZonesList(resZ.data.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Lỗi xóa khu vực:', error);
+      const errMsg = error.response?.data?.message || 'Không thể xóa khu vực này!';
+      showToast(errMsg);
+    } finally {
+      setZoneActionLoading(false);
+    }
+  };
+
+  // Tự động gọi API khi khởi tạo trang và thiết lập đồng bộ thời gian thực (Polling 6s)
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    // Chu kỳ cập nhật tự động 6s/lần trong nền (không giật màn hình)
+    const timer = setInterval(() => {
+      loadData(true);
+    }, 6000);
+
+    // Tự động tải lại ngay khi quản trị viên quay lại tab trình duyệt
+    const handleFocus = () => loadData(true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadData(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Tìm kiếm theo từ khóa (Frontend fallback lọc nhanh nếu cần)
@@ -126,6 +297,80 @@ export default function TableManagementPage() {
 
     return true;
   });
+
+  // Helper tính Badge thời gian ngồi dùng bữa của bàn (Dwell Time Alert)
+  const getTableDwellBadge = (t) => {
+    if (t.status !== 'OCCUPIED') return null;
+
+    const minutes = typeof t.durationMinutes === 'number' ? t.durationMinutes : 0;
+    const timeText = minutes > 0 ? `${minutes} phút` : (t.timeIn ? `Vào lúc ${t.timeIn}` : 'Đang ngồi');
+
+    if (minutes >= 90) {
+      return (
+        <span
+          title={`Khách ngồi rất lâu (${minutes} phút), cần lưu ý chăm sóc hoặc hỗ trợ thanh toán!`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+            padding: '2px 7px',
+            borderRadius: '12px',
+            background: '#FEE2E2',
+            color: '#B91C1C',
+            border: '1px solid #FCA5A5'
+          }}
+        >
+          <Icon name="warning" size={13} style={{ color: '#B91C1C' }} />
+          {timeText}
+        </span>
+      );
+    } else if (minutes >= 60) {
+      return (
+        <span
+          title={`Khách ngồi ${minutes} phút, dự kiến sắp kết thúc bữa ăn.`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            padding: '2px 7px',
+            borderRadius: '12px',
+            background: '#FEF3C7',
+            color: '#B45309',
+            border: '1px solid #FCD34D'
+          }}
+        >
+          <Icon name="timer" size={13} style={{ color: '#B45309' }} />
+          {timeText}
+        </span>
+      );
+    } else if (minutes > 0) {
+      return (
+        <span
+          title={`Thời gian dùng bữa: ${minutes} phút`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            fontSize: '0.68rem',
+            fontWeight: 600,
+            padding: '2px 7px',
+            borderRadius: '12px',
+            background: '#ECFDF5',
+            color: '#047857',
+            border: '1px solid #A7F3D0'
+          }}
+        >
+          <Icon name="schedule" size={13} style={{ color: '#047857' }} />
+          {timeText}
+        </span>
+      );
+    }
+    return null;
+  };
 
   // ===================================================================
   // 2. MỞ MODAL ĐỔI TRẠNG THÁI BÀN
@@ -447,6 +692,29 @@ export default function TableManagementPage() {
 
           <button
             type="button"
+            onClick={handleOpenZoneModal}
+            title="Quản lý thêm, sửa, xóa các phân khu bàn trong nhà hàng"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '12px',
+              background: '#FFFFFF',
+              border: '1px solid #EAE0DE',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              color: '#56423D',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Icon name="domain" size={18} />
+            Quản Lý Khu Vực
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowAddModal(true)}
             style={{
               display: 'inline-flex',
@@ -576,12 +844,11 @@ export default function TableManagementPage() {
                 cursor: 'pointer'
               }}
             >
-              {ZONES.map(z => {
-                const count = z.id === 'ALL'
-                  ? tables.length
-                  : tables.filter(t => t.zone === z.id).length;
+              <option value="ALL">Tất Cả Khu Vực ({tables.length})</option>
+              {zonesList.map(z => {
+                const count = tables.filter(t => t.zone === z.zoneCode).length;
                 return (
-                  <option key={z.id} value={z.id}>
+                  <option key={z.id || z.zoneCode} value={z.zoneCode}>
                     {z.name} ({count})
                   </option>
                 );
@@ -679,20 +946,23 @@ export default function TableManagementPage() {
                       </h4>
                     </div>
 
-                    <span style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      background: statusBadge.bg,
-                      color: statusBadge.color,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      <Icon name={statusBadge.icon} size={13} style={{ color: statusBadge.color }} />
-                      {statusBadge.label}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: statusBadge.bg,
+                        color: statusBadge.color,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <Icon name={statusBadge.icon} size={13} style={{ color: statusBadge.color }} />
+                        {statusBadge.label}
+                      </span>
+                      {getTableDwellBadge(t)}
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#89726B' }}>
@@ -863,7 +1133,11 @@ export default function TableManagementPage() {
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
+                        title="Mở khóa bàn để sẵn sàng đón khách"
                         style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
                           padding: '6px 10px',
                           borderRadius: '8px',
                           background: '#059669',
@@ -874,7 +1148,7 @@ export default function TableManagementPage() {
                           cursor: 'pointer'
                         }}
                       >
-                        Mở Khóa
+                        <Icon name="lock_open" size={13} /> Mở Khóa
                       </button>
                     )}
 
@@ -882,7 +1156,11 @@ export default function TableManagementPage() {
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
+                        title="Xác nhận bàn đã dọn dẹp sạch sẽ"
                         style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
                           padding: '6px 10px',
                           borderRadius: '8px',
                           background: '#059669',
@@ -893,92 +1171,61 @@ export default function TableManagementPage() {
                           cursor: 'pointer'
                         }}
                       >
-                        Đã Dọn
+                        <Icon name="cleaning_services" size={13} /> Đã Dọn
                       </button>
                     )}
 
                     {t.status === 'AVAILABLE' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStatusModal(t, 'BLOCKED')}
-                          title="Khóa bàn"
-                          style={{
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            background: '#F3F4F6',
-                            color: '#374151',
-                            border: '1px solid #D1D5DB',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '2px'
-                          }}
-                        >
-                          <Icon name="lock" size={13} /> Khóa
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStatusModal(t, 'RESERVED')}
-                          style={{
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            background: '#FEF3C7',
-                            color: '#78350F',
-                            border: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Đặt Bàn
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
+                        title="Mở bàn phục vụ khách ngay"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: '#9D4124',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Icon name="restaurant" size={13} /> Phục Vụ
+                      </button>
                     )}
 
                     {t.status === 'RESERVED' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
-                          style={{
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            background: '#9D4124',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Nhận Bàn
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
-                          style={{
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            background: '#F0E6E4',
-                            color: '#56423D',
-                            border: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Hủy
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
+                        title="Khách đến, nhận bàn và bắt đầu phục vụ"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: '#9D4124',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Icon name="check_circle" size={13} /> Nhận Bàn
+                      </button>
                     )}
 
                     {t.status === 'OCCUPIED' && (
                       <button
                         type="button"
                         onClick={() => handleOpenOrderDrawer(t)}
+                        title="Xem chi tiết các món và hóa đơn của bàn"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1275,9 +1522,11 @@ export default function TableManagementPage() {
                       outline: 'none'
                     }}
                   >
-                    <option value="ZONE_1">Tầng 1 - Sảnh Chính</option>
-                    <option value="ZONE_2">Tầng 2 - Ban Công</option>
-                    <option value="VIP">Phòng VIP</option>
+                    {zonesList.map(z => (
+                      <option key={z.id || z.zoneCode} value={z.zoneCode}>
+                        {z.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1511,10 +1760,15 @@ export default function TableManagementPage() {
                 </label>
                 <input
                   type="number"
+                  min="1"
                   value={statusForm.guestsCount}
                   onChange={(e) => setStatusForm(prev => ({ ...prev, guestsCount: e.target.value }))}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #F87171', background: '#FFFFFF', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }}
                 />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.75rem', color: '#B91C1C' }}>
+                  <Icon name="info" size={14} />
+                  <span>Hệ thống sẽ tự động khởi tạo phiên phục vụ (Dining Session) đồng bộ cho Bồi bàn và POS.</span>
+                </div>
               </div>
             )}
 
@@ -1661,9 +1915,11 @@ export default function TableManagementPage() {
                       outline: 'none'
                     }}
                   >
-                    <option value="ZONE_1">Tầng 1 - Sảnh Chính</option>
-                    <option value="ZONE_2">Tầng 2 - Ban Công</option>
-                    <option value="VIP">Phòng VIP</option>
+                    {zonesList.map(z => (
+                      <option key={z.id || z.zoneCode} value={z.zoneCode}>
+                        {z.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -2064,9 +2320,14 @@ export default function TableManagementPage() {
                 }}
               >
                 <option value="ALL">Tất Cả Khu Vực ({tables.length})</option>
-                <option value="ZONE_1">Tầng 1 - Sảnh Chính</option>
-                <option value="ZONE_2">Tầng 2 - Ban Công</option>
-                <option value="VIP">Phòng VIP</option>
+                {zonesList.map(z => {
+                  const count = tables.filter(t => t.zone === z.zoneCode).length;
+                  return (
+                    <option key={z.id || z.zoneCode} value={z.zoneCode}>
+                      {z.name} ({count})
+                    </option>
+                  );
+                })}
               </select>
 
               {/* Nút Kích hoạt In Ấn / Lưu PDF */}
@@ -2219,6 +2480,538 @@ export default function TableManagementPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: QUẢN LÝ KHU VỰC (ZONE CRUD) */}
+      {showZoneModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1050,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: zoneModalMode === 'LIST' ? '780px' : '520px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#FFF8F6'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: '#FFDBC9',
+                  color: '#9D4124',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Icon name="domain" size={24} />
+                </div>
+                <div>
+                  <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#1F1B1A', margin: 0 }}>
+                    {zoneModalMode === 'LIST' ? 'Quản Lý Khu Vực Nhà Hàng' : (zoneModalMode === 'CREATE' ? 'Thêm Khu Vực Mới' : 'Chỉnh Sửa Khu Vực')}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#89726B' }}>
+                    {zoneModalMode === 'LIST' ? `Hiện có ${zonesList.length} khu vực phân bổ bàn ăn` : (zoneModalMode === 'CREATE' ? 'Điền thông tin để tạo khu vực mới' : `Mã khu vực: ${zoneFormData.zoneCode}`)}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (zoneModalMode !== 'LIST') {
+                    setZoneModalMode('LIST');
+                  } else {
+                    setShowZoneModal(false);
+                  }
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#89726B',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Icon name="close" size={22} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+              {zoneModalMode === 'LIST' ? (
+                <div>
+                  {/* Top bar của Tab List */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#56423D', fontWeight: 600 }}>
+                      Danh sách các khu vực hiện tại:
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleStartCreateZone}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        background: '#9D4124',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Icon name="add" size={18} />
+                      Thêm Khu Vực
+                    </button>
+                  </div>
+
+                  {/* Bảng danh sách khu vực */}
+                  <div style={{ border: '1px solid #F0E6E4', borderRadius: '14px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                      <thead style={{ background: '#FAF6F5', borderBottom: '1px solid #F0E6E4' }}>
+                        <tr>
+                          <th style={{ padding: '12px 16px', color: '#89726B', fontWeight: 700, fontSize: '0.78rem' }}>MÃ KHU VỰC</th>
+                          <th style={{ padding: '12px 16px', color: '#89726B', fontWeight: 700, fontSize: '0.78rem' }}>TÊN KHU VỰC</th>
+                          <th style={{ padding: '12px 16px', color: '#89726B', fontWeight: 700, fontSize: '0.78rem' }}>MÔ TẢ</th>
+                          <th style={{ padding: '12px 16px', color: '#89726B', fontWeight: 700, fontSize: '0.78rem', textAlign: 'center' }}>SỐ BÀN</th>
+                          <th style={{ padding: '12px 16px', color: '#89726B', fontWeight: 700, fontSize: '0.78rem', textAlign: 'center' }}>THỨ TỰ</th>
+                          <th style={{ padding: '12px 16px', color: '#89726B', fontWeight: 700, fontSize: '0.78rem', textAlign: 'right' }}>THAO TÁC</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {zonesList.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#89726B' }}>
+                              Chưa có khu vực nào. Hãy nhấn "+ Thêm Khu Vực" để tạo!
+                            </td>
+                          </tr>
+                        ) : (
+                          zonesList.map(z => {
+                            const count = tables.filter(t => t.zone === z.zoneCode).length;
+                            return (
+                              <tr key={z.id || z.zoneCode} style={{ borderBottom: '1px solid #F7EFEF' }}>
+                                <td style={{ padding: '14px 16px' }}>
+                                  <span style={{
+                                    fontFamily: 'monospace',
+                                    fontWeight: 700,
+                                    fontSize: '0.8rem',
+                                    background: '#FFDBC9',
+                                    color: '#9D4124',
+                                    padding: '3px 8px',
+                                    borderRadius: '6px'
+                                  }}>
+                                    {z.zoneCode}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '14px 16px', fontWeight: 700, color: '#1F1B1A' }}>
+                                  {z.name}
+                                </td>
+                                <td style={{ padding: '14px 16px', color: '#56423D', fontSize: '0.8rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {z.description || <span style={{ color: '#BAA8A4', fontStyle: 'italic' }}>Không có</span>}
+                                </td>
+                                <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                  <span style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    background: count > 0 ? '#EAF5EA' : '#F5F5F5',
+                                    color: count > 0 ? '#1E6B24' : '#89726B',
+                                    fontWeight: 700,
+                                    fontSize: '0.78rem'
+                                  }}>
+                                    {count} bàn
+                                  </span>
+                                </td>
+                                <td style={{ padding: '14px 16px', textAlign: 'center', color: '#89726B', fontWeight: 600 }}>
+                                  {z.displayOrder || 0}
+                                </td>
+                                <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                                  <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditZone(z)}
+                                      title="Chỉnh sửa khu vực"
+                                      style={{
+                                        border: '1px solid #EAE0DE',
+                                        background: '#FFFFFF',
+                                        padding: '6px',
+                                        borderRadius: '8px',
+                                        color: '#56423D',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                      }}
+                                    >
+                                      <Icon name="edit" size={16} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmDeleteZone(z)}
+                                      title={count > 0 ? `Khu vực đang có ${count} bàn, không thể xóa trực tiếp` : 'Xóa khu vực'}
+                                      style={{
+                                        border: '1px solid #FFDAD6',
+                                        background: count > 0 ? '#FBF2F2' : '#FFFFFF',
+                                        padding: '6px',
+                                        borderRadius: '8px',
+                                        color: '#BA1A1A',
+                                        cursor: 'pointer',
+                                        opacity: count > 0 ? 0.6 : 1,
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                      }}
+                                    >
+                                      <Icon name="delete" size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div style={{ marginTop: '16px', fontSize: '0.78rem', color: '#89726B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon name="info" size={16} />
+                    <span>Lưu ý: Khu vực đang có bàn ăn sẽ không thể xóa để đảm bảo an toàn dữ liệu.</span>
+                  </div>
+                </div>
+              ) : (
+                /* Form CREATE / EDIT */
+                <form onSubmit={handleSaveZone}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                        Mã Khu Vực {zoneModalMode === 'CREATE' ? <span style={{ color: '#BA1A1A' }}>*</span> : '(Cố định)'}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: ZONE_3, ROOFTOP, GARDEN"
+                        value={zoneFormData.zoneCode}
+                        onChange={(e) => setZoneFormData({ ...zoneFormData, zoneCode: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
+                        disabled={zoneModalMode === 'EDIT'}
+                        required={zoneModalMode === 'CREATE'}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid #EAE0DE',
+                          background: zoneModalMode === 'EDIT' ? '#F7EFEF' : '#FFFFFF',
+                          color: zoneModalMode === 'EDIT' ? '#89726B' : '#1F1B1A',
+                          fontSize: '0.88rem',
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          outline: 'none'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.74rem', color: '#89726B', marginTop: '4px', display: 'block' }}>
+                        {zoneModalMode === 'CREATE'
+                          ? 'Mã định danh hệ thống (chữ hoa, viết liền hoặc gạch dưới, không dấu).'
+                          : 'Mã khu vực không thể thay đổi sau khi tạo để đảm bảo liên kết dữ liệu bàn.'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                        Tên Khu Vực <span style={{ color: '#BA1A1A' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: Tầng 3 - Sân Thượng, Vườn Ngoài Trời..."
+                        value={zoneFormData.name}
+                        onChange={(e) => setZoneFormData({ ...zoneFormData, name: e.target.value })}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid #EAE0DE',
+                          background: '#FFFFFF',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                        Mô Tả / Ghi Chú
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Mô tả không gian, đặc điểm vị trí..."
+                        value={zoneFormData.description}
+                        onChange={(e) => setZoneFormData({ ...zoneFormData, description: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid #EAE0DE',
+                          background: '#FFFFFF',
+                          fontSize: '0.85rem',
+                          outline: 'none',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                        Thứ Tự Hiển Thị
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={99}
+                        value={zoneFormData.displayOrder}
+                        onChange={(e) => setZoneFormData({ ...zoneFormData, displayOrder: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid #EAE0DE',
+                          background: '#FFFFFF',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setZoneModalMode('LIST')}
+                      disabled={zoneActionLoading}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        borderRadius: '12px',
+                        border: '1px solid #EAE0DE',
+                        background: '#FFFFFF',
+                        color: '#56423D',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Hủy / Quay lại
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={zoneActionLoading}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: '#9D4124',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        opacity: zoneActionLoading ? 0.7 : 1
+                      }}
+                    >
+                      {zoneActionLoading ? 'Đang lưu...' : (zoneModalMode === 'CREATE' ? 'Tạo Khu Vực' : 'Lưu Thay Đổi')}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Modal Footer (chỉ hiển thị khi LIST) */}
+            {zoneModalMode === 'LIST' && (
+              <div style={{
+                padding: '14px 24px',
+                borderTop: '1px solid #F0E6E4',
+                background: '#FAF6F5',
+                display: 'flex',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShowZoneModal(false)}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '10px',
+                    border: '1px solid #EAE0DE',
+                    background: '#FFFFFF',
+                    color: '#56423D',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Đóng
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: XÁC NHẬN XÓA KHU VỰC */}
+      {showDeleteZoneConfirm && deletingZone && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '420px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#FFDAD6',
+              color: '#BA1A1A',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <Icon name="warning" size={30} />
+            </div>
+
+            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.3rem', color: '#1F1B1A', margin: '0 0 8px' }}>
+              Xác Nhận Xóa Khu Vực?
+            </h3>
+
+            <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: '#56423D', lineHeight: 1.45 }}>
+              Bạn có chắc chắn muốn xóa khu vực <strong>{deletingZone.name}</strong> ({deletingZone.zoneCode}) không?
+            </p>
+
+            {tables.filter(t => t.zone === deletingZone.zoneCode).length > 0 ? (
+              <div style={{
+                background: '#FFDAD6',
+                border: '1px solid #BA1A1A',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                textAlign: 'left',
+                fontSize: '0.8rem',
+                color: '#410002',
+                marginBottom: '20px',
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'flex-start'
+              }}>
+                <Icon name="error" size={18} style={{ color: '#BA1A1A', flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <strong>Không thể xóa:</strong> Khu vực này đang có {tables.filter(t => t.zone === deletingZone.zoneCode).length} bàn ăn. Hãy chuyển hoặc xóa các bàn ăn đó trước khi xóa khu vực.
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: '#FFF8F6',
+                border: '1px solid #FFDBC9',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                textAlign: 'left',
+                fontSize: '0.78rem',
+                color: '#753400',
+                marginBottom: '20px',
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'flex-start'
+              }}>
+                <Icon name="info" size={18} style={{ color: '#BA1A1A', flexShrink: 0, marginTop: '1px' }} />
+                <div>
+                  Khu vực sẽ bị xóa vĩnh viễn khỏi hệ thống nhà hàng.
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteZoneConfirm(false);
+                  setDeletingZone(null);
+                }}
+                disabled={zoneActionLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteZone}
+                disabled={zoneActionLoading || tables.filter(t => t.zone === deletingZone.zoneCode).length > 0}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#BA1A1A',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: (tables.filter(t => t.zone === deletingZone.zoneCode).length > 0) ? 'not-allowed' : 'pointer',
+                  opacity: (zoneActionLoading || tables.filter(t => t.zone === deletingZone.zoneCode).length > 0) ? 0.5 : 1
+                }}
+              >
+                {zoneActionLoading ? 'Đang xóa...' : 'Xác Nhận Xóa'}
+              </button>
             </div>
           </div>
         </div>

@@ -45,8 +45,13 @@
 | **14** | [14_Khoi_Tao_Va_Kien_Truc_Frontend.md](14_Khoi_Tao_Va_Kien_Truc_Frontend.md) | Khởi tạo và kiến trúc tổng quan Frontend React Vite + TailwindCSS. |
 | **15** | [15_Bao_Cao_Doanh_Thu_Va_Van_Hanh_Reports_Analytics.md](15_Bao_Cao_Doanh_Thu_Va_Van_Hanh_Reports_Analytics.md) | **Full-Stack (Backend & Frontend)**: Báo cáo Doanh thu & Vận hành (`http://localhost:5173/admin/reports`). Backend (DTOs, Repository JPQL, ReportService, ReportController) và Frontend (reportApi, Bộ lọc thời gian linh hoạt, Biểu đồ khung giờ, Phân bổ thanh toán, Top món bán chạy, Xuất Excel UTF-8 & In Báo cáo). |
 | **16** | [16_Dat_Ban_Truoc_Customer_Va_Quan_Ly_Reservation.md](16_Dat_Ban_Truoc_Customer_Va_Quan_Ly_Reservation.md) | **Full-Stack (Backend & Frontend)**: Đặt bàn trước trực tuyến (`http://localhost:5173/reservation`) & Điều phối xếp bàn (`/admin/reservations`). Date Picker chọn ngày cụ thể, khung giờ/số khách đại diện kèm nhập tùy ý, danh sách khu vực động từ DB, quy trình Quản lý gọi điện thoại xác nhận theo SĐT và xếp bàn trống. |
+| **17** | [17_Hoan_Thien_Ma_QR_Va_In_Tem_Ban_Toan_Dien.md](17_Hoan_Thien_Ma_QR_Va_In_Tem_Ban_Toan_Dien.md) | **Full-Stack**: Hoàn thiện in tem mã QR cho toàn bộ bàn ăn, quản lý token bàn và định tuyến khách hàng. |
+| **18** | [18_Hoan_Thien_Goi_Mon_Tai_Ban_Va_Van_Hanh_Waiter.md](18_Hoan_Thien_Goi_Mon_Tai_Ban_Va_Van_Hanh_Waiter.md) | **Full-Stack (Backend & Frontend)**: Nghiệp vụ trạm phục vụ bàn (Waiter Floor Plan), mở bàn, gọi thêm món tại bàn, bảo toàn dữ liệu qua polling 5s, chuyển bàn và yêu cầu thanh toán POS. |
+| **19** | [19_Hoan_Thien_Man_Hinh_Bep_KDS_Va_Lien_Thong_Don_Mon.md](19_Hoan_Thien_Man_Hinh_Bep_KDS_Va_Lien_Thong_Don_Mon.md) | **Full-Stack (Backend & Frontend)**: Màn hình Bếp KDS (Kitchen Display System), xóa bỏ 100% Mock, liên thông đơn món Waiter $\leftrightarrow$ KDS $\leftrightarrow$ POS, tick hoàn thành từng món, ưu tiên Hỏa Tốc (RUSH), chuông âm báo Web Audio Chime, polling 5s và Script SQL sinh dữ liệu test phong phú. |
+| **20** | [20_Hoan_Thien_Tram_Thu_Ngan_POS_Va_Thanh_Toan_Hoa_Don.md](20_Hoan_Thien_Tram_Thu_Ngan_POS_Va_Thanh_Toan_Hoa_Don.md) | **Full-Stack (Backend & Frontend)**: Trạm Thu Ngân POS (Cashier Terminal), xóa bỏ 100% Mock, liên thông tiếp nhận yêu cầu tính tiền từ Waiter, xem tạm tính, in phiếu tạm tính, giảm giá, VietQR động chuẩn NAPAS, chốt bill lưu CSDL, tự động đóng phiên và chuyển bàn DIRTY, Lịch sử hóa đơn, Đối soát két tiền và Bàn giao ca có Quản lý duyệt PIN. |
 
 ---
 
 *Tài liệu được tinh gọn với Project Lombok, đồng bộ và cập nhật tương thích 100% giữa Backend Spring Boot và Frontend React ROMS.*
+
 

@@ -24,6 +24,10 @@ public class WaiterTableResponse {
     private String duration;        // Thời gian đã ngồi (VD: "45 phút")
     private Long durationMinutes;   // Số phút đã ngồi (để sắp xếp cảnh báo)
     private BigDecimal orderTotal;  // Tổng tiền tạm tính hiện tại
+    private String reservationInfo; // Thông tin khách đặt trước (Tên + SĐT)
+    private String reservedTime;    // Thời gian đặt hẹn (VD: "19:30")
+    private String blockedReason;   // Lý do khóa bàn / bảo trì
+    private String qrToken;         // Mã token định danh QR Order của bàn
 
     // Cờ chuông gọi hỗ trợ khẩn
     private Boolean calling;

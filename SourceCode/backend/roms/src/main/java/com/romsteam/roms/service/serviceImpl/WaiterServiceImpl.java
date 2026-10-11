@@ -1,5 +1,6 @@
 package com.romsteam.roms.service.serviceImpl;
 
+import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
 import com.romsteam.roms.dto.request.OpenTableRequest;
 import com.romsteam.roms.dto.request.TransferTableRequest;
 import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -35,6 +37,7 @@ public class WaiterServiceImpl implements WaiterService {
     private final ServiceRequestRepository requestRepository;
     private final MenuItemRepository menuItemRepository;
     private final CategoryRepository categoryRepository;
+    private final ZoneRepository zoneRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -58,20 +61,32 @@ public class WaiterServiceImpl implements WaiterService {
         RestaurantTable table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
 
-        if (table.getStatus() != TableStatus.AVAILABLE) {
-            throw new AppException("Chỉ có thể mở phiên cho bàn đang ở trạng thái Trống!", HttpStatus.BAD_REQUEST);
+        if (table.getStatus() != TableStatus.AVAILABLE && table.getStatus() != TableStatus.RESERVED) {
+            throw new AppException("Chỉ có thể mở phiên cho bàn đang Trống hoặc bàn Đặt Trước!", HttpStatus.BAD_REQUEST);
         }
 
-        // Tạo phiên ăn mới
-        String sessionToken = "sess-" + table.getTableNumber().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
-        DiningSession newSession = new DiningSession();
-        newSession.setTable(table);
-        newSession.setSessionToken(sessionToken);
-        newSession.setStatus(SessionStatus.ACTIVE);
-        newSession.setGuestCount(request.getGuestCount() != null ? request.getGuestCount() : table.getCapacity());
-        newSession.setStartTime(LocalDateTime.now());
-        newSession.setNote(request.getNote());
-        sessionRepository.save(newSession);
+        String sessionNote = request != null && request.getNote() != null ? request.getNote() : null;
+        if (table.getStatus() == TableStatus.RESERVED) {
+            if (sessionNote == null && table.getReservationInfo() != null) {
+                sessionNote = "Khách đặt trước: " + table.getReservationInfo();
+            }
+            table.setReservationInfo(null);
+            table.setReservedTime(null);
+        }
+
+        // Tạo phiên ăn mới nếu chưa có phiên active
+        Optional<DiningSession> activeSessionOpt = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
+        if (activeSessionOpt.isEmpty()) {
+            String sessionToken = "sess-" + table.getTableNumber().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
+            DiningSession newSession = new DiningSession();
+            newSession.setTable(table);
+            newSession.setSessionToken(sessionToken);
+            newSession.setStatus(SessionStatus.ACTIVE);
+            newSession.setGuestCount(request != null && request.getGuestCount() != null ? request.getGuestCount() : table.getCapacity());
+            newSession.setStartTime(LocalDateTime.now());
+            newSession.setNote(sessionNote);
+            sessionRepository.save(newSession);
+        }
 
         // Đổi trạng thái bàn thành OCCUPIED
         table.setStatus(TableStatus.OCCUPIED);
@@ -88,6 +103,15 @@ public class WaiterServiceImpl implements WaiterService {
 
         table.setStatus(TableStatus.AVAILABLE);
         tableRepository.save(table);
+
+        // Đóng dứt điểm phiên ăn cũ nếu vẫn còn sót để tránh rò rỉ sang lượt khách sau
+        Optional<DiningSession> activeSessionOpt = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
+        if (activeSessionOpt.isPresent()) {
+            DiningSession session = activeSessionOpt.get();
+            session.setStatus(SessionStatus.COMPLETED);
+            session.setEndTime(LocalDateTime.now());
+            sessionRepository.save(session);
+        }
 
         return mapToWaiterTableResponse(table);
     }
@@ -109,10 +133,22 @@ public class WaiterServiceImpl implements WaiterService {
             throw new AppException("Bàn nguồn hiện không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST);
         }
 
-        // Chuyển phiên ăn sang bàn mới
+        // Chuyển phiên ăn sang bàn mới và gắn tag chuyển bàn
         DiningSession session = activeSessionOpt.get();
+        String transferTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        String transferNote = String.format("[CHUYỂN TỪ %s SANG %s lúc %s]", 
+                sourceTable.getTableNumber(), targetTable.getTableNumber(), transferTime);
+        String currentNote = session.getNote() != null ? session.getNote() : "";
+        session.setNote(currentNote.isEmpty() ? transferNote : currentNote + " " + transferNote);
         session.setTable(targetTable);
         sessionRepository.save(session);
+
+        // Chuyển toàn bộ chuông gọi / yêu cầu thanh toán PENDING từ bàn nguồn sang bàn đích
+        List<ServiceRequest> pendingRequests = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(sourceTable.getId(), "PENDING");
+        for (ServiceRequest req : pendingRequests) {
+            req.setTable(targetTable);
+            requestRepository.save(req);
+        }
 
         // Bàn cũ chuyển thành DIRTY (cần dọn)
         sourceTable.setStatus(TableStatus.DIRTY);
@@ -125,16 +161,54 @@ public class WaiterServiceImpl implements WaiterService {
 
     @Override
     @Transactional
+    public WaiterTableResponse confirmDeliverSingleItem(Long tableId, Long orderItemId) {
+        OrderItem item = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + orderItemId));
+
+        if (item.getStatus() != OrderItemStatus.READY) {
+            throw new AppException("Chỉ có thể xác nhận bưng món khi Bếp/Quầy đã chuẩn bị xong (READY)!", HttpStatus.BAD_REQUEST);
+        }
+
+        item.setStatus(OrderItemStatus.SERVED);
+        orderItemRepository.save(item);
+
+        Order order = item.getOrder();
+        if (order != null && order.getItems() != null) {
+            boolean allServed = order.getItems().stream()
+                    .allMatch(i -> i.getStatus() == OrderItemStatus.SERVED || i.getStatus() == OrderItemStatus.CANCELLED);
+            if (allServed) {
+                order.setStatus(OrderStatus.SERVED);
+                orderRepository.save(order);
+            }
+        }
+
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
+        return mapToWaiterTableResponse(table);
+    }
+
+    @Override
+    @Transactional
     public WaiterTableResponse confirmDeliverFood(Long tableId) {
         Optional<DiningSession> sessionOpt = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
         if (sessionOpt.isPresent()) {
             List<Order> orders = orderRepository.findBySessionId(sessionOpt.get().getId());
             for (Order order : orders) {
                 if (order.getItems() != null) {
+                    boolean hasUpdated = false;
                     for (OrderItem item : order.getItems()) {
                         if (item.getStatus() == OrderItemStatus.READY) {
                             item.setStatus(OrderItemStatus.SERVED);
                             orderItemRepository.save(item);
+                            hasUpdated = true;
+                        }
+                    }
+                    if (hasUpdated) {
+                        boolean allServed = order.getItems().stream()
+                                .allMatch(i -> i.getStatus() == OrderItemStatus.SERVED || i.getStatus() == OrderItemStatus.CANCELLED);
+                        if (allServed) {
+                            order.setStatus(OrderStatus.SERVED);
+                            orderRepository.save(order);
                         }
                     }
                 }
@@ -165,14 +239,36 @@ public class WaiterServiceImpl implements WaiterService {
             throw new AppException("Chỉ có thể yêu cầu thanh toán cho bàn đang có khách dùng bữa (OCCUPIED)!", HttpStatus.BAD_REQUEST);
         }
 
-        // Tạo ServiceRequest loại BILL để thông báo chuông cho Thu ngân POS
-        ServiceRequest billReq = ServiceRequest.builder()
-                .table(table)
-                .requestType("BILL")
-                .note("Khách yêu cầu tính tiền & in hóa đơn POS")
-                .status("PENDING")
-                .build();
-        requestRepository.save(billReq);
+        Optional<DiningSession> activeSessionOpt = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
+        if (activeSessionOpt.isEmpty()) {
+            throw new AppException("Bàn không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST);
+        }
+
+        DiningSession activeSession = activeSessionOpt.get();
+        List<Order> orders = orderRepository.findBySessionId(activeSession.getId());
+        boolean hasItems = orders.stream()
+                .filter(o -> o.getStatus() != OrderStatus.CANCELLED)
+                .anyMatch(o -> o.getItems() != null && o.getItems().stream().anyMatch(i -> i.getStatus() != OrderItemStatus.CANCELLED));
+
+        if (!hasItems) {
+            throw new AppException("Bàn chưa gọi món ăn nào (0đ), không thể gửi yêu cầu tính tiền sang Thu ngân! Vui lòng đóng bàn nếu khách không dùng món.", HttpStatus.BAD_REQUEST);
+        }
+
+        // Kiểm tra xem đã có ServiceRequest loại BILL đang PENDING cho bàn này chưa (tránh lặp chuông / spam)
+        List<ServiceRequest> existingPendingBills = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(table.getId(), "PENDING");
+        boolean alreadyPending = existingPendingBills.stream().anyMatch(r -> "BILL".equalsIgnoreCase(r.getRequestType()));
+
+        if (!alreadyPending) {
+            // Tạo ServiceRequest loại BILL để thông báo chuông cho Thu ngân POS
+            ServiceRequest billReq = ServiceRequest.builder()
+                    .table(table)
+                    .session(activeSession)
+                    .requestType("BILL")
+                    .note("Khách yêu cầu tính tiền & in hóa đơn POS")
+                    .status("PENDING")
+                    .build();
+            requestRepository.save(billReq);
+        }
 
         return mapToWaiterTableResponse(table);
     }
@@ -186,16 +282,23 @@ public class WaiterServiceImpl implements WaiterService {
         DiningSession activeSession = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE)
                 .orElseThrow(() -> new AppException("Bàn " + table.getTableNumber() + " chưa được mở phiên phục vụ (chưa có khách)! Vui lòng Mở Bàn trước khi gọi món.", HttpStatus.BAD_REQUEST));
 
+        // Nếu bàn trước đó đã in tạm tính, việc gọi thêm món sẽ hủy tag [DRAFT_PRINTED] để Thu ngân in lại bill mới chính xác
+        if (activeSession.getNote() != null && activeSession.getNote().contains("[DRAFT_PRINTED]")) {
+            String cleaned = activeSession.getNote().replace("[DRAFT_PRINTED]", "").trim();
+            activeSession.setNote(cleaned.isEmpty() ? null : cleaned);
+            sessionRepository.save(activeSession);
+        }
+
         String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 10000);
         Order newOrder = new Order();
         newOrder.setSession(activeSession);
         newOrder.setOrderCode(orderCode);
         newOrder.setOrderTime(LocalDateTime.now());
-        newOrder.setStatus(OrderStatus.CONFIRMED);
         newOrder.setNote(request.getNote());
 
         BigDecimal totalOrderAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
+        boolean hasCookingItems = false;
 
         for (WaiterAddOrderRequest.WaiterOrderItemRequest itemReq : request.getItems()) {
             MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
@@ -210,6 +313,15 @@ public class WaiterServiceImpl implements WaiterService {
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(qty));
             totalOrderAmount = totalOrderAmount.add(subtotal);
 
+            // Nhận diện đồ uống đóng chai / pha chế sẵn:
+            boolean isDrink = false;
+            if (menuItem.getCategory() != null && menuItem.getCategory().getName() != null) {
+                String catLower = menuItem.getCategory().getName().toLowerCase();
+                if (catLower.contains("uống") || catLower.contains("drink") || catLower.contains("nước")) {
+                    isDrink = true;
+                }
+            }
+
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(newOrder);
             orderItem.setMenuItem(menuItem);
@@ -217,11 +329,20 @@ public class WaiterServiceImpl implements WaiterService {
             orderItem.setUnitPrice(unitPrice);
             orderItem.setSubtotal(subtotal);
             orderItem.setNote(itemReq.getNote());
-            orderItem.setStatus(OrderItemStatus.COOKING); // Món nấu, Bếp KDS nhận được ngay
+
+            // Đồ uống đóng chai: Sẵn sàng ngay (READY) tại tủ mát/quầy pass để bồi bàn lấy ra bàn
+            // Món ăn xào nấu: Chuyển COOKING vào Bếp KDS
+            if (isDrink) {
+                orderItem.setStatus(OrderItemStatus.READY);
+            } else {
+                orderItem.setStatus(OrderItemStatus.COOKING);
+                hasCookingItems = true;
+            }
 
             orderItems.add(orderItem);
         }
 
+        newOrder.setStatus(hasCookingItems ? OrderStatus.CONFIRMED : OrderStatus.READY);
         newOrder.setTotalAmount(totalOrderAmount);
         newOrder.setItems(orderItems);
 
@@ -237,12 +358,14 @@ public class WaiterServiceImpl implements WaiterService {
 
     // Helper map entity sang WaiterTableResponse
     private WaiterTableResponse mapToWaiterTableResponse(RestaurantTable table) {
-        String zoneName = switch (table.getZone()) {
-            case "ZONE_1" -> "Tầng 1 - Sảnh Chính";
-            case "ZONE_2" -> "Tầng 2 - Ban Công";
-            case "VIP" -> "Phòng VIP";
-            default -> table.getZone();
-        };
+        String zoneName = zoneRepository.findByZoneCode(table.getZone())
+                .map(Zone::getName)
+                .orElseGet(() -> switch (table.getZone()) {
+                    case "ZONE_1" -> "Tầng 1 - Sảnh Chính";
+                    case "ZONE_2" -> "Tầng 2 - Ban Công";
+                    case "VIP" -> "Phòng VIP";
+                    default -> table.getZone();
+                });
 
         Integer actualGuests = 0;
         BigDecimal orderTotal = BigDecimal.ZERO;
@@ -264,10 +387,13 @@ public class WaiterServiceImpl implements WaiterService {
 
             List<Order> orders = orderRepository.findBySessionId(session.getId());
             for (Order order : orders) {
+                if (order.getStatus() == OrderStatus.CANCELLED) continue;
                 if (order.getItems() != null) {
                     for (OrderItem item : order.getItems()) {
                         BigDecimal subtotal = item.getSubtotal() != null ? item.getSubtotal() : BigDecimal.ZERO;
-                        orderTotal = orderTotal.add(subtotal);
+                        if (item.getStatus() != OrderItemStatus.CANCELLED) {
+                            orderTotal = orderTotal.add(subtotal);
+                        }
 
                         if (item.getStatus() == OrderItemStatus.READY) readyCount += item.getQuantity();
                         else if (item.getStatus() == OrderItemStatus.COOKING) cookingCount += item.getQuantity();
@@ -292,7 +418,7 @@ public class WaiterServiceImpl implements WaiterService {
         boolean isCalling = !pendingCalls.isEmpty();
         String callNote = isCalling ? pendingCalls.get(0).getNote() : null;
         Long reqId = isCalling ? pendingCalls.get(0).getId() : null;
-        boolean isBillRequest = isCalling && "BILL".equalsIgnoreCase(pendingCalls.get(0).getRequestType());
+        boolean isBillRequest = pendingCalls.stream().anyMatch(r -> "BILL".equalsIgnoreCase(r.getRequestType()));
 
         // Xác định trạng thái nghiệp vụ cho Waiter
         String waiterStatus = table.getStatus().name();
@@ -330,6 +456,10 @@ public class WaiterServiceImpl implements WaiterService {
                 .duration(durationStr)
                 .durationMinutes(durationMin)
                 .orderTotal(orderTotal)
+                .reservationInfo(table.getReservationInfo())
+                .reservedTime(table.getReservedTime())
+                .blockedReason(table.getBlockedReason())
+                .qrToken(table.getQrToken())
                 .calling(isCalling)
                 .callNote(callNote)
                 .callTime("Vừa gọi")
@@ -399,5 +529,88 @@ public class WaiterServiceImpl implements WaiterService {
         cat.setDisplayOrder(order);
         cat.setIsActive(true);
         return categoryRepository.save(cat);
+    }
+
+    @Override
+    @Transactional
+    public WaiterTableResponse cancelReservation(Long tableId) {
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
+
+        if (table.getStatus() != TableStatus.RESERVED) {
+            throw new AppException("Bàn không ở trạng thái Đặt Trước (RESERVED)!", HttpStatus.BAD_REQUEST);
+        }
+
+        table.setStatus(TableStatus.AVAILABLE);
+        table.setReservationInfo(null);
+        table.setReservedTime(null);
+        tableRepository.save(table);
+
+        return mapToWaiterTableResponse(table);
+    }
+
+    @Override
+    @Transactional
+    public WaiterTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request) {
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
+
+        Optional<DiningSession> sessionOpt = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
+        if (sessionOpt.isPresent()) {
+            DiningSession session = sessionOpt.get();
+            List<Order> orders = orderRepository.findBySessionId(session.getId());
+            BigDecimal subtotal = BigDecimal.ZERO;
+            int nonCancelledItems = 0;
+
+            for (Order order : orders) {
+                if (order.getStatus() == OrderStatus.CANCELLED) continue;
+                if (order.getItems() != null) {
+                    for (OrderItem item : order.getItems()) {
+                        if (item.getStatus() != OrderItemStatus.CANCELLED) {
+                            nonCancelledItems++;
+                            if (item.getSubtotal() != null) {
+                                subtotal = subtotal.add(item.getSubtotal());
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (nonCancelledItems > 0 || subtotal.compareTo(BigDecimal.ZERO) > 0) {
+                throw new AppException("Bàn đang có " + nonCancelledItems + " món ăn hợp lệ (" + subtotal.toPlainString() + "đ). Không thể đóng phiên bàn trống! Vui lòng liên hệ Thu ngân hoặc Quản lý.", HttpStatus.BAD_REQUEST);
+            }
+
+            session.setStatus(SessionStatus.COMPLETED);
+            session.setEndTime(LocalDateTime.now());
+            String reason = (request != null && request.getReason() != null && !request.getReason().trim().isEmpty())
+                    ? request.getReason().trim()
+                    : "Khách không dùng món / Hủy bàn trống";
+            String existingNote = session.getNote() != null ? session.getNote() : "";
+            session.setNote((existingNote + " [EMPTY_SESSION_CLOSED: " + reason + "]").trim());
+            sessionRepository.save(session);
+
+            for (Order order : orders) {
+                if (order.getStatus() != OrderStatus.CANCELLED) {
+                    order.setStatus(OrderStatus.CANCELLED);
+                    orderRepository.save(order);
+                }
+            }
+        }
+
+        // Đóng các chuông gọi / bill pending
+        List<ServiceRequest> pendingReqs = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(table.getId(), "PENDING");
+        for (ServiceRequest req : pendingReqs) {
+            req.setStatus("RESOLVED");
+            requestRepository.save(req);
+        }
+
+        TableStatus targetStatus = TableStatus.AVAILABLE;
+        if (request != null && "DIRTY".equalsIgnoreCase(request.getTargetStatus())) {
+            targetStatus = TableStatus.DIRTY;
+        }
+        table.setStatus(targetStatus);
+        tableRepository.save(table);
+
+        return mapToWaiterTableResponse(table);
     }
 }

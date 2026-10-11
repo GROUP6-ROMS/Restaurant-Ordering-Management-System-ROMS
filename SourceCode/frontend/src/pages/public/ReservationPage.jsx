@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import RomsLogo from '../../components/common/RomsLogo';
+import { reservationApi } from '../../api/reservationApi';
 import { MOCK_CATEGORIES, MOCK_MENU_ITEMS } from '../../mock/mockData';
 
-// Material Symbols Icon helper
+// Helper component hiển thị icon Material Symbols
 function Icon({ name, size = 20, fill = 0, style = {} }) {
   return (
     <span
@@ -22,40 +23,101 @@ function Icon({ name, size = 20, fill = 0, style = {} }) {
 }
 
 export default function ReservationPage() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState('2025-09-21');
-  const [selectedTime, setSelectedTime] = useState('19:00');
-  const [selectedGuests, setSelectedGuests] = useState(4);
-  const [selectedZone, setSelectedZone] = useState('Sảnh Chính - Tầng 1');
+  // Lấy ngày hôm nay định dạng YYYY-MM-DD làm giá trị tối thiểu cho Date Picker
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  // Pre-order items state
+  // 1. Quản lý trạng thái bước đặt chỗ (1 -> 4)
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // 2. Ngày dùng bữa: Chọn ngày cụ thể (mặc định hôm nay)
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+
+  // 3. Khung giờ: Giờ đại diện + chế độ nhập giờ khác
+  const representativeTimes = ['11:30', '12:00', '18:00', '19:00', '20:00'];
+  const [selectedTime, setSelectedTime] = useState('19:00');
+  const [isCustomTime, setIsCustomTime] = useState(false);
+  const [customTimeInput, setCustomTimeInput] = useState('19:30');
+
+  // 4. Số lượng khách: Số đại diện + chế độ nhập số khác
+  const representativeGuests = [2, 4, 6, 8, 10];
+  const [selectedGuests, setSelectedGuests] = useState(4);
+  const [isCustomGuests, setIsCustomGuests] = useState(false);
+  const [customGuestInput, setCustomGuestInput] = useState(5);
+
+  // 5. Khu vực bàn: Nạp động từ Database qua API
+  const [zones, setZones] = useState([]);
+  const [selectedZone, setSelectedZone] = useState('ZONE_1');
+  const [selectedZoneName, setSelectedZoneName] = useState('Sảnh Chính');
+  const [isLoadingZones, setIsLoadingZones] = useState(true);
+
+  // 6. Pre-order món ăn trước (tùy chọn)
   const [preOrderItems, setPreOrderItems] = useState([]);
   const [menuCatFilter, setMenuCatFilter] = useState('ALL');
   const [menuSearch, setMenuSearch] = useState('');
 
-  // Customer contact info
+  // 7. Thông tin liên hệ của khách hàng
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [specialNote, setSpecialNote] = useState('');
 
+  // 8. Trạng thái gửi đơn đặt bàn
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [bookingCode, setBookingCode] = useState('');
 
-  const dates = [
-    { label: 'Hôm nay', value: '2025-09-21', day: '21/09', weekday: 'Chủ Nhật' },
-    { label: 'Ngày mai', value: '2025-09-22', day: '22/09', weekday: 'Thứ Hai' },
-    { label: 'Sắp tới', value: '2025-09-23', day: '23/09', weekday: 'Thứ Ba' },
-    { label: 'Sắp tới', value: '2025-09-24', day: '24/09', weekday: 'Thứ Tư' }
-  ];
+  // Nạp danh sách khu vực bàn từ database khi component mount
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        setIsLoadingZones(true);
+        const res = await reservationApi.getZones();
+        if (res.data && res.data.length > 0) {
+          setZones(res.data);
+          setSelectedZone(res.data[0].zoneCode);
+          setSelectedZoneName(res.data[0].zoneName);
+        }
+      } catch (err) {
+        console.error('Không thể tải khu vực từ CSDL, sử dụng danh sách mặc định:', err);
+        // Fallback an toàn nếu backend chưa sẵn sàng
+        const fallbackZones = [
+          { zoneCode: 'ZONE_1', zoneName: 'Sảnh Chính - Tầng 1', description: 'Không gian ấm cúng, thiết kế hiện đại', badge: 'Phổ biến', availableTables: 6 },
+          { zoneCode: 'ZONE_2', zoneName: 'Ban Công - Tầng 2', description: 'Tầm nhìn thoáng đãng nhìn ra phố cổ', badge: 'View đẹp', availableTables: 4 },
+          { zoneCode: 'VIP', zoneName: 'Phòng Riêng VIP', description: 'Cách âm tuyệt đối, thích hợp tiếp khách sang trọng', badge: 'Riêng tư', availableTables: 2 }
+        ];
+        setZones(fallbackZones);
+        setSelectedZone('ZONE_1');
+        setSelectedZoneName(fallbackZones[0].zoneName);
+      } finally {
+        setIsLoadingZones(false);
+      }
+    };
+    fetchZones();
+  }, []);
 
-  const times = ['11:30', '12:00', '12:30', '18:00', '18:30', '19:00', '19:30', '20:00'];
+  // Xử lý chọn khung giờ
+  const handleSelectPresetTime = (time) => {
+    setIsCustomTime(false);
+    setSelectedTime(time);
+  };
 
-  const zones = [
-    { id: 'z1', name: 'Sảnh Chính - Tầng 1', desc: 'Không gian ấm cúng, thiết kế hiện đại và dàn đèn đồng nghệ thuật', badge: 'Phổ biến' },
-    { id: 'z2', name: 'Ban Công - Tầng 2', desc: 'Tầm nhìn thoáng đãng nhìn ra phố cổ, lãng mạn cho cặp đôi', badge: 'View đẹp' },
-    { id: 'z3', name: 'Phòng Riêng VIP', desc: 'Cách âm tuyệt đối, thích hợp tiếp khách và tiệc gia đình sang trọng', badge: 'Riêng tư' }
-  ];
+  const handleApplyCustomTime = (e) => {
+    const timeVal = e.target.value;
+    setCustomTimeInput(timeVal);
+    setSelectedTime(timeVal);
+  };
+
+  // Xử lý chọn số lượng khách
+  const handleSelectPresetGuests = (guests) => {
+    setIsCustomGuests(false);
+    setSelectedGuests(guests);
+  };
+
+  const handleApplyCustomGuests = (e) => {
+    const val = parseInt(e.target.value, 10) || 1;
+    setCustomGuestInput(val);
+    setSelectedGuests(val);
+  };
 
   // Pre-order handlers
   const handleAddDish = (dish) => {
@@ -87,22 +149,66 @@ export default function ReservationPage() {
   const preOrderTotal = preOrderItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const totalDishesCount = preOrderItems.reduce((sum, item) => sum + item.qty, 0);
 
-  const handleNextStep = (e) => {
+  // Xử lý điều hướng các bước và gửi đơn
+  const handleNextStep = async (e) => {
     if (e) e.preventDefault();
     if (currentStep === 1) {
+      if (!selectedDate) {
+        alert('Vui lòng chọn ngày dùng bữa!');
+        return;
+      }
       setCurrentStep(2);
     } else if (currentStep === 2) {
       setCurrentStep(3);
     } else if (currentStep === 3) {
       setCurrentStep(4);
     } else if (currentStep === 4) {
-      if (!customerName.trim() || !customerPhone.trim()) {
-        alert('Vui lòng điền Họ tên và Số điện thoại liên hệ!');
+      // Xác thực form thông tin khách
+      if (!customerName.trim()) {
+        alert('Vui lòng nhập Họ và tên của bạn!');
         return;
       }
-      const code = 'ROM-RES-' + Math.floor(1000 + Math.random() * 9000);
-      setBookingCode(code);
-      setIsSuccess(true);
+      const phoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
+      if (!customerPhone.trim() || !phoneRegex.test(customerPhone.trim())) {
+        alert('Vui lòng nhập số điện thoại hợp lệ (10 chữ số, ví dụ: 0901234567)!');
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+
+        // Tạo chuỗi ghi chú tổng hợp (kèm danh sách món đặt trước nếu có)
+        let fullNote = specialNote.trim();
+        if (preOrderItems.length > 0) {
+          const preOrderSummary = preOrderItems.map(i => `${i.qty}x ${i.name}`).join(', ');
+          fullNote = fullNote ? `${fullNote} | Đặt món trước: ${preOrderSummary}` : `Đặt món trước: ${preOrderSummary}`;
+        }
+
+        const payload = {
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          customerEmail: customerEmail.trim() || null,
+          guestCount: selectedGuests,
+          reservationDate: selectedDate,
+          reservationTime: selectedTime,
+          requestedZone: selectedZone,
+          note: fullNote
+        };
+
+        // Gửi API xuống Backend
+        const res = await reservationApi.createReservation(payload);
+
+        if (res.data) {
+          setBookingCode(res.data.bookingCode);
+          setIsSuccess(true);
+        }
+      } catch (err) {
+        console.error('Lỗi khi gửi yêu cầu đặt bàn:', err);
+        const errMsg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu đặt bàn. Vui lòng thử lại!';
+        alert(errMsg);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -174,23 +280,23 @@ export default function ReservationPage() {
             marginBottom: '10px'
           }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#9D4124' }} />
-            Hệ thống đặt bàn & gọi món trước
+            Hệ thống đặt bàn & điều phối thông minh
           </div>
 
           <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '2.4rem', color: '#1F1B1A', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-            Đặt Bàn & Gọi Món Trước Tại <span style={{ color: '#9D4124' }}>ROMS</span>
+            Đặt Bàn & Giữ Chỗ Trực Tuyến Tại <span style={{ color: '#9D4124' }}>ROMS</span>
           </h1>
           <p style={{ fontSize: '1rem', color: '#56423D', margin: 0, maxWidth: '680px' }}>
-            Thưởng thức ẩm thực trọn vẹn, chọn trước món ngon để nhà hàng chế biến đúng chuẩn nhiệt độ khi bạn vừa đến bàn.
+            Chọn trước ngày giờ, số khách và không gian yêu thích. Quản lý sẽ liên hệ trực tiếp qua số điện thoại để tư vấn và xếp vị trí bàn ưng ý nhất cho quý khách.
           </p>
 
           {/* Stepper (4 Steps) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginTop: '30px' }}>
             {[
-              { step: 1, title: 'Thời gian & Số khách' },
-              { step: 2, title: 'Chọn khu vực bàn' },
-              { step: 3, title: 'Order món trước (Tùy chọn)' },
-              { step: 4, title: 'Xác nhận giữ chỗ' }
+              { step: 1, title: 'Ngày, Giờ & Số Khách' },
+              { step: 2, title: 'Khu Vực Bàn Ăn' },
+              { step: 3, title: 'Gọi Món Trước (Tùy chọn)' },
+              { step: 4, title: 'Xác Nhận Giữ Chỗ' }
             ].map(s => {
               const isActive = currentStep === s.step;
               const isPast = currentStep > s.step;
@@ -247,7 +353,10 @@ export default function ReservationPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '30px', alignItems: 'flex-start' }}>
           {/* Left Form Flow (8 cols) */}
           <div style={{ gridColumn: 'span 8', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* STEP 1: Date, Time & Guest Count */}
+
+            {/* ============================================================== */}
+            {/* STEP 1: CHỌN NGÀY CỤ THỂ, KHUNG GIỜ & SỐ LƯỢNG KHÁCH             */}
+            {/* ============================================================== */}
             {currentStep === 1 && (
               <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -256,87 +365,68 @@ export default function ReservationPage() {
                   </div>
                   <div>
                     <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
-                      1. Chọn ngày, giờ & số khách
+                      1. Chọn ngày, giờ & số lượng khách
                     </h2>
-                    <span style={{ fontSize: '0.8rem', color: '#89726B' }}>Lựa chọn khung giờ dùng bữa phù hợp với bạn</span>
+                    <span style={{ fontSize: '0.8rem', color: '#89726B' }}>Lựa chọn chính xác thời điểm bạn muốn ghé thăm nhà hàng ROMS</span>
                   </div>
                 </div>
 
-                {/* Pre-order Promo Banner */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #FFF8F6 0%, #FCF1EF 100%)',
-                  border: '1px solid #FFDBC9',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  marginBottom: '22px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  flexWrap: 'wrap'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Icon name="skillet" size={20} style={{ color: '#9D4124' }} />
-                    <span style={{ fontSize: '0.82rem', color: '#56423D' }}>
-                      Có thể <strong>đặt trước món ăn</strong> tránh đợi lâu: nhà hàng sẽ sơ chế và nấu chuẩn bị ngay khi bạn đến!
+                {/* Date Selection: BỘ CHỌN NGÀY CỤ THỂ (DATE PICKER) */}
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                    <Icon name="event" size={18} style={{ color: '#9D4124' }} />
+                    Ngày dùng bữa cụ thể: <span style={{ color: '#9D4124' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input
+                      type="date"
+                      min={todayStr}
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      style={{
+                        padding: '13px 18px',
+                        borderRadius: '14px',
+                        border: '1.5px solid #EAE0DE',
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        color: '#1F1B1A',
+                        background: '#FFF8F6',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                      }}
+                    />
+                    <div style={{ fontSize: '0.88rem', color: '#56423D', background: '#FCF1EF', padding: '12px 18px', borderRadius: '14px', border: '1px solid #FFDBC9' }}>
+                      Đã chọn: <strong style={{ color: '#9D4124' }}>
+                        {new Date(selectedDate).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Selection: KHUNG GIỜ ĐẠI DIỆN + NHẬP GIỜ KHÁC */}
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Icon name="schedule" size={18} style={{ color: '#9D4124' }} />
+                      Khung giờ dùng bữa: <span style={{ color: '#9D4124' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: '#89726B' }}>
+                      {isCustomTime ? 'Đang nhập giờ tùy chọn' : 'Đang chọn giờ đại diện'}
                     </span>
                   </div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9D4124', background: '#FFDBC9', padding: '3px 8px', borderRadius: '6px' }}>
-                    Tiết kiệm 15-20 phút chờ
-                  </span>
-                </div>
 
-                {/* Date selection */}
-                <div style={{ marginBottom: '22px' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '10px' }}>
-                    Ngày dùng bữa:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                    {dates.map(d => {
-                      const isSel = selectedDate === d.value;
-                      return (
-                        <button
-                          key={d.value}
-                          type="button"
-                          onClick={() => setSelectedDate(d.value)}
-                          style={{
-                            padding: '14px 10px',
-                            borderRadius: '16px',
-                            border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
-                            background: isSel ? '#9D4124' : '#FFF8F6',
-                            color: isSel ? '#FFFFFF' : '#1F1B1A',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700, opacity: 0.85 }}>{d.label}</span>
-                          <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem' }}>{d.day}</span>
-                          <span style={{ fontSize: '0.75rem', opacity: 0.85 }}>{d.weekday}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Time selection */}
-                <div style={{ marginBottom: '22px' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '10px' }}>
-                    Khung giờ:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                    {times.map(t => {
-                      const isSel = selectedTime === t;
+                  {/* Danh sách nút giờ đại diện */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                    {representativeTimes.map(t => {
+                      const isSel = !isCustomTime && selectedTime === t;
                       return (
                         <button
                           key={t}
                           type="button"
-                          onClick={() => setSelectedTime(t)}
+                          onClick={() => handleSelectPresetTime(t)}
                           style={{
-                            padding: '12px',
+                            padding: '12px 8px',
                             borderRadius: '12px',
                             border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
                             background: isSel ? '#9D4124' : '#FFF8F6',
@@ -352,22 +442,79 @@ export default function ReservationPage() {
                         </button>
                       );
                     })}
+
+                    {/* Nút bật chế độ nhập giờ khác */}
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomTime(true)}
+                      style={{
+                        padding: '12px 8px',
+                        borderRadius: '12px',
+                        border: isCustomTime ? '2px solid #9D4124' : '1px dashed #9D4124',
+                        background: isCustomTime ? '#FFDBC9' : '#FFFFFF',
+                        color: '#9D4124',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Icon name="edit_calendar" size={16} /> Giờ khác
+                    </button>
                   </div>
+
+                  {/* Ô nhập giờ tùy ý (nếu chọn Giờ khác) */}
+                  {isCustomTime && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
+                        Nhập giờ mong muốn của bạn:
+                      </span>
+                      <input
+                        type="time"
+                        value={customTimeInput}
+                        onChange={handleApplyCustomTime}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #9D4124',
+                          fontSize: '1rem',
+                          fontWeight: 800,
+                          color: '#9D4124',
+                          background: '#FFFFFF',
+                          outline: 'none'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                        (Nhà hàng mở cửa phục vụ từ 10:00 đến 22:30 mỗi ngày)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Guest count */}
+                {/* Guest Count: SỐ KHÁCH ĐẠI DIỆN + NHẬP SỐ KHÁCH KHÁC */}
                 <div style={{ marginBottom: '28px' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '10px' }}>
-                    Số lượng khách:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px' }}>
-                    {[1, 2, 4, 6, 8, 12].map(g => {
-                      const isSel = selectedGuests === g;
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Icon name="groups" size={18} style={{ color: '#9D4124' }} />
+                      Số lượng khách: <span style={{ color: '#9D4124' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: '#89726B' }}>
+                      {isCustomGuests ? 'Đang nhập số khách tùy chọn' : 'Đang chọn số khách đại diện'}
+                    </span>
+                  </div>
+
+                  {/* Danh sách nút số khách đại diện */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                    {representativeGuests.map(g => {
+                      const isSel = !isCustomGuests && selectedGuests === g;
                       return (
                         <button
                           key={g}
                           type="button"
-                          onClick={() => setSelectedGuests(g)}
+                          onClick={() => handleSelectPresetGuests(g)}
                           style={{
                             padding: '12px 6px',
                             borderRadius: '12px',
@@ -378,7 +525,8 @@ export default function ReservationPage() {
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
                           }}
                         >
                           <Icon name="person" size={20} />
@@ -386,12 +534,66 @@ export default function ReservationPage() {
                         </button>
                       );
                     })}
+
+                    {/* Nút bật chế độ nhập số khách khác */}
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomGuests(true)}
+                      style={{
+                        padding: '12px 6px',
+                        borderRadius: '12px',
+                        border: isCustomGuests ? '2px solid #9D4124' : '1px dashed #9D4124',
+                        background: isCustomGuests ? '#FFDBC9' : '#FFFFFF',
+                        color: '#9D4124',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Icon name="add" size={20} />
+                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>Số khác</span>
+                    </button>
                   </div>
+
+                  {/* Ô nhập số lượng khách tùy ý (nếu chọn Số khác) */}
+                  {isCustomGuests && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
+                        Nhập số lượng khách chính xác:
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={customGuestInput}
+                        onChange={handleApplyCustomGuests}
+                        style={{
+                          width: '80px',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #9D4124',
+                          fontSize: '1rem',
+                          fontWeight: 800,
+                          color: '#9D4124',
+                          background: '#FFFFFF',
+                          outline: 'none',
+                          textAlign: 'center'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A' }}>khách</span>
+                      <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                        (Đoàn tiệc trên 20 khách vui lòng ghi chú thêm nhu cầu trang trí hoặc set menu)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(2)}
+                  onClick={handleNextStep}
                   style={{
                     width: '100%',
                     padding: '15px',
@@ -416,7 +618,9 @@ export default function ReservationPage() {
               </div>
             )}
 
-            {/* STEP 2: Choose Dining Zone */}
+            {/* ============================================================== */}
+            {/* STEP 2: CHỌN KHU VỰC BÀN ĂN (LOAD ĐỘNG TỪ CSDL DATABASE)          */}
+            {/* ============================================================== */}
             {currentStep === 2 && (
               <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -425,81 +629,92 @@ export default function ReservationPage() {
                   </div>
                   <div>
                     <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
-                      2. Chọn khu vực bàn ngồi
+                      2. Chọn khu vực bàn ngồi (Từ CSDL Nhà Hàng)
                     </h2>
-                    <span style={{ fontSize: '0.8rem', color: '#89726B' }}>Không gian nhà hàng ROMS được bố trí theo từng trải nghiệm</span>
+                    <span style={{ fontSize: '0.8rem', color: '#89726B' }}>Các khu vực bàn ăn thực tế đang mở phục vụ tại nhà hàng ROMS</span>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '28px' }}>
-                  {zones.map(z => {
-                    const isSel = selectedZone === z.name;
-                    return (
-                      <div
-                        key={z.id}
-                        onClick={() => setSelectedZone(z.name)}
-                        style={{
-                          padding: '18px 20px',
-                          borderRadius: '18px',
-                          border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
-                          background: isSel ? '#FFF8F6' : '#FFFFFF',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '16px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                          <div style={{
-                            width: '42px',
-                            height: '42px',
-                            borderRadius: '12px',
-                            background: isSel ? '#9D4124' : '#F6ECEA',
-                            color: isSel ? '#FFFFFF' : '#9D4124',
+                {isLoadingZones ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#89726B' }}>
+                    <Icon name="sync" size={32} style={{ animation: 'spin 1s linear infinite' }} />
+                    <p style={{ margin: '8px 0 0', fontSize: '0.88rem' }}>Đang nạp danh sách khu vực bàn từ CSDL...</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '28px' }}>
+                    {zones.map(z => {
+                      const isSel = selectedZone === z.zoneCode;
+                      return (
+                        <div
+                          key={z.zoneCode}
+                          onClick={() => {
+                            setSelectedZone(z.zoneCode);
+                            setSelectedZoneName(z.zoneName);
+                          }}
+                          style={{
+                            padding: '18px 20px',
+                            borderRadius: '18px',
+                            border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
+                            background: isSel ? '#FFF8F6' : '#FFFFFF',
+                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <Icon name="table_restaurant" size={22} />
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <h4 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#1F1B1A', margin: 0 }}>
-                                {z.name}
-                              </h4>
-                              <span style={{ padding: '2px 8px', borderRadius: '9999px', background: '#DDE8AB', color: '#181E00', fontSize: '0.72rem', fontWeight: 700 }}>
-                                {z.badge}
-                              </span>
+                            justifyContent: 'space-between',
+                            gap: '16px',
+                            boxShadow: isSel ? '0 4px 14px rgba(157, 65, 36, 0.1)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              border: isSel ? '6px solid #9D4124' : '2px solid #C4B5B0',
+                              background: '#FFFFFF',
+                              flexShrink: 0
+                            }} />
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1rem', color: '#1F1B1A' }}>
+                                  {z.zoneName}
+                                </span>
+                                {z.badge && (
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    background: isSel ? '#FFDBC9' : '#F6ECEA',
+                                    color: isSel ? '#9D4124' : '#56423D'
+                                  }}>
+                                    {z.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.8rem', color: '#89726B', lineHeight: 1.4 }}>
+                                {z.description}
+                              </p>
                             </div>
-                            <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#56423D' }}>
-                              {z.desc}
-                            </p>
+                          </div>
+
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <span style={{ fontSize: '0.78rem', color: '#596232', fontWeight: 700, background: '#EFF5D3', padding: '4px 10px', borderRadius: '8px' }}>
+                              {z.availableTables ? `${z.availableTables} bàn trống` : 'Sẵn sàng xếp bàn'}
+                            </span>
                           </div>
                         </div>
-
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          border: isSel ? '6px solid #9D4124' : '2px solid #CBD5E1',
-                          background: '#FFFFFF',
-                          flexShrink: 0
-                        }} />
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button
                     type="button"
                     onClick={() => setCurrentStep(1)}
                     style={{
-                      flex: 1,
-                      padding: '14px',
+                      padding: '14px 24px',
                       borderRadius: '16px',
                       background: '#F0E6E4',
                       color: '#56423D',
@@ -515,7 +730,7 @@ export default function ReservationPage() {
                     type="button"
                     onClick={() => setCurrentStep(3)}
                     style={{
-                      flex: 2,
+                      flex: 1,
                       padding: '14px',
                       borderRadius: '16px',
                       background: '#9D4124',
@@ -523,7 +738,7 @@ export default function ReservationPage() {
                       border: 'none',
                       fontFamily: "'Epilogue', sans-serif",
                       fontWeight: 800,
-                      fontSize: '0.95rem',
+                      fontSize: '1rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -532,17 +747,19 @@ export default function ReservationPage() {
                       boxShadow: '0 6px 18px rgba(157, 65, 36, 0.3)'
                     }}
                   >
-                    <span>Tiếp tục: Gọi món trước</span>
-                    <Icon name="restaurant_menu" size={18} />
+                    <span>Tiếp tục chọn món (Tùy chọn)</span>
+                    <Icon name="arrow_forward" size={18} />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STEP 3: PRE-ORDER DISHES (GỌI MÓN TRƯỚC) */}
+            {/* ============================================================== */}
+            {/* STEP 3: PRE-ORDER GỌI MÓN TRƯỚC (TÙY CHỌN)                       */}
+            {/* ============================================================== */}
             {currentStep === 3 && (
               <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124' }}>
                       <Icon name="restaurant_menu" size={20} />
@@ -557,7 +774,7 @@ export default function ReservationPage() {
                         </span>
                       </div>
                       <span style={{ fontSize: '0.8rem', color: '#89726B' }}>
-                        Chọn trước món ngon để nhà hàng sơ chế và phục vụ nóng hổi ngay khi bạn đến!
+                        Bếp sẽ sơ chế và nấu chuẩn bị ngay khi bạn tới bàn, tiết kiệm 15-20 phút chờ đợi
                       </span>
                     </div>
                   </div>
@@ -622,7 +839,7 @@ export default function ReservationPage() {
                 </div>
 
                 {/* Dishes Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', maxHeight: '420px', overflowY: 'auto', marginBottom: '22px', paddingRight: '4px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', maxHeight: '400px', overflowY: 'auto', marginBottom: '22px', paddingRight: '4px' }}>
                   {filteredMenuItems.map(dish => {
                     const selected = preOrderItems.find(i => i.id === dish.id);
                     return (
@@ -644,16 +861,9 @@ export default function ReservationPage() {
                           <img
                             src={dish.imageUrl}
                             alt={dish.name}
-                            style={{ width: '72px', height: '72px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
+                            style={{ width: '70px', height: '70px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
                           />
                           <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                              {dish.tag && (
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: '#FFDBC9', color: '#9D4124' }}>
-                                  {dish.tag}
-                                </span>
-                              )}
-                            </div>
                             <h4 style={{ margin: 0, fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {dish.name}
                             </h4>
@@ -666,7 +876,7 @@ export default function ReservationPage() {
                         {selected && (
                           <input
                             type="text"
-                            placeholder="Ghi chú (chín kỹ, ít đá...)"
+                            placeholder="Ghi chú (chín vừa, ít sốt...)"
                             value={selected.note || ''}
                             onChange={(e) => handleUpdateDishNote(dish.id, e.target.value)}
                             style={{
@@ -699,7 +909,7 @@ export default function ReservationPage() {
                               <button
                                 type="button"
                                 onClick={() => handleUpdateDishQty(dish.id, 1)}
-                                style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #EAE0DE', background: '#F6ECEA', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
+                                style={{ width: '26px', height: '26px', borderRadius: '6px', border: 'none', background: '#9D4124', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
                               >
                                 +
                               </button>
@@ -709,11 +919,11 @@ export default function ReservationPage() {
                               type="button"
                               onClick={() => handleAddDish(dish)}
                               style={{
-                                padding: '6px 12px',
+                                padding: '5px 12px',
                                 borderRadius: '8px',
-                                background: '#9D4124',
-                                color: '#FFFFFF',
-                                border: 'none',
+                                border: '1px solid #9D4124',
+                                background: '#FFF8F6',
+                                color: '#9D4124',
                                 fontWeight: 700,
                                 fontSize: '0.78rem',
                                 cursor: 'pointer',
@@ -798,7 +1008,9 @@ export default function ReservationPage() {
               </div>
             )}
 
-            {/* STEP 4: Customer Information & Final Confirmation */}
+            {/* ============================================================== */}
+            {/* STEP 4: ĐIỀN THÔNG TIN KHÁCH & XÁC NHẬN GIỮ CHỖ (SUBMIT PENDING)  */}
+            {/* ============================================================== */}
             {currentStep === 4 && (
               <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -807,77 +1019,13 @@ export default function ReservationPage() {
                   </div>
                   <div>
                     <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
-                      4. Thông tin người đặt bàn
+                      4. Thông tin người đặt bàn & xác nhận
                     </h2>
-                    <span style={{ fontSize: '0.8rem', color: '#89726B' }}>ROMS sẽ gửi tin nhắn SMS xác nhận giữ chỗ tới số điện thoại này</span>
+                    <span style={{ fontSize: '0.8rem', color: '#89726B' }}>
+                      Quản lý nhà hàng sẽ gọi điện tới số này để xác nhận yêu cầu và sắp xếp vị trí bàn
+                    </span>
                   </div>
                 </div>
-
-                {/* Pre-order Preview alert if any */}
-                {preOrderItems.length > 0 && (
-                  <div style={{ background: '#FFF8F6', border: '1px dashed #9D4124', borderRadius: '16px', padding: '14px 18px', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#9D4124', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Icon name="restaurant_menu" size={18} />
-                        Món Ăn Đặt Trước ({totalDishesCount} phần)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentStep(3)}
-                        style={{ border: 'none', background: 'transparent', color: '#9D4124', fontSize: '0.78rem', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}
-                      >
-                        Sửa món
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {preOrderItems.map(item => (
-                        <span key={item.id} style={{ background: '#FFFFFF', border: '1px solid #FFDBC9', borderRadius: '8px', padding: '4px 10px', fontSize: '0.78rem', color: '#1F1B1A' }}>
-                          <b>{item.qty}x</b> {item.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {preOrderItems.length === 0 && (
-                  <div style={{
-                    background: '#FFFDF0',
-                    border: '1px dashed #F59E0B',
-                    borderRadius: '16px',
-                    padding: '14px 18px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '12px',
-                    flexWrap: 'wrap'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Icon name="tips_and_updates" size={20} style={{ color: '#D97706' }} />
-                      <span style={{ fontSize: '0.82rem', color: '#78350F' }}>
-                        Chưa chọn món? <strong>Đặt món trước</strong> giúp bếp chuẩn bị và phục vụ đúng giờ bạn đến, tránh chờ lên món lâu!
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(3)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '8px',
-                        border: '1px solid #D97706',
-                        background: '#FFFFFF',
-                        color: '#B45309',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      + Chọn Món Ngay
-                    </button>
-                  </div>
-                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
                   <div>
@@ -906,11 +1054,11 @@ export default function ReservationPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                     <div>
                       <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '6px' }}>
-                        Số điện thoại <span style={{ color: '#9D4124' }}>*</span>
+                        Số điện thoại nhận cuộc gọi xác nhận <span style={{ color: '#9D4124' }}>*</span>
                       </label>
                       <input
                         type="tel"
-                        placeholder="090xxxxxxx"
+                        placeholder="090xxxxxxx (10 số)"
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
                         style={{
@@ -929,7 +1077,7 @@ export default function ReservationPage() {
 
                     <div>
                       <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '6px' }}>
-                        Email nhận xác nhận
+                        Email nhận xác nhận (tùy chọn)
                       </label>
                       <input
                         type="email"
@@ -953,11 +1101,11 @@ export default function ReservationPage() {
 
                   <div>
                     <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '6px' }}>
-                      Ghi chú đặc biệt (Khẩu vị, dịp sinh nhật, kỷ niệm...):
+                      Ghi chú đặc biệt cho nhà hàng (Khẩu vị, tiệc sinh nhật, kỷ niệm...):
                     </label>
                     <textarea
                       rows={3}
-                      placeholder="Ví dụ: Kỷ niệm ngày cưới, chuẩn bị ghế trẻ em, không ăn cay..."
+                      placeholder="Ví dụ: Kỷ niệm ngày cưới, chuẩn bị ghế trẻ em, không ăn hành tây..."
                       value={specialNote}
                       onChange={(e) => setSpecialNote(e.target.value)}
                       style={{
@@ -996,18 +1144,19 @@ export default function ReservationPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={isSubmitting}
                     onClick={handleNextStep}
                     style={{
                       flex: 2,
                       padding: '15px',
                       borderRadius: '16px',
-                      background: '#9D4124',
+                      background: isSubmitting ? '#C4B5B0' : '#9D4124',
                       color: '#FFF',
                       border: 'none',
                       fontFamily: "'Epilogue', sans-serif",
                       fontWeight: 800,
                       fontSize: '1.05rem',
-                      cursor: 'pointer',
+                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1015,8 +1164,14 @@ export default function ReservationPage() {
                       boxShadow: '0 8px 24px rgba(157, 65, 36, 0.35)'
                     }}
                   >
-                    <Icon name="check_circle" size={22} fill={1} />
-                    <span>Xác Nhận Giữ Chỗ Ngay</span>
+                    {isSubmitting ? (
+                      <span>Đang gửi yêu cầu...</span>
+                    ) : (
+                      <>
+                        <Icon name="check_circle" size={22} fill={1} />
+                        <span>Xác Nhận Giữ Chỗ Ngay</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1041,16 +1196,22 @@ export default function ReservationPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.88rem', paddingBottom: '16px', borderBottom: '1px dashed #EAE0DE' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#89726B' }}>Thời gian:</span>
-                  <span style={{ fontWeight: 800, color: '#9D4124' }}>{selectedTime} • {selectedDate}</span>
+                  <span style={{ color: '#89726B' }}>Ngày dùng bữa:</span>
+                  <span style={{ fontWeight: 800, color: '#9D4124' }}>
+                    {new Date(selectedDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#89726B' }}>Khung giờ hẹn:</span>
+                  <span style={{ fontWeight: 800, color: '#9D4124' }}>{selectedTime}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#89726B' }}>Số lượng khách:</span>
                   <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{selectedGuests} khách</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#89726B' }}>Khu vực:</span>
-                  <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{selectedZone}</span>
+                  <span style={{ color: '#89726B' }}>Khu vực mong muốn:</span>
+                  <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{selectedZoneName}</span>
                 </div>
                 {customerName && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1086,29 +1247,31 @@ export default function ReservationPage() {
               {/* Policy note */}
               <div style={{ background: '#FFF8F6', padding: '12px 14px', borderRadius: '14px', marginTop: '16px', border: '1px solid #F6ECEA' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#596232', fontWeight: 700, fontSize: '0.78rem', marginBottom: '4px' }}>
-                  <Icon name="verified" size={16} /> Tiêu chuẩn dịch vụ ROMS
+                  <Icon name="phone_in_talk" size={16} /> Quy trình xác nhận ROMS
                 </div>
                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#56423D', lineHeight: 1.45 }}>
-                  Nhà hàng cam kết giữ bàn trong vòng <strong>20 phút</strong> kể từ giờ hẹn. Món đặt trước sẽ được bắt đầu sơ chế trước giờ hẹn 15 phút.
+                  Sau khi bạn nhấn xác nhận, yêu cầu sẽ được chuyển đến <strong>Quản lý ca trực</strong>. Quản lý sẽ gọi điện đến SĐT của bạn trong ít phút để kiểm tra vị trí bàn trống và xếp bàn tốt nhất.
                 </p>
               </div>
 
               <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.78rem', color: '#89726B' }}>
-                Hotline hỗ trợ: <strong style={{ color: '#9D4124' }}>1900 8924</strong>
+                Hotline hỗ trợ trực tiếp: <strong style={{ color: '#9D4124' }}>1900 8924</strong>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* SUCCESS MODAL */}
+      {/* ==================================================================== */}
+      {/* 4. MODAL THÔNG BÁO XÁC NHẬN GIỮ CHỖ THÀNH CÔNG (CHỜ QUẢN LÝ GỌI ĐIỆN) */}
+      {/* ==================================================================== */}
       {isSuccess && (
         <div style={{
           position: 'fixed',
           inset: 0,
           zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
+          background: 'rgba(31, 27, 26, 0.7)',
+          backdropFilter: 'blur(6px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1117,17 +1280,17 @@ export default function ReservationPage() {
           <div style={{
             background: '#FFFFFF',
             width: '100%',
-            maxWidth: '520px',
+            maxWidth: '540px',
             borderRadius: '28px',
-            padding: '32px',
+            padding: '36px',
             textAlign: 'center',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.25)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
             maxHeight: '90vh',
             overflowY: 'auto'
           }}>
             <div style={{
-              width: '68px',
-              height: '68px',
+              width: '72px',
+              height: '72px',
               borderRadius: '50%',
               background: '#DDE8AB',
               color: '#596232',
@@ -1136,28 +1299,51 @@ export default function ReservationPage() {
               justifyContent: 'center',
               margin: '0 auto 16px'
             }}>
-              <Icon name="check_circle" size={40} fill={1} />
+              <Icon name="phone_callback" size={40} fill={1} />
             </div>
 
-            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.45rem', color: '#1F1B1A', margin: '0 0 6px' }}>
-              Đặt Bàn Thành Công!
+            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#1F1B1A', margin: '0 0 8px' }}>
+              Yêu Cầu Đã Gửi Tới Quản Lý!
             </h3>
-            <p style={{ fontSize: '0.85rem', color: '#56423D', margin: '0 0 20px' }}>
-              Cảm ơn quý khách <strong>{customerName}</strong>. ROMS đã ghi nhận thông tin giữ chỗ và sẵn sàng phục vụ quý khách.
+            <p style={{ fontSize: '0.9rem', color: '#56423D', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Cảm ơn quý khách <strong>{customerName}</strong>. Nhà hàng đã ghi nhận yêu cầu giữ chỗ của quý khách.
             </p>
 
-            <div style={{ background: '#FFF8F6', padding: '16px 18px', borderRadius: '18px', border: '1.5px dashed #9D4124', marginBottom: '20px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+            {/* Hộp thông báo quản lý gọi điện */}
+            <div style={{
+              background: '#FFF8F6',
+              padding: '16px',
+              borderRadius: '16px',
+              border: '1.5px solid #FFDBC9',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              textAlign: 'left'
+            }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124', flexShrink: 0 }}>
+                <Icon name="phone_in_talk" size={22} />
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#56423D' }}>
+                Quản lý nhà hàng sẽ gọi điện thoại tới số <strong style={{ color: '#9D4124', fontSize: '0.95rem' }}>{customerPhone}</strong> trong vòng <strong>5-10 phút</strong> để xác nhận và sắp xếp vị trí bàn ưng ý nhất cho bạn!
+              </div>
+            </div>
+
+            {/* Chi tiết phiếu đặt chỗ */}
+            <div style={{ background: '#FAF5F4', padding: '16px 18px', borderRadius: '18px', border: '1px dashed #C4B5B0', marginBottom: '24px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#89726B' }}>Mã đặt chỗ:</span>
-                <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, color: '#9D4124', fontSize: '1.05rem' }}>{bookingCode}</span>
+                <span style={{ color: '#89726B' }}>Mã đặt chỗ tra cứu:</span>
+                <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, color: '#9D4124', fontSize: '1.1rem' }}>{bookingCode}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#89726B' }}>Thời gian:</span>
-                <span style={{ fontWeight: 700 }}>{selectedTime} • {selectedDate}</span>
+                <span style={{ color: '#89726B' }}>Thời gian hẹn:</span>
+                <span style={{ fontWeight: 700 }}>
+                  {selectedTime} • {new Date(selectedDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#89726B' }}>Số khách & Khu vực:</span>
-                <span style={{ fontWeight: 700 }}>{selectedGuests} khách • {selectedZone}</span>
+                <span style={{ fontWeight: 700 }}>{selectedGuests} khách • {selectedZoneName}</span>
               </div>
 
               {preOrderItems.length > 0 && (
@@ -1173,39 +1359,46 @@ export default function ReservationPage() {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
               <Link
                 to="/"
                 style={{
                   flex: 1,
-                  padding: '13px',
-                  borderRadius: '14px',
+                  padding: '14px',
+                  borderRadius: '16px',
                   background: '#F0E6E4',
                   color: '#56423D',
                   textDecoration: 'none',
                   fontWeight: 700,
-                  fontSize: '0.9rem'
+                  fontSize: '0.92rem',
+                  display: 'inline-block'
                 }}
               >
                 Về Trang Chủ
               </Link>
-              <Link
-                to="/dining/welcome?table=01"
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuccess(false);
+                  setCurrentStep(1);
+                  setPreOrderItems([]);
+                }}
                 style={{
                   flex: 1,
-                  padding: '13px',
-                  borderRadius: '14px',
+                  padding: '14px',
+                  borderRadius: '16px',
                   background: '#9D4124',
                   color: '#FFFFFF',
-                  textDecoration: 'none',
+                  border: 'none',
                   fontFamily: "'Epilogue', sans-serif",
                   fontWeight: 800,
-                  fontSize: '0.9rem',
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
                   boxShadow: '0 4px 14px rgba(157, 65, 36, 0.3)'
                 }}
               >
-                Trải Nghiệm Gọi Món
-              </Link>
+                Đặt Thêm Bàn Khác
+              </button>
             </div>
           </div>
         </div>

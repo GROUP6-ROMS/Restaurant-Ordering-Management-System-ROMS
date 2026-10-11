@@ -14,6 +14,7 @@ public class TableResponse {
 
     private Long id;
     private String code;          // Mã bàn (tableNumber)
+    private String tableNumber;   // Mã bàn (alias)
     private String name;          // Tên bàn hiển thị
     private String zone;          // ZONE_1, ZONE_2, VIP
     private String zoneName;      // Tầng 1 - Sảnh Chính, Tầng 2 - Ban Công, Phòng VIP
@@ -25,6 +26,7 @@ public class TableResponse {
     private Integer guests;           // Số khách thực tế đang ngồi
     private BigDecimal currentBill;   // Hóa đơn hiện tại (VND)
     private String timeIn;            // Thời gian vào ngồi (ví dụ: "18:45")
+    private Long durationMinutes;     // Số phút đã ngồi dùng bữa
     private Long activeSessionId;     // ID phiên ăn đang diễn ra
 
     // Thông tin nếu bàn Đã Đặt hoặc Khóa
