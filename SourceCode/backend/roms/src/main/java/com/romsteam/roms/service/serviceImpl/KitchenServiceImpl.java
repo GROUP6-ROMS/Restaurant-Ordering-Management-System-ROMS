@@ -36,8 +36,8 @@ public class KitchenServiceImpl implements KitchenService {
     @Override
     @Transactional(readOnly = true)
     public List<KitchenOrderResponse> getActiveKitchenOrders() {
-        // Lấy các đơn đang cần hiển thị trên màn hình bếp: CONFIRMED, COOKING, READY
-        List<OrderStatus> activeStatuses = Arrays.asList(OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.READY);
+        // Lấy các đơn đang cần hiển thị trên màn hình bếp: SUBMITTED (khách gửi qua QR), CONFIRMED, COOKING, READY
+        List<OrderStatus> activeStatuses = Arrays.asList(OrderStatus.SUBMITTED, OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.READY);
         List<Order> orders = orderRepository.findByStatusInOrderByCreatedAtAsc(activeStatuses);
 
         return orders.stream()
@@ -167,7 +167,7 @@ public class KitchenServiceImpl implements KitchenService {
     @Override
     @Transactional(readOnly = true)
     public KitchenSummaryResponse getKitchenSummary() {
-        List<OrderStatus> activeStatuses = Arrays.asList(OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.READY);
+        List<OrderStatus> activeStatuses = Arrays.asList(OrderStatus.SUBMITTED, OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.READY);
         List<Order> orders = orderRepository.findByStatusInOrderByCreatedAtAsc(activeStatuses)
                 .stream()
                 .filter(o -> o.getSession() != null && o.getSession().getStatus() == SessionStatus.ACTIVE)

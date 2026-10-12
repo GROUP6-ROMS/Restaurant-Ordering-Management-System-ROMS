@@ -145,6 +145,7 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
         newOrder.setNote(request.getOrderNote());
 
         BigDecimal totalOrderAmount = BigDecimal.ZERO;
+        boolean hasCookingItems = false;
 
         for (CustomerOrderItemRequest itemReq : request.getItems()) {
             MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
@@ -159,6 +160,12 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(qty));
             totalOrderAmount = totalOrderAmount.add(subtotal);
 
+            // Nhận diện đồ uống đóng chai / lấy tại tủ mát phục vụ:
+            boolean isDrink = "WAITER".equalsIgnoreCase(menuItem.getStation()) ||
+                    (menuItem.getCategory() != null && menuItem.getCategory().getName() != null &&
+                    (menuItem.getCategory().getName().toLowerCase().contains("uống") ||
+                     menuItem.getCategory().getName().toLowerCase().contains("nước")));
+
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(newOrder);
             orderItem.setMenuItem(menuItem);
@@ -166,11 +173,20 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
             orderItem.setUnitPrice(unitPrice);
             orderItem.setSubtotal(subtotal);
             orderItem.setNote(itemReq.getNote());
-            orderItem.setStatus(OrderItemStatus.PENDING);
+
+            // Đồ uống đóng chai: Sẵn sàng ngay (READY) tại Quầy Pass để bồi bàn lấy ra bàn
+            // Món nấu: Chờ tiếp nhận (PENDING) để Bếp KDS tiếp nhận và nấu
+            if (isDrink) {
+                orderItem.setStatus(OrderItemStatus.READY);
+            } else {
+                orderItem.setStatus(OrderItemStatus.PENDING);
+                hasCookingItems = true;
+            }
 
             newOrder.addOrderItem(orderItem);
         }
 
+        newOrder.setStatus(hasCookingItems ? OrderStatus.SUBMITTED : OrderStatus.READY);
         newOrder.setTotalAmount(totalOrderAmount);
         orderRepository.save(newOrder);
 

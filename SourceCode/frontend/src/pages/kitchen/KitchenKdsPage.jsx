@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { kitchenApi } from '../../api/kitchenApi';
+import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 // Icon Material Symbols
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -588,7 +589,7 @@ export default function KitchenKdsPage() {
     }
   };
 
-  // Chu kỳ Polling 5s & đồng bộ khi người dùng focus tab
+  // Chu kỳ Polling 5s & đồng bộ Realtime tức thì khi có đơn mới
   useEffect(() => {
     loadOrders(false);
 
@@ -600,10 +601,17 @@ export default function KitchenKdsPage() {
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
 
+    const unsubscribeRealtime = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'NEW_ORDER_CREATED' || event?.type === 'ORDER_UPDATE' || event?.type === 'TABLE_UPDATE') {
+        loadOrders(true);
+      }
+    });
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
+      unsubscribeRealtime();
     };
   }, [soundEnabled]);
 

@@ -7,9 +7,9 @@ const axiosClient = axios.create({
     },
 });
 
-// Interceptor: Tự động gắn Bearer Token vào header nếu đã đăng nhập (ưu tiên sessionStorage của từng tab)
+// Interceptor: Tự động gắn Bearer Token vào header nếu đã đăng nhập (độc lập sessionStorage theo từng tab)
 axiosClient.interceptors.request.use((config) => {
-    const token = sessionStorage.getItem('roms_token') || localStorage.getItem('roms_token');
+    const token = sessionStorage.getItem('roms_token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }

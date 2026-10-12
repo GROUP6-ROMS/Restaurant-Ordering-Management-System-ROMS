@@ -62,7 +62,9 @@ export default function WaiterOrderDetailPage() {
               price: typeof item.unitPrice === 'number' ? item.unitPrice : Number(item.unitPrice || 0),
               qty: item.quantity || 1,
               status: item.status,
-              statusText: item.status === 'READY' ? 'Quầy Pass' : item.status === 'COOKING' ? 'Bếp đang nấu' : 'Đã lên món',
+              statusText: item.status === 'READY' ? 'Quầy Pass' :
+                          item.status === 'COOKING' ? 'Bếp đang nấu' :
+                          item.status === 'PENDING' ? 'Chờ bếp nhận' : 'Đã lên món',
               note: item.note || ''
             }))
           });
@@ -520,7 +522,8 @@ export default function WaiterOrderDetailPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {tableData.items.map((item, idx) => {
               let statusBadge = { bg: '#E8F5E9', color: '#2E7D32', text: 'Đã lên món' };
-              if (item.status === 'COOKING') statusBadge = { bg: '#FFF8E1', color: '#B45309', text: 'Đang nấu (Bếp)' };
+              if (item.status === 'PENDING') statusBadge = { bg: '#FEF3C7', color: '#B45309', text: 'Chờ tiếp nhận' };
+              else if (item.status === 'COOKING') statusBadge = { bg: '#FFF8E1', color: '#B45309', text: 'Đang nấu (Bếp)' };
               else if (item.status === 'READY') statusBadge = { bg: '#DCFCE7', color: '#15803D', text: 'Quầy Pass (Sẵn sàng)' };
               else if (item.status === 'WAITER_PREP' || item.status === 'BREWING') statusBadge = { bg: '#DDE8AB', color: '#3B4800', text: 'Waiter lấy nước' };
               else if (item.status === 'CANCELLED') statusBadge = { bg: '#FFDAD6', color: '#BA1A1A', text: 'Đã hủy' };

@@ -21,12 +21,18 @@ export function getRoleHome(role) {
 }
 
 export function AuthProvider({ children }) {
+  // Dọn dẹp tàn dư localStorage cũ (nếu có) để tránh rò rỉ phiên giữa các tab
+  if (typeof window !== 'undefined' && (localStorage.getItem('roms_user') || localStorage.getItem('roms_token'))) {
+    localStorage.removeItem('roms_user');
+    localStorage.removeItem('roms_token');
+  }
+
   const [user, setUser] = useState(() => {
-    const saved = sessionStorage.getItem('roms_user') || localStorage.getItem('roms_user');
+    const saved = sessionStorage.getItem('roms_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [token, setToken] = useState(() => sessionStorage.getItem('roms_token') || localStorage.getItem('roms_token') || null);
+  const [token, setToken] = useState(() => sessionStorage.getItem('roms_token') || null);
 
   const login = async (username, pinCode) => {
     try {
@@ -41,8 +47,8 @@ export function AuthProvider({ children }) {
       // Lưu sessionStorage (độc lập từng tab khi test nhiều tài khoản song song)
       sessionStorage.setItem('roms_token', authToken);
       sessionStorage.setItem('roms_user', JSON.stringify(userData));
-      localStorage.setItem('roms_token', authToken);
-      localStorage.setItem('roms_user', JSON.stringify(userData));
+      localStorage.removeItem('roms_token');
+      localStorage.removeItem('roms_user');
 
       setToken(authToken);
       setUser(userData);
@@ -64,7 +70,7 @@ export function AuthProvider({ children }) {
     } finally {
       setUser(null);
       setToken(null);
-      // Chỉ đăng xuất tab hiện tại khỏi sessionStorage
+      // Đăng xuất tab hiện tại khỏi sessionStorage
       sessionStorage.removeItem('roms_user');
       sessionStorage.removeItem('roms_token');
       localStorage.removeItem('roms_user');
