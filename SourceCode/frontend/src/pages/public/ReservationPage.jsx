@@ -22,14 +22,44 @@ function Icon({ name, size = 20, fill = 0, style = {} }) {
   );
 }
 
+// Helper tính toán ngày theo múi giờ địa phương chuẩn định dạng YYYY-MM-DD (tránh lệch timezone UTC)
+const getLocalDateString = (offsetDays = 0) => {
+  const d = new Date();
+  if (offsetDays !== 0) {
+    d.setDate(d.getDate() + offsetDays);
+  }
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper format hiển thị ngày đầy đủ tiếng Việt không bị lệch timezone
+const formatDisplayDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  return d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+// Helper format hiển thị ngày ngắn gọn DD/MM/YYYY
+const formatShortDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
 export default function ReservationPage() {
-  // Lấy ngày hôm nay định dạng YYYY-MM-DD làm giá trị tối thiểu cho Date Picker
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Lấy ngày hôm nay theo giờ địa phương (YYYY-MM-DD) làm giá trị mặc định cho ngày đặt bàn
+  const todayStr = getLocalDateString(0);
 
   // 1. Quản lý trạng thái bước đặt chỗ (1 -> 4)
   const [currentStep, setCurrentStep] = useState(1);
 
-  // 2. Ngày dùng bữa: Chọn ngày cụ thể (mặc định hôm nay)
+  // 2. Ngày dùng bữa: Chọn ngày cụ thể (mặc định hôm nay - ngày đặt bàn)
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
   // 3. Khung giờ: Giờ đại diện + chế độ nhập giờ khác
@@ -371,19 +401,28 @@ export default function ReservationPage() {
                   </div>
                 </div>
 
-                {/* Date Selection: BỘ CHỌN NGÀY CỤ THỂ (DATE PICKER) */}
+                {/* Date Selection: BỘ CHỌN NGÀY CỤ THỂ (MẶC ĐỊNH LÀ NGÀY ĐẶT BÀN / HÔM NAY) */}
                 <div style={{ marginBottom: '24px' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                    <Icon name="event" size={18} style={{ color: '#9D4124' }} />
-                    Ngày dùng bữa cụ thể: <span style={{ color: '#9D4124' }}>*</span>
-                  </label>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Icon name="event" size={18} style={{ color: '#9D4124' }} />
+                      Ngày đặt bàn / dùng bữa: <span style={{ color: '#9D4124' }}>*</span>
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: '#89726B', fontWeight: 600 }}>
+                      Mặc định: Hôm nay ({formatShortDate(todayStr)})
+                    </span>
+                  </div>
+
+
+                  {/* Input date picker chọn ngày */}
+                  <div style={{ position: 'relative' }}>
                     <input
                       type="date"
                       min={todayStr}
                       value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
+                      onChange={(e) => setSelectedDate(e.target.value || todayStr)}
                       style={{
+                        width: '100%',
                         padding: '13px 18px',
                         borderRadius: '14px',
                         border: '1.5px solid #EAE0DE',
@@ -393,14 +432,10 @@ export default function ReservationPage() {
                         background: '#FFF8F6',
                         outline: 'none',
                         cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                        boxSizing: 'border-box'
                       }}
                     />
-                    <div style={{ fontSize: '0.88rem', color: '#56423D', background: '#FCF1EF', padding: '12px 18px', borderRadius: '14px', border: '1px solid #FFDBC9' }}>
-                      Đã chọn: <strong style={{ color: '#9D4124' }}>
-                        {new Date(selectedDate).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </strong>
-                    </div>
                   </div>
                 </div>
 
@@ -773,9 +808,9 @@ export default function ReservationPage() {
                           Tùy chọn
                         </span>
                       </div>
-                      <span style={{ fontSize: '0.8rem', color: '#89726B' }}>
-                        Bếp sẽ sơ chế và nấu chuẩn bị ngay khi bạn tới bàn, tiết kiệm 15-20 phút chờ đợi
-                      </span>
+                      <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '2px' }}>
+                        Bếp sẽ sơ chế chuẩn bị sẵn khi bạn tới bàn vào ngày: <strong style={{ color: '#9D4124' }}>{formatDisplayDate(selectedDate)}</strong> ({selectedTime})
+                      </div>
                     </div>
                   </div>
 
@@ -1198,7 +1233,7 @@ export default function ReservationPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#89726B' }}>Ngày dùng bữa:</span>
                   <span style={{ fontWeight: 800, color: '#9D4124' }}>
-                    {new Date(selectedDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    {formatShortDate(selectedDate)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1338,7 +1373,7 @@ export default function ReservationPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#89726B' }}>Thời gian hẹn:</span>
                 <span style={{ fontWeight: 700 }}>
-                  {selectedTime} • {new Date(selectedDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  {selectedTime} • {formatShortDate(selectedDate)}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Icon from '../../components/common/Icon';
 import { tableApi } from '../../api/tableApi';
 import { zoneApi } from '../../api/zoneApi';
 import { reservationApi } from '../../api/reservationApi';
 
 export default function TableManagementPage() {
+  const location = useLocation();
   const [tables, setTables] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -389,6 +391,11 @@ export default function TableManagementPage() {
   // Tự động gọi API khi khởi tạo trang và thiết lập đồng bộ thời gian thực (Polling 6s)
   useEffect(() => {
     loadData(false);
+
+    // Nếu được điều hướng từ chuông thông báo để duyệt đặt bàn
+    if (location.state?.openReservationModal) {
+      handleOpenReservationModal();
+    }
 
     // Chu kỳ cập nhật tự động 6s/lần trong nền (không giật màn hình)
     const timer = setInterval(() => {

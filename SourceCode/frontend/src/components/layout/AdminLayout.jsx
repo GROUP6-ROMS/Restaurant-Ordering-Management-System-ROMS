@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../common/Icon';
 import RomsLogo from '../common/RomsLogo';
+import NotificationBell from '../common/NotificationBell';
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
@@ -100,8 +101,11 @@ export default function AdminLayout() {
           <span style={{ color: '#89726B', fontSize: '0.75rem' }}>• {dateStr}</span>
         </div>
 
-        {/* Right: Profile & Unified Logout button */}
+        {/* Right: Notification Bell, Profile & Unified Logout button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Chuông Thông Báo Quản Trị (Bàn gọi hỗ trợ & Đặt bàn mới) */}
+          <NotificationBell />
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right' }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.85rem', color: user ? '#1F1B1A' : '#BA1A1A' }}>

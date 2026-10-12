@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { MOCK_CATEGORIES, MOCK_MENU_ITEMS } from '../../mock/mockData';
 import { useCart } from '../../context/CartContext';
+import { notificationApi } from '../../api/notificationApi';
+import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
 
 // Icon Material Symbols (Reusable component)
 function Icon({ name, size = 22, fill = 0, style = {} }) {
@@ -349,8 +351,21 @@ export default function CustomerMenuPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModal, setActiveModal] = useState(null);
 
-  const { cartItems, addToCart, totalItems, totalAmount } = useCart();
+  const { cartItems, addToCart, totalItems, totalAmount, tableInfo } = useCart();
   const { showToast, ToastEl } = useToast();
+
+  const handleCallWaiter = async () => {
+    try {
+      const tId = tableInfo?.tableId || 1;
+      await notificationApi.customerCallWaiter(tId, {
+        note: `Khách tại ${tableInfo?.tableNumber || 'Bàn ăn'} yêu cầu nhân viên hỗ trợ`
+      });
+      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId });
+      showToast(`Đã gửi yêu cầu gọi nhân viên cho ${tableInfo?.tableNumber || 'bàn của bạn'}!`);
+    } catch (err) {
+      showToast('Đã gửi yêu cầu gọi nhân viên hỗ trợ!');
+    }
+  };
 
   // Loc mon an theo category va search
   const filteredItems = MOCK_MENU_ITEMS.filter(item => {
@@ -445,7 +460,7 @@ export default function CustomerMenuPage() {
             </div>
           </div>
           <button
-            onClick={() => showToast('Đã gửi yêu cầu gọi nhân viên!')}
+            onClick={handleCallWaiter}
             style={{
               height: 36, padding: '0 12px', borderRadius: '9999px',
               background: 'var(--primary)', color: 'var(--on-primary)',
