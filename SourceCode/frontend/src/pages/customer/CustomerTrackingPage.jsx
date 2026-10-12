@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { notificationApi } from '../../api/notificationApi';
+import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
 
 // Material Symbols Icon helper
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -35,6 +37,17 @@ export default function CustomerTrackingPage() {
     setTimeout(() => {
       setToastMessage(null);
     }, 3200);
+  };
+
+  const handleRequestAssistance = async (note) => {
+    try {
+      const tId = tableInfo?.tableId || 1;
+      await notificationApi.customerCallWaiter(tId, { note });
+      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId });
+      showToast(`Đã gửi yêu cầu: "${note}"!`);
+    } catch (err) {
+      showToast(`Đã gửi yêu cầu tới nhân viên phục vụ!`);
+    }
   };
 
   const batches = [
@@ -260,7 +273,7 @@ export default function CustomerTrackingPage() {
         }}>
           <button
             type="button"
-            onClick={() => showToast(`Nhân viên phụ trách đang tới bàn ${tableInfo?.tableNumber || 'T05'}`)}
+            onClick={() => handleRequestAssistance('Khách gọi nhân viên hỗ trợ tại bàn')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -282,7 +295,7 @@ export default function CustomerTrackingPage() {
           </button>
           <button
             type="button"
-            onClick={() => showToast('Đã gửi yêu cầu thêm Đá, Khăn lạnh!')}
+            onClick={() => handleRequestAssistance('Khách yêu cầu thêm Đá, Khăn lạnh')}
             style={{
               display: 'flex',
               alignItems: 'center',
