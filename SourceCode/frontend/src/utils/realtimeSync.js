@@ -25,15 +25,25 @@ const getBroadcastChannel = () => {
 
 /**
  * Phát sự kiện đồng bộ realtime tới tất cả các tab trình duyệt khác cùng origin
- * @param {Object} eventData Ví dụ: { type: 'PAYMENT_REQUEST', tableId: 22, tableName: 'Bàn T-04' }
+ * @param {Object|string} eventData Ví dụ: { type: 'PAYMENT_REQUEST', tableId: 22 } hoặc 'CALL_WAITER'
+ * @param {Object} [extraData] Dữ liệu bổ sung nếu eventData là chuỗi tên sự kiện
  */
-export const broadcastRealtimeEvent = (eventData) => {
-  if (!eventData || typeof eventData !== 'object') return;
-
-  const payload = {
-    ...eventData,
-    timestamp: Date.now()
-  };
+export const broadcastRealtimeEvent = (eventData, extraData = {}) => {
+  let payload;
+  if (typeof eventData === 'string') {
+    payload = {
+      type: eventData,
+      ...(extraData && typeof extraData === 'object' ? extraData : {}),
+      timestamp: Date.now()
+    };
+  } else if (eventData && typeof eventData === 'object') {
+    payload = {
+      ...eventData,
+      timestamp: Date.now()
+    };
+  } else {
+    return;
+  }
 
   // 1. BroadcastChannel API (chuẩn HTML5, giữ channel mở, không gọi close() để tránh hủy IPC message)
   try {

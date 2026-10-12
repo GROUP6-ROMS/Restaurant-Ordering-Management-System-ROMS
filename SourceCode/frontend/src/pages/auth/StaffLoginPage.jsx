@@ -22,13 +22,8 @@ export default function StaffLoginPage() {
   const [activeField, setActiveField] = useState('pin'); // 'code' or 'pin'
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // If already authenticated, redirect to proper workspace
-  useEffect(() => {
-    if (isAuthenticated && user?.role) {
-      const destination = location.state?.from?.pathname || getRoleHome(user.role);
-      navigate(destination, { replace: true });
-    }
-  }, [isAuthenticated, user, navigate, location]);
+  // Không ép tự động chuyển hướng để cho phép nhân viên đổi ca / chọn vai trò khác
+  // Nếu muốn vào tiếp ca hiện tại, người dùng có nút bấm nhanh "Vào ca →" trên thông báo
 
   // Handle Preset Account Selection
   const handleSelectPreset = (preset) => {
@@ -84,7 +79,7 @@ export default function StaffLoginPage() {
 
     // 2. Nếu đăng nhập thành công từ CSDL -> Điều hướng vào ca trực
     if (result.success) {
-      const targetRoute = getRoleHome(result.role);
+      const targetRoute = location.state?.from?.pathname || getRoleHome(result.role);
       navigate(targetRoute, { replace: true });
     } else {
       // 3. Nếu sai mã PIN hoặc tài khoản không tồn tại -> Báo lỗi đỏ lên giao diện
@@ -135,6 +130,45 @@ export default function StaffLoginPage() {
             <p style={{ margin: '0 0 20px', fontSize: '0.85rem', color: '#89726B' }}>
               Quét thẻ nhân viên hoặc nhập Mã Nhân Viên và Mã PIN để vào vị trí làm việc.
             </p>
+
+            {/* Thông báo nếu tab hiện tại đã có ca trực (cho phép đổi ca hoặc vào lại ca) */}
+            {isAuthenticated && user?.role && (
+              <div style={{
+                background: '#FDF7F5',
+                border: '1px solid #EAE0DE',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icon name="verified_user" size={18} style={{ color: '#9D4124' }} />
+                  <span style={{ fontSize: '0.78rem', color: '#56423D' }}>
+                    Tab này đang đăng nhập: <b>{user.fullName || user.username}</b> ({user.role})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(getRoleHome(user.role), { replace: true })}
+                  style={{
+                    background: '#9D4124',
+                    color: '#FFF',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Vào ca →
+                </button>
+              </div>
+            )}
 
             {/* Error Message */}
             {errorMessage && (

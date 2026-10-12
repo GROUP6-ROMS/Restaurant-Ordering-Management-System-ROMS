@@ -49,12 +49,12 @@ public class MenuItem {
 
     // Giá vốn nguyên liệu / giá nhập hàng (Dùng để tính Lợi nhuận gộp và Tỷ suất Margin mà không cần Recipe BOM)
     @Builder.Default
-    @Column(name = "cost_price", nullable = false, precision = 12, scale = 2)
+    @Column(name = "cost_price", nullable = false, precision = 12, scale = 2, columnDefinition = "DECIMAL(12,2) DEFAULT 0")
     private BigDecimal costPrice = BigDecimal.ZERO;
 
     // Trạm điều phối xử lý món: "KITCHEN" (nấu tại bếp) hoặc "WAITER" (nước đóng lon/chai do phục vụ lấy từ tủ mát)
     @Builder.Default
-    @Column(name = "station", nullable = false, length = 20)
+    @Column(name = "station", nullable = false, length = 20, columnDefinition = "NVARCHAR(20) DEFAULT 'KITCHEN'")
     private String station = "KITCHEN";
 
     // Nhãn nổi bật hiển thị trên giao diện (Ví dụ: "Bestseller", "Chef's Choice", "Món Mới", "Healthy")

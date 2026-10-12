@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { waiterApi } from '../../api/waiterApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
@@ -57,7 +57,12 @@ export default function WaiterFloorPlanPage() {
             ...item,
             name: item.name || 'Món ăn',
             qty: item.quantity || 1,
-            note: item.note || (item.status === 'READY' ? 'Quầy Pass sẵn sàng' : item.status === 'COOKING' ? 'Bếp đang nấu KDS' : 'Đã lên bàn')
+            note: item.note || (
+              item.status === 'READY' ? 'Quầy Pass sẵn sàng' :
+              item.status === 'COOKING' ? 'Bếp đang nấu KDS' :
+              item.status === 'PENDING' ? 'Chờ bếp nhận món' :
+              item.status === 'SERVED' ? 'Đã lên bàn' : 'Chờ xử lý'
+            )
           }))
         }));
         setTables(mappedTables);
@@ -100,26 +105,27 @@ export default function WaiterFloorPlanPage() {
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
-      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE') {
+      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE' || event?.type === 'NEW_ORDER_CREATED' || event?.type === 'CALL_WAITER') {
         loadFloorPlan();
       }
     });
     return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        const res = await waiterApi.getMenu();
-        if (res.data && res.data.success) {
-          setMenuCatalog(res.data.data || []);
-        }
-      } catch (err) {
-        console.error("Lỗi tải thực đơn món:", err);
+  const fetchMenu = useCallback(async () => {
+    try {
+      const res = await waiterApi.getMenu();
+      if (res.data && res.data.success) {
+        setMenuCatalog(res.data.data || []);
       }
-    };
-    fetchMenu();
+    } catch (err) {
+      console.error("Lỗi tải thực đơn món:", err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchMenu();
+  }, [fetchMenu]);
 
   useEffect(() => {
     const fetchZones = async () => {
@@ -310,6 +316,9 @@ export default function WaiterFloorPlanPage() {
     setOrderGeneralNote('');
     setMenuSearchQuery('');
     setSelectedCategory('ALL');
+    if (!menuCatalog || menuCatalog.length === 0) {
+      fetchMenu();
+    }
     setShowOrderModal(true);
   };
 
@@ -948,6 +957,11 @@ export default function WaiterFloorPlanPage() {
                       {item.status === 'COOKING' && (
                         <span style={{ color: '#994703', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
                           <Icon name="microwave" size={14} /> Bếp nấu
+                        </span>
+                      )}
+                      {item.status === 'PENDING' && (
+                        <span style={{ color: '#B45309', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px', background: '#FEF3C7', padding: '2px 6px', borderRadius: '4px' }}>
+                          <Icon name="hourglass_top" size={14} /> Chờ bếp
                         </span>
                       )}
                       {item.status === 'READY' && (
@@ -1991,6 +2005,25 @@ export default function WaiterFloorPlanPage() {
                       <div style={{ textAlign: 'center', padding: '30px 10px', color: '#89726B', fontSize: '0.85rem' }}>
                         <Icon name="search_off" size={32} style={{ color: '#D1C2BE', marginBottom: '6px' }} />
                         <div>Không tìm thấy món ăn nào</div>
+                        {menuCatalog.length === 0 && (
+                          <button
+                            type="button"
+                            onClick={fetchMenu}
+                            style={{
+                              marginTop: '10px',
+                              padding: '6px 14px',
+                              borderRadius: '8px',
+                              background: '#9D4124',
+                              color: '#FFF',
+                              border: 'none',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Tải lại thực đơn
+                          </button>
+                        )}
                       </div>
                     ) : (
                       filteredOrderMenu.map(dish => {
