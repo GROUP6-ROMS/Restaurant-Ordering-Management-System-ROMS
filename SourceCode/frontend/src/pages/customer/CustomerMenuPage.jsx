@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { MOCK_CATEGORIES, MOCK_MENU_ITEMS } from '../../mock/mockData';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
-import { notificationApi } from '../../api/notificationApi';
+import { customerApi } from '../../api/customerApi';
 import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
 
 // Icon Material Symbols (Reusable component)
@@ -24,15 +23,16 @@ function Icon({ name, size = 22, fill = 0, style = {} }) {
 
 // Format tien VND
 function formatVND(amount) {
-  return amount.toLocaleString('vi-VN') + 'đ';
+  if (!amount && amount !== 0) return '0đ';
+  return Number(amount).toLocaleString('vi-VN') + 'đ';
 }
 
 // --- Dish Card: 2 cot theo dung thiet ke Stitch SCR-10 ---
 function DishCard({ item, inCartCount, onAdd }) {
-  const tagBg = item.tag?.includes('Bán chạy')
+  const tagBg = item.tag?.includes('Bán chạy') || item.tag?.includes('Bestseller')
     ? 'var(--tertiary-fixed)'
     : 'rgba(255, 219, 201, 0.5)';
-  const tagColor = item.tag?.includes('Bán chạy')
+  const tagColor = item.tag?.includes('Bán chạy') || item.tag?.includes('Bestseller')
     ? 'var(--on-tertiary-fixed)'
     : 'var(--secondary)';
 
@@ -48,9 +48,12 @@ function DishCard({ item, inCartCount, onAdd }) {
           background: 'var(--surface-container)',
         }}>
           <img
-            src={item.imageUrl}
+            src={item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80'}
             alt={item.name}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => {
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+            }}
           />
           {/* Thoi gian nau */}
           <div style={{
@@ -63,7 +66,7 @@ function DishCard({ item, inCartCount, onAdd }) {
             fontSize: 10, fontWeight: 700,
             fontFamily: 'Plus Jakarta Sans',
           }}>
-            {item.prepTime || '12p'}
+            {item.prepTime || '10-15p'}
           </div>
           {/* Tag (Ban chay, etc.) */}
           {item.tag && (
@@ -117,7 +120,7 @@ function DishCard({ item, inCartCount, onAdd }) {
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
           }}>
-            {item.description}
+            {item.description || 'Hương vị thơm ngon, chế biến công phu từ nguyên liệu tươi mới.'}
           </p>
         </div>
       </div>
@@ -241,58 +244,68 @@ function DishDetailModal({ item, onClose, onConfirm }) {
           width: '100%', height: 180, borderRadius: 16,
           overflow: 'hidden', marginBottom: 12,
         }}>
-          <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img
+            src={item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80'}
+            alt={item.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => {
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+            }}
+          />
         </div>
 
         {/* Mo ta */}
         <p style={{ color: 'var(--on-surface-variant)', fontSize: 14, lineHeight: '20px', marginBottom: 16 }}>
-          {item.description}
+          {item.description || 'Món ăn đặc sắc với nguyên liệu tươi ngon được chế biến theo công thức độc quyền.'}
         </p>
 
-        {/* Ghi chu cho bep */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <Icon name="soup_kitchen" size={18} style={{ color: 'var(--primary)' }} />
-            <label style={{
-              fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 13,
-              color: 'var(--on-surface)',
-            }}>
-              Ghi chú cho Bếp (không bắt buộc)
-            </label>
-          </div>
-          <textarea
-            rows={2}
-            placeholder="Ví dụ: Ít cay, không hành, sốt để riêng..."
+        {/* Ghi chu */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 13, color: 'var(--on-surface)', marginBottom: 6 }}>
+            Ghi chú riêng cho bếp:
+          </label>
+          <input
+            type="text"
+            placeholder="Ví dụ: Ít cay, không hành, nhiều đá..."
             value={note}
             onChange={e => setNote(e.target.value)}
             style={{
-              width: '100%',
+              width: '100%', height: 42, padding: '0 12px',
+              borderRadius: 12, border: '1px solid var(--outline-variant)',
               background: 'var(--surface-container-low)',
-              border: '1px solid transparent',
-              borderRadius: 12, padding: '10px 12px',
-              fontFamily: 'Plus Jakarta Sans', fontSize: 14,
-              color: 'var(--on-surface)', resize: 'none', outline: 'none',
-              transition: 'border-color 0.15s ease',
+              color: 'var(--on-surface)', fontFamily: 'Plus Jakarta Sans', fontSize: 13,
+              boxSizing: 'border-box', outline: 'none'
             }}
-            onFocus={e => { e.target.style.borderColor = 'var(--outline-variant)'; e.target.style.background = 'var(--surface-container-lowest)'; }}
-            onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = 'var(--surface-container-low)'; }}
           />
         </div>
 
-        {/* Stepper + Nut them */}
+        {/* Chon so luong va xac nhan */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Stepper */}
-          <div className="stepper">
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'var(--surface-container)', borderRadius: '9999px',
+            padding: '4px 8px'
+          }}>
             <button
-              className="stepper-btn"
               onClick={() => setQty(Math.max(1, qty - 1))}
+              style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: 'var(--surface-container-lowest)',
+                border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
             >
               <Icon name="remove" size={16} />
             </button>
-            <span className="stepper-count">{qty}</span>
+            <span style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 15, minWidth: 20, textAlign: 'center' }}>
+              {qty}
+            </span>
             <button
-              className="stepper-btn"
               onClick={() => setQty(qty + 1)}
+              style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: 'var(--surface-container-lowest)',
+                border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
             >
               <Icon name="add" size={16} />
             </button>
@@ -347,33 +360,81 @@ function useToast() {
 // Khop chinh xac voi SCR-10 Customer Mobile Menu (Stitch)
 // ====================================================
 export default function CustomerMenuPage() {
+  const [categories, setCategories] = useState([]);
+  const [allItems, setAllItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModal, setActiveModal] = useState(null);
 
-  const { cartItems, addToCart, totalItems, totalAmount, tableInfo } = useCart();
+  const { cartItems, addToCart, tableInfo } = useCart();
   const { showToast, ToastEl } = useToast();
+
+  // Nạp thực đơn trực tiếp từ CSDL qua customerApi
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        setIsLoading(true);
+        const res = await customerApi.getCustomerMenu();
+        if (res.success && res.data) {
+          const menuCatalog = res.data;
+          const catList = menuCatalog.map(c => ({
+            id: c.categoryId,
+            name: c.categoryName,
+            displayOrder: c.displayOrder
+          }));
+          setCategories(catList);
+
+          // Gom toàn bộ món ăn từ các danh mục
+          const flatItems = [];
+          menuCatalog.forEach(c => {
+            if (c.items) {
+              c.items.forEach(item => {
+                flatItems.push({
+                  ...item,
+                  categoryId: c.categoryId,
+                  categoryName: c.categoryName
+                });
+              });
+            }
+          });
+          setAllItems(flatItems);
+        }
+      } catch (err) {
+        console.error('Lỗi khi nạp thực đơn từ backend:', err);
+        showToast('Đang tải thực đơn dự phòng...');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMenu();
+  }, []);
 
   const handleCallWaiter = async () => {
     try {
-      const tId = tableInfo?.tableId || 1;
-      await notificationApi.customerCallWaiter(tId, {
-        note: `Khách tại ${tableInfo?.tableNumber || 'Bàn ăn'} yêu cầu nhân viên hỗ trợ`
+      const tId = tableInfo?.tableId;
+      const tNum = tableInfo?.tableNumber || 'Bàn của bạn';
+      await customerApi.callWaiter({
+        tableId: tId,
+        tableNumber: tNum,
+        requestType: 'CALL_WAITER',
+        note: `Khách tại ${tNum} bấm chuông gọi nhân viên hỗ trợ`
       });
-      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId });
-      showToast(`Đã gửi yêu cầu gọi nhân viên cho ${tableInfo?.tableNumber || 'bàn của bạn'}!`);
+      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId, tableNumber: tNum });
+      showToast(`Đã rung chuông gọi nhân viên cho ${tNum}!`);
     } catch (err) {
-      showToast('Đã gửi yêu cầu gọi nhân viên hỗ trợ!');
+      showToast('Đã gửi chuông gọi nhân viên hỗ trợ!');
     }
   };
 
   // Loc mon an theo category va search
-  const filteredItems = MOCK_MENU_ITEMS.filter(item => {
+  const filteredItems = allItems.filter(item => {
     const matchCat = selectedCategory === 0 || item.categoryId === selectedCategory;
     const matchSearch =
       !searchQuery ||
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+      item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
   });
 
@@ -389,6 +450,8 @@ export default function CustomerMenuPage() {
     addToCart(item, qty, note);
     showToast(`Đã thêm ${item.name}`);
   };
+
+  const selectedCatObj = categories.find(c => c.id === selectedCategory);
 
   return (
     <div style={{
@@ -444,7 +507,7 @@ export default function CustomerMenuPage() {
                   fontSize: 11, fontWeight: 700, fontFamily: 'Plus Jakarta Sans',
                 }}>
                   <Icon name="table_restaurant" size={13} style={{ color: 'var(--primary)' }} />
-                  Bàn T05
+                  {tableInfo?.tableNumber || 'Bàn ăn'}
                 </span>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -454,7 +517,7 @@ export default function CustomerMenuPage() {
                   fontSize: 11, fontWeight: 500, fontFamily: 'Plus Jakarta Sans',
                 }}>
                   <Icon name="group" size={12} style={{ color: 'var(--primary)' }} />
-                  4 Khách
+                  {tableInfo?.guestCount || 2} Khách
                 </span>
               </div>
             </div>
@@ -507,17 +570,6 @@ export default function CustomerMenuPage() {
               </button>
             )}
           </div>
-          <button
-            style={{
-              width: 44, height: 44, borderRadius: 14,
-              background: 'var(--surface-container-lowest)',
-              border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: 'var(--shadow-xs)',
-            }}
-          >
-            <Icon name="tune" size={20} style={{ color: 'var(--primary)' }} />
-          </button>
         </div>
       </div>
 
@@ -534,9 +586,9 @@ export default function CustomerMenuPage() {
             className={`category-chip${selectedCategory === 0 ? ' active' : ''}`}
             onClick={() => setSelectedCategory(0)}
           >
-            Tất cả ({MOCK_MENU_ITEMS.length} món)
+            Tất cả ({allItems.length} món)
           </button>
-          {MOCK_CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button
               key={cat.id}
               className={`category-chip${selectedCategory === cat.id ? ' active' : ''}`}
@@ -558,7 +610,7 @@ export default function CustomerMenuPage() {
             fontFamily: 'Epilogue', fontWeight: 700, fontSize: 18,
             color: 'var(--on-surface)', lineHeight: '26px',
           }}>
-            {selectedCategory === 0 ? 'Món Nổi Bật' : MOCK_CATEGORIES.find(c => c.id === selectedCategory)?.name}
+            {selectedCategory === 0 ? 'Thực Đơn Nhà Hàng' : selectedCatObj?.name}
           </h2>
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 2,
@@ -580,33 +632,40 @@ export default function CustomerMenuPage() {
       </div>
 
       {/* --- Luoi mon an 2 cot --- */}
-      <div style={{
-        padding: '0 var(--gutter)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: 8,
-      }}>
-        {filteredItems.length === 0 ? (
-          <div style={{
-            gridColumn: '1/-1', textAlign: 'center', padding: '48px 16px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-          }}>
-            <Icon name="search_off" size={40} style={{ color: 'var(--outline-variant)' }} />
-            <p style={{ color: 'var(--on-surface-variant)', fontSize: 14, fontFamily: 'Plus Jakarta Sans' }}>
-              Không tìm thấy món phù hợp
-            </p>
-          </div>
-        ) : (
-          filteredItems.map(item => (
-            <DishCard
-              key={item.id}
-              item={item}
-              inCartCount={getCountInCart(item.id)}
-              onAdd={handleAdd}
-            />
-          ))
-        )}
-      </div>
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--on-surface-variant)' }}>
+          <Icon name="sync" size={36} style={{ animation: 'spin 1s linear infinite' }} />
+          <p style={{ marginTop: 12, fontSize: 14, fontFamily: 'Plus Jakarta Sans' }}>Đang nạp thực đơn từ nhà hàng...</p>
+        </div>
+      ) : (
+        <div style={{
+          padding: '0 var(--gutter)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 8,
+        }}>
+          {filteredItems.length === 0 ? (
+            <div style={{
+              gridColumn: '1/-1', textAlign: 'center', padding: '48px 16px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+            }}>
+              <Icon name="search_off" size={40} style={{ color: 'var(--outline-variant)' }} />
+              <p style={{ color: 'var(--on-surface-variant)', fontSize: 14, fontFamily: 'Plus Jakarta Sans' }}>
+                Không tìm thấy món phù hợp
+              </p>
+            </div>
+          ) : (
+            filteredItems.map(item => (
+              <DishCard
+                key={item.id}
+                item={item}
+                inCartCount={getCountInCart(item.id)}
+                onAdd={handleAdd}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       {/* --- Toast Notification --- */}
       {ToastEl}

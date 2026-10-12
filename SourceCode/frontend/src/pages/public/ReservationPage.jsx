@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import RomsLogo from '../../components/common/RomsLogo';
 import { reservationApi } from '../../api/reservationApi';
-import { MOCK_CATEGORIES, MOCK_MENU_ITEMS } from '../../mock/mockData';
+import { customerApi } from '../../api/customerApi';
 
 // Helper component hiển thị icon Material Symbols
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -80,7 +80,10 @@ export default function ReservationPage() {
   const [selectedZoneName, setSelectedZoneName] = useState('Sảnh Chính');
   const [isLoadingZones, setIsLoadingZones] = useState(true);
 
-  // 6. Pre-order món ăn trước (tùy chọn)
+  // 6. Pre-order món ăn trước (tùy chọn) - Nạp động từ CSDL
+  const [menuCategories, setMenuCategories] = useState([]);
+  const [menuDishes, setMenuDishes] = useState([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
   const [preOrderItems, setPreOrderItems] = useState([]);
   const [menuCatFilter, setMenuCatFilter] = useState('ALL');
   const [menuSearch, setMenuSearch] = useState('');
@@ -96,7 +99,7 @@ export default function ReservationPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [bookingCode, setBookingCode] = useState('');
 
-  // Nạp danh sách khu vực bàn từ database khi component mount
+  // Nạp danh sách khu vực bàn và thực đơn từ database khi component mount
   useEffect(() => {
     const fetchZones = async () => {
       try {
@@ -122,7 +125,46 @@ export default function ReservationPage() {
         setIsLoadingZones(false);
       }
     };
+
+    const fetchMenu = async () => {
+      try {
+        setIsLoadingMenu(true);
+        const res = await customerApi.getCustomerMenu();
+        if (res.success && res.data) {
+          const catList = res.data.map(c => ({
+            id: c.categoryId,
+            name: c.categoryName
+          }));
+          setMenuCategories(catList);
+
+          const flatDishes = [];
+          res.data.forEach(c => {
+            if (c.items) {
+              c.items.forEach(item => {
+                flatDishes.push({
+                  id: item.id,
+                  name: item.name,
+                  description: item.description,
+                  price: item.price,
+                  imageUrl: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80',
+                  categoryId: c.categoryId,
+                  categoryName: c.categoryName,
+                  isAvailable: item.isAvailable
+                });
+              });
+            }
+          });
+          setMenuDishes(flatDishes);
+        }
+      } catch (err) {
+        console.error('Không thể tải thực đơn từ CSDL cho pre-order:', err);
+      } finally {
+        setIsLoadingMenu(false);
+      }
+    };
+
     fetchZones();
+    fetchMenu();
   }, []);
 
   // Xử lý chọn khung giờ
@@ -242,10 +284,11 @@ export default function ReservationPage() {
     }
   };
 
-  const filteredMenuItems = MOCK_MENU_ITEMS.filter(d => {
+  const filteredMenuItems = menuDishes.filter(d => {
     if (menuCatFilter !== 'ALL' && d.categoryId !== menuCatFilter) return false;
     if (menuSearch.trim() !== '') {
-      return d.name.toLowerCase().includes(menuSearch.toLowerCase());
+      return d.name?.toLowerCase().includes(menuSearch.toLowerCase()) ||
+             d.description?.toLowerCase().includes(menuSearch.toLowerCase());
     }
     return true;
   });
@@ -850,7 +893,7 @@ export default function ReservationPage() {
                     >
                       Tất cả
                     </button>
-                    {MOCK_CATEGORIES.map(c => (
+                    {menuCategories.map(c => (
                       <button
                         key={c.id}
                         type="button"
@@ -874,8 +917,19 @@ export default function ReservationPage() {
                 </div>
 
                 {/* Dishes Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', maxHeight: '400px', overflowY: 'auto', marginBottom: '22px', paddingRight: '4px' }}>
-                  {filteredMenuItems.map(dish => {
+                {isLoadingMenu ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#89726B' }}>
+                    <Icon name="sync" size={32} style={{ animation: 'spin 1s linear infinite', color: '#9D4124' }} />
+                    <p style={{ margin: '8px 0 0', fontSize: '0.88rem' }}>Đang nạp thực đơn món ăn từ CSDL...</p>
+                  </div>
+                ) : filteredMenuItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#89726B', background: '#FFF8F6', borderRadius: '16px', marginBottom: '22px' }}>
+                    <Icon name="search_off" size={36} style={{ color: '#C4B5B0', marginBottom: '6px' }} />
+                    <p style={{ margin: 0, fontSize: '0.88rem' }}>Không tìm thấy món ăn nào phù hợp với bộ lọc</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', maxHeight: '400px', overflowY: 'auto', marginBottom: '22px', paddingRight: '4px' }}>
+                    {filteredMenuItems.map(dish => {
                     const selected = preOrderItems.find(i => i.id === dish.id);
                     return (
                       <div
@@ -975,6 +1029,7 @@ export default function ReservationPage() {
                     );
                   })}
                 </div>
+              )}
 
                 {/* Pre-order Navigation */}
                 <div style={{ display: 'flex', gap: '12px' }}>
