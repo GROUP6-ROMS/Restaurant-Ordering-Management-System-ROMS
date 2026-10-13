@@ -47,4 +47,14 @@ export const tableApi = {
     getTableOrders: (tableId) => {
         return axiosClient.get(`/admin/tables/${tableId}/orders`);
     },
+
+    // Quản lý xác nhận đã xử lý chuông gọi phục vụ
+    resolveServiceRequest: (requestId) => {
+        return axiosClient.patch(`/admin/tables/requests/${requestId}/resolve`);
+    },
+
+    // Quản lý xử lý toàn bộ chuông gọi của 1 bàn
+    resolveAllTableRequests: (tableId) => {
+        return axiosClient.patch(`/admin/tables/${tableId}/resolve-all-requests`);
+    },
 };

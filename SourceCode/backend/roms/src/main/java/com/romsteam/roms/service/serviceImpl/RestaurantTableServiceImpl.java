@@ -18,9 +18,11 @@ import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.exception.ResourceNotFoundException;
 import java.time.LocalDateTime;
 import com.romsteam.roms.entity.Zone;
+import com.romsteam.roms.entity.ServiceRequest;
 import com.romsteam.roms.repository.DiningSessionRepository;
 import com.romsteam.roms.repository.OrderRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
+import com.romsteam.roms.repository.ServiceRequestRepository;
 import com.romsteam.roms.repository.ZoneRepository;
 import com.romsteam.roms.service.RestaurantTableService;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
     private final DiningSessionRepository diningSessionRepository;
     private final OrderRepository orderRepository;
     private final ZoneRepository zoneRepository;
+    private final ServiceRequestRepository serviceRequestRepository;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendBaseUrl;
@@ -375,6 +378,27 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             }
         }
 
+        // Kiểm tra xem bàn có yêu cầu phục vụ / xin tính tiền đang PENDING không
+        Long pendingServiceRequestId = null;
+        String pendingServiceRequestType = null;
+        String pendingServiceRequestNote = null;
+        String pendingServiceRequestCreatedAt = null;
+        Long pendingServiceRequestElapsedMinutes = 0L;
+        Integer pendingServiceRequestCount = 0;
+
+        List<ServiceRequest> pendingRequests = serviceRequestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(table.getId(), "PENDING");
+        if (pendingRequests != null && !pendingRequests.isEmpty()) {
+            pendingServiceRequestCount = pendingRequests.size();
+            ServiceRequest latestReq = pendingRequests.get(0);
+            pendingServiceRequestId = latestReq.getId();
+            pendingServiceRequestType = latestReq.getRequestType();
+            pendingServiceRequestNote = latestReq.getNote();
+            if (latestReq.getCreatedAt() != null) {
+                pendingServiceRequestCreatedAt = latestReq.getCreatedAt().format(DateTimeFormatter.ofPattern("HH:mm"));
+                pendingServiceRequestElapsedMinutes = Math.max(0, java.time.Duration.between(latestReq.getCreatedAt(), LocalDateTime.now()).toMinutes());
+            }
+        }
+
         // Tạo link gọi món thực tế dẫn tới màn hình chào bàn của khách
         String baseUrl = (frontendBaseUrl != null && !frontendBaseUrl.trim().isEmpty())
                 ? frontendBaseUrl.trim()
@@ -402,6 +426,12 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .reservationInfo(table.getReservationInfo())
                 .reservedTime(table.getReservedTime())
                 .blockedReason(table.getBlockedReason())
+                .pendingServiceRequestId(pendingServiceRequestId)
+                .pendingServiceRequestType(pendingServiceRequestType)
+                .pendingServiceRequestNote(pendingServiceRequestNote)
+                .pendingServiceRequestCreatedAt(pendingServiceRequestCreatedAt)
+                .pendingServiceRequestElapsedMinutes(pendingServiceRequestElapsedMinutes)
+                .pendingServiceRequestCount(pendingServiceRequestCount)
                 .qrToken(table.getQrToken())
                 .qrUrl(qrUrl)
                 .isActive(table.getIsActive())
@@ -497,5 +527,29 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .items(items)
                 .build();
     }
-    
+
+    // ===================================================================
+    // 9. QUẢN LÝ XÁC NHẬN ĐÃ XỬ LÝ CHUÔNG GỌI PHỤC VỤ TẠI BÀN
+    // ===================================================================
+    @Override
+    @Transactional
+    public void resolveServiceRequest(Long requestId) {
+        ServiceRequest req = serviceRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Yêu cầu phục vụ không tồn tại với ID: " + requestId));
+        req.setStatus("RESOLVED");
+        serviceRequestRepository.save(req);
+    }
+
+    // ===================================================================
+    // 10. QUẢN LÝ XÁC NHẬN XỬ LÝ TOÀN BỘ YÊU CẦU CỦA 1 BÀN ĂN
+    // ===================================================================
+    @Override
+    @Transactional
+    public void resolveAllRequestsForTable(Long tableId) {
+        List<ServiceRequest> pendingRequests = serviceRequestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(tableId, "PENDING");
+        for (ServiceRequest req : pendingRequests) {
+            req.setStatus("RESOLVED");
+            serviceRequestRepository.save(req);
+        }
+    }
 }

@@ -281,7 +281,7 @@ export default function CustomerTrackingPage() {
           </button>
           <button
             type="button"
-            onClick={() => handleRequestAssistance('CALL_WATER', 'Khách yêu cầu thêm Đá / Nước lọc / Khăn lạnh')}
+            onClick={() => handleRequestAssistance('REQUEST_ICE', 'Khách xin thêm đá lạnh')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -289,17 +289,17 @@ export default function CustomerTrackingPage() {
               gap: '8px',
               padding: '10px 14px',
               borderRadius: '12px',
-              border: '1px solid #F0E6E4',
-              background: '#FFF8F6',
-              color: '#56423D',
+              border: '1px solid #BFDBFE',
+              background: '#EFF6FF',
+              color: '#1D4ED8',
               fontWeight: 700,
               fontSize: '0.85rem',
               cursor: 'pointer',
               transition: 'all 0.15s ease'
             }}
           >
-            <Icon name="ac_unit" size={18} style={{ color: '#994703' }} />
-            <span>Xin đá / Khăn</span>
+            <Icon name="ac_unit" size={18} style={{ color: '#2563EB' }} />
+            <span>Xin thêm đá</span>
           </button>
         </div>
       </section>

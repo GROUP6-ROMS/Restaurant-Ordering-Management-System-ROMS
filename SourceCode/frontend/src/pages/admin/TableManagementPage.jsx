@@ -5,6 +5,7 @@ import { tableApi } from '../../api/tableApi';
 import { zoneApi } from '../../api/zoneApi';
 import { reservationApi } from '../../api/reservationApi';
 import { menuApi } from '../../api/menuApi';
+import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 export default function TableManagementPage() {
   const location = useLocation();
@@ -584,6 +585,85 @@ export default function TableManagementPage() {
     };
   }, []);
 
+  // Lắng nghe sự kiện đồng bộ thời gian thực từ chuông gọi phục vụ, xin thanh toán và đơn món
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        event?.type === 'CALL_WAITER' ||
+        event?.type === 'PAYMENT_REQUEST' ||
+        event?.type === 'SERVICE_REQUEST_RESOLVED' ||
+        event?.type === 'TABLE_UPDATE' ||
+        event?.type === 'NEW_ORDER_CREATED'
+      ) {
+        loadData(true);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  // Danh sách các bàn đang có chuông gọi phục vụ hoặc yêu cầu thanh toán PENDING
+  const tablesWithAlert = tables.filter(t => (t.pendingServiceRequestCount && t.pendingServiceRequestCount > 0) || !!t.pendingServiceRequestId);
+
+  // Helper lấy cấu hình hiển thị cho chuông gọi phục vụ & thanh toán
+  const getAlertDetails = (table) => {
+    const reqType = (table.pendingServiceRequestType || '').toUpperCase();
+    const isBill = reqType === 'BILL' || reqType === 'REQUEST_BILL' || (table.pendingServiceRequestNote && table.pendingServiceRequestNote.toLowerCase().includes('thanh toán'));
+
+    if (isBill) {
+      return {
+        isBill: true,
+        title: 'Khách yêu cầu tính tiền',
+        icon: 'payments',
+        badgeBg: '#F5F3FF',
+        badgeColor: '#7C3AED',
+        badgeBorder: '#DDD6FE',
+        btnBg: '#7C3AED'
+      };
+    }
+    if (reqType === 'REQUEST_ICE') {
+      return {
+        isBill: false,
+        title: 'Khách xin thêm đá',
+        icon: 'ac_unit',
+        badgeBg: '#FFFBEB',
+        badgeColor: '#D97706',
+        badgeBorder: '#FDE68A',
+        btnBg: '#D97706'
+      };
+    }
+    if (reqType === 'CALL_WATER' || reqType === 'REQUEST_WATER') {
+      return {
+        isBill: false,
+        title: 'Khách xin thêm nước',
+        icon: 'water_drop',
+        badgeBg: '#EFF6FF',
+        badgeColor: '#2563EB',
+        badgeBorder: '#BFDBFE',
+        btnBg: '#2563EB'
+      };
+    }
+    if (reqType === 'REQUEST_CLEAN') {
+      return {
+        isBill: false,
+        title: 'Yêu cầu dọn bàn',
+        icon: 'cleaning_services',
+        badgeBg: '#F3F4F6',
+        badgeColor: '#4B5563',
+        badgeBorder: '#E5E7EB',
+        btnBg: '#4B5563'
+      };
+    }
+    return {
+      isBill: false,
+      title: 'Khách gọi phục vụ',
+      icon: 'notifications_active',
+      badgeBg: '#FFFBEB',
+      badgeColor: '#D97706',
+      badgeBorder: '#FDE68A',
+      btnBg: '#D97706'
+    };
+  };
+
   // Tìm kiếm theo từ khóa (Frontend fallback lọc nhanh nếu cần)
   // Lọc bàn hiển thị theo Khu vực, Trạng thái và Ô tìm kiếm
   const filteredTables = tables.filter(t => {
@@ -593,7 +673,10 @@ export default function TableManagementPage() {
     }
 
     // 2. Lọc theo Trạng Thái được chọn trong Dropdown
-    if (statusFilter !== 'ALL' && t.status !== statusFilter) {
+    if (statusFilter === 'ALERT') {
+      const hasAlert = (t.pendingServiceRequestCount && t.pendingServiceRequestCount > 0) || !!t.pendingServiceRequestId;
+      if (!hasAlert) return false;
+    } else if (statusFilter !== 'ALL' && t.status !== statusFilter) {
       return false;
     }
 
@@ -741,6 +824,27 @@ export default function TableManagementPage() {
     } catch (error) {
       console.error('Lỗi chuyển trạng thái bàn:', error);
       const errMsg = error.response?.data?.message || 'Lỗi khi đổi trạng thái bàn!';
+      showToast(errMsg);
+    }
+  };
+
+  // ===================================================================
+  // 4.1. QUẢN LÝ XÁC NHẬN ĐÃ XỬ LÝ CHUÔNG GỌI PHỤC VỤ / XIN THANH TOÁN
+  // ===================================================================
+  const handleResolveServiceRequest = async (table, e) => {
+    if (e) e.stopPropagation();
+    try {
+      if (table.pendingServiceRequestId) {
+        await tableApi.resolveServiceRequest(table.pendingServiceRequestId);
+      } else {
+        await tableApi.resolveAllTableRequests(table.id);
+      }
+      showToast(`Đã xử lý xong yêu cầu hỗ trợ cho bàn ${table.code || table.name}!`);
+      broadcastRealtimeEvent({ type: 'SERVICE_REQUEST_RESOLVED', tableId: table.id });
+      await loadData(true);
+    } catch (err) {
+      console.error('Lỗi khi xử lý yêu cầu chuông:', err);
+      const errMsg = err.response?.data?.message || 'Có lỗi khi xử lý yêu cầu hỗ trợ!';
       showToast(errMsg);
     }
   };
@@ -1147,6 +1251,82 @@ export default function TableManagementPage() {
         </div>
       )}
 
+      {/* CSS Keyframes cho hiệu ứng chuông nhấp nháy trên thẻ bàn */}
+      <style>{`
+        @keyframes romsPulseService {
+          0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+          50% { box-shadow: 0 0 16px 4px rgba(245, 158, 11, 0.35); }
+          100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+        }
+        @keyframes romsPulseBill {
+          0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
+          50% { box-shadow: 0 0 16px 4px rgba(124, 58, 237, 0.35); }
+          100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
+        }
+      `}</style>
+
+      {/* Banner Cảnh Báo: Bàn Ăn Đang Gọi Phục Vụ Hoặc Xin Tính Tiền */}
+      {tablesWithAlert.length > 0 && (
+        <div style={{
+          background: '#FFFBEB',
+          border: '1.5px solid #FDE68A',
+          borderRadius: '16px',
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap',
+          boxShadow: '0 4px 14px rgba(245, 158, 11, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: '#FEF3C7',
+              color: '#D97706',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Icon name="notifications_active" size={22} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, color: '#92400E', fontSize: '0.96rem' }}>
+                Có {tablesWithAlert.length} bàn ăn đang gửi chuông gọi phục vụ / yêu cầu thanh toán!
+              </div>
+              <div style={{ color: '#B45309', fontSize: '0.84rem', marginTop: '2px' }}>
+                Các bàn: <strong>{tablesWithAlert.map(t => t.code || t.name).join(', ')}</strong> cần được nhân viên hỗ trợ ngay.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === 'ALERT' ? 'ALL' : 'ALERT')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 16px',
+              background: statusFilter === 'ALERT' ? '#B45309' : '#D97706',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 800,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Icon name="filter_list" size={16} />
+            {statusFilter === 'ALERT' ? 'Hiển thị tất cả bàn' : 'Lọc riêng các bàn này'}
+          </button>
+        </div>
+      )}
+
       {/* 5 Thẻ KPI Thống Kê Tổng Quan */}
       <div style={{
         display: 'grid',
@@ -1285,6 +1465,11 @@ export default function TableManagementPage() {
               }}
             >
               <option value="ALL">Tất cả ({tables.length})</option>
+              {tablesWithAlert.length > 0 && (
+                <option value="ALERT" style={{ fontWeight: 800, color: '#D97706' }}>
+                  🔔 Bàn cần hỗ trợ / Xin bill ({tablesWithAlert.length})
+                </option>
+              )}
               <option value="AVAILABLE">Trống sẵn sàng</option>
               <option value="OCCUPIED">Đang phục vụ</option>
               <option value="RESERVED">Đã đặt trước</option>
@@ -1322,20 +1507,41 @@ export default function TableManagementPage() {
 
             const billDisplay = t.currentBill ? Number(t.currentBill).toLocaleString('vi-VN') + '₫' : '0₫';
 
+            const hasAlert = (t.pendingServiceRequestCount && t.pendingServiceRequestCount > 0) || !!t.pendingServiceRequestId;
+            const alertConfig = hasAlert ? getAlertDetails(t) : null;
+            const isBillAlert = alertConfig?.isBill;
+
+            let cardBorder = t.status === 'BLOCKED' ? '1.5px dashed #D1D5DB' : '1px solid #F0E6E4';
+            let cardBoxShadow = '0 2px 8px rgba(0,0,0,0.03)';
+            let cardAnimation = 'none';
+
+            if (hasAlert) {
+              if (isBillAlert) {
+                cardBorder = '2px solid #8B5CF6';
+                cardBoxShadow = '0 0 16px rgba(139, 92, 246, 0.4)';
+                cardAnimation = 'romsPulseBill 2s infinite ease-in-out';
+              } else {
+                cardBorder = '2px solid #F59E0B';
+                cardBoxShadow = '0 0 16px rgba(245, 158, 11, 0.4)';
+                cardAnimation = 'romsPulseService 2s infinite ease-in-out';
+              }
+            }
+
             return (
               <div
                 key={t.id}
                 style={{
                   background: '#FFFFFF',
                   borderRadius: '16px',
-                  border: t.status === 'BLOCKED' ? '1.5px dashed #D1D5DB' : '1px solid #F0E6E4',
+                  border: cardBorder,
                   padding: '16px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                  boxShadow: cardBoxShadow,
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  gap: '14px',
+                  gap: '12px',
                   opacity: t.status === 'BLOCKED' ? 0.9 : 1,
+                  animation: cardAnimation,
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease'
                 }}
               >
@@ -1380,6 +1586,104 @@ export default function TableManagementPage() {
                     <span>{t.zoneName}</span>
                   </div>
                 </div>
+
+                {/* Banner Chuông Báo Cần Hỗ Trợ / Yêu Cầu Thanh Toán */}
+                {hasAlert && alertConfig && (
+                  <div
+                    style={{
+                      background: alertConfig.badgeBg,
+                      border: `1.5px solid ${alertConfig.badgeBorder}`,
+                      borderRadius: '12px',
+                      padding: '8px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '50%',
+                        background: '#FFFFFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: alertConfig.badgeColor,
+                        flexShrink: 0,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                      }}>
+                        <Icon name={alertConfig.icon} size={18} />
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          color: alertConfig.badgeColor,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span>{alertConfig.title}</span>
+                          {t.pendingServiceRequestCount > 1 && (
+                            <span style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              padding: '1px 5px',
+                              borderRadius: '8px',
+                              background: alertConfig.badgeColor,
+                              color: '#FFFFFF'
+                            }}>
+                              +{t.pendingServiceRequestCount - 1}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{
+                          fontSize: '0.72rem',
+                          color: '#4B5563',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          marginTop: '1px'
+                        }}>
+                          {t.pendingServiceRequestNote
+                            ? t.pendingServiceRequestNote
+                            : (t.pendingServiceRequestElapsedMinutes > 0
+                                ? `${t.pendingServiceRequestElapsedMinutes} phút trước`
+                                : (t.pendingServiceRequestCreatedAt ? `Lúc ${t.pendingServiceRequestCreatedAt}` : 'Vừa gọi'))
+                          }
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleResolveServiceRequest(t, e)}
+                      title="Xác nhận đã xử lý xong yêu cầu này"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: '5px 9px',
+                        borderRadius: '8px',
+                        background: alertConfig.btnBg,
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Icon name="check" size={13} />
+                      Đã xong
+                    </button>
+                  </div>
+                )}
 
                 {/* Table Stats (Đã bỏ shape) */}
                 <div style={{

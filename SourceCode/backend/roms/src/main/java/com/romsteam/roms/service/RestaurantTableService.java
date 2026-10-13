@@ -39,4 +39,10 @@ public interface RestaurantTableService {
     // 8. Xóa bàn (chặn xóa nếu bàn đang có khách)
     void deleteTable(Long id);
     TableOrdersResponse getTableActiveOrders(Long tableId);
+
+    // 9. Quản lý xác nhận đã xử lý chuông gọi phục vụ
+    void resolveServiceRequest(Long requestId);
+
+    // 10. Quản lý xác nhận đã xử lý toàn bộ chuông gọi của 1 bàn
+    void resolveAllRequestsForTable(Long tableId);
 }

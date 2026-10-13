@@ -34,6 +34,14 @@ public class TableResponse {
     private String reservedTime;
     private String blockedReason;
 
+    // Thông tin chuông gọi phục vụ / yêu cầu thanh toán PENDING (nếu có)
+    private Long pendingServiceRequestId;
+    private String pendingServiceRequestType;        // "CALL_WAITER", "BILL", "REQUEST_ICE", etc.
+    private String pendingServiceRequestNote;        // Ghi chú yêu cầu của khách
+    private String pendingServiceRequestCreatedAt;   // Giờ tạo yêu cầu "19:05"
+    private Long pendingServiceRequestElapsedMinutes;// Số phút đã trôi qua kể từ khi khách bấm chuông
+    private Integer pendingServiceRequestCount;      // Tổng số yêu cầu đang chờ xử lý của bàn
+
     // Mã QR Code dán tại bàn
     private String qrToken;
     private String qrUrl;         // Link ảnh hoặc link điều hướng quét QR

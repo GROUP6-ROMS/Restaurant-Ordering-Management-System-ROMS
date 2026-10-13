@@ -411,20 +411,24 @@ export default function CustomerMenuPage() {
     fetchMenu();
   }, []);
 
-  const handleCallWaiter = async () => {
+  const handleRequestAssistance = async (reqType, note) => {
     try {
       const tId = tableInfo?.tableId;
       const tNum = tableInfo?.tableNumber || 'Bàn của bạn';
       await customerApi.callWaiter({
         tableId: tId,
         tableNumber: tNum,
-        requestType: 'CALL_WAITER',
-        note: `Khách tại ${tNum} bấm chuông gọi nhân viên hỗ trợ`
+        requestType: reqType,
+        note: note || (reqType === 'REQUEST_ICE' ? 'Khách xin thêm đá lạnh' : 'Khách gọi nhân viên hỗ trợ')
       });
-      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId, tableNumber: tNum });
-      showToast(`Đã rung chuông gọi nhân viên cho ${tNum}!`);
+      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId, tableNumber: tNum, requestType: reqType });
+      if (reqType === 'REQUEST_ICE') {
+        showToast('🧊 Đã gửi yêu cầu xin thêm đá lạnh tới nhân viên!');
+      } else {
+        showToast(`🔔 Đã rung chuông gọi nhân viên cho ${tNum}!`);
+      }
     } catch (err) {
-      showToast('Đã gửi chuông gọi nhân viên hỗ trợ!');
+      showToast('Đã gửi yêu cầu tới nhân viên hỗ trợ!');
     }
   };
 
@@ -522,21 +526,61 @@ export default function CustomerMenuPage() {
               </div>
             </div>
           </div>
-          <button
-            onClick={handleCallWaiter}
-            style={{
-              height: 36, padding: '0 12px', borderRadius: '9999px',
-              background: 'var(--primary)', color: 'var(--on-primary)',
-              border: 'none', cursor: 'pointer',
-              fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
-              display: 'flex', alignItems: 'center', gap: 5,
-              flexShrink: 0, boxShadow: 'var(--shadow-xs)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Icon name="room_service" size={15} />
-            Gọi phục vụ
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {/* Nút 1: Xin thêm đá riêng biệt */}
+            <button
+              type="button"
+              onClick={() => handleRequestAssistance('REQUEST_ICE', 'Khách xin thêm đá lạnh')}
+              title="Xin thêm xô đá lạnh"
+              style={{
+                height: 34,
+                padding: '0 10px',
+                borderRadius: '9999px',
+                background: '#EFF6FF',
+                color: '#1D4ED8',
+                border: '1px solid #BFDBFE',
+                cursor: 'pointer',
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                boxShadow: 'var(--shadow-xs)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Icon name="ac_unit" size={14} style={{ color: '#2563EB' }} />
+              <span>Xin đá</span>
+            </button>
+
+            {/* Nút 2: Gọi nhân viên hỗ trợ */}
+            <button
+              type="button"
+              onClick={() => handleRequestAssistance('CALL_WAITER', 'Khách gọi nhân viên hỗ trợ')}
+              title="Gọi nhân viên phục vụ tới bàn"
+              style={{
+                height: 34,
+                padding: '0 10px',
+                borderRadius: '9999px',
+                background: 'var(--primary)',
+                color: 'var(--on-primary)',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                boxShadow: 'var(--shadow-xs)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Icon name="room_service" size={14} />
+              <span>Gọi phục vụ</span>
+            </button>
+          </div>
         </div>
       </div>
 

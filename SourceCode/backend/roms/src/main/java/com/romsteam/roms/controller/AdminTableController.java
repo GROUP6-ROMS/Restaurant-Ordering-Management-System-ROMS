@@ -99,4 +99,18 @@ public class AdminTableController {
         TableOrdersResponse ordersResponse = tableService.getTableActiveOrders(id);
         return ResponseEntity.ok(ApiResponse.success(ordersResponse, "Lấy danh sách món tại bàn thành công!"));
     }
+
+    // 9. PATCH /api/admin/tables/requests/{id}/resolve - Quản lý xác nhận đã xử lý chuông gọi phục vụ
+    @PatchMapping("/requests/{id}/resolve")
+    public ResponseEntity<ApiResponse<Void>> resolveServiceRequest(@PathVariable Long id) {
+        tableService.resolveServiceRequest(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xử lý xong yêu cầu tại bàn!"));
+    }
+
+    // 10. PATCH /api/admin/tables/{tableId}/resolve-all-requests - Quản lý xác nhận xử lý toàn bộ yêu cầu của bàn
+    @PatchMapping("/{tableId}/resolve-all-requests")
+    public ResponseEntity<ApiResponse<Void>> resolveAllRequestsForTable(@PathVariable Long tableId) {
+        tableService.resolveAllRequestsForTable(tableId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xử lý xong toàn bộ yêu cầu của bàn!"));
+    }
 }

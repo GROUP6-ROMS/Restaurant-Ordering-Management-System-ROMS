@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import RomsLogo from '../common/RomsLogo';
+import { customerApi } from '../../api/customerApi';
+import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
 
 // Icon Material Symbols
 function Icon({ name, size = 22, fill = 0, style = {} }) {
@@ -32,10 +34,35 @@ export default function CustomerLayout() {
   const { tableInfo, totalCount, totalPrice } = useCart();
   const location = useLocation();
   const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('Đã gửi yêu cầu gọi nhân viên!');
+  const [showAssistModal, setShowAssistModal] = useState(false);
 
-  const handleCallWaiter = () => {
+  const showToast = (msg) => {
+    setToastMessage(msg);
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 2500);
+  };
+
+  const triggerAssist = async (reqType, note, label) => {
+    try {
+      setShowAssistModal(false);
+      const tId = tableInfo?.tableId;
+      const tNum = tableInfo?.tableNumber || 'Bàn của bạn';
+      await customerApi.callWaiter({
+        tableId: tId,
+        tableNumber: tNum,
+        requestType: reqType,
+        note: note
+      });
+      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId, tableNumber: tNum, requestType: reqType });
+      showToast(`Đã gửi yêu cầu: "${label}"!`);
+    } catch (err) {
+      showToast('Đã gửi yêu cầu tới nhân viên hỗ trợ!');
+    }
+  };
+
+  const handleCallWaiter = () => {
+    setShowAssistModal(true);
   };
 
   const isMenu = location.pathname.includes('/menu');
@@ -277,10 +304,136 @@ export default function CustomerLayout() {
         </Link>
       </nav>
 
+      {/* --- Modal Bảng Chọn Nhanh Yêu Cầu Hỗ Trợ --- */}
+      {showAssistModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(31, 27, 26, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            width: '100%', maxWidth: 430,
+            borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            padding: '20px 20px 28px',
+            boxShadow: '0 -8px 30px rgba(0,0,0,0.2)',
+            animation: 'slideUp 0.25s ease-out',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontFamily: 'Epilogue', fontWeight: 800, fontSize: '1.05rem', color: '#1F1B1A', margin: 0 }}>
+                  Bạn cần nhà hàng hỗ trợ gì?
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                  {tableInfo?.tableNumber || 'Bàn ăn'} • Nhân viên sẽ tới bàn ngay sau vài giây
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssistModal(false)}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: '#F6ECEA', border: 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#56423D'
+                }}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {/* Option 1: Xin đá */}
+              <button
+                type="button"
+                onClick={() => triggerAssist('REQUEST_ICE', 'Khách xin thêm xô đá lạnh', 'Xin thêm đá')}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  padding: '16px 10px', borderRadius: 16,
+                  background: '#EFF6FF', border: '1.5px solid #BFDBFE',
+                  cursor: 'pointer', transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1D4ED8' }}>
+                  <Icon name="ac_unit" size={22} />
+                </div>
+                <span style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 800, fontSize: 13, color: '#1E40AF' }}>
+                  Xin thêm đá
+                </span>
+                <span style={{ fontSize: 11, color: '#6B7280' }}>Đá bi / Xô đá</span>
+              </button>
+
+              {/* Option 2: Gọi nhân viên */}
+              <button
+                type="button"
+                onClick={() => triggerAssist('CALL_WAITER', 'Khách gọi nhân viên hỗ trợ tại bàn', 'Gọi nhân viên')}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  padding: '16px 10px', borderRadius: 16,
+                  background: '#FFF7ED', border: '1.5px solid #FFEDD5',
+                  cursor: 'pointer', transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#FFEDD5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C2410C' }}>
+                  <Icon name="room_service" size={22} />
+                </div>
+                <span style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 800, fontSize: 13, color: '#9A3412' }}>
+                  Gọi nhân viên
+                </span>
+                <span style={{ fontSize: 11, color: '#6B7280' }}>Hỗ trợ tại bàn</span>
+              </button>
+
+              {/* Option 3: Nước lọc / Khăn */}
+              <button
+                type="button"
+                onClick={() => triggerAssist('CALL_WATER', 'Khách xin nước lọc / khăn ướt', 'Nước / Khăn')}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  padding: '16px 10px', borderRadius: 16,
+                  background: '#F0FDF4', border: '1.5px solid #BBF7D0',
+                  cursor: 'pointer', transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803D' }}>
+                  <Icon name="water_drop" size={22} />
+                </div>
+                <span style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 800, fontSize: 13, color: '#166534' }}>
+                  Nước / Khăn
+                </span>
+                <span style={{ fontSize: 11, color: '#6B7280' }}>Nước lọc & Khăn lạnh</span>
+              </button>
+
+              {/* Option 4: Thêm chén dĩa / muỗng đũa */}
+              <button
+                type="button"
+                onClick={() => triggerAssist('REQUEST_CUTLERY', 'Khách xin thêm chén đĩa, muỗng đũa', 'Chén đĩa / Đũa')}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  padding: '16px 10px', borderRadius: 16,
+                  background: '#FAF5FF', border: '1.5px solid #E9D5FF',
+                  cursor: 'pointer', transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7E22CE' }}>
+                  <Icon name="flatware" size={22} />
+                </div>
+                <span style={{ fontFamily: 'Plus Jakarta Sans', fontWeight: 800, fontSize: 13, color: '#6B21A8' }}>
+                  Chén đĩa / Đũa
+                </span>
+                <span style={{ fontSize: 11, color: '#6B7280' }}>Bát thìa đũa phụ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- Toast Notification --- */}
       <div className={`toast ${toastVisible ? '' : 'hidden'}`}>
         <Icon name="check_circle" size={18} style={{ color: 'var(--secondary-fixed-dim)' }} />
-        Đã gửi yêu cầu gọi nhân viên!
+        {toastMessage}
       </div>
     </div>
   );
