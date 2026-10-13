@@ -7,6 +7,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Entity đại diện cho bảng phiếu đặt bàn trước (reservations).
@@ -82,4 +84,9 @@ public class Reservation {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Danh sách các món ăn thực khách đặt trước (hoặc Quản lý thêm/sửa/xóa)
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ReservationItem> items = new ArrayList<>();
 }

@@ -2,6 +2,7 @@ package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.AssignTableReservationRequest;
 import com.romsteam.roms.dto.request.CancelReservationRequest;
+import com.romsteam.roms.dto.request.UpdateReservationItemsRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.ReservationResponse;
 import com.romsteam.roms.dto.response.TableResponse;
@@ -83,5 +84,17 @@ public class AdminReservationController {
             @Valid @RequestBody CancelReservationRequest request) {
         ReservationResponse cancelled = reservationService.cancelReservation(id, request);
         return ResponseEntity.ok(ApiResponse.success(cancelled, "Đã cập nhật hủy đơn đặt bàn thành công"));
+    }
+
+    /**
+     * 6. Quản lý kiểm tra và cập nhật (thêm / sửa / xóa) danh sách món đặt trước của bàn
+     * PUT /api/admin/reservations/{id}/items
+     */
+    @PutMapping("/{id}/items")
+    public ResponseEntity<ApiResponse<ReservationResponse>> updateReservationItems(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateReservationItemsRequest request) {
+        ReservationResponse updated = reservationService.updateReservationItems(id, request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật danh sách món đặt trước thành công!"));
     }
 }

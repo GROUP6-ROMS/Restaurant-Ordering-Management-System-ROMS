@@ -4,6 +4,7 @@ import Icon from '../../components/common/Icon';
 import { tableApi } from '../../api/tableApi';
 import { zoneApi } from '../../api/zoneApi';
 import { reservationApi } from '../../api/reservationApi';
+import { menuApi } from '../../api/menuApi';
 
 export default function TableManagementPage() {
   const location = useLocation();
@@ -103,6 +104,16 @@ export default function TableManagementPage() {
   const [cancelResReason, setCancelResReason] = useState('Khách hàng yêu cầu hủy / Không liên lạc được');
   const [cancelResLoading, setCancelResLoading] = useState(false);
 
+  // State Modal Quản Lý & Điều Chỉnh Món Đặt Trước Cho Bàn (Pre-order Management)
+  const [showPreOrderModal, setShowPreOrderModal] = useState(false);
+  const [selectedResForPreOrder, setSelectedResForPreOrder] = useState(null);
+  const [editingPreOrderItems, setEditingPreOrderItems] = useState([]);
+  const [menuCatalog, setMenuCatalog] = useState([]);
+  const [menuCatalogLoading, setMenuCatalogLoading] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogCatFilter, setCatalogCatFilter] = useState('ALL');
+  const [savePreOrderLoading, setSavePreOrderLoading] = useState(false);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -170,16 +181,13 @@ export default function TableManagementPage() {
       setReservations(list);
       const pendingCount = list.filter(r => r.status === 'PENDING').length;
       setPendingReservationsCount(pendingCount);
+      return list;
     } catch (err) {
       console.warn('Lỗi tải danh sách đặt bàn:', err);
+      return [];
     } finally {
       setResLoading(false);
     }
-  };
-
-  const handleOpenReservationModal = async () => {
-    setShowReservationModal(true);
-    await loadReservations();
   };
 
   const handleOpenAssignModal = async (resItem) => {
@@ -203,6 +211,18 @@ export default function TableManagementPage() {
       showToast('Không thể lấy danh sách bàn trống khả dụng!');
     } finally {
       setAssignLoading(false);
+    }
+  };
+
+  const handleOpenReservationModal = async (targetResId = null) => {
+    setShowReservationModal(true);
+    setResStatusFilter('PENDING'); // Luôn chuyển tab sang Chờ Duyệt (PENDING) khi mở từ thông báo
+    const list = await loadReservations();
+    if (targetResId && Array.isArray(list)) {
+      const found = list.find(r => String(r.id) === String(targetResId) || r.bookingCode === targetResId);
+      if (found) {
+        handleOpenAssignModal(found);
+      }
     }
   };
 
@@ -260,6 +280,132 @@ export default function TableManagementPage() {
       showToast(errMsg);
     } finally {
       setCancelResLoading(false);
+    }
+  };
+
+  // ===================================================================
+  // 1.0.1. CÁC HÀM XỬ LÝ MÓN ĐẶT TRƯỚC (PRE-ORDER MANAGEMENT)
+  // ===================================================================
+  const handleOpenPreOrderModal = async (resItem) => {
+    setSelectedResForPreOrder(resItem);
+    const currentItems = (resItem.preOrderItems || []).map(item => ({
+      menuItemId: item.menuItemId,
+      menuItemName: item.menuItemName,
+      sku: item.sku,
+      imageUrl: item.imageUrl,
+      categoryName: item.categoryName,
+      unitPrice: Number(item.unitPrice) || 0,
+      quantity: Number(item.quantity) || 1,
+      subtotal: Number(item.subtotal) || ((Number(item.unitPrice) || 0) * (Number(item.quantity) || 1)),
+      note: item.note || ''
+    }));
+    setEditingPreOrderItems(currentItems);
+    setCatalogSearch('');
+    setCatalogCatFilter('ALL');
+    setShowPreOrderModal(true);
+
+    if (menuCatalog.length === 0) {
+      try {
+        setMenuCatalogLoading(true);
+        const resMenu = await menuApi.getItems();
+        const dishes = resMenu.data || [];
+        setMenuCatalog(dishes.filter(d => d.isActive));
+      } catch (err) {
+        console.warn('Lỗi khi tải thực đơn cho đặt trước:', err);
+      } finally {
+        setMenuCatalogLoading(false);
+      }
+    }
+  };
+
+  const handleUpdatePreOrderItemQty = (index, delta) => {
+    setEditingPreOrderItems(prev => {
+      const next = [...prev];
+      const item = next[index];
+      const newQty = item.quantity + delta;
+      if (newQty <= 0) {
+        next.splice(index, 1);
+      } else {
+        next[index] = {
+          ...item,
+          quantity: newQty,
+          subtotal: item.unitPrice * newQty
+        };
+      }
+      return next;
+    });
+  };
+
+  const handleUpdatePreOrderItemNote = (index, note) => {
+    setEditingPreOrderItems(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], note };
+      return next;
+    });
+  };
+
+  const handleRemovePreOrderItem = (index) => {
+    setEditingPreOrderItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddDishToPreOrder = (dish) => {
+    setEditingPreOrderItems(prev => {
+      const existingIdx = prev.findIndex(i => i.menuItemId === dish.id);
+      if (existingIdx >= 0) {
+        const next = [...prev];
+        const cur = next[existingIdx];
+        const newQty = cur.quantity + 1;
+        next[existingIdx] = {
+          ...cur,
+          quantity: newQty,
+          subtotal: cur.unitPrice * newQty
+        };
+        return next;
+      } else {
+        const price = Number(dish.price) || 0;
+        return [
+          ...prev,
+          {
+            menuItemId: dish.id,
+            menuItemName: dish.name,
+            sku: dish.sku,
+            imageUrl: dish.imageUrl,
+            categoryName: dish.categoryName,
+            unitPrice: price,
+            quantity: 1,
+            subtotal: price,
+            note: ''
+          }
+        ];
+      }
+    });
+  };
+
+  const handleSavePreOrderItems = async () => {
+    if (!selectedResForPreOrder) return;
+    try {
+      setSavePreOrderLoading(true);
+      const payload = {
+        items: editingPreOrderItems.map(i => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+          note: i.note ? i.note.trim() : ''
+        }))
+      };
+
+      const res = await reservationApi.updateReservationItems(selectedResForPreOrder.id, payload);
+      const updatedRes = res.data;
+
+      setReservations(prev => prev.map(r => r.id === updatedRes.id ? updatedRes : r));
+      setSelectedResForPreOrder(updatedRes);
+      showToast('Cập nhật danh sách món đặt trước thành công!');
+      setShowPreOrderModal(false);
+    } catch (err) {
+      console.error('Lỗi lưu món đặt trước:', err);
+      const errMsg = err.response?.data?.message || 'Không thể lưu món đặt trước!';
+      showToast(errMsg);
+    } finally {
+      setSavePreOrderLoading(false);
     }
   };
 
@@ -392,11 +538,6 @@ export default function TableManagementPage() {
   useEffect(() => {
     loadData(false);
 
-    // Nếu được điều hướng từ chuông thông báo để duyệt đặt bàn
-    if (location.state?.openReservationModal) {
-      handleOpenReservationModal();
-    }
-
     // Chu kỳ cập nhật tự động 6s/lần trong nền (không giật màn hình)
     const timer = setInterval(() => {
       loadData(true);
@@ -417,6 +558,29 @@ export default function TableManagementPage() {
       clearInterval(timer);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  // Lắng nghe tín hiệu từ chuông thông báo thông qua React Router location.state (khi chuyển từ trang khác đến)
+  useEffect(() => {
+    if (location.state?.openReservationModal) {
+      const targetId = location.state.targetReservationId || null;
+      handleOpenReservationModal(targetId);
+      // Xóa state để tránh mở lại khi reload trang
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
+  // Lắng nghe sự kiện mở popup duyệt bàn khi người dùng đang ở sẵn trên trang Sơ đồ bàn
+  useEffect(() => {
+    const handleCustomOpenReservation = (e) => {
+      const targetId = e.detail?.targetReservationId || null;
+      handleOpenReservationModal(targetId);
+    };
+
+    window.addEventListener('ROMS_OPEN_RESERVATION_MODAL', handleCustomOpenReservation);
+    return () => {
+      window.removeEventListener('ROMS_OPEN_RESERVATION_MODAL', handleCustomOpenReservation);
     };
   }, []);
 
@@ -3748,6 +3912,101 @@ export default function TableManagementPage() {
                           </div>
                         )}
 
+                        {/* Món Ăn Đặt Trước (Pre-order Dishes) */}
+                        <div style={{
+                          background: r.preOrderItems && r.preOrderItems.length > 0 ? '#FFF7ED' : '#FAF7F5',
+                          border: r.preOrderItems && r.preOrderItems.length > 0 ? '1.5px solid #FFEDD5' : '1px dashed #EAE0DE',
+                          borderRadius: '12px',
+                          padding: '12px 16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <Icon name="restaurant_menu" size={18} style={{ color: r.preOrderItems && r.preOrderItems.length > 0 ? '#EA580C' : '#89726B' }} />
+                              <span style={{ fontWeight: 800, fontSize: '0.85rem', color: r.preOrderItems && r.preOrderItems.length > 0 ? '#9A3412' : '#56423D' }}>
+                                Món Đặt Trước: {r.preOrderItems && r.preOrderItems.length > 0
+                                  ? `${r.preOrderItems.length} món (${r.preOrderItemsCount || 0} phần)`
+                                  : 'Chưa có món đặt trước'}
+                              </span>
+                              {r.preOrderTotal > 0 && (
+                                <span style={{
+                                  background: '#FFEDD5',
+                                  color: '#C2410C',
+                                  padding: '2px 8px',
+                                  borderRadius: '999px',
+                                  fontWeight: 800,
+                                  fontSize: '0.78rem'
+                                }}>
+                                  {Number(r.preOrderTotal).toLocaleString('vi-VN')} đ
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Nút Xem / Sửa / Thêm món đặt trước */}
+                            {!isCancelled && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPreOrderModal(r)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '5px 12px',
+                                  borderRadius: '8px',
+                                  border: r.preOrderItems && r.preOrderItems.length > 0 ? '1px solid #EA580C' : '1px solid #EAE0DE',
+                                  background: '#FFFFFF',
+                                  color: r.preOrderItems && r.preOrderItems.length > 0 ? '#EA580C' : '#56423D',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Icon name={r.preOrderItems && r.preOrderItems.length > 0 ? "edit_note" : "add_circle"} size={15} />
+                                {r.preOrderItems && r.preOrderItems.length > 0 ? "Kiểm tra & Sửa món" : "+ Thêm món đặt trước"}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Preview danh sách món nếu có */}
+                          {r.preOrderItems && r.preOrderItems.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                              {r.preOrderItems.map((item, idx) => (
+                                <span
+                                  key={item.id || idx}
+                                  style={{
+                                    background: '#FFFFFF',
+                                    border: '1px solid #FED7AA',
+                                    borderRadius: '6px',
+                                    padding: '4px 9px',
+                                    fontSize: '0.78rem',
+                                    color: '#7C2D12',
+                                    fontWeight: 600,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                  }}
+                                >
+                                  <strong style={{ color: '#EA580C' }}>{item.quantity}x</strong> {item.menuItemName}
+                                  {item.unitPrice && (
+                                    <span style={{ color: '#9A3412', fontSize: '0.72rem' }}>
+                                      ({Number(item.subtotal || item.unitPrice * item.quantity).toLocaleString('vi-VN')} đ)
+                                    </span>
+                                  )}
+                                  {item.note && (
+                                    <span style={{ color: '#B45309', fontStyle: 'italic', fontSize: '0.72rem' }}>
+                                      • {item.note}
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         {/* Confirmed Table Info */}
                         {isConfirmed && (
                           <div style={{
@@ -4465,6 +4724,660 @@ export default function TableManagementPage() {
               >
                 {cancelResLoading ? 'Đang Hủy...' : 'Xác Nhận Hủy'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL 4: KIỂM TRA & ĐIỀU CHỈNH MÓN ĐẶT TRƯỚC (PRE-ORDER DISHES)    */}
+      {/* ================================================================= */}
+      {showPreOrderModal && selectedResForPreOrder && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px',
+          overflowY: 'auto'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '1050px',
+            width: '100%',
+            height: 'min(90vh, 820px)',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#FAF7F5',
+              flexShrink: 0
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: '#C2410C',
+                    background: '#FFEDD5',
+                    padding: '2px 8px',
+                    borderRadius: '6px'
+                  }}>
+                    MÓN ĐẶT TRƯỚC
+                  </span>
+                  <span style={{ fontSize: '0.85rem', color: '#89726B', fontWeight: 600 }}>
+                    Mã đơn: <strong style={{ color: '#9D4124', fontFamily: 'monospace' }}>{selectedResForPreOrder.bookingCode}</strong>
+                  </span>
+                </div>
+                <h2 style={{
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontWeight: 900,
+                  fontSize: '1.35rem',
+                  color: '#1F1B1A',
+                  margin: '4px 0 0'
+                }}>
+                  Kiểm Tra & Điều Chỉnh Món Đặt Trước
+                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', marginTop: '4px', fontSize: '0.82rem', color: '#56423D' }}>
+                  <span>Khách: <strong>{selectedResForPreOrder.customerName}</strong> ({selectedResForPreOrder.customerPhone})</span>
+                  <span>•</span>
+                  <span>Hẹn đến: <strong>{selectedResForPreOrder.formattedTime}</strong> ngày <strong>{selectedResForPreOrder.formattedDate}</strong></span>
+                  <span>•</span>
+                  <span>Quy mô: <strong>{selectedResForPreOrder.guestCount}</strong> khách ({selectedResForPreOrder.requestedZoneName || selectedResForPreOrder.requestedZone || 'Mặc định'})</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPreOrderModal(false)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body: Split 2 columns (Left: Selected pre-orders, Right: Menu Catalog to add) */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1.1fr 1fr',
+              flex: 1,
+              minHeight: 0,
+              height: '100%',
+              overflow: 'hidden',
+              background: '#FFFFFF'
+            }}>
+              {/* CỘT TRÁI: DANH SÁCH MÓN ĐÃ ĐẶT TRƯỚC */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                height: '100%',
+                overflow: 'hidden',
+                borderRight: '1px solid #F0E6E4',
+                background: '#FAF7F5'
+              }}>
+                <div style={{
+                  padding: '14px 20px',
+                  borderBottom: '1px solid #F0E6E4',
+                  background: '#FFFFFF',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexShrink: 0
+                }}>
+                  <div style={{ fontWeight: 800, color: '#1F1B1A', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon name="receipt_long" size={18} style={{ color: '#EA580C' }} />
+                    Danh Sách Món Của Bàn ({editingPreOrderItems.length})
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                    Tổng: <strong>{editingPreOrderItems.reduce((s, i) => s + (i.quantity || 0), 0)}</strong> phần
+                  </span>
+                </div>
+
+                {/* List items scrollable */}
+                <div style={{
+                  padding: '16px 20px',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  overscrollBehavior: 'contain',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#D4C4BF #FAF7F5'
+                }}>
+                  {editingPreOrderItems.length === 0 ? (
+                    <div style={{
+                      padding: '40px 16px',
+                      textAlign: 'center',
+                      background: '#FFFFFF',
+                      borderRadius: '16px',
+                      border: '1px dashed #EAE0DE',
+                      color: '#89726B'
+                    }}>
+                      <Icon name="restaurant" size={32} style={{ color: '#D4C4BF', marginBottom: '8px' }} />
+                      <div style={{ fontWeight: 700, color: '#56423D', fontSize: '0.92rem' }}>Chưa có món đặt trước</div>
+                      <div style={{ fontSize: '0.78rem', marginTop: '4px' }}>
+                        Chọn món từ thực đơn bên phải để thêm món cho khách hàng này.
+                      </div>
+                    </div>
+                  ) : (
+                    editingPreOrderItems.map((item, index) => {
+                      const lineTotal = (item.unitPrice || 0) * (item.quantity || 1);
+                      return (
+                        <div
+                          key={item.menuItemId || index}
+                          style={{
+                            background: '#FFFFFF',
+                            borderRadius: '14px',
+                            border: '1px solid #EAE0DE',
+                            padding: '12px 14px',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.menuItemName}
+                                  style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '8px',
+                                  background: '#FFF5F0',
+                                  color: '#EA580C',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Icon name="dinner_dining" size={22} />
+                                </div>
+                              )}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{
+                                  fontWeight: 800,
+                                  color: '#1F1B1A',
+                                  fontSize: '0.88rem',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {item.menuItemName}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#89726B', marginTop: '2px' }}>
+                                  {item.categoryName ? `${item.categoryName} • ` : ''}
+                                  <span style={{ color: '#EA580C', fontWeight: 700 }}>
+                                    {Number(item.unitPrice).toLocaleString('vi-VN')} đ/phần
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Line total & Delete button */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontWeight: 800, color: '#9D4124', fontSize: '0.9rem' }}>
+                                {Number(lineTotal).toLocaleString('vi-VN')} đ
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePreOrderItem(index)}
+                                title="Xóa món này khỏi đơn đặt trước"
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '6px',
+                                  border: 'none',
+                                  background: '#FEE2E2',
+                                  color: '#DC2626',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Icon name="delete" size={16} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Quantity stepper & Dish note */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '10px',
+                            background: '#FAF7F5',
+                            padding: '6px 10px',
+                            borderRadius: '8px'
+                          }}>
+                            {/* Quantity stepper */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#89726B', fontWeight: 600 }}>SL:</span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdatePreOrderItemQty(index, -1)}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #EAE0DE',
+                                  background: '#FFFFFF',
+                                  color: '#56423D',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  fontWeight: 800
+                                }}
+                              >
+                                -
+                              </button>
+                              <span style={{
+                                minWidth: '24px',
+                                textAlign: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.85rem',
+                                color: '#1F1B1A'
+                              }}>
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdatePreOrderItemQty(index, 1)}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #EAE0DE',
+                                  background: '#FFFFFF',
+                                  color: '#56423D',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  fontWeight: 800
+                                }}
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            {/* Note input */}
+                            <input
+                              type="text"
+                              placeholder="Ghi chú món: ít cay, ăn trước..."
+                              value={item.note || ''}
+                              onChange={(e) => handleUpdatePreOrderItemNote(index, e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid #EAE0DE',
+                                fontSize: '0.78rem',
+                                outline: 'none',
+                                background: '#FFFFFF',
+                                color: '#1F1B1A'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Subtotal bill summary */}
+                <div style={{
+                  padding: '14px 20px',
+                  background: '#FFFFFF',
+                  borderTop: '1px solid #F0E6E4',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexShrink: 0
+                }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', color: '#89726B' }}>TỔNG TIỀN MÓN ĐẶT TRƯỚC</div>
+                    <div style={{ fontSize: '0.75rem', color: '#56423D' }}>
+                      (Chưa gồm VAT / Dịch vụ tại bàn)
+                    </div>
+                  </div>
+                  <div style={{
+                    fontWeight: 900,
+                    fontSize: '1.25rem',
+                    color: '#9D4124',
+                    fontFamily: "'Epilogue', sans-serif"
+                  }}>
+                    {Number(editingPreOrderItems.reduce((s, i) => s + ((i.unitPrice || 0) * (i.quantity || 1)), 0)).toLocaleString('vi-VN')} đ
+                  </div>
+                </div>
+              </div>
+
+              {/* CỘT PHẢI: TRA CỨU & CHỌN MÓN TỪ THỰC ĐƠN NHÀ HÀNG */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                height: '100%',
+                overflow: 'hidden',
+                background: '#FFFFFF'
+              }}>
+                <div style={{
+                  padding: '14px 20px',
+                  borderBottom: '1px solid #F0E6E4',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  flexShrink: 0
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 800, color: '#1F1B1A', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Icon name="menu_book" size={18} style={{ color: '#047857' }} />
+                      Thực Đơn Nhà Hàng
+                    </div>
+                    <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                      {menuCatalog.length} món sẵn sàng
+                    </span>
+                  </div>
+
+                  {/* Filter & Search Bar */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#F9F5F3',
+                      border: '1px solid #EAE0DE',
+                      borderRadius: '8px',
+                      padding: '5px 10px',
+                      gap: '6px',
+                      flex: 1
+                    }}>
+                      <Icon name="search" size={16} style={{ color: '#89726B' }} />
+                      <input
+                        type="text"
+                        placeholder="Tìm món ăn, đồ uống..."
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          outline: 'none',
+                          fontSize: '0.8rem',
+                          color: '#1F1B1A',
+                          width: '100%'
+                        }}
+                      />
+                      {catalogSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCatalogSearch('')}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}
+                        >
+                          <Icon name="close" size={12} style={{ color: '#89726B' }} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Category Filter Pills */}
+                  {(() => {
+                    const uniqueCats = ['ALL', ...new Set(menuCatalog.map(d => d.categoryName).filter(Boolean))];
+                    if (uniqueCats.length <= 1) return null;
+                    return (
+                      <div style={{
+                        display: 'flex',
+                        gap: '6px',
+                        overflowX: 'auto',
+                        paddingBottom: '2px',
+                        scrollbarWidth: 'none'
+                      }}>
+                        {uniqueCats.map(cat => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setCatalogCatFilter(cat)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              background: catalogCatFilter === cat ? '#9D4124' : '#F5EFEB',
+                              color: catalogCatFilter === cat ? '#FFFFFF' : '#56423D',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {cat === 'ALL' ? 'Tất Cả' : cat}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Dishes list from catalog */}
+                <div style={{
+                  padding: '16px 20px',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  overscrollBehavior: 'contain',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#D4C4BF #FFFFFF'
+                }}>
+                  {menuCatalogLoading ? (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#89726B' }}>
+                      <Icon name="sync" size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                      <div style={{ marginTop: '8px', fontSize: '0.82rem' }}>Đang tải thực đơn...</div>
+                    </div>
+                  ) : (
+                    (() => {
+                      const filteredDishes = menuCatalog.filter(d => {
+                        if (catalogCatFilter !== 'ALL' && d.categoryName !== catalogCatFilter) return false;
+                        if (!catalogSearch.trim()) return true;
+                        const q = catalogSearch.trim().toLowerCase();
+                        return (d.name || '').toLowerCase().includes(q) ||
+                               (d.sku || '').toLowerCase().includes(q) ||
+                               (d.categoryName || '').toLowerCase().includes(q);
+                      });
+
+                      if (filteredDishes.length === 0) {
+                        return (
+                          <div style={{ padding: '40px 16px', textAlign: 'center', color: '#89726B', fontSize: '0.82rem' }}>
+                            Không tìm thấy món nào phù hợp với bộ lọc hiện tại.
+                          </div>
+                        );
+                      }
+
+                      return filteredDishes.map(dish => {
+                        const inOrder = editingPreOrderItems.find(i => i.menuItemId === dish.id);
+                        return (
+                          <div
+                            key={dish.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              borderRadius: '12px',
+                              border: inOrder ? '1px solid #FED7AA' : '1px solid #F0E6E4',
+                              background: inOrder ? '#FFFDFB' : '#FFFFFF',
+                              gap: '10px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              {dish.imageUrl ? (
+                                <img
+                                  src={dish.imageUrl}
+                                  alt={dish.name}
+                                  style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '8px',
+                                  background: '#F5EFEB',
+                                  color: '#89726B',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Icon name="lunch_dining" size={20} />
+                                </div>
+                              )}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{
+                                  fontWeight: 700,
+                                  fontSize: '0.85rem',
+                                  color: '#1F1B1A',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {dish.name}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#89726B', marginTop: '2px' }}>
+                                  <span style={{ fontWeight: 700, color: '#EA580C' }}>
+                                    {Number(dish.price).toLocaleString('vi-VN')} đ
+                                  </span>
+                                  {dish.categoryName && ` • ${dish.categoryName}`}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Button Add / Increase */}
+                            <button
+                              type="button"
+                              onClick={() => handleAddDishToPreOrder(dish)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: inOrder ? '#EA580C' : '#9D4124',
+                                color: '#FFFFFF',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Icon name={inOrder ? "add" : "add_shopping_cart"} size={14} />
+                              {inOrder ? `Thêm (${inOrder.quantity})` : 'Chọn Món'}
+                            </button>
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div style={{
+              padding: '14px 24px',
+              borderTop: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#FAF7F5',
+              flexShrink: 0
+            }}>
+              <span style={{ fontSize: '0.82rem', color: '#56423D' }}>
+                Đã chọn: <strong>{editingPreOrderItems.length}</strong> món (<strong>{editingPreOrderItems.reduce((s, i) => s + (i.quantity || 0), 0)}</strong> phần)
+              </span>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowPreOrderModal(false)}
+                  disabled={savePreOrderLoading}
+                  style={{
+                    padding: '9px 18px',
+                    borderRadius: '10px',
+                    border: '1px solid #EAE0DE',
+                    background: '#FFFFFF',
+                    color: '#56423D',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Đóng
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSavePreOrderItems}
+                  disabled={savePreOrderLoading}
+                  style={{
+                    padding: '9px 22px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#9D4124',
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                    cursor: savePreOrderLoading ? 'not-allowed' : 'pointer',
+                    opacity: savePreOrderLoading ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 8px rgba(157, 65, 36, 0.25)'
+                  }}
+                >
+                  <Icon name={savePreOrderLoading ? "sync" : "save"} size={16} style={savePreOrderLoading ? { animation: 'spin 1s linear infinite' } : {}} />
+                  {savePreOrderLoading ? 'Đang Lưu...' : 'Lưu Thay Đổi Món Đặt Trước'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

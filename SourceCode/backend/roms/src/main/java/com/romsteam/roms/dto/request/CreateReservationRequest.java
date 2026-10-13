@@ -1,5 +1,6 @@
 package com.romsteam.roms.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -8,6 +9,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.List;
 
 /**
  * DTO nhận dữ liệu từ Form đặt bàn của Khách hàng
@@ -49,4 +52,7 @@ public class CreateReservationRequest {
 
     // Ghi chú thêm của khách
     private String note;
+
+    // Danh sách các món ăn thực khách đặt trước (tùy chọn)
+    private List<@Valid ReservationItemRequest> preOrderItems;
 }

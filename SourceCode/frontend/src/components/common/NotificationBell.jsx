@@ -171,11 +171,28 @@ export default function NotificationBell() {
   };
 
   // 6. Điều hướng tới Sơ đồ bàn & mở modal duyệt đặt bàn
-  const handleGoToReservation = (e) => {
-    e.stopPropagation();
+  const handleGoToReservation = (item, e) => {
+    if (e) e.stopPropagation();
     setIsOpen(false);
-    // Điều hướng tới sơ đồ bàn và phát tín hiệu mở modal đặt bàn
-    navigate('/admin/tables', { state: { openReservationModal: true } });
+    const targetReservationId = item?.reservationId || item?.sourceId || null;
+
+    // 1. Phát event nội bộ để trang Sơ đồ bàn bắt ngay lập tức nếu đang ở sẵn trang này
+    window.dispatchEvent(new CustomEvent('ROMS_OPEN_RESERVATION_MODAL', {
+      detail: {
+        openReservationModal: true,
+        targetReservationId: targetReservationId,
+        timestamp: Date.now()
+      }
+    }));
+
+    // 2. Điều hướng tới sơ đồ bàn và phát tín hiệu mở modal đặt bàn (nếu đang ở trang khác)
+    navigate('/admin/tables', {
+      state: {
+        openReservationModal: true,
+        targetReservationId: targetReservationId,
+        timestamp: Date.now()
+      }
+    });
   };
 
   // 7. Tạo chuông thử nghiệm nhanh
@@ -656,7 +673,7 @@ export default function NotificationBell() {
                       ) : (
                         <button
                           type="button"
-                          onClick={handleGoToReservation}
+                          onClick={(e) => handleGoToReservation(item, e)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',

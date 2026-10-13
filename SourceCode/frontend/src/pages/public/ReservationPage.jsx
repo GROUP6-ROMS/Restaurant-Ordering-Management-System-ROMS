@@ -264,7 +264,12 @@ export default function ReservationPage() {
           reservationDate: selectedDate,
           reservationTime: selectedTime,
           requestedZone: selectedZone,
-          note: fullNote
+          note: fullNote,
+          preOrderItems: preOrderItems.map(i => ({
+            menuItemId: i.id,
+            quantity: i.qty,
+            note: i.note || ''
+          }))
         };
 
         // Gửi API xuống Backend

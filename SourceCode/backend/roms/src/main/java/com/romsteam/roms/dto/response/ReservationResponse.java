@@ -6,10 +6,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
- * DTO trả về thông tin chi tiết của một phiếu đặt bà   n
+ * DTO trả về thông tin chi tiết của một phiếu đặt bàn
  */
 @Data
 @Builder
@@ -51,6 +53,15 @@ public class ReservationResponse {
     // Ghi chú của khách & Lý do hủy
     private String note;
     private String cancelReason;
+
+    // Danh sách các món ăn thực khách đặt trước (hoặc Quản lý đã chỉnh sửa)
+    private List<ReservationItemResponse> preOrderItems;
+
+    // Tổng tiền dự kiến của các món đặt trước
+    private BigDecimal preOrderTotal;
+
+    // Tổng số lượng phần món ăn đặt trước
+    private Integer preOrderItemsCount;
 
     // Thời gian tạo
     private LocalDateTime createdAt;

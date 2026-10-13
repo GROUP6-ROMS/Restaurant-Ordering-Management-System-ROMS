@@ -38,6 +38,12 @@ export const reservationApi = {
   cancelReservation: async (reservationId, data) => {
     const res = await axiosClient.put(`/admin/reservations/${reservationId}/cancel`, data);
     return res.data;
+  },
+
+  // 7. Quản lý kiểm tra và cập nhật danh sách món đặt trước (thêm, sửa số lượng, xóa)
+  updateReservationItems: async (reservationId, data) => {
+    const res = await axiosClient.put(`/admin/reservations/${reservationId}/items`, data);
+    return res.data;
   }
 };
 

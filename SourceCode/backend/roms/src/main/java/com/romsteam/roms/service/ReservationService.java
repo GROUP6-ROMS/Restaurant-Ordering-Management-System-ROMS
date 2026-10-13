@@ -3,6 +3,7 @@ package com.romsteam.roms.service;
 import com.romsteam.roms.dto.request.AssignTableReservationRequest;
 import com.romsteam.roms.dto.request.CancelReservationRequest;
 import com.romsteam.roms.dto.request.CreateReservationRequest;
+import com.romsteam.roms.dto.request.UpdateReservationItemsRequest;
 import com.romsteam.roms.dto.response.ReservationResponse;
 import com.romsteam.roms.dto.response.TableResponse;
 import com.romsteam.roms.dto.response.ZoneResponse;
@@ -33,4 +34,7 @@ public interface ReservationService {
 
     // 7. Quản lý hủy đơn đặt bàn (hoặc khách gọi hủy)
     ReservationResponse cancelReservation(Long reservationId, CancelReservationRequest request);
+
+    // 8. Quản lý kiểm tra và chỉnh sửa (thêm, sửa số lượng, xóa) các món đặt trước cho bàn
+    ReservationResponse updateReservationItems(Long reservationId, UpdateReservationItemsRequest request);
 }

@@ -3,14 +3,20 @@ package com.romsteam.roms.service.serviceImpl;
 import com.romsteam.roms.dto.request.AssignTableReservationRequest;
 import com.romsteam.roms.dto.request.CancelReservationRequest;
 import com.romsteam.roms.dto.request.CreateReservationRequest;
+import com.romsteam.roms.dto.request.ReservationItemRequest;
+import com.romsteam.roms.dto.request.UpdateReservationItemsRequest;
+import com.romsteam.roms.dto.response.ReservationItemResponse;
 import com.romsteam.roms.dto.response.ReservationResponse;
 import com.romsteam.roms.dto.response.TableResponse;
 import com.romsteam.roms.dto.response.ZoneResponse;
+import com.romsteam.roms.entity.MenuItem;
 import com.romsteam.roms.entity.Reservation;
+import com.romsteam.roms.entity.ReservationItem;
 import com.romsteam.roms.entity.RestaurantTable;
 import com.romsteam.roms.entity.enums.ReservationStatus;
 import com.romsteam.roms.entity.enums.TableStatus;
 import com.romsteam.roms.exception.AppException;
+import com.romsteam.roms.repository.MenuItemRepository;
 import com.romsteam.roms.repository.ReservationRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
 import com.romsteam.roms.service.ReservationService;
@@ -18,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -31,6 +38,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final RestaurantTableRepository tableRepository;
+    private final MenuItemRepository menuItemRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -72,7 +80,34 @@ public class ReservationServiceImpl implements ReservationService {
                 .status(ReservationStatus.PENDING) // Luôn khởi tạo là PENDING chờ Quản lý gọi điện
                 .note(request.getNote() != null ? request.getNote().trim() : null)
                 .table(null) // Chưa gán bàn lúc khách mới gửi yêu cầu
+                .items(new ArrayList<>())
                 .build();
+
+        // 4. Đính kèm các món ăn đặt trước (nếu có)
+        if (request.getPreOrderItems() != null && !request.getPreOrderItems().isEmpty()) {
+            for (ReservationItemRequest itemReq : request.getPreOrderItems()) {
+                if (itemReq.getMenuItemId() == null || itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
+                    continue;
+                }
+                MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
+                        .orElseThrow(() -> new AppException("Món ăn ID #" + itemReq.getMenuItemId() + " không tồn tại trong hệ thống!"));
+                if (!menuItem.getIsActive()) {
+                    throw new AppException("Món '" + menuItem.getName() + "' hiện không còn kinh doanh!");
+                }
+                BigDecimal unitPrice = menuItem.getPrice();
+                BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+
+                ReservationItem item = ReservationItem.builder()
+                        .reservation(reservation)
+                        .menuItem(menuItem)
+                        .quantity(itemReq.getQuantity())
+                        .unitPrice(unitPrice)
+                        .subtotal(subtotal)
+                        .note(itemReq.getNote() != null ? itemReq.getNote().trim() : null)
+                        .build();
+                reservation.getItems().add(item);
+            }
+        }
 
         Reservation saved = reservationRepository.save(reservation);
         return mapToResponse(saved);
@@ -266,6 +301,56 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     // ===================================================================
+    // 8. QUẢN LÝ KIỂM TRA & CẬP NHẬT MÓN ĐẶT TRƯỚC (THÊM / SỬA / XÓA)
+    // ===================================================================
+    @Override
+    @Transactional
+    public ReservationResponse updateReservationItems(Long reservationId, UpdateReservationItemsRequest request) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt bàn #" + reservationId));
+
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new AppException("Đơn đặt bàn này đã bị hủy, không thể chỉnh sửa món đặt trước!");
+        }
+
+        if (reservation.getStatus() == ReservationStatus.COMPLETED) {
+            throw new AppException("Đơn đặt bàn này đã hoàn tất check-in, không thể chỉnh sửa món đặt trước!");
+        }
+
+        // Xóa danh sách món cũ (orphanRemoval = true sẽ xóa các row tương ứng trong CSDL)
+        reservation.getItems().clear();
+
+        // Thêm danh sách món mới theo chỉ định của Quản lý
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            for (ReservationItemRequest itemReq : request.getItems()) {
+                if (itemReq.getMenuItemId() == null || itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
+                    continue;
+                }
+                MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
+                        .orElseThrow(() -> new AppException("Món ăn ID #" + itemReq.getMenuItemId() + " không tồn tại trong hệ thống!"));
+                if (!menuItem.getIsActive()) {
+                    throw new AppException("Món '" + menuItem.getName() + "' hiện không còn kinh doanh!");
+                }
+                BigDecimal unitPrice = menuItem.getPrice();
+                BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+
+                ReservationItem item = ReservationItem.builder()
+                        .reservation(reservation)
+                        .menuItem(menuItem)
+                        .quantity(itemReq.getQuantity())
+                        .unitPrice(unitPrice)
+                        .subtotal(subtotal)
+                        .note(itemReq.getNote() != null ? itemReq.getNote().trim() : null)
+                        .build();
+                reservation.getItems().add(item);
+            }
+        }
+
+        Reservation saved = reservationRepository.save(reservation);
+        return mapToResponse(saved);
+    }
+
+    // ===================================================================
     // HÀM HELPER CHUYỂN ĐỔI ENTITY SANG DTO RESPONSE
     // ===================================================================
     private ReservationResponse mapToResponse(Reservation r) {
@@ -296,6 +381,32 @@ public class ReservationServiceImpl implements ReservationService {
             zoneName = "Sảnh Chính";
         }
 
+        List<ReservationItemResponse> preOrderResponses = new ArrayList<>();
+        BigDecimal preOrderTotal = BigDecimal.ZERO;
+        int preOrderCount = 0;
+
+        if (r.getItems() != null && !r.getItems().isEmpty()) {
+            for (ReservationItem item : r.getItems()) {
+                BigDecimal sub = item.getSubtotal() != null ? item.getSubtotal() : BigDecimal.ZERO;
+                preOrderTotal = preOrderTotal.add(sub);
+                preOrderCount += (item.getQuantity() != null ? item.getQuantity() : 0);
+
+                MenuItem m = item.getMenuItem();
+                preOrderResponses.add(ReservationItemResponse.builder()
+                        .id(item.getId())
+                        .menuItemId(m != null ? m.getId() : null)
+                        .menuItemName(m != null ? m.getName() : "Món không xác định")
+                        .sku(m != null ? m.getSku() : null)
+                        .imageUrl(m != null ? m.getImageUrl() : null)
+                        .categoryName(m != null && m.getCategory() != null ? m.getCategory().getName() : null)
+                        .unitPrice(item.getUnitPrice())
+                        .quantity(item.getQuantity())
+                        .subtotal(sub)
+                        .note(item.getNote())
+                        .build());
+            }
+        }
+
         return ReservationResponse.builder()
                 .id(r.getId())
                 .bookingCode(r.getBookingCode())
@@ -316,6 +427,9 @@ public class ReservationServiceImpl implements ReservationService {
                 .statusLabel(statusLabel)
                 .note(r.getNote())
                 .cancelReason(r.getCancelReason())
+                .preOrderItems(preOrderResponses)
+                .preOrderTotal(preOrderTotal)
+                .preOrderItemsCount(preOrderCount)
                 .createdAt(r.getCreatedAt())
                 .build();
     }
