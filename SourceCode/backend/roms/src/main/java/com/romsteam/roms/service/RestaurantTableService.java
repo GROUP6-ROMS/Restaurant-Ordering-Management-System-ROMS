@@ -45,4 +45,13 @@ public interface RestaurantTableService {
 
     // 10. Quản lý xác nhận đã xử lý toàn bộ chuông gọi của 1 bàn
     void resolveAllRequestsForTable(Long tableId);
+
+    // 11. Quản lý thêm món trực tiếp vào bàn ăn
+    TableOrdersResponse addItemsToTable(Long tableId, com.romsteam.roms.dto.request.WaiterAddOrderRequest request);
+
+    // 12. Quản lý điều chỉnh số lượng món ăn tại bàn
+    TableOrdersResponse updateOrderItemQuantity(Long orderItemId, Integer quantity);
+
+    // 13. Quản lý hủy món ăn tại bàn kèm lý do
+    TableOrdersResponse cancelOrderItem(Long orderItemId, String reason);
 }

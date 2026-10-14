@@ -5,6 +5,7 @@ import { tableApi } from '../../api/tableApi';
 import { zoneApi } from '../../api/zoneApi';
 import { reservationApi } from '../../api/reservationApi';
 import { menuApi } from '../../api/menuApi';
+import { cashierApi } from '../../api/cashierApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 export default function TableManagementPage() {
@@ -44,6 +45,26 @@ export default function TableManagementPage() {
   const [orderDrawerTable, setOrderDrawerTable] = useState(null); // Bàn đang chọn xem đơn
   const [activeOrdersData, setActiveOrdersData] = useState(null); // Dữ liệu món lấy từ API
   const [orderDrawerLoading, setOrderDrawerLoading] = useState(false);
+
+  // State nâng cao cho Ngăn Kéo Quản Lý Đơn Món Tại Bàn (Step 2: Order Drawer Full Operations)
+  const [itemUpdatingId, setItemUpdatingId] = useState(null); // ID món đang được cập nhật số lượng
+  const [voidModalItem, setVoidModalItem] = useState(null); // Món được chọn để hủy
+  const [voidReason, setVoidReason] = useState('Khách đổi ý / không dùng nữa');
+  const [voidCustomReason, setVoidCustomReason] = useState('');
+  const [voidSubmitting, setVoidSubmitting] = useState(false);
+
+  // Modal Gọi Thêm Món Vào Bàn (Add Items to Table)
+  const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const [orderCart, setOrderCart] = useState([]);
+  const [orderAddNote, setOrderAddNote] = useState('');
+  const [orderMenuSearch, setOrderMenuSearch] = useState('');
+  const [orderMenuCategory, setOrderMenuCategory] = useState('ALL');
+  const [orderAddSubmitting, setOrderAddSubmitting] = useState(false);
+
+  // Modal Xem Trước & In Phiếu Tạm Tính (Pre-check Bill Thermal Modal)
+  const [showPreCheckBillModal, setShowPreCheckBillModal] = useState(false);
+  const [preCheckBillData, setPreCheckBillData] = useState(null);
+  const [preCheckBillLoading, setPreCheckBillLoading] = useState(false);
 
   // Status Modal State (Cập nhật trạng thái bàn, khóa bàn, đặt bàn với thời gian)
   const [statusModalTable, setStatusModalTable] = useState(null);
@@ -975,7 +996,7 @@ export default function TableManagementPage() {
   };
 
   // ===================================================================
-  // 6.1 XEM NHANH ORDER TẠI BÀN (QUICK BILL PREVIEW)
+  // 6.1 XEM NHANH VÀ QUẢN LÝ ORDER TẠI BÀN (ORDER DRAWER FULL OPERATIONS)
   // ===================================================================
   const handleOpenOrderDrawer = async (table) => {
     setOrderDrawerTable(table);
@@ -990,6 +1011,198 @@ export default function TableManagementPage() {
       showToast('Không thể lấy thông tin món ăn tại bàn!');
     } finally {
       setOrderDrawerLoading(false);
+    }
+  };
+
+  // 6.2. CẬP NHẬT SỐ LƯỢNG MÓN ĂN (+ / -)
+  const handleUpdateItemQty = async (item, delta) => {
+    if (!orderDrawerTable || !item) return;
+    const newQty = (item.quantity || 1) + delta;
+    if (newQty <= 0) {
+      handleOpenVoidModal(item);
+      return;
+    }
+
+    try {
+      setItemUpdatingId(item.orderItemId);
+      const res = await tableApi.updateOrderItemQuantity(item.orderItemId, newQty);
+      if (res.data && res.data.success) {
+        setActiveOrdersData(res.data.data);
+        showToast(`Đã cập nhật ${item.itemName} thành x${newQty}`);
+        broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: orderDrawerTable.id });
+        loadData(true);
+      }
+    } catch (err) {
+      console.error('Lỗi cập nhật số lượng món:', err);
+      const msg = err.response?.data?.message || 'Không thể cập nhật số lượng món!';
+      showToast(msg);
+    } finally {
+      setItemUpdatingId(null);
+    }
+  };
+
+  // 6.3. HỦY MÓN ĂN KÈM LÝ DO
+  const handleOpenVoidModal = (item) => {
+    setVoidModalItem(item);
+    setVoidReason('Khách đổi ý / không dùng nữa');
+    setVoidCustomReason('');
+  };
+
+  const handleConfirmVoidItem = async () => {
+    if (!voidModalItem) return;
+    try {
+      setVoidSubmitting(true);
+      const finalReason = voidReason === 'OTHER'
+        ? (voidCustomReason ? voidCustomReason.trim() : 'Lý do khác')
+        : voidReason;
+      const res = await tableApi.cancelOrderItem(voidModalItem.orderItemId, finalReason);
+      if (res.data && res.data.success) {
+        setActiveOrdersData(res.data.data);
+        setVoidModalItem(null);
+        showToast(`Đã hủy món ${voidModalItem.itemName} thành công!`);
+        broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: orderDrawerTable.id });
+        loadData(true);
+      }
+    } catch (err) {
+      console.error('Lỗi khi hủy món ăn:', err);
+      const msg = err.response?.data?.message || 'Không thể hủy món ăn!';
+      showToast(msg);
+    } finally {
+      setVoidSubmitting(false);
+    }
+  };
+
+  // 6.4. MỞ MODAL THÊM MÓN VÀO BÀN
+  const handleOpenAddOrderModal = async () => {
+    setShowAddOrderModal(true);
+    setOrderCart([]);
+    setOrderAddNote('');
+    setOrderMenuSearch('');
+    setOrderMenuCategory('ALL');
+
+    if (menuCatalog.length === 0) {
+      try {
+        setMenuCatalogLoading(true);
+        const resMenu = await menuApi.getItems();
+        const dishes = resMenu.data || [];
+        setMenuCatalog(dishes.filter(d => d.isActive));
+      } catch (err) {
+        console.warn('Lỗi tải thực đơn món ăn:', err);
+      } finally {
+        setMenuCatalogLoading(false);
+      }
+    }
+  };
+
+  const handleAddToCart = (dish) => {
+    setOrderCart(prev => {
+      const idx = prev.findIndex(i => i.menuItemId === dish.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        const cur = next[idx];
+        const newQty = cur.quantity + 1;
+        next[idx] = { ...cur, quantity: newQty, subtotal: cur.price * newQty };
+        return next;
+      } else {
+        const price = Number(dish.price) || 0;
+        return [
+          ...prev,
+          {
+            menuItemId: dish.id,
+            name: dish.name,
+            sku: dish.sku,
+            imageUrl: dish.imageUrl,
+            categoryName: dish.categoryName,
+            price,
+            quantity: 1,
+            subtotal: price,
+            note: ''
+          }
+        ];
+      }
+    });
+  };
+
+  const handleUpdateCartQty = (index, delta) => {
+    setOrderCart(prev => {
+      const next = [...prev];
+      const cur = next[index];
+      const newQty = cur.quantity + delta;
+      if (newQty <= 0) {
+        next.splice(index, 1);
+      } else {
+        next[index] = { ...cur, quantity: newQty, subtotal: cur.price * newQty };
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateCartNote = (index, note) => {
+    setOrderCart(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], note };
+      return next;
+    });
+  };
+
+  const handleSubmitAddOrder = async () => {
+    if (!orderDrawerTable || orderCart.length === 0) return;
+    try {
+      setOrderAddSubmitting(true);
+      const payload = {
+        note: orderAddNote ? orderAddNote.trim() : '',
+        items: orderCart.map(i => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+          note: i.note ? i.note.trim() : ''
+        }))
+      };
+
+      const res = await tableApi.addItemsToTable(orderDrawerTable.id, payload);
+      if (res.data && res.data.success) {
+        setActiveOrdersData(res.data.data);
+        setShowAddOrderModal(false);
+        setOrderCart([]);
+        showToast('Đã gửi đợt gọi món vào bàn thành công!');
+        broadcastRealtimeEvent({ type: 'NEW_ORDER_CREATED', tableId: orderDrawerTable.id });
+        loadData(true);
+      }
+    } catch (err) {
+      console.error('Lỗi khi thêm món vào bàn:', err);
+      const msg = err.response?.data?.message || 'Không thể thêm món vào bàn!';
+      showToast(msg);
+    } finally {
+      setOrderAddSubmitting(false);
+    }
+  };
+
+  // 6.5. MỞ MODAL XEM TRƯỚC VÀ IN PHIẾU TẠM TÍNH (PRE-CHECK BILL)
+  const handleOpenPreCheckBill = async () => {
+    if (!orderDrawerTable) return;
+    setShowPreCheckBillModal(true);
+    setPreCheckBillLoading(true);
+    try {
+      const res = await cashierApi.getBillPreview(orderDrawerTable.id);
+      if (res.data && res.data.success) {
+        setPreCheckBillData(res.data.data);
+      }
+    } catch (err) {
+      console.error('Lỗi lấy thông tin tạm tính bàn:', err);
+      showToast('Không thể lấy thông tin tạm tính của bàn!');
+    } finally {
+      setPreCheckBillLoading(false);
+    }
+  };
+
+  const handlePrintDraftBill = async () => {
+    if (!orderDrawerTable) return;
+    try {
+      await cashierApi.markDraftPrinted(orderDrawerTable.id);
+      window.print();
+      showToast('Đã xuất lệnh in phiếu tạm tính!');
+    } catch (err) {
+      console.warn('Lỗi đánh dấu in tạm tính:', err);
+      window.print();
     }
   };
 
@@ -1262,6 +1475,28 @@ export default function TableManagementPage() {
           0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
           50% { box-shadow: 0 0 16px 4px rgba(124, 58, 237, 0.35); }
           100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
+        }
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #thermal-receipt-print, #thermal-receipt-print * {
+            visibility: visible;
+          }
+          #thermal-receipt-print {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 80mm;
+            margin: 0;
+            padding: 4mm;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000000;
+            background: #FFFFFF;
+          }
+          .no-print {
+            display: none !important;
+          }
         }
       `}</style>
 
@@ -2828,6 +3063,9 @@ export default function TableManagementPage() {
       {/* ============================================================= */}
       {/* DRAWER: XEM NHANH ORDER VÀ TIẾN ĐỘ BẾP TẠI BÀN               */}
       {/* ============================================================= */}
+      {/* ============================================================= */}
+      {/* NGĂN KÉO QUẢN LÝ ĐƠN MÓN TẠI BÀN (ORDER DRAWER FULL OPS)       */}
+      {/* ============================================================= */}
       {orderDrawerTable && (
         <div style={{
           position: 'fixed',
@@ -2841,32 +3079,80 @@ export default function TableManagementPage() {
           <div style={{
             background: '#FFFFFF',
             width: '100%',
-            maxWidth: '460px',
+            maxWidth: '520px',
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '-8px 0 32px rgba(0,0,0,0.15)'
           }}>
             {/* Header Drawer */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF7F5' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9D4124' }}>{orderDrawerTable.code}</span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1F1B1A' }}>{orderDrawerTable.name}</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>{orderDrawerTable.code}</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1F1B1A' }}>{orderDrawerTable.name}</span>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '3px' }}>
                   {orderDrawerTable.zoneName} • {activeOrdersData?.guestCount || orderDrawerTable.guests || orderDrawerTable.capacity} khách
                   {activeOrdersData?.timeIn && ` • Vào lúc: ${activeOrdersData.timeIn}`}
                   {activeOrdersData?.durationMinutes !== undefined && activeOrdersData?.durationMinutes > 0 && ` (${activeOrdersData.durationMinutes} phút)`}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => { setOrderDrawerTable(null); setActiveOrdersData(null); }}
-                style={{ background: '#F6ECEA', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#56423D' }}
-              >
-                <Icon name="close" size={20} />
-              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleOpenAddOrderModal}
+                  title="Thêm món mới vào bàn này"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '7px 12px',
+                    borderRadius: '8px',
+                    background: '#9D4124',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(157,65,36,0.25)'
+                  }}
+                >
+                  <Icon name="add_circle" size={16} />
+                  Thêm Món
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenPreCheckBill}
+                  title="Xem trước và in phiếu tạm tính cho khách"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '7px 11px',
+                    borderRadius: '8px',
+                    background: '#FFFFFF',
+                    color: '#9D4124',
+                    border: '1.5px solid #9D4124',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Icon name="receipt" size={16} />
+                  In Tạm Tính
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setOrderDrawerTable(null); setActiveOrdersData(null); }}
+                  style={{ background: '#F6ECEA', border: 'none', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#56423D' }}
+                >
+                  <Icon name="close" size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Nội dung danh sách món */}
@@ -2878,80 +3164,311 @@ export default function TableManagementPage() {
                 </div>
               ) : !activeOrdersData || !activeOrdersData.items || activeOrdersData.items.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 20px', color: '#89726B' }}>
-                  <Icon name="soup_kitchen" size={40} style={{ color: '#D1C2BE', marginBottom: '8px' }} />
-                  <div style={{ fontWeight: 700, color: '#1F1B1A' }}>Chưa có món nào được gọi</div>
-                  <p style={{ fontSize: '0.82rem', margin: '4px 0 0' }}>Bàn đang chờ khách quét mã QR để bắt đầu gọi món.</p>
+                  <Icon name="soup_kitchen" size={48} style={{ color: '#D1C2BE', marginBottom: '8px' }} />
+                  <div style={{ fontWeight: 700, color: '#1F1B1A', fontSize: '1rem' }}>Bàn chưa có món nào</div>
+                  <p style={{ fontSize: '0.82rem', margin: '6px 0 16px' }}>Khách chưa đặt món qua QR, hoặc quản lý có thể chủ động bấm Thêm Món ngay bên dưới.</p>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddOrderModal}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '10px 18px',
+                      borderRadius: '10px',
+                      background: '#9D4124',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(157,65,36,0.25)'
+                    }}
+                  >
+                    <Icon name="add" size={18} />
+                    Gọi Món Cho Bàn Này
+                  </button>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {/* Thanh thống kê tiến độ món */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: '#FFF8F6', padding: '12px', borderRadius: '12px', border: '1px solid #F0E6E4', textAlign: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: '#89726B' }}>Chờ bếp</div>
-                      <div style={{ fontWeight: 800, color: '#B45309', fontSize: '1.1rem' }}>{activeOrdersData.pendingItems || 0}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#89726B', fontWeight: 600 }}>Chờ bếp</div>
+                      <div style={{ fontWeight: 900, color: '#B45309', fontSize: '1.15rem' }}>{activeOrdersData.pendingItems || 0}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: '#89726B' }}>Đang nấu</div>
-                      <div style={{ fontWeight: 800, color: '#9D4124', fontSize: '1.1rem' }}>{activeOrdersData.cookingItems || 0}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#89726B', fontWeight: 600 }}>Đang nấu</div>
+                      <div style={{ fontWeight: 900, color: '#9D4124', fontSize: '1.15rem' }}>{activeOrdersData.cookingItems || 0}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: '#89726B' }}>Đã ra món</div>
-                      <div style={{ fontWeight: 800, color: '#059669', fontSize: '1.1rem' }}>{activeOrdersData.servedItems || 0}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#89726B', fontWeight: 600 }}>Đã lên bàn</div>
+                      <div style={{ fontWeight: 900, color: '#059669', fontSize: '1.15rem' }}>{activeOrdersData.servedItems || 0}</div>
                     </div>
                   </div>
 
-                  {/* Danh sách từng món */}
+                  {/* Danh sách từng món với nút +/- và Hủy món */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {activeOrdersData.items.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '10px', background: '#FAFAFA', border: '1px solid #F0E6E4' }}>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1F1B1A' }}>
-                            {item.itemName} <span style={{ color: '#9D4124' }}>x{item.quantity}</span>
+                    {activeOrdersData.items.map((item, idx) => {
+                      const isCancelled = item.status === 'CANCELLED';
+                      const isUpdating = itemUpdatingId === item.orderItemId;
+
+                      return (
+                        <div
+                          key={item.orderItemId || idx}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: isCancelled ? '#F9FAFB' : '#FFFFFF',
+                            border: isCancelled ? '1px dashed #D1D5DB' : '1px solid #F0E6E4',
+                            boxShadow: isCancelled ? 'none' : '0 2px 6px rgba(0,0,0,0.03)',
+                            opacity: isCancelled ? 0.75 : 1,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {/* Row 1: Tên món, đơn giá, mã đợt gọi & nút xóa */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{
+                                fontWeight: 800,
+                                fontSize: '0.92rem',
+                                color: isCancelled ? '#9CA3AF' : '#1F1B1A',
+                                textDecoration: isCancelled ? 'line-through' : 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                flexWrap: 'wrap'
+                              }}>
+                                <span>{item.itemName}</span>
+                                {item.orderCode && (
+                                  <span style={{
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    background: '#F3E8E2',
+                                    color: '#78350F'
+                                  }}>
+                                    {item.orderCode}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#89726B', marginTop: '2px' }}>
+                                Đơn giá: {Number(item.unitPrice || 0).toLocaleString('vi-VN')}₫
+                              </div>
+                            </div>
+
+                            {/* Badge trạng thái */}
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              background: isCancelled ? '#E5E7EB' : (item.status === 'COOKING' ? '#FFEDD5' : item.status === 'SERVED' ? '#DCFCE7' : item.status === 'READY' ? '#DBEAFE' : '#FEF3C7'),
+                              color: isCancelled ? '#6B7280' : (item.status === 'COOKING' ? '#9A3412' : item.status === 'SERVED' ? '#166534' : item.status === 'READY' ? '#1E40AF' : '#92400E'),
+                              flexShrink: 0
+                            }}>
+                              {item.statusText || item.status}
+                            </span>
                           </div>
+
+                          {/* Row 2: Ghi chú chế biến */}
                           {item.note && (
-                            <div style={{ fontSize: '0.75rem', color: '#89726B', fontStyle: 'italic', marginTop: '2px' }}>
+                            <div style={{
+                              fontSize: '0.74rem',
+                              color: isCancelled ? '#9CA3AF' : '#6B7280',
+                              fontStyle: 'italic',
+                              background: isCancelled ? '#F3F4F6' : '#FFF8F6',
+                              padding: '4px 8px',
+                              borderRadius: '6px'
+                            }}>
                               📝 {item.note}
                             </div>
                           )}
-                          <span style={{
-                            display: 'inline-block',
-                            marginTop: '4px',
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            background: item.status === 'COOKING' ? '#FFEDD5' : item.status === 'SERVED' ? '#DCFCE7' : '#FEF3C7',
-                            color: item.status === 'COOKING' ? '#9A3412' : item.status === 'SERVED' ? '#166534' : '#92400E'
+
+                          {/* Row 3: Bộ điều khiển Số lượng (+/-), Hủy món và Thành tiền */}
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            borderTop: '1px dashed #F0E6E4',
+                            paddingTop: '8px',
+                            marginTop: '2px'
                           }}>
-                            {item.statusText}
-                          </span>
+                            {/* Nút điều chỉnh số lượng & Hủy */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {!isCancelled ? (
+                                <>
+                                  <div style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    background: '#F9FAFB',
+                                    border: '1px solid #E5E7EB',
+                                    borderRadius: '8px',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <button
+                                      type="button"
+                                      disabled={isUpdating}
+                                      onClick={() => handleUpdateItemQty(item, -1)}
+                                      title={item.quantity === 1 ? "Giảm về 0 sẽ chuyển sang hủy món" : "Giảm số lượng"}
+                                      style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#56423D',
+                                        fontWeight: 800
+                                      }}
+                                    >
+                                      -
+                                    </button>
+                                    <span style={{
+                                      minWidth: '24px',
+                                      textAlign: 'center',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 800,
+                                      color: '#1F1B1A'
+                                    }}>
+                                      {item.quantity}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={isUpdating}
+                                      onClick={() => handleUpdateItemQty(item, 1)}
+                                      title="Tăng số lượng"
+                                      style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#56423D',
+                                        fontWeight: 800
+                                      }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenVoidModal(item)}
+                                    title="Hủy món ăn này khỏi bàn (ghi rõ lý do)"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px',
+                                      padding: '4px 8px',
+                                      borderRadius: '6px',
+                                      background: '#FEE2E2',
+                                      color: '#DC2626',
+                                      border: 'none',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <Icon name="delete" size={13} />
+                                    Hủy món
+                                  </button>
+                                </>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                                  Đã hủy {item.quantity} phần
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Thành tiền */}
+                            <div style={{
+                              fontWeight: 900,
+                              fontSize: '0.95rem',
+                              color: isCancelled ? '#9CA3AF' : '#9D4124',
+                              textDecoration: isCancelled ? 'line-through' : 'none'
+                            }}>
+                              {Number(item.subtotal || 0).toLocaleString('vi-VN')}₫
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A' }}>
-                          {Number(item.subtotal).toLocaleString('vi-VN')}₫
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Footer Drawer: Tạm tính */}
+            {/* Footer Drawer: Tạm tính & Các nút hành động chính */}
             {activeOrdersData && (
               <div style={{ padding: '16px 24px', borderTop: '1px solid #F0E6E4', background: '#FFF8F6' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#89726B', fontWeight: 600 }}>Tạm tính ({activeOrdersData.totalItems || 0} món):</span>
-                  <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#9D4124' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#89726B', fontWeight: 600 }}>
+                    Tạm tính ({activeOrdersData.totalItems || 0} món đang dùng):
+                  </span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>
                     {Number(activeOrdersData.totalAmount || 0).toLocaleString('vi-VN')}₫
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setOrderDrawerTable(null); setActiveOrdersData(null); }}
-                  style={{ width: '100%', padding: '10px', borderRadius: '10px', background: '#9D4124', color: '#FFFFFF', border: 'none', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Đóng Ngăn Kéo
-                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddOrderModal}
+                    style={{
+                      padding: '11px',
+                      borderRadius: '10px',
+                      background: '#9D4124',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(157,65,36,0.25)'
+                    }}
+                  >
+                    <Icon name="add" size={16} />
+                    + Thêm Món
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenPreCheckBill}
+                    style={{
+                      padding: '11px',
+                      borderRadius: '10px',
+                      background: '#FFFFFF',
+                      color: '#9D4124',
+                      border: '1.5px solid #9D4124',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Icon name="print" size={16} />
+                    In Tạm Tính
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -5682,6 +6199,840 @@ export default function TableManagementPage() {
                   {savePreOrderLoading ? 'Đang Lưu...' : 'Lưu Thay Đổi Món Đặt Trước'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL 7: GỌI THÊM MÓN VÀO BÀN TRỰC TIẾP (MANAGER ADD ORDER)   */}
+      {/* ============================================================= */}
+      {showAddOrderModal && orderDrawerTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 10001,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '1050px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#FAF7F5'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9D4124' }}>
+                    {orderDrawerTable.code} - {orderDrawerTable.name}
+                  </span>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    background: '#FFDBC9',
+                    color: '#9D4124'
+                  }}>
+                    Thêm Món Vào Bàn
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '2px' }}>
+                  Chọn món từ thực đơn nhà hàng để gửi yêu cầu chế biến xuống Bếp / Quầy đồ uống
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddOrderModal(false)}
+                disabled={orderAddSubmitting}
+                style={{
+                  background: '#F6ECEA',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#56423D'
+                }}
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body: 2 Cột (Trái: Menu Catalog, Phải: Đợt gọi món) */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1.2fr 1fr',
+              flex: 1,
+              minHeight: 0,
+              overflow: 'hidden'
+            }}>
+              {/* CỘT TRÁI: DANH MỤC THỰC ĐƠN */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                borderRight: '1px solid #F0E6E4',
+                minHeight: 0,
+                background: '#FAF7F5'
+              }}>
+                {/* Search & Category Tabs */}
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid #F0E6E4', background: '#FFFFFF' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: '#F5EFEB',
+                    borderRadius: '10px',
+                    padding: '0 12px',
+                    height: '38px',
+                    gap: '8px',
+                    marginBottom: '10px'
+                  }}>
+                    <Icon name="search" size={18} style={{ color: '#89726B' }} />
+                    <input
+                      type="text"
+                      placeholder="Tìm món theo tên hoặc mã SKU..."
+                      value={orderMenuSearch}
+                      onChange={(e) => setOrderMenuSearch(e.target.value)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        width: '100%',
+                        fontSize: '0.84rem',
+                        color: '#1F1B1A'
+                      }}
+                    />
+                    {orderMenuSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setOrderMenuSearch('')}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#89726B' }}
+                      >
+                        <Icon name="close" size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Category Pills */}
+                  {(() => {
+                    const uniqueCats = ['ALL', ...new Set(menuCatalog.map(d => d.categoryName).filter(Boolean))];
+                    return (
+                      <div style={{
+                        display: 'flex',
+                        gap: '6px',
+                        overflowX: 'auto',
+                        paddingBottom: '2px',
+                        scrollbarWidth: 'none'
+                      }}>
+                        {uniqueCats.map(cat => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setOrderMenuCategory(cat)}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: '20px',
+                              border: 'none',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              background: orderMenuCategory === cat ? '#9D4124' : '#F5EFEB',
+                              color: orderMenuCategory === cat ? '#FFFFFF' : '#56423D',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {cat === 'ALL' ? 'Tất Cả' : cat}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Danh sách món ăn */}
+                <div style={{
+                  padding: '14px 18px',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  {menuCatalogLoading ? (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#89726B' }}>
+                      <Icon name="sync" size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                      <div style={{ marginTop: '8px', fontSize: '0.82rem' }}>Đang nạp thực đơn...</div>
+                    </div>
+                  ) : (
+                    (() => {
+                      const filtered = menuCatalog.filter(d => {
+                        if (orderMenuCategory !== 'ALL' && d.categoryName !== orderMenuCategory) return false;
+                        if (!orderMenuSearch.trim()) return true;
+                        const q = orderMenuSearch.trim().toLowerCase();
+                        return (d.name || '').toLowerCase().includes(q) ||
+                               (d.sku || '').toLowerCase().includes(q) ||
+                               (d.categoryName || '').toLowerCase().includes(q);
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div style={{ padding: '40px 16px', textAlign: 'center', color: '#89726B', fontSize: '0.82rem' }}>
+                            Không tìm thấy món nào phù hợp.
+                          </div>
+                        );
+                      }
+
+                      return filtered.map(dish => {
+                        const inCart = orderCart.find(i => i.menuItemId === dish.id);
+
+                        return (
+                          <div
+                            key={dish.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              borderRadius: '12px',
+                              background: '#FFFFFF',
+                              border: inCart ? '1.5px solid #9D4124' : '1px solid #F0E6E4',
+                              gap: '12px',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              {dish.imageUrl ? (
+                                <img
+                                  src={dish.imageUrl}
+                                  alt={dish.name}
+                                  style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover' }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '8px',
+                                  background: '#FFF8F6',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#9D4124'
+                                }}>
+                                  <Icon name="restaurant" size={20} />
+                                </div>
+                              )}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{
+                                  fontWeight: 800,
+                                  fontSize: '0.88rem',
+                                  color: '#1F1B1A',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {dish.name}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#89726B', marginTop: '2px' }}>
+                                  {dish.categoryName} • <strong style={{ color: '#9D4124' }}>{Number(dish.price || 0).toLocaleString('vi-VN')}₫</strong>
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAddToCart(dish)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: inCart ? '#EA580C' : '#9D4124',
+                                color: '#FFFFFF',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}
+                            >
+                              <Icon name={inCart ? "add" : "add_shopping_cart"} size={14} />
+                              {inCart ? `Thêm (${inCart.quantity})` : 'Chọn'}
+                            </button>
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
+                </div>
+              </div>
+
+              {/* CỘT PHẢI: GIỎ MÓN CHUẨN BỊ GỌI */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                background: '#FFFFFF'
+              }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFF8F6' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A' }}>
+                    Đợt Món Gọi Thêm ({orderCart.length} món)
+                  </span>
+                  {orderCart.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOrderCart([])}
+                      style={{ border: 'none', background: 'transparent', color: '#DC2626', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Xóa tất cả
+                    </button>
+                  )}
+                </div>
+
+                <div style={{
+                  padding: '16px 20px',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  {orderCart.length === 0 ? (
+                    <div style={{ padding: '60px 20px', textAlign: 'center', color: '#89726B' }}>
+                      <Icon name="shopping_basket" size={40} style={{ color: '#D4C4BF', marginBottom: '8px' }} />
+                      <div style={{ fontWeight: 700, color: '#1F1B1A' }}>Chưa chọn món nào</div>
+                      <p style={{ fontSize: '0.8rem', margin: '4px 0 0' }}>Bấm nút Chọn bên trái để đưa món vào đợt gọi này.</p>
+                    </div>
+                  ) : (
+                    orderCart.map((item, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: '12px',
+                          borderRadius: '12px',
+                          background: '#FAF7F5',
+                          border: '1px solid #F0E6E4',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1F1B1A' }}>{item.name}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#89726B' }}>
+                              Đơn giá: {Number(item.price || 0).toLocaleString('vi-VN')}₫
+                            </div>
+                          </div>
+                          <div style={{ fontWeight: 900, fontSize: '0.92rem', color: '#9D4124' }}>
+                            {Number(item.subtotal || 0).toLocaleString('vi-VN')}₫
+                          </div>
+                        </div>
+
+                        {/* Quantity and Note */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: '#FFFFFF',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '8px',
+                            overflow: 'hidden'
+                          }}>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCartQty(idx, -1)}
+                              style={{ width: '26px', height: '26px', border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 800 }}
+                            >
+                              -
+                            </button>
+                            <span style={{ minWidth: '22px', textAlign: 'center', fontSize: '0.8rem', fontWeight: 800 }}>
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCartQty(idx, 1)}
+                              style={{ width: '26px', height: '26px', border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 800 }}
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <input
+                            type="text"
+                            placeholder="Ghi chú chế biến (vd: ít cay)..."
+                            value={item.note || ''}
+                            onChange={(e) => handleUpdateCartNote(idx, e.target.value)}
+                            style={{
+                              flex: 1,
+                              border: '1px solid #EAE0DE',
+                              background: '#FFFFFF',
+                              borderRadius: '8px',
+                              padding: '5px 10px',
+                              fontSize: '0.76rem',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Footer Cột Phải: Ghi chú chung, Tổng tiền & Submit */}
+                <div style={{ padding: '14px 20px', borderTop: '1px solid #F0E6E4', background: '#FFF8F6' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="Ghi chú chung cho đợt gọi (vd: Khách đang đói, làm gấp)..."
+                      value={orderAddNote}
+                      onChange={(e) => setOrderAddNote(e.target.value)}
+                      style={{
+                        width: '100%',
+                        border: '1px solid #EAE0DE',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        outline: 'none',
+                        background: '#FFFFFF'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '0.84rem', color: '#89726B', fontWeight: 600 }}>Tạm tính đợt gọi này:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9D4124' }}>
+                      {Number(orderCart.reduce((s, i) => s + (i.subtotal || 0), 0)).toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddOrderModal(false)}
+                      disabled={orderAddSubmitting}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        borderRadius: '10px',
+                        border: '1px solid #EAE0DE',
+                        background: '#FFFFFF',
+                        color: '#56423D',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Hủy bỏ
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSubmitAddOrder}
+                      disabled={orderAddSubmitting || orderCart.length === 0}
+                      style={{
+                        flex: 2,
+                        padding: '10px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: orderCart.length === 0 ? '#E5E7EB' : '#9D4124',
+                        color: orderCart.length === 0 ? '#9CA3AF' : '#FFFFFF',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        cursor: orderCart.length === 0 || orderAddSubmitting ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: orderCart.length > 0 ? '0 2px 8px rgba(157,65,36,0.25)' : 'none'
+                      }}
+                    >
+                      <Icon name={orderAddSubmitting ? "sync" : "send"} size={16} style={orderAddSubmitting ? { animation: 'spin 1s linear infinite' } : {}} />
+                      {orderAddSubmitting ? 'Đang gửi...' : 'Gửi Gọi Món Vào Bàn'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL 8: XÁC NHẬN HỦY MÓN ĂN KÈM LÝ DO (VOID ITEM MODAL)      */}
+      {/* ============================================================= */}
+      {voidModalItem && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 10002,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '18px',
+            width: '100%',
+            maxWidth: '480px',
+            overflow: 'hidden',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)'
+          }}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid #FEE2E2', background: '#FEF2F2', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: '#FEE2E2',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Icon name="warning" size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#991B1B' }}>
+                  Xác Nhận Hủy Món Ăn
+                </h3>
+                <div style={{ fontSize: '0.78rem', color: '#B91C1C', marginTop: '2px' }}>
+                  Món ăn sẽ bị hủy khỏi hóa đơn và thông báo tới Bếp KDS
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Item info */}
+              <div style={{ padding: '12px 14px', borderRadius: '10px', background: '#FAF7F5', border: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#1F1B1A' }}>
+                    {voidModalItem.itemName} <span style={{ color: '#DC2626' }}>x{voidModalItem.quantity}</span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#89726B', marginTop: '2px' }}>
+                    {voidModalItem.orderCode || 'Đợt gọi hiện tại'}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 900, fontSize: '1rem', color: '#DC2626' }}>
+                  {Number(voidModalItem.subtotal || 0).toLocaleString('vi-VN')}₫
+                </div>
+              </div>
+
+              {/* Reasons Selection */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#56423D', marginBottom: '8px' }}>
+                  Chọn lý do hủy món:
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {[
+                    'Khách đổi ý / không dùng nữa',
+                    'Bếp báo hết nguyên liệu chế biến',
+                    'Chế biến quá lâu / Khách phải chờ',
+                    'Nhân viên bấm nhầm bàn',
+                    'OTHER'
+                  ].map(reasonOption => (
+                    <label
+                      key={reasonOption}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: voidReason === reasonOption ? '1.5px solid #DC2626' : '1px solid #E5E7EB',
+                        background: voidReason === reasonOption ? '#FEF2F2' : '#FFFFFF',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem',
+                        fontWeight: voidReason === reasonOption ? 700 : 500,
+                        color: voidReason === reasonOption ? '#991B1B' : '#374151'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="voidReason"
+                        checked={voidReason === reasonOption}
+                        onChange={() => setVoidReason(reasonOption)}
+                        style={{ accentColor: '#DC2626' }}
+                      />
+                      <span>{reasonOption === 'OTHER' ? 'Lý do khác (tự nhập)' : reasonOption}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {voidReason === 'OTHER' && (
+                  <div style={{ marginTop: '10px' }}>
+                    <textarea
+                      rows={2}
+                      placeholder="Nhập chi tiết lý do hủy món..."
+                      value={voidCustomReason}
+                      onChange={(e) => setVoidCustomReason(e.target.value)}
+                      style={{
+                        width: '100%',
+                        borderRadius: '8px',
+                        border: '1px solid #E5E7EB',
+                        padding: '8px 10px',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        resize: 'none'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #F0E6E4', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: '#FAF7F5' }}>
+              <button
+                type="button"
+                onClick={() => setVoidModalItem(null)}
+                disabled={voidSubmitting}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Quay Lại
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmVoidItem}
+                disabled={voidSubmitting}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  cursor: voidSubmitting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(220,38,38,0.25)'
+                }}
+              >
+                <Icon name={voidSubmitting ? "sync" : "delete"} size={16} style={voidSubmitting ? { animation: 'spin 1s linear infinite' } : {}} />
+                {voidSubmitting ? 'Đang hủy...' : 'Xác Nhận Hủy Món'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL 9: XEM TRƯỚC VÀ IN PHIẾU TẠM TÍNH (PRE-CHECK BILL K80)  */}
+      {/* ============================================================= */}
+      {showPreCheckBillModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 10003,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '460px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            overflow: 'hidden'
+          }}>
+            {/* Header Modal */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF7F5' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Icon name="receipt_long" size={20} style={{ color: '#9D4124' }} />
+                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#1F1B1A' }}>
+                  Phiếu Tạm Tính Bàn {orderDrawerTable?.code}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPreCheckBillModal(false)}
+                style={{ background: '#F6ECEA', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#56423D' }}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            {/* Vùng in ấn nhiệt chuẩn khổ 80mm */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              {preCheckBillLoading ? (
+                <div style={{ textAlign: 'center', padding: '60px 0', color: '#89726B' }}>
+                  <Icon name="sync" size={28} style={{ animation: 'spin 1s linear infinite' }} />
+                  <div style={{ marginTop: '8px', fontSize: '0.85rem' }}>Đang nạp dữ liệu tạm tính...</div>
+                </div>
+              ) : preCheckBillData ? (
+                <div id="thermal-receipt-print" style={{ background: '#FFFFFF', padding: '8px' }}>
+                  <div style={{ textAlign: 'center', paddingBottom: '12px', borderBottom: '1px dashed #CCC' }}>
+                    <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.35rem', color: '#9D4124' }}>
+                      NHÀ HÀNG HOÀNG GIA ROMS
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>Số 123 Đường Ẩm Thực, Quận 1, TP. Hồ Chí Minh</div>
+                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>Hotline: 1900-8888 • MST: 0312345678</div>
+                    <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.15rem', color: '#1F1B1A', marginTop: '10px' }}>
+                      PHIẾU TẠM TÍNH TIỀN
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#89726B' }}>
+                      (PRE-CHECK BILL - CHƯA PHẢI HÓA ĐƠN VAT)
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '10px 0', borderBottom: '1px dashed #CCC', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Bàn: <strong>{preCheckBillData.tableName || preCheckBillData.tableCode}</strong></span>
+                    <span>Số khách: <strong>{preCheckBillData.guestCount || 2}</strong></span>
+                  </div>
+                  <div style={{ padding: '4px 0 10px', borderBottom: '1px dashed #CCC', fontSize: '0.75rem', color: '#56423D', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Giờ vào: {preCheckBillData.timeIn || '--:--'}</span>
+                    <span>Giờ in: {new Date().toLocaleTimeString('vi-VN')}</span>
+                  </div>
+
+                  {/* Chi tiết từng món ăn */}
+                  <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
+                    {preCheckBillData.items && preCheckBillData.items.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 600 }}>{item.itemName || item.name}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#89726B' }}>
+                            {item.quantity} x {Number(item.unitPrice).toLocaleString('vi-VN')}₫
+                          </div>
+                        </div>
+                        <div style={{ fontWeight: 700 }}>
+                          {Number(item.subtotal).toLocaleString('vi-VN')}₫
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tổng kết tiền */}
+                  <div style={{ padding: '12px 0', borderTop: '1px dashed #CCC', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.84rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Cộng tiền món:</span>
+                      <span>{Number(preCheckBillData.subtotal || 0).toLocaleString('vi-VN')}₫</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Thuế VAT ({preCheckBillData.taxRate || 8}%):</span>
+                      <span>{Number(preCheckBillData.taxAmount || 0).toLocaleString('vi-VN')}₫</span>
+                    </div>
+                    {Number(preCheckBillData.discountAmount || 0) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#DC2626' }}>
+                        <span>Giảm giá:</span>
+                        <span>-{Number(preCheckBillData.discountAmount).toLocaleString('vi-VN')}₫</span>
+                      </div>
+                    )}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontWeight: 900,
+                      fontSize: '1.2rem',
+                      color: '#9D4124',
+                      marginTop: '6px',
+                      paddingTop: '6px',
+                      borderTop: '1.5px solid #1F1B1A'
+                    }}>
+                      <span>TỔNG CỘNG:</span>
+                      <span>{Number(preCheckBillData.finalAmount || 0).toLocaleString('vi-VN')}₫</span>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'center', fontSize: '0.74rem', color: '#89726B', padding: '12px 0 6px' }}>
+                    * Quý khách vui lòng kiểm tra lại món trước khi thanh toán *
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#89726B' }}>
+                  Không có dữ liệu tạm tính cho bàn này.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer: Action Buttons */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #F0E6E4', display: 'flex', gap: '10px', background: '#FAF7F5' }} className="no-print">
+              <button
+                type="button"
+                onClick={() => setShowPreCheckBillModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Đóng
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrintDraftBill}
+                disabled={preCheckBillLoading || !preCheckBillData}
+                style={{
+                  flex: 2,
+                  padding: '10px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#9D4124',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(157,65,36,0.25)'
+                }}
+              >
+                <Icon name="print" size={18} />
+                In Ra Máy Nhiệt K80
+              </button>
             </div>
           </div>
         </div>

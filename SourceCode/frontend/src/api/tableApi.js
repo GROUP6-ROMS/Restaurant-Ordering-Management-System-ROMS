@@ -57,4 +57,19 @@ export const tableApi = {
     resolveAllTableRequests: (tableId) => {
         return axiosClient.patch(`/admin/tables/${tableId}/resolve-all-requests`);
     },
+
+    // Quản lý gọi thêm món trực tiếp vào bàn ăn
+    addItemsToTable: (tableId, data) => {
+        return axiosClient.post(`/admin/tables/${tableId}/add-items`, data);
+    },
+
+    // Quản lý điều chỉnh số lượng món ăn tại bàn
+    updateOrderItemQuantity: (orderItemId, quantity) => {
+        return axiosClient.patch(`/admin/tables/items/${orderItemId}/quantity`, { quantity });
+    },
+
+    // Quản lý hủy món ăn tại bàn kèm lý do
+    cancelOrderItem: (orderItemId, reason) => {
+        return axiosClient.post(`/admin/tables/items/${orderItemId}/cancel`, { reason });
+    },
 };

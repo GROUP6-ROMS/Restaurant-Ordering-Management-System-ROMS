@@ -39,6 +39,8 @@ public class TableOrdersResponse {
     @Builder
     public static class OrderItemDetail {
         private Long orderItemId;
+        private Long menuItemId;        // ID món ăn trong thực đơn
+        private Long orderId;           // ID đợt gọi món
         private String orderCode;       // Thuộc đợt gọi nào (Đợt 1, Đợt 2)
         private String itemName;        // Tên món (Bò nướng, Trà đào...)
         private String imageUrl;

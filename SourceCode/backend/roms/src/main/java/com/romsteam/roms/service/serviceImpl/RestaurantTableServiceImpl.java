@@ -45,6 +45,8 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
     private final RestaurantTableRepository tableRepository;
     private final DiningSessionRepository diningSessionRepository;
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final com.romsteam.roms.repository.MenuItemRepository menuItemRepository;
     private final ZoneRepository zoneRepository;
     private final ServiceRequestRepository serviceRequestRepository;
 
@@ -489,6 +491,8 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
                     items.add(TableOrdersResponse.OrderItemDetail.builder()
                             .orderItemId(item.getId())
+                            .menuItemId(item.getMenuItem() != null ? item.getMenuItem().getId() : null)
+                            .orderId(order.getId())
                             .orderCode(order.getOrderCode())
                             .itemName(item.getMenuItem() != null ? item.getMenuItem().getName() : "Món chưa đặt tên")
                             .imageUrl(item.getMenuItem() != null ? item.getMenuItem().getImageUrl() : null)
@@ -551,5 +555,167 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             req.setStatus("RESOLVED");
             serviceRequestRepository.save(req);
         }
+    }
+
+    // ===================================================================
+    // 11. QUẢN LÝ THÊM MÓN TRỰC TIẾP VÀO BÀN ĂN
+    // ===================================================================
+    @Override
+    @Transactional
+    public TableOrdersResponse addItemsToTable(Long tableId, com.romsteam.roms.dto.request.WaiterAddOrderRequest request) {
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn ăn không tồn tại với ID: " + tableId));
+
+        DiningSession session = diningSessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE)
+                .orElseGet(() -> {
+                    DiningSession newSession = new DiningSession();
+                    newSession.setTable(table);
+                    newSession.setSessionToken(UUID.randomUUID().toString());
+                    newSession.setGuestCount(table.getCapacity() != null ? table.getCapacity() : 2);
+                    newSession.setStartTime(LocalDateTime.now());
+                    newSession.setStatus(SessionStatus.ACTIVE);
+                    return diningSessionRepository.save(newSession);
+                });
+
+        if (session.getNote() != null && session.getNote().contains("[DRAFT_PRINTED]")) {
+            String cleaned = session.getNote().replace("[DRAFT_PRINTED]", "").trim();
+            session.setNote(cleaned.isEmpty() ? null : cleaned);
+            diningSessionRepository.save(session);
+        }
+
+        String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 10000);
+        Order newOrder = new Order();
+        newOrder.setSession(session);
+        newOrder.setOrderCode(orderCode);
+        newOrder.setOrderTime(LocalDateTime.now());
+        newOrder.setNote(request.getNote());
+
+        BigDecimal totalOrderAmount = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new ArrayList<>();
+        boolean hasCookingItems = false;
+
+        for (com.romsteam.roms.dto.request.WaiterAddOrderRequest.WaiterOrderItemRequest itemReq : request.getItems()) {
+            com.romsteam.roms.entity.MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại với ID: " + itemReq.getMenuItemId()));
+
+            if (!menuItem.getIsAvailable()) {
+                throw new AppException("Món '" + menuItem.getName() + "' hiện đã tạm hết hàng!", HttpStatus.BAD_REQUEST);
+            }
+
+            int qty = itemReq.getQuantity() != null && itemReq.getQuantity() > 0 ? itemReq.getQuantity() : 1;
+            BigDecimal unitPrice = menuItem.getPrice();
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(qty));
+            totalOrderAmount = totalOrderAmount.add(subtotal);
+
+            boolean isDrink = false;
+            if (menuItem.getCategory() != null && menuItem.getCategory().getName() != null) {
+                String catLower = menuItem.getCategory().getName().toLowerCase();
+                if (catLower.contains("uống") || catLower.contains("drink") || catLower.contains("nước")) {
+                    isDrink = true;
+                }
+            }
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(newOrder);
+            orderItem.setMenuItem(menuItem);
+            orderItem.setQuantity(qty);
+            orderItem.setUnitPrice(unitPrice);
+            orderItem.setSubtotal(subtotal);
+            orderItem.setNote(itemReq.getNote());
+
+            if (isDrink) {
+                orderItem.setStatus(OrderItemStatus.READY);
+            } else {
+                orderItem.setStatus(OrderItemStatus.COOKING);
+                hasCookingItems = true;
+            }
+
+            orderItems.add(orderItem);
+        }
+
+        newOrder.setStatus(hasCookingItems ? OrderStatus.CONFIRMED : OrderStatus.READY);
+        newOrder.setTotalAmount(totalOrderAmount);
+        newOrder.setItems(orderItems);
+        orderRepository.save(newOrder);
+
+        if (table.getStatus() != TableStatus.OCCUPIED) {
+            table.setStatus(TableStatus.OCCUPIED);
+            tableRepository.save(table);
+        }
+
+        return getTableActiveOrders(tableId);
+    }
+
+    // ===================================================================
+    // 12. QUẢN LÝ ĐIỀU CHỈNH SỐ LƯỢNG MÓN ĂN TẠI BÀN
+    // ===================================================================
+    @Override
+    @Transactional
+    public TableOrdersResponse updateOrderItemQuantity(Long orderItemId, Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            throw new AppException("Số lượng món phải lớn hơn 0! Để hủy món, vui lòng chọn thao tác Hủy món.", HttpStatus.BAD_REQUEST);
+        }
+
+        OrderItem item = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + orderItemId));
+
+        if (item.getStatus() == OrderItemStatus.CANCELLED) {
+            throw new AppException("Món ăn này đã bị hủy, không thể chỉnh sửa số lượng!", HttpStatus.BAD_REQUEST);
+        }
+
+        item.setQuantity(quantity);
+        item.setSubtotal(item.getUnitPrice().multiply(BigDecimal.valueOf(quantity)));
+        orderItemRepository.save(item);
+
+        Order order = item.getOrder();
+        if (order != null && order.getItems() != null) {
+            BigDecimal recalculatedTotal = order.getItems().stream()
+                    .filter(i -> i.getStatus() != OrderItemStatus.CANCELLED)
+                    .map(i -> i.getSubtotal() != null ? i.getSubtotal() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            order.setTotalAmount(recalculatedTotal);
+            orderRepository.save(order);
+        }
+
+        Long tableId = order.getSession().getTable().getId();
+        return getTableActiveOrders(tableId);
+    }
+
+    // ===================================================================
+    // 13. QUẢN LÝ HỦY MÓN ĂN TẠI BÀN KÈM LÝ DO
+    // ===================================================================
+    @Override
+    @Transactional
+    public TableOrdersResponse cancelOrderItem(Long orderItemId, String reason) {
+        OrderItem item = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + orderItemId));
+
+        if (item.getStatus() == OrderItemStatus.CANCELLED) {
+            throw new AppException("Món ăn này đã được hủy trước đó!", HttpStatus.BAD_REQUEST);
+        }
+
+        item.setStatus(OrderItemStatus.CANCELLED);
+        String reasonStr = (reason != null && !reason.trim().isEmpty()) ? reason.trim() : "Quản lý hủy";
+        String existingNote = item.getNote() != null ? item.getNote() + " - " : "";
+        item.setNote(existingNote + "[HỦY BỞI QUẢN LÝ: " + reasonStr + "]");
+        orderItemRepository.save(item);
+
+        Order order = item.getOrder();
+        if (order != null && order.getItems() != null) {
+            BigDecimal recalculatedTotal = order.getItems().stream()
+                    .filter(i -> i.getStatus() != OrderItemStatus.CANCELLED)
+                    .map(i -> i.getSubtotal() != null ? i.getSubtotal() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            order.setTotalAmount(recalculatedTotal);
+
+            boolean allCancelled = order.getItems().stream().allMatch(i -> i.getStatus() == OrderItemStatus.CANCELLED);
+            if (allCancelled) {
+                order.setStatus(OrderStatus.CANCELLED);
+            }
+            orderRepository.save(order);
+        }
+
+        Long tableId = order.getSession().getTable().getId();
+        return getTableActiveOrders(tableId);
     }
 }

@@ -17,6 +17,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
 
 @RestController
 @RequestMapping("/api/admin/tables")
@@ -112,5 +114,34 @@ public class AdminTableController {
     public ResponseEntity<ApiResponse<Void>> resolveAllRequestsForTable(@PathVariable Long tableId) {
         tableService.resolveAllRequestsForTable(tableId);
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xử lý xong toàn bộ yêu cầu của bàn!"));
+    }
+
+    // 11. POST /api/admin/tables/{tableId}/add-items - Quản lý gọi thêm món trực tiếp vào bàn
+    @PostMapping("/{tableId}/add-items")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> addItemsToTable(
+            @PathVariable Long tableId,
+            @Valid @RequestBody WaiterAddOrderRequest request) {
+        TableOrdersResponse response = tableService.addItemsToTable(tableId, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã thêm món vào bàn thành công!"));
+    }
+
+    // 12. PATCH /api/admin/tables/items/{orderItemId}/quantity - Quản lý điều chỉnh số lượng món ăn
+    @PatchMapping("/items/{orderItemId}/quantity")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> updateOrderItemQuantity(
+            @PathVariable Long orderItemId,
+            @RequestBody Map<String, Integer> payload) {
+        Integer quantity = payload != null ? payload.get("quantity") : 1;
+        TableOrdersResponse response = tableService.updateOrderItemQuantity(orderItemId, quantity);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã cập nhật số lượng món thành công!"));
+    }
+
+    // 13. POST /api/admin/tables/items/{orderItemId}/cancel - Quản lý hủy món ăn tại bàn kèm lý do
+    @PostMapping("/items/{orderItemId}/cancel")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> cancelOrderItem(
+            @PathVariable Long orderItemId,
+            @RequestBody(required = false) Map<String, String> payload) {
+        String reason = payload != null ? payload.get("reason") : "Quản lý hủy";
+        TableOrdersResponse response = tableService.cancelOrderItem(orderItemId, reason);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã hủy món ăn tại bàn thành công!"));
     }
 }
