@@ -20,6 +20,7 @@ import com.romsteam.roms.repository.MenuItemRepository;
 import com.romsteam.roms.repository.ReservationRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
 import com.romsteam.roms.service.ReservationService;
+import com.romsteam.roms.service.RestaurantTableService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationRepository reservationRepository;
     private final RestaurantTableRepository tableRepository;
     private final MenuItemRepository menuItemRepository;
+    private final RestaurantTableService tableService;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -348,6 +350,34 @@ public class ReservationServiceImpl implements ReservationService {
 
         Reservation saved = reservationRepository.save(reservation);
         return mapToResponse(saved);
+    }
+
+    // ===================================================================
+    // 9. QUẢN LÝ XÁC NHẬN KHÁCH ĐẶT ĐÃ ĐẾN VÀ CHECK-IN (1-CLICK CHECK-IN)
+    // ===================================================================
+    @Override
+    @Transactional
+    public ReservationResponse checkInReservation(Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt bàn #" + reservationId));
+
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new AppException("Đơn đặt bàn này đã bị hủy, không thể check-in!");
+        }
+
+        if (reservation.getStatus() == ReservationStatus.COMPLETED) {
+            throw new AppException("Đơn đặt bàn này đã hoàn tất check-in trước đó!");
+        }
+
+        if (reservation.getTable() == null) {
+            throw new AppException("Đơn đặt bàn chưa được xếp bàn! Vui lòng xếp bàn trước khi check-in.");
+        }
+
+        RestaurantTable table = reservation.getTable();
+        tableService.checkInReservationForTable(table.getId(), reservation.getId());
+
+        Reservation refreshed = reservationRepository.findById(reservationId).orElse(reservation);
+        return mapToResponse(refreshed);
     }
 
     // ===================================================================

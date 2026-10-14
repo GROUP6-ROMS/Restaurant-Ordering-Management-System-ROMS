@@ -73,8 +73,38 @@ export default function TableManagementPage() {
     reservationTime: '19:30',
     reservationGuest: '',
     guestsCount: 4,
-    blockedReason: 'Bảo trì trang thiết bị'
+    blockedReason: 'Bảo trì trang thiết bị',
+    forceOverride: false
   });
+
+  // State Modal Check-in Đón Khách Đặt Bàn (Buffer Time Lock - Step 3)
+  const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [checkInModalTable, setCheckInModalTable] = useState(null);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+
+  // State Modal Cảnh Báo Mở Cưỡng Chế Khách Vãng Lai (Force Override - Step 3)
+  const [showForceModal, setShowForceModal] = useState(false);
+  const [forceModalTable, setForceModalTable] = useState(null);
+  const [forceLoading, setForceLoading] = useState(false);
+
+  // State Modal Chuyển Bàn (Table Transfer - Step 4)
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferSourceTable, setTransferSourceTable] = useState(null);
+  const [transferTargetTableId, setTransferTargetTableId] = useState('');
+  const [transferZoneFilter, setTransferZoneFilter] = useState('ALL');
+  const [transferReason, setTransferReason] = useState('Khách yêu cầu đổi vị trí bàn');
+  const [transferCustomReason, setTransferCustomReason] = useState('');
+  const [transferMarkDirty, setTransferMarkDirty] = useState(true);
+  const [transferLoading, setTransferLoading] = useState(false);
+
+  // State Modal Gộp Bàn (Table Merge - Step 4)
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeSourceTable, setMergeSourceTable] = useState(null);
+  const [mergeTargetTableId, setMergeTargetTableId] = useState('');
+  const [mergeReason, setMergeReason] = useState('Khách đi chung nhóm, muốn ngồi cùng và tính 1 hóa đơn');
+  const [mergeCustomReason, setMergeCustomReason] = useState('');
+  const [mergeMarkDirty, setMergeMarkDirty] = useState(true);
+  const [mergeLoading, setMergeLoading] = useState(false);
 
   // Form Thêm Bàn Mới (Đã bỏ thuộc tính shape)
   const [formData, setFormData] = useState({
@@ -796,7 +826,8 @@ export default function TableManagementPage() {
       reservationTime: table.reservedTime || (table.timeIn ? table.timeIn.replace('Đặt lúc ', '') : '20:00'),
       reservationGuest: table.reservationInfo || '',
       guestsCount: table.guests || table.capacity,
-      blockedReason: table.blockedReason || 'Bảo trì định kỳ / Ghép bàn'
+      blockedReason: table.blockedReason || 'Bảo trì định kỳ / Ghép bàn',
+      forceOverride: false
     });
   };
 
@@ -811,7 +842,8 @@ export default function TableManagementPage() {
         blockedReason: statusForm.status === 'BLOCKED' ? statusForm.blockedReason : null,
         reservationInfo: statusForm.status === 'RESERVED' ? statusForm.reservationGuest : null,
         reservedTime: statusForm.status === 'RESERVED' ? statusForm.reservationTime : null,
-        guestsCount: parseInt(statusForm.guestsCount) || statusModalTable.capacity
+        guestsCount: parseInt(statusForm.guestsCount) || statusModalTable.capacity,
+        forceOverride: Boolean(statusForm.forceOverride)
       };
 
       const res = await tableApi.updateStatus(statusModalTable.id, payload);
@@ -846,6 +878,171 @@ export default function TableManagementPage() {
       console.error('Lỗi chuyển trạng thái bàn:', error);
       const errMsg = error.response?.data?.message || 'Lỗi khi đổi trạng thái bàn!';
       showToast(errMsg);
+    }
+  };
+
+  // ===================================================================
+  // 4.0. XỬ LÝ KHÓA AN TOÀN & CHECK-IN ĐÓN KHÁCH ĐẶT BÀN (STEP 3: BUFFER LOCK)
+  // ===================================================================
+  const handleCheckInReservation = (table) => {
+    setCheckInModalTable(table);
+    setShowCheckInModal(true);
+  };
+
+  const handleConfirmCheckIn = async () => {
+    if (!checkInModalTable) return;
+    try {
+      setCheckInLoading(true);
+      const res = await tableApi.checkInReservation(
+        checkInModalTable.id,
+        checkInModalTable.bufferLockReservationId
+      );
+      if (res.data && res.data.success) {
+        showToast(`Đã đón khách đặt bàn vào bàn ${checkInModalTable.code}! Đã mở phiên ăn và nạp món đặt trước.`);
+        setShowCheckInModal(false);
+        setCheckInModalTable(null);
+        broadcastRealtimeEvent('RESERVATION_UPDATED', { tableId: checkInModalTable.id });
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi check-in nhận bàn:', error);
+      const errMsg = error.response?.data?.message || 'Có lỗi khi check-in nhận bàn!';
+      showToast(errMsg);
+    } finally {
+      setCheckInLoading(false);
+    }
+  };
+
+  const handlePromptForceOverride = (table) => {
+    setForceModalTable(table);
+    setShowForceModal(true);
+  };
+
+  const handleConfirmForceOverride = async () => {
+    if (!forceModalTable) return;
+    try {
+      setForceLoading(true);
+      const payload = {
+        status: 'OCCUPIED',
+        guestsCount: forceModalTable.capacity,
+        forceOverride: true
+      };
+      const res = await tableApi.updateStatus(forceModalTable.id, payload);
+      if (res.data && res.data.success) {
+        showToast(`Đã mở cưỡng chế bàn ${forceModalTable.code} cho khách vãng lai!`);
+        setShowForceModal(false);
+        setForceModalTable(null);
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi mở cưỡng chế bàn:', error);
+      const errMsg = error.response?.data?.message || 'Có lỗi khi mở cưỡng chế bàn!';
+      showToast(errMsg);
+    } finally {
+      setForceLoading(false);
+    }
+  };
+
+  // ===================================================================
+  // 4.0.1. QUẢN LÝ CHUYỂN BÀN (STEP 4: TABLE TRANSFER)
+  // ===================================================================
+  const handleOpenTransferModal = (table) => {
+    if (!table || table.status !== 'OCCUPIED') {
+      showToast('Chỉ có thể chuyển bàn đang có khách phục vụ (OCCUPIED)!');
+      return;
+    }
+    setTransferSourceTable(table);
+    setTransferTargetTableId('');
+    setTransferZoneFilter('ALL');
+    setTransferReason('Khách yêu cầu đổi vị trí bàn');
+    setTransferCustomReason('');
+    setTransferMarkDirty(true);
+    setShowTransferModal(true);
+  };
+
+  const handleConfirmTransfer = async () => {
+    if (!transferSourceTable || !transferTargetTableId) {
+      showToast('Vui lòng chọn bàn trống muốn chuyển đến!');
+      return;
+    }
+    const finalReason = transferReason === 'OTHER' ? (transferCustomReason.trim() || 'Khác') : transferReason;
+    try {
+      setTransferLoading(true);
+      const payload = {
+        sourceTableId: transferSourceTable.id,
+        targetTableId: Number(transferTargetTableId),
+        reason: finalReason,
+        markSourceDirty: transferMarkDirty
+      };
+      const res = await tableApi.transferTable(payload);
+      if (res.data && res.data.success) {
+        showToast(`Đã chuyển bàn ${transferSourceTable.code} sang ${res.data.data?.code || 'bàn mới'} thành công!`);
+        setShowTransferModal(false);
+        setTransferSourceTable(null);
+        broadcastRealtimeEvent('TABLE_TRANSFER', { sourceId: transferSourceTable.id, targetId: Number(transferTargetTableId) });
+        if (orderDrawerTable && orderDrawerTable.id === transferSourceTable.id) {
+          setOrderDrawerTable(res.data.data);
+          handleOpenOrderDrawer(res.data.data);
+        }
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi chuyển bàn:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi thực hiện chuyển bàn!';
+      showToast(errMsg);
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  // ===================================================================
+  // 4.0.2. QUẢN LÝ GỘP BÀN (STEP 4: TABLE MERGE)
+  // ===================================================================
+  const handleOpenMergeModal = (table) => {
+    if (!table || table.status !== 'OCCUPIED') {
+      showToast('Chỉ có thể gộp bàn đang có khách phục vụ (OCCUPIED)!');
+      return;
+    }
+    setMergeSourceTable(table);
+    setMergeTargetTableId('');
+    setMergeReason('Khách đi chung nhóm, muốn ngồi cùng và tính 1 hóa đơn');
+    setMergeCustomReason('');
+    setMergeMarkDirty(true);
+    setShowMergeModal(true);
+  };
+
+  const handleConfirmMerge = async () => {
+    if (!mergeSourceTable || !mergeTargetTableId) {
+      showToast('Vui lòng chọn bàn đích đang phục vụ để gộp vào!');
+      return;
+    }
+    const finalReason = mergeReason === 'OTHER' ? (mergeCustomReason.trim() || 'Khác') : mergeReason;
+    try {
+      setMergeLoading(true);
+      const payload = {
+        sourceTableId: mergeSourceTable.id,
+        targetTableId: Number(mergeTargetTableId),
+        reason: finalReason,
+        markSourceDirty: mergeMarkDirty
+      };
+      const res = await tableApi.mergeTables(payload);
+      if (res.data && res.data.success) {
+        showToast(`Đã gộp bàn ${mergeSourceTable.code} vào ${res.data.data?.code || 'bàn chính'} thành công!`);
+        setShowMergeModal(false);
+        setMergeSourceTable(null);
+        broadcastRealtimeEvent('TABLE_MERGE', { sourceId: mergeSourceTable.id, targetId: Number(mergeTargetTableId) });
+        if (orderDrawerTable && (orderDrawerTable.id === mergeSourceTable.id || orderDrawerTable.id === Number(mergeTargetTableId))) {
+          setOrderDrawerTable(res.data.data);
+          handleOpenOrderDrawer(res.data.data);
+        }
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Lỗi gộp bàn:', error);
+      const errMsg = error.response?.data?.message || 'Lỗi khi thực hiện gộp bàn!';
+      showToast(errMsg);
+    } finally {
+      setMergeLoading(false);
     }
   };
 
@@ -1745,6 +1942,7 @@ export default function TableManagementPage() {
             const hasAlert = (t.pendingServiceRequestCount && t.pendingServiceRequestCount > 0) || !!t.pendingServiceRequestId;
             const alertConfig = hasAlert ? getAlertDetails(t) : null;
             const isBillAlert = alertConfig?.isBill;
+            const isBufferLocked = Boolean(t.isBufferLocked);
 
             let cardBorder = t.status === 'BLOCKED' ? '1.5px dashed #D1D5DB' : '1px solid #F0E6E4';
             let cardBoxShadow = '0 2px 8px rgba(0,0,0,0.03)';
@@ -1760,6 +1958,9 @@ export default function TableManagementPage() {
                 cardBoxShadow = '0 0 16px rgba(245, 158, 11, 0.4)';
                 cardAnimation = 'romsPulseService 2s infinite ease-in-out';
               }
+            } else if (isBufferLocked) {
+              cardBorder = '2px solid #F59E0B';
+              cardBoxShadow = '0 0 14px rgba(245, 158, 11, 0.22)';
             }
 
             return (
@@ -1917,6 +2118,80 @@ export default function TableManagementPage() {
                       <Icon name="check" size={13} />
                       Đã xong
                     </button>
+                  </div>
+                )}
+
+                {/* Banner Khóa An Toàn Đón Khách Đặt Trước (Buffer Time Lock) */}
+                {isBufferLocked && (
+                  <div
+                    style={{
+                      background: '#FFFBEB',
+                      border: '1.5px solid #FCD34D',
+                      borderRadius: '12px',
+                      padding: '8px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: '#FEF3C7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#B45309',
+                        flexShrink: 0
+                      }}>
+                        <Icon name="lock_clock" size={18} />
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          fontSize: '0.76rem',
+                          fontWeight: 800,
+                          color: '#92400E',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span>Khóa Đón Khách [{t.bufferLockTargetTime || t.reservedTime || 'Hẹn trước'}]</span>
+                          {t.bufferLockPreOrderCount > 0 && (
+                            <span style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              padding: '1px 5px',
+                              borderRadius: '6px',
+                              background: '#D97706',
+                              color: '#FFFFFF'
+                            }}>
+                              {t.bufferLockPreOrderCount} món
+                            </span>
+                          )}
+                        </div>
+                        <div style={{
+                          fontSize: '0.72rem',
+                          color: '#78350F',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          marginTop: '1px'
+                        }}>
+                          {t.bufferLockCustomer || t.reservationInfo || 'Khách đặt trước'}
+                          {t.bufferLockMinutesRemaining !== null && t.bufferLockMinutesRemaining !== undefined && (
+                            <strong style={{ marginLeft: '4px', color: t.bufferLockMinutesRemaining < 0 ? '#DC2626' : '#B45309' }}>
+                              • {t.bufferLockMinutesRemaining > 0 
+                                  ? `Còn ${t.bufferLockMinutesRemaining} phút` 
+                                  : (t.bufferLockMinutesRemaining === 0 ? 'Đến giờ hẹn' : `Trễ ${Math.abs(t.bufferLockMinutesRemaining)}p`)}
+                            </strong>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2124,7 +2399,54 @@ export default function TableManagementPage() {
                       </button>
                     )}
 
-                    {t.status === 'AVAILABLE' && (
+                    {isBufferLocked && (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleCheckInReservation(t)}
+                          title="Khách đặt đã đến, bấm để nhận bàn và chuyển món đặt trước vào Bếp"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            background: '#059669',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
+                          }}
+                        >
+                          <Icon name="how_to_reg" size={14} /> Nhận Bàn Đặt
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePromptForceOverride(t)}
+                          title="Mở cưỡng chế cho khách vãng lai (Cảnh báo rủi ro trùng lịch)"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            border: '1px solid #FCD34D',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Icon name="warning" size={13} /> Cưỡng Chế
+                        </button>
+                      </div>
+                    )}
+
+                    {!isBufferLocked && t.status === 'AVAILABLE' && (
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
@@ -2147,10 +2469,10 @@ export default function TableManagementPage() {
                       </button>
                     )}
 
-                    {t.status === 'RESERVED' && (
+                    {!isBufferLocked && t.status === 'RESERVED' && (
                       <button
                         type="button"
-                        onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
+                        onClick={() => handleCheckInReservation(t)}
                         title="Khách đến, nhận bàn và bắt đầu phục vụ"
                         style={{
                           display: 'inline-flex',
@@ -2158,7 +2480,7 @@ export default function TableManagementPage() {
                           gap: '3px',
                           padding: '6px 10px',
                           borderRadius: '8px',
-                          background: '#9D4124',
+                          background: '#059669',
                           color: '#FFFFFF',
                           border: 'none',
                           fontSize: '0.75rem',
@@ -2171,28 +2493,74 @@ export default function TableManagementPage() {
                     )}
 
                     {t.status === 'OCCUPIED' && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenOrderDrawer(t)}
-                        title="Xem chi tiết các món và hóa đơn của bàn"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          background: '#9D4124',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          color: '#FFFFFF',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(157, 65, 36, 0.2)'
-                        }}
-                      >
-                        <Icon name="receipt_long" size={15} />
-                        Xem Đơn
-                      </button>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTransferModal(t)}
+                          title="Chuyển khách và các món sang bàn trống khác"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            background: '#EFF6FF',
+                            border: '1px solid #BFDBFE',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#1D4ED8',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Icon name="swap_horiz" size={14} />
+                          Chuyển
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenMergeModal(t)}
+                          title="Gộp khách và gộp chung hóa đơn sang bàn khác"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            background: '#FAF5FF',
+                            border: '1px solid #E9D5FF',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#7E22CE',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Icon name="call_merge" size={14} />
+                          Gộp
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOrderDrawer(t)}
+                          title="Xem chi tiết các món và hóa đơn của bàn"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            background: '#9D4124',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#FFFFFF',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(157, 65, 36, 0.2)'
+                          }}
+                        >
+                          <Icon name="receipt_long" size={15} />
+                          Xem Đơn
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2718,6 +3086,34 @@ export default function TableManagementPage() {
                   <Icon name="info" size={14} />
                   <span>Hệ thống sẽ tự động khởi tạo phiên phục vụ (Dining Session) đồng bộ cho Bồi bàn và POS.</span>
                 </div>
+
+                {statusModalTable.isBufferLocked && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: '#FFFBEB',
+                    border: '1.5px solid #FCD34D',
+                    color: '#92400E'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '0.8rem' }}>
+                      <Icon name="warning" size={16} style={{ color: '#D97706' }} />
+                      <span>Cảnh Báo: Bàn đang trong khung Khóa An Toàn Đặt Bàn!</span>
+                    </div>
+                    <p style={{ margin: '4px 0 8px', fontSize: '0.74rem', color: '#78350F', lineHeight: 1.4 }}>
+                      Bàn này đã được giữ chỗ cho khách <strong>{statusModalTable.bufferLockCustomer || statusModalTable.reservationInfo || 'Đặt trước'}</strong> vào lúc <strong>{statusModalTable.bufferLockTargetTime || statusModalTable.reservedTime}</strong>. Mở cho khách vãng lai có nguy cơ khiến khách đặt không có bàn khi đến!
+                    </p>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 800, color: '#B45309' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(statusForm.forceOverride)}
+                        onChange={(e) => setStatusForm(prev => ({ ...prev, forceOverride: e.target.checked }))}
+                        style={{ width: '16px', height: '16px', accentColor: '#D97706', cursor: 'pointer' }}
+                      />
+                      <span>Xác nhận Mở Cưỡng Chế (Force Override)</span>
+                    </label>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3151,6 +3547,68 @@ export default function TableManagementPage() {
                   style={{ background: '#F6ECEA', border: 'none', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#56423D' }}
                 >
                   <Icon name="close" size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Thanh thao tác nhanh Chuyển Bàn & Gộp Bàn trong Order Drawer */}
+            <div style={{
+              padding: '10px 24px',
+              background: '#FFF8F6',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px'
+            }}>
+              <span style={{ fontSize: '0.8rem', color: '#89726B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Icon name="tune" size={15} style={{ color: '#9D4124' }} /> Thao tác tại bàn:
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleOpenTransferModal(orderDrawerTable)}
+                  title="Chuyển khách và các món sang bàn trống khác"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    color: '#1D4ED8',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(29, 78, 216, 0.1)'
+                  }}
+                >
+                  <Icon name="swap_horiz" size={15} />
+                  Chuyển Bàn
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenMergeModal(orderDrawerTable)}
+                  title="Gộp khách và gộp chung hóa đơn sang bàn khác"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: '#FAF5FF',
+                    border: '1px solid #E9D5FF',
+                    color: '#7E22CE',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(126, 34, 206, 0.1)'
+                  }}
+                >
+                  <Icon name="call_merge" size={15} />
+                  Gộp Bàn
                 </button>
               </div>
             </div>
@@ -7032,6 +7490,1130 @@ export default function TableManagementPage() {
               >
                 <Icon name="print" size={18} />
                 In Ra Máy Nhiệt K80
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CHECK-IN ĐÓN KHÁCH ĐẶT BÀN (STEP 3: BUFFER LOCK CHECK-IN) */}
+      {showCheckInModal && checkInModalTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1050,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '520px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            position: 'relative'
+          }}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCheckInModal(false);
+                setCheckInModalTable(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: '#F6ECEA',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <Icon name="close" size={18} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: '#D1FAE5',
+                color: '#059669',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Icon name="how_to_reg" size={26} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
+                  Xác Nhận Đón Khách Đặt Bàn
+                </h3>
+                <span style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700 }}>
+                  Bàn {checkInModalTable.code} — {checkInModalTable.name} ({checkInModalTable.zoneName})
+                </span>
+              </div>
+            </div>
+
+            {/* Thông Tin Khách Đặt */}
+            <div style={{
+              background: '#F0FDF4',
+              border: '1.5px solid #BBF7D0',
+              borderRadius: '16px',
+              padding: '16px',
+              marginBottom: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>Khách hàng:</span>
+                <span style={{ fontSize: '0.9rem', color: '#14532D', fontWeight: 800 }}>
+                  {checkInModalTable.bufferLockCustomer || checkInModalTable.reservationInfo || 'Khách đặt trước'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>Giờ hẹn:</span>
+                <span style={{ fontSize: '0.9rem', color: '#047857', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Icon name="schedule" size={16} />
+                  {checkInModalTable.bufferLockTargetTime || checkInModalTable.reservedTime}
+                </span>
+              </div>
+
+              {checkInModalTable.bufferLockBookingCode && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>Mã phiếu đặt:</span>
+                  <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 700, background: '#DCFCE7', padding: '2px 8px', borderRadius: '6px' }}>
+                    {checkInModalTable.bufferLockBookingCode}
+                  </span>
+                </div>
+              )}
+
+              {checkInModalTable.bufferLockPreOrderCount > 0 && (
+                <div style={{
+                  background: '#FEF3C7',
+                  border: '1px solid #FCD34D',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '4px'
+                }}>
+                  <Icon name="restaurant_menu" size={18} style={{ color: '#D97706' }} />
+                  <span style={{ fontSize: '0.8rem', color: '#92400E', fontWeight: 700 }}>
+                    Đơn đặt có <strong>{checkInModalTable.bufferLockPreOrderCount} món ăn</strong> đặt trước. Hệ thống sẽ tự động nạp vào Bếp và mở phiên phục vụ!
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: '#FFF8F6',
+              borderRadius: '12px',
+              padding: '12px',
+              marginBottom: '20px',
+              fontSize: '0.78rem',
+              color: '#56423D',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px'
+            }}>
+              <Icon name="info" size={18} style={{ color: '#9D4124', flexShrink: 0, marginTop: '1px' }} />
+              <span>
+                Thao tác này sẽ chuyển phiếu đặt sang <strong>COMPLETED</strong>, chuyển bàn sang <strong>Đang Phục Vụ (OCCUPIED)</strong> và giải phóng khóa an toàn của bàn.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCheckInModal(false);
+                  setCheckInModalTable(null);
+                }}
+                disabled={checkInLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#56423D',
+                  cursor: checkInLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Hủy bỏ
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmCheckIn}
+                disabled={checkInLoading}
+                style={{
+                  flex: 2,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#059669',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  color: '#FFFFFF',
+                  cursor: checkInLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+                }}
+              >
+                {checkInLoading ? (
+                  <span>Đang tiếp nhận...</span>
+                ) : (
+                  <>
+                    <Icon name="check" size={18} />
+                    <span>Xác Nhận Đón Khách Vào Bàn</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CẢNH BÁO MỞ CƯỠNG CHẾ KHÁCH VÃNG LAI (STEP 3: FORCE OVERRIDE) */}
+      {showForceModal && forceModalTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1050,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '500px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            position: 'relative'
+          }}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForceModal(false);
+                setForceModalTable(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: '#F6ECEA',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <Icon name="close" size={18} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: '#FEF3C7',
+                color: '#D97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Icon name="warning" size={26} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#92400E', margin: 0 }}>
+                  Cảnh Báo: Mở Cưỡng Chế
+                </h3>
+                <span style={{ fontSize: '0.85rem', color: '#78350F', fontWeight: 600 }}>
+                  Bàn {forceModalTable.code} — {forceModalTable.name} ({forceModalTable.zoneName})
+                </span>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#FFFBEB',
+              border: '1.5px solid #FCD34D',
+              borderRadius: '16px',
+              padding: '16px',
+              marginBottom: '18px',
+              fontSize: '0.82rem',
+              color: '#78350F',
+              lineHeight: 1.5
+            }}>
+              <p style={{ margin: '0 0 10px', fontWeight: 700 }}>
+                Bàn này đang được <strong>Khóa An Toàn</strong> để giữ chỗ cho khách:
+              </p>
+              <div style={{ background: '#FFFFFF', padding: '10px 14px', borderRadius: '10px', border: '1px solid #FDE68A', marginBottom: '10px' }}>
+                <div>Khách: <strong>{forceModalTable.bufferLockCustomer || forceModalTable.reservationInfo || 'Khách đặt trước'}</strong></div>
+                <div>Giờ hẹn: <strong>{forceModalTable.bufferLockTargetTime || forceModalTable.reservedTime}</strong> {forceModalTable.bufferLockMinutesRemaining !== null && `(còn ${forceModalTable.bufferLockMinutesRemaining} phút)`}</div>
+              </div>
+              <p style={{ margin: 0, color: '#B45309', fontWeight: 600 }}>
+                ⚠️ Nếu bạn cho khách vãng lai (walk-in) vào ngồi ăn, rất có thể khi khách đặt bàn đến thì bàn vẫn chưa ăn xong, dẫn đến tình trạng thiếu bàn và khiếu nại!
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForceModal(false);
+                  setForceModalTable(null);
+                }}
+                disabled={forceLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#56423D',
+                  cursor: forceLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Hủy bỏ (Giữ bàn)
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmForceOverride}
+                disabled={forceLoading}
+                style={{
+                  flex: 2,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#D97706',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  color: '#FFFFFF',
+                  cursor: forceLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(217, 119, 6, 0.3)'
+                }}
+              >
+                {forceLoading ? (
+                  <span>Đang xử lý...</span>
+                ) : (
+                  <>
+                    <Icon name="bolt" size={18} />
+                    <span>Tôi hiểu rủi ro — Mở Cho Khách</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL: CHUYỂN BÀN (TABLE TRANSFER - STEP 4)                   */}
+      {/* ============================================================= */}
+      {showTransferModal && transferSourceTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10050,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '680px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Header Modal */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#F8FAFC'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: '#EFF6FF',
+                  color: '#1D4ED8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1.5px solid #BFDBFE'
+                }}>
+                  <Icon name="swap_horiz" size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1E293B', fontFamily: "'Epilogue', sans-serif" }}>
+                    Chuyển Bàn Phục Vụ
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748B' }}>
+                    Chuyển toàn bộ phiên ăn & các món đang gọi từ <strong>{transferSourceTable.code}</strong> sang bàn trống mới
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setShowTransferModal(false); setTransferSourceTable(null); }}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: '#F1F5F9',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748B'
+                }}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+              {/* Card Bàn Nguồn Hiện Tại */}
+              <div style={{
+                background: '#FFF8F6',
+                border: '1.5px solid #F6D6CE',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#9D4124', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Bàn Nguồn Cần Chuyển
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                    <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>{transferSourceTable.code}</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1F1B1A' }}>{transferSourceTable.name}</span>
+                    <span style={{ fontSize: '0.78rem', color: '#89726B', background: '#FFFFFF', padding: '2px 8px', borderRadius: '6px', border: '1px solid #F0E6E4' }}>
+                      {transferSourceTable.zoneName}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                    Khách: <strong style={{ color: '#1F1B1A' }}>{transferSourceTable.guests || transferSourceTable.capacity} người</strong>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#9D4124', marginTop: '2px' }}>
+                    {transferSourceTable.currentBill ? Number(transferSourceTable.currentBill).toLocaleString('vi-VN') + '₫' : '0₫'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bộ Lọc Khu Vực Cho Bàn Đích */}
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon name="table_restaurant" size={16} style={{ color: '#1D4ED8' }} />
+                    Chọn Bàn Đích (Chỉ bàn Trống AVAILABLE)
+                  </label>
+                  <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                    {tables.filter(t => t.id !== transferSourceTable.id && t.status === 'AVAILABLE' && (transferZoneFilter === 'ALL' || t.zone === transferZoneFilter)).length} bàn khả dụng
+                  </span>
+                </div>
+
+                {/* Zone pills */}
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTransferZoneFilter('ALL')}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      border: transferZoneFilter === 'ALL' ? '1.5px solid #1D4ED8' : '1px solid #E2E8F0',
+                      background: transferZoneFilter === 'ALL' ? '#EFF6FF' : '#FFFFFF',
+                      color: transferZoneFilter === 'ALL' ? '#1D4ED8' : '#64748B',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Tất cả khu vực
+                  </button>
+                  {zonesList.map(z => (
+                    <button
+                      key={z.id || z.zoneCode}
+                      type="button"
+                      onClick={() => setTransferZoneFilter(z.zoneCode)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        border: transferZoneFilter === z.zoneCode ? '1.5px solid #1D4ED8' : '1px solid #E2E8F0',
+                        background: transferZoneFilter === z.zoneCode ? '#EFF6FF' : '#FFFFFF',
+                        color: transferZoneFilter === z.zoneCode ? '#1D4ED8' : '#64748B',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {z.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Danh Sách Bàn Đích Để Chọn */}
+              <div style={{
+                maxHeight: '220px',
+                overflowY: 'auto',
+                border: '1.5px solid #E2E8F0',
+                borderRadius: '16px',
+                padding: '12px',
+                background: '#F8FAFC',
+                marginBottom: '18px'
+              }}>
+                {(() => {
+                  const availableList = tables.filter(t =>
+                    t.id !== transferSourceTable.id &&
+                    t.status === 'AVAILABLE' &&
+                    !t.isBufferLocked &&
+                    (transferZoneFilter === 'ALL' || t.zone === transferZoneFilter)
+                  );
+
+                  if (availableList.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '30px 10px', color: '#64748B' }}>
+                        <Icon name="block" size={32} style={{ color: '#94A3B8', marginBottom: '6px' }} />
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Không có bàn trống khả dụng</div>
+                        <div style={{ fontSize: '0.75rem', marginTop: '2px' }}>
+                          Vui lòng chọn khu vực khác hoặc giải phóng bớt bàn cần dọn dẹp.
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+                      {availableList.map(tbl => {
+                        const isSelected = String(transferTargetTableId) === String(tbl.id);
+                        const isSmaller = (transferSourceTable.guests || 1) > tbl.capacity;
+
+                        return (
+                          <div
+                            key={tbl.id}
+                            onClick={() => setTransferTargetTableId(String(tbl.id))}
+                            style={{
+                              background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                              border: isSelected ? '2px solid #1D4ED8' : '1px solid #E2E8F0',
+                              borderRadius: '12px',
+                              padding: '10px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              boxShadow: isSelected ? '0 4px 12px rgba(29, 78, 216, 0.15)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: '1rem', fontWeight: 900, color: isSelected ? '#1D4ED8' : '#1E293B' }}>
+                                {tbl.code}
+                              </span>
+                              <div style={{
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                border: isSelected ? '5px solid #1D4ED8' : '1.5px solid #CBD5E1',
+                                background: '#FFFFFF'
+                              }} />
+                            </div>
+
+                            <div style={{ marginTop: '4px' }}>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>
+                                {tbl.name}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                                <Icon name="group" size={12} />
+                                <span>{tbl.capacity} chỗ</span>
+                              </div>
+                              {isSmaller && (
+                                <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#DC2626', marginTop: '2px' }}>
+                                  ⚠️ Nhỏ hơn {transferSourceTable.guests}K
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Lý Do Chuyển Bàn */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'block', marginBottom: '6px' }}>
+                  Lý do chuyển bàn
+                </label>
+                <select
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.85rem',
+                    color: '#1E293B',
+                    background: '#FFFFFF',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="Khách yêu cầu đổi vị trí bàn">Khách yêu cầu đổi vị trí bàn</option>
+                  <option value="Máy lạnh / Quạt nhỏ giọt hoặc quá lạnh">Máy lạnh / Quạt nhỏ giọt hoặc quá lạnh</option>
+                  <option value="Muốn đổi sang bàn view đẹp / ngoài trời">Muốn đổi sang bàn view đẹp / ngoài trời</option>
+                  <option value="Bàn rung lắc / hỏng thiết bị">Bàn rung lắc / hỏng thiết bị</option>
+                  <option value="Gia đình có trẻ nhỏ cần bàn rộng hơn">Gia đình có trẻ nhỏ cần bàn rộng hơn</option>
+                  <option value="OTHER">Lý do khác...</option>
+                </select>
+
+                {transferReason === 'OTHER' && (
+                  <input
+                    type="text"
+                    value={transferCustomReason}
+                    onChange={(e) => setTransferCustomReason(e.target.value)}
+                    placeholder="Nhập lý do cụ thể..."
+                    style={{
+                      width: '100%',
+                      marginTop: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '0.85rem',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Tùy Chọn Đánh Dấu Bàn Cũ Cần Dọn Dẹp */}
+              <div style={{
+                background: '#F1F5F9',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px'
+              }}>
+                <input
+                  type="checkbox"
+                  id="transferMarkDirty"
+                  checked={transferMarkDirty}
+                  onChange={(e) => setTransferMarkDirty(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: '#1D4ED8', marginTop: '2px', cursor: 'pointer' }}
+                />
+                <label htmlFor="transferMarkDirty" style={{ fontSize: '0.82rem', color: '#334155', cursor: 'pointer', lineHeight: 1.4 }}>
+                  <strong>Đánh dấu bàn cũ ({transferSourceTable.code}) thành "Cần Dọn Dẹp" (DIRTY)</strong>
+                  <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>
+                    Nhân viên chạy bàn sẽ nhận được thông báo đến lau dọn, chuẩn bị bàn trước khi đón lượt khách tiếp theo.
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              background: '#F8FAFC'
+            }}>
+              <button
+                type="button"
+                onClick={() => { setShowTransferModal(false); setTransferSourceTable(null); }}
+                disabled={transferLoading}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  color: '#64748B',
+                  cursor: transferLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Hủy bỏ
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmTransfer}
+                disabled={!transferTargetTableId || transferLoading}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: !transferTargetTableId || transferLoading ? '#94A3B8' : '#1D4ED8',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  cursor: !transferTargetTableId || transferLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: !transferTargetTableId || transferLoading ? 'none' : '0 4px 12px rgba(29, 78, 216, 0.3)'
+                }}
+              >
+                {transferLoading ? (
+                  <span>Đang chuyển bàn...</span>
+                ) : (
+                  <>
+                    <Icon name="swap_horiz" size={18} />
+                    <span>Xác Nhận Chuyển Bàn</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL: GỘP BÀN (TABLE MERGE - STEP 4)                         */}
+      {/* ============================================================= */}
+      {showMergeModal && mergeSourceTable && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10050,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '680px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Header Modal */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #F0E6E4',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#FAF5FF'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: '#F3E8FF',
+                  color: '#7E22CE',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1.5px solid #D8B4FE'
+                }}>
+                  <Icon name="call_merge" size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#581C87', fontFamily: "'Epilogue', sans-serif" }}>
+                    Gộp Bàn Phục Vụ
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#7E22CE' }}>
+                    Gộp khách & hóa đơn từ <strong>{mergeSourceTable.code}</strong> vào một bàn đang phục vụ khác
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setShowMergeModal(false); setMergeSourceTable(null); }}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: '#F5F3FF',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#7E22CE'
+                }}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+              {/* Card Bàn Nguồn */}
+              <div style={{
+                background: '#FFF8F6',
+                border: '1.5px solid #F6D6CE',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#9D4124', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Bàn Cần Gộp (Bàn Nguồn - Sẽ Đóng Phiên)
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                    <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>{mergeSourceTable.code}</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1F1B1A' }}>{mergeSourceTable.name}</span>
+                    <span style={{ fontSize: '0.78rem', color: '#89726B', background: '#FFFFFF', padding: '2px 8px', borderRadius: '6px', border: '1px solid #F0E6E4' }}>
+                      {mergeSourceTable.zoneName}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                    Khách: <strong style={{ color: '#1F1B1A' }}>{mergeSourceTable.guests || mergeSourceTable.capacity} người</strong>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#9D4124', marginTop: '2px' }}>
+                    {mergeSourceTable.currentBill ? Number(mergeSourceTable.currentBill).toLocaleString('vi-VN') + '₫' : '0₫'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Danh sách Bàn Đang Phục Vụ Khác (Target Table) */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <Icon name="restaurant" size={16} style={{ color: '#7E22CE' }} />
+                  Chọn Bàn Đích Để Gộp Vào (Đang Phục Vụ OCCUPIED)
+                </label>
+
+                {(() => {
+                  const occupiedOthers = tables.filter(t => t.id !== mergeSourceTable.id && t.status === 'OCCUPIED');
+
+                  if (occupiedOthers.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '30px 10px', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', color: '#64748B' }}>
+                        <Icon name="info" size={32} style={{ color: '#94A3B8', marginBottom: '6px' }} />
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Không có bàn phục vụ nào khác</div>
+                        <div style={{ fontSize: '0.75rem', marginTop: '2px' }}>
+                          Hiện tại chỉ có bàn {mergeSourceTable.code} đang mở phục vụ trong nhà hàng.
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      border: '1.5px solid #E9D5FF',
+                      borderRadius: '16px',
+                      padding: '10px',
+                      background: '#FAF5FF',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      {occupiedOthers.map(tbl => {
+                        const isSelected = String(mergeTargetTableId) === String(tbl.id);
+                        return (
+                          <div
+                            key={tbl.id}
+                            onClick={() => setMergeTargetTableId(String(tbl.id))}
+                            style={{
+                              background: isSelected ? '#FFFFFF' : '#FAF5FF',
+                              border: isSelected ? '2px solid #7E22CE' : '1px solid #E9D5FF',
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              boxShadow: isSelected ? '0 4px 12px rgba(126, 34, 206, 0.12)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '50%',
+                                border: isSelected ? '6px solid #7E22CE' : '2px solid #D8B4FE',
+                                background: '#FFFFFF',
+                                flexShrink: 0
+                              }} />
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#581C87' }}>{tbl.code}</span>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A' }}>{tbl.name}</span>
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>
+                                  {tbl.zoneName} • Sức chứa {tbl.capacity} chỗ
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '0.78rem', color: '#4B5563' }}>
+                                Khách: <strong>{tbl.guests || tbl.capacity} người</strong>
+                              </div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#7E22CE', marginTop: '1px' }}>
+                                {tbl.currentBill ? Number(tbl.currentBill).toLocaleString('vi-VN') + '₫' : '0₫'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Realtime Preview Bàn Sau Khi Gộp */}
+              {mergeTargetTableId && (() => {
+                const targetTbl = tables.find(t => String(t.id) === String(mergeTargetTableId));
+                if (!targetTbl) return null;
+
+                const sourceGuests = mergeSourceTable.guests || mergeSourceTable.capacity || 0;
+                const targetGuests = targetTbl.guests || targetTbl.capacity || 0;
+                const totalGuests = sourceGuests + targetGuests;
+
+                const sourceBill = Number(mergeSourceTable.currentBill || 0);
+                const targetBill = Number(targetTbl.currentBill || 0);
+                const totalBill = sourceBill + targetBill;
+
+                return (
+                  <div style={{
+                    background: '#F0FDF4',
+                    border: '1.5px solid #86EFAC',
+                    borderRadius: '16px',
+                    padding: '14px 18px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 800, color: '#15803D', marginBottom: '8px' }}>
+                      <Icon name="preview" size={16} />
+                      DỰ BÁO KẾT QUẢ SAU KHI GỘP VÀO BÀN {targetTbl.code}:
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.8rem' }}>
+                      <div style={{ background: '#FFFFFF', padding: '10px 12px', borderRadius: '10px', border: '1px solid #DCFCE7' }}>
+                        <span style={{ color: '#4B5563', display: 'block', fontSize: '0.72rem' }}>Tổng số khách sau gộp:</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#15803D' }}>{totalGuests} khách</strong>
+                        <span style={{ fontSize: '0.7rem', color: '#6B7280', display: 'block' }}>
+                          ({sourceGuests} + {targetGuests} khách)
+                        </span>
+                      </div>
+
+                      <div style={{ background: '#FFFFFF', padding: '10px 12px', borderRadius: '10px', border: '1px solid #DCFCE7' }}>
+                        <span style={{ color: '#4B5563', display: 'block', fontSize: '0.72rem' }}>Tổng tiền hóa đơn sau gộp:</span>
+                        <strong style={{ fontSize: '1.05rem', color: '#15803D' }}>{totalBill.toLocaleString('vi-VN')}₫</strong>
+                        <span style={{ fontSize: '0.7rem', color: '#6B7280', display: 'block' }}>
+                          ({sourceBill.toLocaleString('vi-VN')}₫ + {targetBill.toLocaleString('vi-VN')}₫)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#166534', marginTop: '8px', lineHeight: 1.4 }}>
+                      ✓ Toàn bộ món ăn của bàn {mergeSourceTable.code} sẽ chuyển sang hóa đơn bàn {targetTbl.code}.
+                      <br />
+                      ✓ Phiên ăn bàn {mergeSourceTable.code} sẽ tự động đóng lại (COMPLETED).
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Lý Do Gộp Bàn */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'block', marginBottom: '6px' }}>
+                  Lý do gộp bàn
+                </label>
+                <select
+                  value={mergeReason}
+                  onChange={(e) => setMergeReason(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '0.85rem',
+                    color: '#1E293B',
+                    background: '#FFFFFF',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="Khách đi chung nhóm, muốn ngồi cùng và tính 1 hóa đơn">Khách đi chung nhóm, muốn ngồi cùng và tính 1 hóa đơn</option>
+                  <option value="Khách quen / bạn bè gặp nhau muốn gộp bàn">Khách quen / bạn bè gặp nhau muốn gộp bàn</option>
+                  <option value="Gộp tiệc / liên hoan công ty">Gộp tiệc / liên hoan công ty</option>
+                  <option value="Khách chuyển chỗ ngồi sang ngồi chung người thân">Khách chuyển chỗ ngồi sang ngồi chung người thân</option>
+                  <option value="OTHER">Lý do khác...</option>
+                </select>
+
+                {mergeReason === 'OTHER' && (
+                  <input
+                    type="text"
+                    value={mergeCustomReason}
+                    onChange={(e) => setMergeCustomReason(e.target.value)}
+                    placeholder="Nhập lý do gộp bàn cụ thể..."
+                    style={{
+                      width: '100%',
+                      marginTop: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '0.85rem',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Tùy Chọn Đánh Dấu Bàn Nguồn Cần Dọn Dẹp */}
+              <div style={{
+                background: '#F1F5F9',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px'
+              }}>
+                <input
+                  type="checkbox"
+                  id="mergeMarkDirty"
+                  checked={mergeMarkDirty}
+                  onChange={(e) => setMergeMarkDirty(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: '#7E22CE', marginTop: '2px', cursor: 'pointer' }}
+                />
+                <label htmlFor="mergeMarkDirty" style={{ fontSize: '0.82rem', color: '#334155', cursor: 'pointer', lineHeight: 1.4 }}>
+                  <strong>Đánh dấu bàn cũ ({mergeSourceTable.code}) thành "Cần Dọn Dẹp" (DIRTY)</strong>
+                  <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>
+                    Nhân viên chạy bàn sẽ đến dọn ly chén, khăn ăn và lau bàn để sẵn sàng đón lượt khách mới.
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #F0E6E4',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              background: '#FAF5FF'
+            }}>
+              <button
+                type="button"
+                onClick={() => { setShowMergeModal(false); setMergeSourceTable(null); }}
+                disabled={mergeLoading}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  color: '#64748B',
+                  cursor: mergeLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Hủy bỏ
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmMerge}
+                disabled={!mergeTargetTableId || mergeLoading}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: !mergeTargetTableId || mergeLoading ? '#94A3B8' : '#7E22CE',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  cursor: !mergeTargetTableId || mergeLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: !mergeTargetTableId || mergeLoading ? 'none' : '0 4px 12px rgba(126, 34, 206, 0.3)'
+                }}
+              >
+                {mergeLoading ? (
+                  <span>Đang gộp bàn...</span>
+                ) : (
+                  <>
+                    <Icon name="call_merge" size={18} />
+                    <span>Xác Nhận Gộp Bàn</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

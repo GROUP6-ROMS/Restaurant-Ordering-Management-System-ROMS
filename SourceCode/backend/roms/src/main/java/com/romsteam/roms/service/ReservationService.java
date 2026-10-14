@@ -37,4 +37,7 @@ public interface ReservationService {
 
     // 8. Quản lý kiểm tra và chỉnh sửa (thêm, sửa số lượng, xóa) các món đặt trước cho bàn
     ReservationResponse updateReservationItems(Long reservationId, UpdateReservationItemsRequest request);
+
+    // 9. Quản lý xác nhận khách đặt đã đến và check-in (1-Click Check-in)
+    ReservationResponse checkInReservation(Long reservationId);
 }

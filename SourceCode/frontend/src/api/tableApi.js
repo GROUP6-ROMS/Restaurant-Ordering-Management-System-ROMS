@@ -72,4 +72,22 @@ export const tableApi = {
     cancelOrderItem: (orderItemId, reason) => {
         return axiosClient.post(`/admin/tables/items/${orderItemId}/cancel`, { reason });
     },
+
+    // Quản lý check-in đón khách đặt bàn trực tiếp từ sơ đồ bàn (1-Click Check-in)
+    checkInReservation: (tableId, reservationId) => {
+        const url = reservationId 
+            ? `/admin/tables/${tableId}/check-in-reservation?reservationId=${reservationId}`
+            : `/admin/tables/${tableId}/check-in-reservation`;
+        return axiosClient.post(url);
+    },
+
+    // Quản lý chuyển bàn (Table Transfer)
+    transferTable: (data) => {
+        return axiosClient.post('/admin/tables/transfer', data);
+    },
+
+    // Quản lý gộp bàn (Table Merge)
+    mergeTables: (data) => {
+        return axiosClient.post('/admin/tables/merge', data);
+    },
 };

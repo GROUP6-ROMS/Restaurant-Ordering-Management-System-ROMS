@@ -44,6 +44,12 @@ export const reservationApi = {
   updateReservationItems: async (reservationId, data) => {
     const res = await axiosClient.put(`/admin/reservations/${reservationId}/items`, data);
     return res.data;
+  },
+
+  // 8. Quản lý check-in đón khách đặt bàn vào ngồi ăn (1-Click Check-in)
+  checkIn: async (reservationId) => {
+    const res = await axiosClient.post(`/admin/reservations/${reservationId}/check-in`);
+    return res.data;
   }
 };
 

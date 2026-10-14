@@ -41,4 +41,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     // Đếm số lượng đơn đặt bàn theo trạng thái
     long countByStatus(ReservationStatus status);
+
+    // Tìm kiếm đơn đặt bàn đã gán cho bàn ăn theo trạng thái (sắp xếp theo giờ hẹn tăng dần)
+    List<Reservation> findByTableIdAndStatusOrderByReservationTimeAsc(Long tableId, ReservationStatus status);
 }

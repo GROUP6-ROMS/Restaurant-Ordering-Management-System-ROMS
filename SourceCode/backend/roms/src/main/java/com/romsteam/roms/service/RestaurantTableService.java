@@ -1,6 +1,8 @@
 package com.romsteam.roms.service;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.MergeTableRequest;
+import com.romsteam.roms.dto.request.TransferTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
 import com.romsteam.roms.dto.response.TableOrdersResponse;
@@ -54,4 +56,13 @@ public interface RestaurantTableService {
 
     // 13. Quản lý hủy món ăn tại bàn kèm lý do
     TableOrdersResponse cancelOrderItem(Long orderItemId, String reason);
+
+    // 14. Quản lý check-in đón khách đặt bàn trực tiếp từ sơ đồ bàn (1-Click Check-in)
+    TableResponse checkInReservationForTable(Long tableId, Long reservationId);
+
+    // 15. Quản lý chuyển bàn (Table Transfer)
+    TableResponse transferTable(TransferTableRequest request);
+
+    // 16. Quản lý gộp bàn (Table Merge)
+    TableResponse mergeTables(MergeTableRequest request);
 }

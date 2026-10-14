@@ -1,6 +1,8 @@
 package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.MergeTableRequest;
+import com.romsteam.roms.dto.request.TransferTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
@@ -143,5 +145,28 @@ public class AdminTableController {
         String reason = payload != null ? payload.get("reason") : "Quản lý hủy";
         TableOrdersResponse response = tableService.cancelOrderItem(orderItemId, reason);
         return ResponseEntity.ok(ApiResponse.success(response, "Đã hủy món ăn tại bàn thành công!"));
+    }
+
+    // 14. POST /api/admin/tables/{tableId}/check-in-reservation - Quản lý check-in đón khách đặt bàn
+    @PostMapping("/{tableId}/check-in-reservation")
+    public ResponseEntity<ApiResponse<TableResponse>> checkInReservation(
+            @PathVariable Long tableId,
+            @RequestParam(required = false) Long reservationId) {
+        TableResponse response = tableService.checkInReservationForTable(tableId, reservationId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Check-in đón khách đặt bàn thành công! Đã mở phiên ăn và nạp món đặt trước vào hệ thống."));
+    }
+
+    // 15. POST /api/admin/tables/transfer - Quản lý chuyển bàn
+    @PostMapping("/transfer")
+    public ResponseEntity<ApiResponse<TableResponse>> transferTable(@Valid @RequestBody TransferTableRequest request) {
+        TableResponse response = tableService.transferTable(request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Chuyển bàn thành công!"));
+    }
+
+    // 16. POST /api/admin/tables/merge - Quản lý gộp bàn
+    @PostMapping("/merge")
+    public ResponseEntity<ApiResponse<TableResponse>> mergeTables(@Valid @RequestBody MergeTableRequest request) {
+        TableResponse response = tableService.mergeTables(request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Gộp bàn thành công!"));
     }
 }

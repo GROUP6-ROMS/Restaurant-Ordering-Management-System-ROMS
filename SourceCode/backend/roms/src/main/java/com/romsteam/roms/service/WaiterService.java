@@ -1,5 +1,6 @@
 package com.romsteam.roms.service;
 
+import com.romsteam.roms.dto.request.MergeTableRequest;
 import com.romsteam.roms.dto.request.OpenTableRequest;
 import com.romsteam.roms.dto.request.TransferTableRequest;
 import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
@@ -20,6 +21,9 @@ public interface WaiterService {
 
     // 4. Chuyển bàn (Move Table)
     void transferTable(TransferTableRequest request);
+
+    // 4.1. Gộp bàn (Merge Table)
+    void mergeTables(MergeTableRequest request);
 
     // 5. Xác nhận bưng toàn bộ món READY lên bàn (chuyển sang SERVED)
     WaiterTableResponse confirmDeliverFood(Long tableId);

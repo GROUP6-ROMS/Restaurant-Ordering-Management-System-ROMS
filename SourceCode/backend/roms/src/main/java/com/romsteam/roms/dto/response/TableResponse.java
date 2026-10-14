@@ -34,6 +34,18 @@ public class TableResponse {
     private String reservedTime;
     private String blockedReason;
 
+    // ===================================================================
+    // Khóa An Toàn Cho Bàn Đặt Trước (Buffer Time Lock)
+    // ===================================================================
+    private Boolean isBufferLocked;                  // true nếu bàn đang trong khung thời gian khóa an toàn
+    private Long bufferLockMinutesRemaining;         // Số phút còn lại đến giờ khách hẹn (âm nếu đã quá giờ)
+    private String bufferLockTargetTime;             // "19:30 (14/10)"
+    private String bufferLockCustomer;               // "Anh Hoàng (0909123456) - 4 khách"
+    private Long bufferLockReservationId;            // ID đơn đặt bàn
+    private String bufferLockBookingCode;            // Mã đặt bàn (RES-20261014-...)
+    private Integer bufferLockPreOrderCount;         // Số lượng món ăn khách đã đặt trước
+    private Integer bufferLockGuestCount;            // Số lượng khách đặt
+
     // Thông tin chuông gọi phục vụ / yêu cầu thanh toán PENDING (nếu có)
     private Long pendingServiceRequestId;
     private String pendingServiceRequestType;        // "CALL_WAITER", "BILL", "REQUEST_ICE", etc.

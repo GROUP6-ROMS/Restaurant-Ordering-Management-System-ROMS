@@ -25,4 +25,7 @@ public class UpdateTableStatusRequest {
 
     // Số lượng khách thực tế khi chuyển sang OCCUPIED
     private Integer guestsCount;
+
+    // Cho phép mở bàn cưỡng chế cho khách vãng lai dù đang trong khung Buffer Lock của bàn đặt trước
+    private Boolean forceOverride;
 }

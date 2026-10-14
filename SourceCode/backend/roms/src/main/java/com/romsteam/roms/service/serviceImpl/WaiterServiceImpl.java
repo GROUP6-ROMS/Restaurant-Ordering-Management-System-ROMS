@@ -1,6 +1,7 @@
 package com.romsteam.roms.service.serviceImpl;
 
 import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
+import com.romsteam.roms.dto.request.MergeTableRequest;
 import com.romsteam.roms.dto.request.OpenTableRequest;
 import com.romsteam.roms.dto.request.TransferTableRequest;
 import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
@@ -155,6 +156,84 @@ public class WaiterServiceImpl implements WaiterService {
         tableRepository.save(sourceTable);
 
         // Bàn mới chuyển thành OCCUPIED
+        targetTable.setStatus(TableStatus.OCCUPIED);
+        tableRepository.save(targetTable);
+    }
+
+    @Override
+    @Transactional
+    public void mergeTables(MergeTableRequest request) {
+        if (request.getSourceTableId().equals(request.getTargetTableId())) {
+            throw new AppException("Không thể gộp một bàn vào chính nó!", HttpStatus.BAD_REQUEST);
+        }
+
+        RestaurantTable sourceTable = tableRepository.findById(request.getSourceTableId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn nguồn không tồn tại: " + request.getSourceTableId()));
+        RestaurantTable targetTable = tableRepository.findById(request.getTargetTableId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn đích không tồn tại: " + request.getTargetTableId()));
+
+        if (sourceTable.getStatus() != TableStatus.OCCUPIED) {
+            throw new AppException("Bàn nguồn (" + sourceTable.getTableNumber() + ") không có khách đang ngồi!", HttpStatus.BAD_REQUEST);
+        }
+        if (targetTable.getStatus() != TableStatus.OCCUPIED) {
+            throw new AppException("Bàn đích (" + targetTable.getTableNumber() + ") không có khách đang ngồi!", HttpStatus.BAD_REQUEST);
+        }
+
+        DiningSession sourceSession = sessionRepository.findByTableIdAndStatus(sourceTable.getId(), SessionStatus.ACTIVE)
+                .orElseThrow(() -> new AppException("Bàn nguồn không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST));
+        DiningSession targetSession = sessionRepository.findByTableIdAndStatus(targetTable.getId(), SessionStatus.ACTIVE)
+                .orElseThrow(() -> new AppException("Bàn đích không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST));
+
+        String mergeTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        String reasonStr = (request.getReason() != null && !request.getReason().trim().isEmpty())
+                ? " (Lý do: " + request.getReason().trim() + ")" : "";
+
+        // 1. Chuyển các Order từ source sang target
+        List<Order> sourceOrders = orderRepository.findBySessionId(sourceSession.getId());
+        if (sourceOrders != null && !sourceOrders.isEmpty()) {
+            for (Order order : sourceOrders) {
+                order.setSession(targetSession);
+                String existingNote = order.getNote() != null ? order.getNote() : "";
+                String mergeTag = "[Gộp từ " + sourceTable.getTableNumber() + "]";
+                order.setNote(existingNote.isEmpty() ? mergeTag : existingNote + " " + mergeTag);
+                orderRepository.save(order);
+            }
+        }
+
+        // 2. Gộp số lượng khách
+        int sourceGuests = sourceSession.getGuestCount() != null ? sourceSession.getGuestCount() : 0;
+        int targetGuests = targetSession.getGuestCount() != null ? targetSession.getGuestCount() : 0;
+        targetSession.setGuestCount(targetGuests + sourceGuests);
+
+        // 3. Ghi chú targetSession
+        String mergeNote = String.format("[GỘP TỪ %s lúc %s%s]", sourceTable.getTableNumber(), mergeTime, reasonStr);
+        String targetNote = targetSession.getNote() != null ? targetSession.getNote() : "";
+        targetSession.setNote(targetNote.isEmpty() ? mergeNote : targetNote + " | " + mergeNote);
+        sessionRepository.save(targetSession);
+
+        // 4. Kết thúc sourceSession
+        String sourceCloseNote = String.format("[ĐÃ GỘP VÀO BÀN %s lúc %s]", targetTable.getTableNumber(), mergeTime);
+        String sNote = sourceSession.getNote() != null ? sourceSession.getNote() : "";
+        sourceSession.setNote(sNote.isEmpty() ? sourceCloseNote : sNote + " | " + sourceCloseNote);
+        sourceSession.setStatus(SessionStatus.COMPLETED);
+        sourceSession.setEndTime(LocalDateTime.now());
+        sessionRepository.save(sourceSession);
+
+        // 5. Chuyển ServiceRequest
+        List<ServiceRequest> pendingRequests = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(sourceTable.getId(), "PENDING");
+        if (pendingRequests != null) {
+            for (ServiceRequest req : pendingRequests) {
+                req.setTable(targetTable);
+                req.setNote((req.getNote() != null ? req.getNote() + " " : "") + "[Gộp từ " + sourceTable.getTableNumber() + "]");
+                requestRepository.save(req);
+            }
+        }
+
+        // 6. Cập nhật trạng thái bàn
+        boolean markDirty = request.getMarkSourceDirty() == null || request.getMarkSourceDirty();
+        sourceTable.setStatus(markDirty ? TableStatus.DIRTY : TableStatus.AVAILABLE);
+        tableRepository.save(sourceTable);
+
         targetTable.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(targetTable);
     }

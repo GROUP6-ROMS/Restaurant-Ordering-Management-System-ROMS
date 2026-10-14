@@ -1,6 +1,7 @@
 package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
+import com.romsteam.roms.dto.request.MergeTableRequest;
 import com.romsteam.roms.dto.request.OpenTableRequest;
 import com.romsteam.roms.dto.request.TransferTableRequest;
 import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
@@ -74,6 +75,13 @@ public class WaiterController {
     public ResponseEntity<ApiResponse<Void>> transferTable(@Valid @RequestBody TransferTableRequest request) {
         waiterService.transferTable(request);
         return ResponseEntity.ok(ApiResponse.success(null, "Chuyển bàn thành công!"));
+    }
+
+    // 4.1. POST /api/waiter/tables/merge - Gộp bàn
+    @PostMapping("/tables/merge")
+    public ResponseEntity<ApiResponse<Void>> mergeTables(@Valid @RequestBody MergeTableRequest request) {
+        waiterService.mergeTables(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Gộp bàn thành công!"));
     }
 
     // 5. POST /api/waiter/tables/{id}/deliver - Xác nhận đã bưng toàn bộ món READY (READY -> SERVED)

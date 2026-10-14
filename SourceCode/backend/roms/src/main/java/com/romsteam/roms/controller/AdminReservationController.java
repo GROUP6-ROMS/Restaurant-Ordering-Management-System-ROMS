@@ -97,4 +97,14 @@ public class AdminReservationController {
         ReservationResponse updated = reservationService.updateReservationItems(id, request);
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật danh sách món đặt trước thành công!"));
     }
+
+    /**
+     * 7. Quản lý check-in đón khách đặt bàn vào ngồi ăn (chuyển sang COMPLETED, mở DiningSession, nạp món đặt trước)
+     * POST /api/admin/reservations/{id}/check-in
+     */
+    @PostMapping("/{id}/check-in")
+    public ResponseEntity<ApiResponse<ReservationResponse>> checkInReservation(@PathVariable Long id) {
+        ReservationResponse res = reservationService.checkInReservation(id);
+        return ResponseEntity.ok(ApiResponse.success(res, "Check-in đón khách đặt bàn thành công! Đã mở phiên ăn và nạp món đặt trước vào hệ thống."));
+    }
 }

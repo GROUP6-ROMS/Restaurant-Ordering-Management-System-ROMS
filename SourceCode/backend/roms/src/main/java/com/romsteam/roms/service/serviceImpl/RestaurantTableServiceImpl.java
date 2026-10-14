@@ -1,6 +1,8 @@
 package com.romsteam.roms.service.serviceImpl;
 
 import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.MergeTableRequest;
+import com.romsteam.roms.dto.request.TransferTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableRequest;
 import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
 import com.romsteam.roms.dto.response.TableOrdersResponse;
@@ -16,11 +18,17 @@ import com.romsteam.roms.entity.enums.SessionStatus;
 import com.romsteam.roms.entity.enums.TableStatus;
 import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.exception.ResourceNotFoundException;
-import java.time.LocalDateTime;
+import com.romsteam.roms.entity.MenuItem;
+import com.romsteam.roms.entity.Reservation;
+import com.romsteam.roms.entity.ReservationItem;
 import com.romsteam.roms.entity.Zone;
 import com.romsteam.roms.entity.ServiceRequest;
+import com.romsteam.roms.entity.enums.ReservationStatus;
+import java.time.LocalDateTime;
 import com.romsteam.roms.repository.DiningSessionRepository;
 import com.romsteam.roms.repository.OrderRepository;
+import com.romsteam.roms.repository.OrderItemRepository;
+import com.romsteam.roms.repository.ReservationRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
 import com.romsteam.roms.repository.ServiceRequestRepository;
 import com.romsteam.roms.repository.ZoneRepository;
@@ -49,6 +57,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
     private final com.romsteam.roms.repository.MenuItemRepository menuItemRepository;
     private final ZoneRepository zoneRepository;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final ReservationRepository reservationRepository;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendBaseUrl;
@@ -228,6 +237,30 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
         // 2. Nếu chuyển sang OCCUPIED (Đang phục vụ)
         if (targetStatus == TableStatus.OCCUPIED) {
+            // Kiểm tra Khóa An Toàn Đón Khách Đặt Trước (Buffer Time Lock)
+            if (request.getForceOverride() == null || !request.getForceOverride()) {
+                LocalDateTime now = LocalDateTime.now();
+                List<Reservation> confirmedList = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(id, ReservationStatus.CONFIRMED);
+                if (confirmedList != null && !confirmedList.isEmpty()) {
+                    for (Reservation r : confirmedList) {
+                        if (r.getReservationTime() == null) continue;
+                        LocalDateTime startLock = r.getReservationTime().minusMinutes(60);
+                        LocalDateTime endLock = r.getReservationTime().plusMinutes(45);
+                        if (now.isAfter(startLock) && now.isBefore(endLock)) {
+                            long diff = java.time.Duration.between(now, r.getReservationTime()).toMinutes();
+                            String timeStr = r.getReservationTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+                            String prompt = diff > 0 ? ("còn " + diff + " phút nữa") : ("đã đến giờ hẹn");
+                            throw new AppException(
+                                    "BÀN ĐANG ĐƯỢC KHÓA AN TOÀN! Bàn này đang giữ chỗ cho khách đặt: " +
+                                    r.getCustomerName() + " (" + r.getCustomerPhone() + " - " + r.getGuestCount() + " khách) lúc " +
+                                    timeStr + " (" + prompt + "). Không thể xếp khách vãng lai trừ khi Quản lý chọn 'Mở cưỡng chế'!",
+                                    HttpStatus.BAD_REQUEST
+                            );
+                        }
+                    }
+                }
+            }
+
             if (activeSessionOpt.isEmpty()) {
                 String sessionToken = "sess-" + table.getTableNumber().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
                 DiningSession newSession = new DiningSession();
@@ -237,7 +270,8 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 int guests = (request.getGuestsCount() != null && request.getGuestsCount() > 0) ? request.getGuestsCount() : table.getCapacity();
                 newSession.setGuestCount(guests);
                 newSession.setStartTime(LocalDateTime.now());
-                newSession.setNote("Quản lý mở bàn trực tiếp");
+                boolean isForce = Boolean.TRUE.equals(request.getForceOverride());
+                newSession.setNote(isForce ? "Quản lý mở cưỡng chế bỏ qua khóa an toàn đặt bàn" : "Quản lý mở bàn trực tiếp");
                 diningSessionRepository.save(newSession);
             }
             table.setBlockedReason(null);
@@ -401,6 +435,51 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             }
         }
 
+        // Kiểm tra Khóa An Toàn Đón Khách Đặt Trước (Buffer Time Lock)
+        Boolean isBufferLocked = false;
+        Long bufferLockMinutesRemaining = null;
+        String bufferLockTargetTime = null;
+        String bufferLockCustomer = null;
+        Long bufferLockReservationId = null;
+        String bufferLockBookingCode = null;
+        Integer bufferLockPreOrderCount = 0;
+        Integer bufferLockGuestCount = null;
+
+        List<Reservation> confirmedReservations = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(table.getId(), ReservationStatus.CONFIRMED);
+        if (confirmedReservations != null && !confirmedReservations.isEmpty()) {
+            LocalDateTime nowTime = LocalDateTime.now();
+            for (Reservation r : confirmedReservations) {
+                if (r.getReservationTime() == null) continue;
+                LocalDateTime startLock = r.getReservationTime().minusMinutes(60);
+                LocalDateTime endLock = r.getReservationTime().plusMinutes(45);
+
+                boolean inBufferWindow = nowTime.isAfter(startLock) && nowTime.isBefore(endLock);
+                boolean isReservedState = (table.getStatus() == TableStatus.RESERVED);
+
+                if (inBufferWindow || isReservedState) {
+                    isBufferLocked = true;
+                    bufferLockReservationId = r.getId();
+                    bufferLockBookingCode = r.getBookingCode();
+                    bufferLockMinutesRemaining = java.time.Duration.between(nowTime, r.getReservationTime()).toMinutes();
+                    bufferLockTargetTime = r.getReservationTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+                    bufferLockCustomer = r.getCustomerName() + " (" + r.getCustomerPhone() + ")";
+                    bufferLockGuestCount = r.getGuestCount();
+                    if (r.getItems() != null) {
+                        bufferLockPreOrderCount = r.getItems().stream()
+                                .mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0)
+                                .sum();
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (!isBufferLocked && table.getStatus() == TableStatus.RESERVED) {
+            isBufferLocked = true;
+            bufferLockTargetTime = table.getReservedTime();
+            bufferLockCustomer = table.getReservationInfo();
+        }
+
         // Tạo link gọi món thực tế dẫn tới màn hình chào bàn của khách
         String baseUrl = (frontendBaseUrl != null && !frontendBaseUrl.trim().isEmpty())
                 ? frontendBaseUrl.trim()
@@ -428,6 +507,14 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .reservationInfo(table.getReservationInfo())
                 .reservedTime(table.getReservedTime())
                 .blockedReason(table.getBlockedReason())
+                .isBufferLocked(isBufferLocked)
+                .bufferLockMinutesRemaining(bufferLockMinutesRemaining)
+                .bufferLockTargetTime(bufferLockTargetTime)
+                .bufferLockCustomer(bufferLockCustomer)
+                .bufferLockReservationId(bufferLockReservationId)
+                .bufferLockBookingCode(bufferLockBookingCode)
+                .bufferLockPreOrderCount(bufferLockPreOrderCount)
+                .bufferLockGuestCount(bufferLockGuestCount)
                 .pendingServiceRequestId(pendingServiceRequestId)
                 .pendingServiceRequestType(pendingServiceRequestType)
                 .pendingServiceRequestNote(pendingServiceRequestNote)
@@ -717,5 +804,268 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
         Long tableId = order.getSession().getTable().getId();
         return getTableActiveOrders(tableId);
+    }
+
+    // ===================================================================
+    // 14. QUẢN LÝ CHECK-IN ĐÓN KHÁCH ĐẶT BÀN TRỰC TIẾP TỪ SƠ ĐỒ BÀN (1-CLICK CHECK-IN)
+    // ===================================================================
+    @Override
+    @Transactional
+    public TableResponse checkInReservationForTable(Long tableId, Long reservationId) {
+        RestaurantTable table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại với ID: " + tableId));
+
+        Reservation reservation;
+        if (reservationId != null) {
+            reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Đơn đặt bàn không tồn tại với ID: " + reservationId));
+        } else {
+            List<Reservation> confirmed = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(tableId, ReservationStatus.CONFIRMED);
+            if (confirmed.isEmpty()) {
+                throw new AppException("Không tìm thấy đơn đặt bàn đã xác nhận nào cho bàn này!", HttpStatus.BAD_REQUEST);
+            }
+            reservation = confirmed.get(0);
+        }
+
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new AppException("Đơn đặt bàn này đã bị hủy, không thể nhận bàn!", HttpStatus.BAD_REQUEST);
+        }
+
+        if (reservation.getStatus() == ReservationStatus.COMPLETED) {
+            throw new AppException("Đơn đặt bàn này đã hoàn tất check-in trước đó!", HttpStatus.BAD_REQUEST);
+        }
+
+        // 1. Khởi tạo phiên ăn mới (DiningSession)
+        Optional<DiningSession> activeSessionOpt = diningSessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
+        DiningSession session;
+        if (activeSessionOpt.isPresent()) {
+            session = activeSessionOpt.get();
+        } else {
+            String sessionToken = "sess-" + table.getTableNumber().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
+            session = new DiningSession();
+            session.setTable(table);
+            session.setSessionToken(sessionToken);
+            session.setStatus(SessionStatus.ACTIVE);
+            session.setGuestCount(reservation.getGuestCount() != null ? reservation.getGuestCount() : table.getCapacity());
+            session.setStartTime(LocalDateTime.now());
+            session.setNote("Khách đặt trước: " + reservation.getCustomerName() + " (" + reservation.getBookingCode() + ")");
+            session = diningSessionRepository.save(session);
+        }
+
+        // 2. Tự động nạp các món đặt trước (Pre-order items) vào Order mới nếu có
+        if (reservation.getItems() != null && !reservation.getItems().isEmpty()) {
+            Order newOrder = new Order();
+            newOrder.setSession(session);
+            String dateStr = java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String orderCode = "ORD-PRE-" + dateStr + "-" + (1000 + new Random().nextInt(9000));
+            newOrder.setOrderCode(orderCode);
+            newOrder.setOrderTime(LocalDateTime.now());
+            newOrder.setNote("Món đặt trước - Đơn #" + reservation.getBookingCode());
+
+            List<OrderItem> orderItems = new ArrayList<>();
+            BigDecimal totalAmount = BigDecimal.ZERO;
+            boolean hasCookingItems = false;
+
+            for (ReservationItem resItem : reservation.getItems()) {
+                if (resItem.getQuantity() == null || resItem.getQuantity() <= 0) continue;
+                MenuItem menuItem = resItem.getMenuItem();
+                if (menuItem == null) continue;
+
+                OrderItem orderItem = new OrderItem();
+                orderItem.setOrder(newOrder);
+                orderItem.setMenuItem(menuItem);
+                orderItem.setQuantity(resItem.getQuantity());
+                orderItem.setUnitPrice(resItem.getUnitPrice() != null ? resItem.getUnitPrice() : menuItem.getPrice());
+                BigDecimal subtotal = orderItem.getUnitPrice().multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+                orderItem.setSubtotal(subtotal);
+                orderItem.setNote(resItem.getNote() != null ? resItem.getNote() : "Món đặt trước");
+
+                boolean isDrink = false;
+                if (menuItem.getCategory() != null && menuItem.getCategory().getName() != null) {
+                    String catLower = menuItem.getCategory().getName().toLowerCase();
+                    if (catLower.contains("uống") || catLower.contains("drink") || catLower.contains("nước")) {
+                        isDrink = true;
+                    }
+                }
+
+                if (isDrink) {
+                    orderItem.setStatus(OrderItemStatus.READY);
+                } else {
+                    orderItem.setStatus(OrderItemStatus.PENDING);
+                    hasCookingItems = true;
+                }
+
+                orderItems.add(orderItem);
+                totalAmount = totalAmount.add(subtotal);
+            }
+
+            if (!orderItems.isEmpty()) {
+                newOrder.setStatus(hasCookingItems ? OrderStatus.CONFIRMED : OrderStatus.READY);
+                newOrder.setTotalAmount(totalAmount);
+                newOrder.setItems(orderItems);
+                orderRepository.save(newOrder);
+            }
+        }
+
+        // 3. Cập nhật trạng thái phiếu đặt bàn sang COMPLETED
+        reservation.setStatus(ReservationStatus.COMPLETED);
+        reservationRepository.save(reservation);
+
+        // 4. Cập nhật trạng thái bàn sang OCCUPIED và xóa thông tin giữ chỗ
+        table.setStatus(TableStatus.OCCUPIED);
+        table.setReservationInfo(null);
+        table.setReservedTime(null);
+        table.setBlockedReason(null);
+        RestaurantTable updatedTable = tableRepository.save(table);
+
+        return mapToTableResponse(updatedTable);
+    }
+
+    // ===================================================================
+    // 15. CHUYỂN BÀN (TABLE TRANSFER)
+    // ===================================================================
+    @Override
+    @Transactional
+    public TableResponse transferTable(TransferTableRequest request) {
+        if (request.getSourceTableId().equals(request.getTargetTableId())) {
+            throw new AppException("Không thể chuyển bàn sang chính nó!", HttpStatus.BAD_REQUEST);
+        }
+
+        RestaurantTable sourceTable = tableRepository.findById(request.getSourceTableId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn nguồn không tồn tại với ID: " + request.getSourceTableId()));
+        RestaurantTable targetTable = tableRepository.findById(request.getTargetTableId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn đích không tồn tại với ID: " + request.getTargetTableId()));
+
+        if (targetTable.getStatus() != TableStatus.AVAILABLE) {
+            throw new AppException("Bàn đích (" + targetTable.getTableNumber() + ") phải ở trạng thái Trống (AVAILABLE) mới có thể chuyển đến!", HttpStatus.BAD_REQUEST);
+        }
+
+        // Kiểm tra buffer lock của bàn đích (nếu có khách đặt trước trong vòng 60 phút)
+        List<Reservation> targetReservations = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(targetTable.getId(), ReservationStatus.CONFIRMED);
+        if (targetReservations != null && !targetReservations.isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            for (Reservation res : targetReservations) {
+                if (res.getReservationTime() != null && res.getReservationTime().isAfter(now.minusMinutes(15)) && res.getReservationTime().isBefore(now.plusMinutes(60))) {
+                    throw new AppException("Bàn đích đang trong khung giờ khóa an toàn cho đơn đặt bàn #" + res.getBookingCode() + " lúc " + res.getReservationTime().format(DateTimeFormatter.ofPattern("HH:mm")) + "!", HttpStatus.BAD_REQUEST);
+                }
+            }
+        }
+
+        DiningSession session = diningSessionRepository.findByTableIdAndStatus(sourceTable.getId(), SessionStatus.ACTIVE)
+                .orElseThrow(() -> new AppException("Bàn nguồn hiện không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST));
+
+        // Cập nhật session sang bàn mới và lưu lịch sử note
+        String transferTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        String reasonStr = (request.getReason() != null && !request.getReason().trim().isEmpty())
+                ? " (Lý do: " + request.getReason().trim() + ")" : "";
+        String transferNote = String.format("[CHUYỂN TỪ %s SANG %s lúc %s%s]",
+                sourceTable.getTableNumber(), targetTable.getTableNumber(), transferTime, reasonStr);
+        String currentNote = session.getNote() != null ? session.getNote() : "";
+        session.setNote(currentNote.isEmpty() ? transferNote : currentNote + " | " + transferNote);
+        session.setTable(targetTable);
+        diningSessionRepository.save(session);
+
+        // Chuyển toàn bộ chuông gọi phục vụ / yêu cầu tính tiền PENDING sang bàn đích
+        List<ServiceRequest> pendingRequests = serviceRequestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(sourceTable.getId(), "PENDING");
+        if (pendingRequests != null) {
+            for (ServiceRequest req : pendingRequests) {
+                req.setTable(targetTable);
+                serviceRequestRepository.save(req);
+            }
+        }
+
+        // Cập nhật trạng thái hai bàn
+        boolean markDirty = request.getMarkSourceDirty() == null || request.getMarkSourceDirty();
+        sourceTable.setStatus(markDirty ? TableStatus.DIRTY : TableStatus.AVAILABLE);
+        tableRepository.save(sourceTable);
+
+        targetTable.setStatus(TableStatus.OCCUPIED);
+        RestaurantTable updatedTargetTable = tableRepository.save(targetTable);
+
+        return mapToTableResponse(updatedTargetTable);
+    }
+
+    // ===================================================================
+    // 16. GỘP BÀN (TABLE MERGE)
+    // ===================================================================
+    @Override
+    @Transactional
+    public TableResponse mergeTables(MergeTableRequest request) {
+        if (request.getSourceTableId().equals(request.getTargetTableId())) {
+            throw new AppException("Không thể gộp một bàn vào chính nó!", HttpStatus.BAD_REQUEST);
+        }
+
+        RestaurantTable sourceTable = tableRepository.findById(request.getSourceTableId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn nguồn không tồn tại với ID: " + request.getSourceTableId()));
+        RestaurantTable targetTable = tableRepository.findById(request.getTargetTableId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bàn đích không tồn tại với ID: " + request.getTargetTableId()));
+
+        if (sourceTable.getStatus() != TableStatus.OCCUPIED) {
+            throw new AppException("Bàn nguồn (" + sourceTable.getTableNumber() + ") không có khách đang ngồi (OCCUPIED)!", HttpStatus.BAD_REQUEST);
+        }
+        if (targetTable.getStatus() != TableStatus.OCCUPIED) {
+            throw new AppException("Bàn đích (" + targetTable.getTableNumber() + ") không có khách đang ngồi (OCCUPIED)!", HttpStatus.BAD_REQUEST);
+        }
+
+        DiningSession sourceSession = diningSessionRepository.findByTableIdAndStatus(sourceTable.getId(), SessionStatus.ACTIVE)
+                .orElseThrow(() -> new AppException("Bàn nguồn không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST));
+        DiningSession targetSession = diningSessionRepository.findByTableIdAndStatus(targetTable.getId(), SessionStatus.ACTIVE)
+                .orElseThrow(() -> new AppException("Bàn đích không có phiên ăn đang hoạt động!", HttpStatus.BAD_REQUEST));
+
+        String mergeTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        String reasonStr = (request.getReason() != null && !request.getReason().trim().isEmpty())
+                ? " (Lý do: " + request.getReason().trim() + ")" : "";
+
+        // 1. Chuyển toàn bộ Order từ sourceSession sang targetSession
+        List<Order> sourceOrders = orderRepository.findBySessionId(sourceSession.getId());
+        if (sourceOrders != null && !sourceOrders.isEmpty()) {
+            for (Order order : sourceOrders) {
+                order.setSession(targetSession);
+                String existingNote = order.getNote() != null ? order.getNote() : "";
+                String mergeTag = "[Gộp từ " + sourceTable.getTableNumber() + "]";
+                order.setNote(existingNote.isEmpty() ? mergeTag : existingNote + " " + mergeTag);
+                orderRepository.save(order);
+            }
+        }
+
+        // 2. Gộp số lượng khách vào targetSession
+        int sourceGuests = sourceSession.getGuestCount() != null ? sourceSession.getGuestCount() : 0;
+        int targetGuests = targetSession.getGuestCount() != null ? targetSession.getGuestCount() : 0;
+        targetSession.setGuestCount(targetGuests + sourceGuests);
+
+        // 3. Gắn ghi chú gộp bàn vào targetSession
+        String mergeNote = String.format("[GỘP TỪ %s lúc %s%s]", sourceTable.getTableNumber(), mergeTime, reasonStr);
+        String targetNote = targetSession.getNote() != null ? targetSession.getNote() : "";
+        targetSession.setNote(targetNote.isEmpty() ? mergeNote : targetNote + " | " + mergeNote);
+        diningSessionRepository.save(targetSession);
+
+        // 4. Đóng sourceSession với trạng thái COMPLETED và ghi chú
+        String sourceCloseNote = String.format("[ĐÃ GỘP VÀO BÀN %s lúc %s]", targetTable.getTableNumber(), mergeTime);
+        String sNote = sourceSession.getNote() != null ? sourceSession.getNote() : "";
+        sourceSession.setNote(sNote.isEmpty() ? sourceCloseNote : sNote + " | " + sourceCloseNote);
+        sourceSession.setStatus(SessionStatus.COMPLETED);
+        sourceSession.setEndTime(LocalDateTime.now());
+        diningSessionRepository.save(sourceSession);
+
+        // 5. Chuyển các ServiceRequest PENDING từ sourceTable sang targetTable
+        List<ServiceRequest> pendingRequests = serviceRequestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(sourceTable.getId(), "PENDING");
+        if (pendingRequests != null) {
+            for (ServiceRequest req : pendingRequests) {
+                req.setTable(targetTable);
+                req.setNote((req.getNote() != null ? req.getNote() + " " : "") + "[Gộp từ " + sourceTable.getTableNumber() + "]");
+                serviceRequestRepository.save(req);
+            }
+        }
+
+        // 6. Cập nhật trạng thái bàn nguồn
+        boolean markDirty = request.getMarkSourceDirty() == null || request.getMarkSourceDirty();
+        sourceTable.setStatus(markDirty ? TableStatus.DIRTY : TableStatus.AVAILABLE);
+        tableRepository.save(sourceTable);
+
+        // 7. Bàn đích vẫn OCCUPIED
+        targetTable.setStatus(TableStatus.OCCUPIED);
+        RestaurantTable updatedTargetTable = tableRepository.save(targetTable);
+
+        return mapToTableResponse(updatedTargetTable);
     }
 }
