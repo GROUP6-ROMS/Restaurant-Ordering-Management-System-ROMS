@@ -39,6 +39,7 @@ export default function TableManagementPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQrTable, setSelectedQrTable] = useState(null);
+  const [cardMenuTableId, setCardMenuTableId] = useState(null); // Menu 3 chấm tác vụ bàn
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   // State ngăn kéo (Drawer) xem nhanh Order tại bàn
@@ -635,6 +636,21 @@ export default function TableManagementPage() {
       window.removeEventListener('ROMS_OPEN_RESERVATION_MODAL', handleCustomOpenReservation);
     };
   }, []);
+
+  // Tự động đóng Menu 3 chấm tác vụ bàn khi click ra ngoài
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.roms-card-menu-container')) {
+        setCardMenuTableId(null);
+      }
+    };
+    if (cardMenuTableId) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [cardMenuTableId]);
 
   // Lắng nghe sự kiện đồng bộ thời gian thực từ chuông gọi phục vụ, xin thanh toán và đơn món
   useEffect(() => {
@@ -1998,22 +2014,197 @@ export default function TableManagementPage() {
                       </h4>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        background: statusBadge.bg,
-                        color: statusBadge.color,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <Icon name={statusBadge.icon} size={13} style={{ color: statusBadge.color }} />
-                        {statusBadge.label}
-                      </span>
-                      {getTableDwellBadge(t)}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          background: statusBadge.bg,
+                          color: statusBadge.color,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <Icon name={statusBadge.icon} size={13} style={{ color: statusBadge.color }} />
+                          {statusBadge.label}
+                        </span>
+                        {getTableDwellBadge(t)}
+                      </div>
+
+                      {/* Nút 3 chấm Kebab Menu (Tác vụ Quản Trị / Bàn) */}
+                      <div className="roms-card-menu-container" style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCardMenuTableId(cardMenuTableId === t.id ? null : t.id);
+                          }}
+                          title="Tùy chọn quản trị bàn"
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '8px',
+                            border: '1px solid #EAE0DE',
+                            background: cardMenuTableId === t.id ? '#FDF0EC' : '#FAFAFA',
+                            color: cardMenuTableId === t.id ? '#9D4124' : '#6B7280',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <Icon name="more_vert" size={17} />
+                        </button>
+
+                        {/* Floating Dropdown Menu */}
+                        {cardMenuTableId === t.id && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '34px',
+                              right: 0,
+                              zIndex: 60,
+                              width: '195px',
+                              background: '#FFFFFF',
+                              borderRadius: '12px',
+                              boxShadow: '0 10px 25px rgba(0,0,0,0.14), 0 3px 8px rgba(0,0,0,0.06)',
+                              border: '1px solid #F0E6E4',
+                              padding: '6px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px'
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCardMenuTableId(null);
+                                setSelectedQrTable(t);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                padding: '8px 10px',
+                                border: 'none',
+                                background: 'transparent',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                color: '#1F1B1A',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#FFF8F6')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <Icon name="qr_code_2" size={16} style={{ color: '#9D4124' }} />
+                              Tải / In Mã QR
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCardMenuTableId(null);
+                                handleOpenStatusModal(t);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                padding: '8px 10px',
+                                border: 'none',
+                                background: 'transparent',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                color: '#1F1B1A',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#FFF8F6')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <Icon name="tune" size={16} style={{ color: '#9D4124' }} />
+                              Cài Đặt Trạng Thái
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCardMenuTableId(null);
+                                handleOpenEditModal(t);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                padding: '8px 10px',
+                                border: 'none',
+                                background: 'transparent',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                color: '#56423D',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#FFF8F6')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <Icon name="edit" size={16} style={{ color: '#56423D' }} />
+                              Sửa Thông Tin Bàn
+                            </button>
+
+                            <div style={{ height: '1px', background: '#F0E6E4', margin: '4px 0' }} />
+
+                            <button
+                              type="button"
+                              disabled={t.status === 'OCCUPIED'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCardMenuTableId(null);
+                                handleOpenDeleteModal(t);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                padding: '8px 10px',
+                                border: 'none',
+                                background: 'transparent',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                color: t.status === 'OCCUPIED' ? '#9CA3AF' : '#DC2626',
+                                cursor: t.status === 'OCCUPIED' ? 'not-allowed' : 'pointer',
+                                textAlign: 'left'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (t.status !== 'OCCUPIED') e.currentTarget.style.background = '#FEF2F2';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                              title={t.status === 'OCCUPIED' ? 'Không thể xóa bàn đang có khách phục vụ' : 'Xóa bàn khỏi hệ thống'}
+                            >
+                              <Icon name="delete" size={16} style={{ color: t.status === 'OCCUPIED' ? '#9CA3AF' : '#DC2626' }} />
+                              Xóa Bàn Ăn
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -2260,309 +2451,195 @@ export default function TableManagementPage() {
                   )}
                 </div>
 
-                {/* Actions Footer */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderTop: '1px solid #F6ECEA', paddingTop: '12px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: '4px' }}>
+                {/* Actions Footer - 1 Nút Hành Động Trọng Tâm Theo Trạng Thái (FSM Primary Call-To-Action) */}
+                <div style={{ borderTop: '1px solid #F6ECEA', paddingTop: '10px' }}>
+                  {t.status === 'BLOCKED' && (
                     <button
                       type="button"
-                      onClick={() => setSelectedQrTable(t)}
+                      onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
+                      title="Mở khóa bàn để sẵn sàng đón khách"
                       style={{
+                        width: '100%',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '3px',
-                        padding: '6px 8px',
-                        borderRadius: '8px',
-                        background: '#FDF7F5',
-                        border: '1px solid #EAE0DE',
-                        fontSize: '0.75rem',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        background: '#374151',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
-                        color: '#9D4124',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(55, 65, 81, 0.15)',
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      <Icon name="qr_code_2" size={15} />
-                      QR
+                      <Icon name="lock_open" size={15} /> Mở Khóa Bàn
                     </button>
+                  )}
 
+                  {t.status === 'DIRTY' && (
                     <button
                       type="button"
-                      onClick={() => handleOpenStatusModal(t)}
-                      title="Cài đặt trạng thái bàn, khóa bàn hoặc thời gian đặt"
+                      onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
+                      title="Xác nhận bàn đã dọn dẹp sạch sẽ, sẵn sàng đón khách mới"
                       style={{
+                        width: '100%',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '3px',
-                        padding: '6px 8px',
-                        borderRadius: '8px',
-                        background: '#FFFFFF',
-                        border: '1px solid #9D4124',
-                        fontSize: '0.75rem',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        background: '#059669',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
-                        color: '#9D4124',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(5, 150, 105, 0.2)',
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      <Icon name="tune" size={15} />
-                      Đổi TT
+                      <Icon name="cleaning_services" size={15} /> Xác Nhận Đã Dọn Xong
                     </button>
+                  )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditModal(t)}
-                      title="Chỉnh sửa thông tin bàn (Mã số, Tên bàn, Khu vực, Sức chứa)"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        padding: '6px 8px',
-                        borderRadius: '8px',
-                        background: '#FFF8F6',
-                        border: '1px solid #EAE0DE',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: '#56423D',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Icon name="edit" size={15} />
-                      Sửa
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDeleteModal(t)}
-                      title={t.status === 'OCCUPIED' ? 'Không thể xóa bàn đang có khách phục vụ' : 'Xóa bàn ăn khỏi sơ đồ'}
-                      disabled={t.status === 'OCCUPIED'}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        padding: '6px 8px',
-                        borderRadius: '8px',
-                        background: t.status === 'OCCUPIED' ? '#F5F5F4' : '#FFDAD6',
-                        border: t.status === 'OCCUPIED' ? '1px solid #E5E5E5' : '1px solid #FFB4AB',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: t.status === 'OCCUPIED' ? '#A8A29E' : '#BA1A1A',
-                        cursor: t.status === 'OCCUPIED' ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <Icon name="delete" size={15} />
-                      Xóa
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {t.status === 'BLOCKED' && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
-                        title="Mở khóa bàn để sẵn sàng đón khách"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          background: '#059669',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Icon name="lock_open" size={13} /> Mở Khóa
-                      </button>
-                    )}
-
-                    {t.status === 'DIRTY' && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(t.id, 'AVAILABLE')}
-                        title="Xác nhận bàn đã dọn dẹp sạch sẽ"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          background: '#059669',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Icon name="cleaning_services" size={13} /> Đã Dọn
-                      </button>
-                    )}
-
-                    {isBufferLocked && (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleCheckInReservation(t)}
-                          title="Khách đặt đã đến, bấm để nhận bàn và chuyển món đặt trước vào Bếp"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            background: '#059669',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
-                          }}
-                        >
-                          <Icon name="how_to_reg" size={14} /> Nhận Bàn Đặt
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handlePromptForceOverride(t)}
-                          title="Mở cưỡng chế cho khách vãng lai (Cảnh báo rủi ro trùng lịch)"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '2px',
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            background: '#FEF3C7',
-                            color: '#92400E',
-                            border: '1px solid #FCD34D',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Icon name="warning" size={13} /> Cưỡng Chế
-                        </button>
-                      </div>
-                    )}
-
-                    {!isBufferLocked && t.status === 'AVAILABLE' && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
-                        title="Mở bàn phục vụ khách ngay"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          background: '#9D4124',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Icon name="restaurant" size={13} /> Phục Vụ
-                      </button>
-                    )}
-
-                    {!isBufferLocked && t.status === 'RESERVED' && (
+                  {isBufferLocked && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       <button
                         type="button"
                         onClick={() => handleCheckInReservation(t)}
-                        title="Khách đến, nhận bàn và bắt đầu phục vụ"
+                        title="Khách đặt đã đến, bấm để nhận bàn và chuyển món đặt trước vào Bếp"
                         style={{
+                          flex: 1,
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '3px',
-                          padding: '6px 10px',
-                          borderRadius: '8px',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '9px 12px',
+                          borderRadius: '10px',
                           background: '#059669',
                           color: '#FFFFFF',
                           border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer'
+                          fontSize: '0.8rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        <Icon name="check_circle" size={13} /> Nhận Bàn
+                        <Icon name="how_to_reg" size={16} /> Nhận Bàn Đặt
                       </button>
-                    )}
 
-                    {t.status === 'OCCUPIED' && (
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenTransferModal(t)}
-                          title="Chuyển khách và các món sang bàn trống khác"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            background: '#EFF6FF',
-                            border: '1px solid #BFDBFE',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            color: '#1D4ED8',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Icon name="swap_horiz" size={14} />
-                          Chuyển
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePromptForceOverride(t)}
+                        title="Mở cưỡng chế cho khách vãng lai (Cảnh báo rủi ro trùng lịch)"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          padding: '9px 10px',
+                          borderRadius: '10px',
+                          background: '#FEF3C7',
+                          color: '#92400E',
+                          border: '1px solid #FCD34D',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Icon name="warning" size={14} /> Cưỡng Chế
+                      </button>
+                    </div>
+                  )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenMergeModal(t)}
-                          title="Gộp khách và gộp chung hóa đơn sang bàn khác"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            background: '#FAF5FF',
-                            border: '1px solid #E9D5FF',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            color: '#7E22CE',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Icon name="call_merge" size={14} />
-                          Gộp
-                        </button>
+                  {!isBufferLocked && t.status === 'AVAILABLE' && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStatus(t.id, 'OCCUPIED')}
+                      title="Mở bàn phục vụ khách ngay"
+                      style={{
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        background: '#9D4124',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(157, 65, 36, 0.2)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Icon name="restaurant" size={15} /> Mở Bàn Phục Vụ
+                    </button>
+                  )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenOrderDrawer(t)}
-                          title="Xem chi tiết các món và hóa đơn của bàn"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            background: '#9D4124',
-                            border: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            color: '#FFFFFF',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(157, 65, 36, 0.2)'
-                          }}
-                        >
-                          <Icon name="receipt_long" size={15} />
-                          Xem Đơn
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {!isBufferLocked && t.status === 'RESERVED' && (
+                    <button
+                      type="button"
+                      onClick={() => handleCheckInReservation(t)}
+                      title="Khách đến, nhận bàn và bắt đầu phục vụ"
+                      style={{
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        background: '#059669',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Icon name="check_circle" size={15} /> Nhận Bàn (Check-in)
+                    </button>
+                  )}
+
+                  {t.status === 'OCCUPIED' && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenOrderDrawer(t)}
+                      title="Xem chi tiết các món, chuyển bàn, gộp bàn và in tạm tính trong ngăn kéo"
+                      style={{
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        background: '#9D4124',
+                        border: 'none',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        color: '#FFFFFF',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(157, 65, 36, 0.25)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Icon name="receipt_long" size={16} />
+                      <span>Xem Đơn & Thao Tác</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );
