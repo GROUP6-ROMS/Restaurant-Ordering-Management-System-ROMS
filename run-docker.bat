@@ -1,28 +1,40 @@
 @echo off
-chcp 65001 > nul
+title ROMS - Docker Container Launcher
+cls
 echo ===================================================================
-echo [ROMS] KHỞI CHẠY HỆ THỐNG QUA DOCKER (PRODUCTION CONTAINERIZATION)
+echo   ROMS RESTAURANT SYSTEM - DOCKER LAUNCHER
 echo ===================================================================
 echo.
-echo 1. Kiểm tra trạng thái Docker Desktop...
-docker info > nul 2>&1
+
+echo [1/3] Kiem tra trang thai Docker Desktop...
+docker ps >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [THÔNG BÁO] Docker Desktop đang tắt. Đang khởi động Docker Desktop...
+    echo [THONG BAO] Docker Desktop chua bat. Dang khoi dong Docker Desktop...
     start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-    echo Vui lòng đợi khoảng 30s để Docker Engine chuyển sang trạng thái xanh (Running)...
+    echo Vui long cho khoang 30 giay de Docker Engine khoi dong...
+    echo Khi thay bieu tuong ca voi o goc phai duoi man hinh dung yen, bam phim bat ky.
     pause
 )
 
-echo 2. Đang build và khởi chạy các dịch vụ (Frontend, Backend, Nginx)...
+echo.
+echo [2/3] Dang build va khoi chay cac container ROMS...
+echo Lenh: docker compose up -d --build
 docker compose up -d --build
 
-echo.
-echo ===================================================================
-echo [ROMS] HỆ THỐNG ĐÃ KHỞI CHẠY THÀNH CÔNG TRÊN DOCKER!
-echo -------------------------------------------------------------------
-echo * Ứng dụng Web ROMS:       http://localhost   (hoặc http://localhost:5173)
-echo * Backend REST API Docs:    http://localhost:8080/swagger-ui.html
-echo * Giám sát sức khỏe Hệ thống: http://localhost:8080/actuator/health
-echo ===================================================================
+if %errorlevel% equ 0 (
+    echo.
+    echo ===================================================================
+    echo   ROMS DA KHOI CHAY THANH CONG TREN DOCKER!
+    echo ===================================================================
+    echo   - Web ROMS:          http://localhost
+    echo   - Cong Web phu:      http://localhost:5173
+    echo   - Swagger API Docs:  http://localhost:8080/swagger-ui.html
+    echo   - Actuator Health:   http://localhost:8080/actuator/health
+    echo ===================================================================
+) else (
+    echo.
+    echo [LOI] Docker compose chua thanh cong. Vui long kiem tra Docker Desktop da Engine running chua.
+)
+
 echo.
 pause
