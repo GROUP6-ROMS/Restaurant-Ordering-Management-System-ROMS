@@ -37,11 +37,13 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
     private final CategoryRepository categoryRepository;
     private final ServiceRequestRepository requestRepository;
     private final RealtimeService realtimeService;
+    private final org.springframework.cache.CacheManager cacheManager;
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     @Override
     @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(value = "customerMenu", key = "'active_catalog'")
     public List<CustomerMenuResponse> getCustomerMenu() {
         List<Category> categories = categoryRepository.findByIsActiveTrueOrderByDisplayOrderAsc();
         List<MenuItem> allActiveItems = menuItemRepository.findByIsActiveTrueOrderByDisplayOrderAsc();
@@ -138,7 +140,7 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
         }
 
         // 2. Tạo phiếu gọi món Order
-        String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 100000);
+        String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 100000) + "-" + (100 + new java.util.Random().nextInt(900));
         Order newOrder = new Order();
         newOrder.setSession(activeSession);
         newOrder.setStaff(null); // Thực khách tự gọi qua mã QR
@@ -170,6 +172,9 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
                 try {
                     realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), false, menuItem.getRemainingStock());
                 } catch (Exception ignored) {}
+                if (cacheManager != null && cacheManager.getCache("customerMenu") != null) {
+                    cacheManager.getCache("customerMenu").clear();
+                }
             }
 
             BigDecimal unitPrice = menuItem.getPrice() != null ? menuItem.getPrice() : BigDecimal.ZERO;

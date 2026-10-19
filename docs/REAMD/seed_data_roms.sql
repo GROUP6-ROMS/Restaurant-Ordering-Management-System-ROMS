@@ -71,21 +71,21 @@ DECLARE @PIN_123456 VARCHAR(255) = '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8
 SET IDENTITY_INSERT staffs ON;
 INSERT INTO staffs (id, username, pin_code, full_name, phone, role, is_active, is_on_shift, created_at, updated_at) VALUES
 -- 1. Quản lý (MANAGER)
-(1, 'MGR-001', @PIN_123456, N'Dương Trong (Tổng Quản Lý)', '0901000001', 'MANAGER', 1, 1, GETDATE(), GETDATE()),
-(2, 'MGR-002', @PIN_123456, N'Trần Anh Thư (Phó Quản Lý)',  '0901000002', 'MANAGER', 1, 0, GETDATE(), GETDATE()),
+(1, 'MGR-001', @PIN_123456, N'Dương Trong', '0901000001', 'MANAGER', 1, 1, GETDATE(), GETDATE()),
+(2, 'MGR-002', @PIN_123456, N'Trần Anh Thư',  '0901000002', 'MANAGER', 1, 0, GETDATE(), GETDATE()),
 
 -- 2. Phục vụ bàn (WAITER)
-(3, 'EMP-001', @PIN_123456, N'Phạm Minh Đức (Phục vụ T1)',   '0902000001', 'WAITER', 1, 1, GETDATE(), GETDATE()),
-(4, 'EMP-002', @PIN_123456, N'Lê Hoàng Nam (Phục vụ T2)',    '0902000002', 'WAITER', 1, 1, GETDATE(), GETDATE()),
-(5, 'EMP-003', @PIN_123456, N'Vũ Thị Mai (Phục vụ VIP)',     '0902000003', 'WAITER', 1, 0, GETDATE(), GETDATE()),
+(3, 'EMP-001', @PIN_123456, N'Phạm Minh Đức',   '0902000001', 'WAITER', 1, 1, GETDATE(), GETDATE()),
+(4, 'EMP-002', @PIN_123456, N'Lê Hoàng Nam',    '0902000002', 'WAITER', 1, 1, GETDATE(), GETDATE()),
+(5, 'EMP-003', @PIN_123456, N'Vũ Thị Mai',     '0902000003', 'WAITER', 1, 0, GETDATE(), GETDATE()),
 
 -- 3. Bếp trưởng & Bếp chính (KITCHEN)
-(6, 'KDS-001', @PIN_123456, N'Ngô Viết Bảo Huy (Bếp Trưởng)', '0903000001', 'KITCHEN', 1, 1, GETDATE(), GETDATE()),
-(7, 'KDS-002', @PIN_123456, N'Đặng Quốc Tuấn (Bếp Bánh & Mì)', '0903000002', 'KITCHEN', 1, 1, GETDATE(), GETDATE()),
+(6, 'KDS-001', @PIN_123456, N'Ngô Viết Bảo Huy', '0903000001', 'KITCHEN', 1, 1, GETDATE(), GETDATE()),
+(7, 'KDS-002', @PIN_123456, N'Đặng Quốc Tuấn', '0903000002', 'KITCHEN', 1, 1, GETDATE(), GETDATE()),
 
 -- 4. Thu ngân (CASHIER)
-(8, 'CSH-001', @PIN_123456, N'Đỗ Võ Thanh Trung (Thu Ngân 1)', '0904000001', 'CASHIER', 1, 1, GETDATE(), GETDATE()),
-(9, 'CSH-002', @PIN_123456, N'Nguyễn Thùy Linh (Thu Ngân 2)',  '0904000002', 'CASHIER', 1, 0, GETDATE(), GETDATE());
+(8, 'CSH-001', @PIN_123456, N'Đỗ Võ Thanh Trung', '0904000001', 'CASHIER', 1, 1, GETDATE(), GETDATE()),
+(9, 'CSH-002', @PIN_123456, N'Nguyễn Thùy Linh',  '0904000002', 'CASHIER', 1, 0, GETDATE(), GETDATE());
 SET IDENTITY_INSERT staffs OFF;
 
 PRINT N'==> Đã chèn 9 tài khoản nhân viên đầy đủ 4 phân quyền.';

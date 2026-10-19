@@ -20,10 +20,22 @@ axiosClient.interceptors.request.use((config) => {
     return config;
 });
 
-// Interceptor: Bắt lỗi 401 (hết hạn Token hoặc chưa đăng nhập)
+// Interceptor: Xử lý response và bắt lỗi, trích xuất Trace ID để đối soát
 axiosClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        const traceId = response.headers?.['x-trace-id'] || response.data?.traceId;
+        if (traceId && response.data && typeof response.data === 'object') {
+            response.data.traceId = traceId;
+        }
+        return response;
+    },
     (error) => {
+        const traceId = error.response?.headers?.['x-trace-id'] || error.response?.data?.traceId;
+        if (traceId) {
+            error.traceId = traceId;
+            console.warn(`[ROMS Trace: ${traceId}] Lỗi API ${error.config?.url}:`, error.response?.data?.message || error.message);
+        }
+
         if (error.response && error.response.status === 401) {
             const isDining = window.location.pathname.startsWith('/dining');
             if (isDining) {

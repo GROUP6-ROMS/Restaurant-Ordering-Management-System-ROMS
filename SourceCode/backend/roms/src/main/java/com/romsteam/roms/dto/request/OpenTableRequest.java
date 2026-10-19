@@ -8,6 +8,6 @@ import lombok.*;
 @AllArgsConstructor
 public class OpenTableRequest {
     @Min(value = 1, message = "Số lượng khách tối thiểu là 1 người")
-    private Integer guestCount = 2;
+    private Integer guestCount;
     private String note;
 }

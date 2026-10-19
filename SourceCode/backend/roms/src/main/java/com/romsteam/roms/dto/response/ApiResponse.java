@@ -25,6 +25,9 @@ public class ApiResponse<T> {
     // Thoi diem may chu sinh ra phan hoi nay
     private LocalDateTime timestamp = LocalDateTime.now();
 
+    // Dinh danh vet toan cuc phuc vu doi soat va truy vet loi (Global Trace ID)
+    private String traceId;
+
     // ===================================================================
     // CONSTRUCTORS (HAM KHOI TAO)
     // ===================================================================
@@ -32,6 +35,7 @@ public class ApiResponse<T> {
     // Constructor mac dinh khong tham so
     public ApiResponse() {
         this.timestamp = LocalDateTime.now();
+        this.traceId = org.slf4j.MDC.get("traceId");
     }
 
     // Constructor day du tham so
@@ -41,6 +45,7 @@ public class ApiResponse<T> {
         this.data = data;
         this.errors = errors;
         this.timestamp = LocalDateTime.now();
+        this.traceId = org.slf4j.MDC.get("traceId");
     }
 
     // ===================================================================
@@ -54,6 +59,7 @@ public class ApiResponse<T> {
         response.setMessage(message);
         response.setData(data);
         response.setTimestamp(LocalDateTime.now());
+        response.setTraceId(org.slf4j.MDC.get("traceId"));
         return response;
     }
 
@@ -68,6 +74,7 @@ public class ApiResponse<T> {
         response.setSuccess(false);
         response.setMessage(message);
         response.setTimestamp(LocalDateTime.now());
+        response.setTraceId(org.slf4j.MDC.get("traceId"));
         return response;
     }
 
@@ -78,6 +85,7 @@ public class ApiResponse<T> {
         response.setMessage(message);
         response.setErrors(errors);
         response.setTimestamp(LocalDateTime.now());
+        response.setTraceId(org.slf4j.MDC.get("traceId"));
         return response;
     }
 
@@ -123,5 +131,13 @@ public class ApiResponse<T> {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
     }
 }

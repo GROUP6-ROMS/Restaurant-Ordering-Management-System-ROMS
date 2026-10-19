@@ -1,0 +1,57 @@
+services:
+  # ===================================================================
+  # 1. DỊCH VỤ BACKEND: SPRING BOOT 3 (JAVA 21 LTS)
+  # ===================================================================
+  backend:
+    build:
+      context: ./SourceCode/backend/roms
+      dockerfile: Dockerfile
+    image: roms-backend:latest
+    container_name: roms-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Kết nối trực tiếp tới CSDL SQL Server trên máy chủ qua host.docker.internal
+      - SPRING_DATASOURCE_URL=jdbc:sqlserver://${DB_HOST:-host.docker.internal}:1433;databaseName=ROMS_DB;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true;
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-sa}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-sa}
+      - APP_FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    extra_hosts:
+      # Cho phép container liên lạc trực tiếp với SQL Server đang chạy trên Windows Host
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - roms-net
+
+  # ===================================================================
+  # 2. DỊCH VỤ FRONTEND: REACT VITE + PRODUCTION NGINX REVERSE PROXY
+  # ===================================================================
+  frontend:
+    build:
+      context: ./SourceCode/frontend
+      dockerfile: Dockerfile
+    image: roms-frontend:latest
+    container_name: roms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"     # Cổng HTTP chuẩn
+      - "5173:80"   # Ánh xạ thêm cổng 5173 để tương thích hoàn toàn với cấu hình dev cũ
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - roms-net
+
+# ===================================================================
+# MẠNG NỘI BỘ DOCKER (ISOLATED NETWORK)
+# ===================================================================
+networks:
+  roms-net:
+    driver: bridge

@@ -28,6 +28,7 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final com.romsteam.roms.security.TraceIdFilter traceIdFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -53,8 +54,11 @@ public class SecurityConfig {
         // Cho phép toàn bộ các phương thức HTTP
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // Cho phép gửi kèm các Header xác thực (Bearer Token, Content-Type)
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept"));
+        // Cho phép gửi kèm các Header xác thực (Bearer Token, Content-Type, X-Trace-Id)
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "X-Trace-Id"));
+
+        // Công khai các Header phản hồi để Frontend Axios có thể đọc được (nhất là X-Trace-Id khi đối soát lỗi)
+        configuration.setExposedHeaders(Arrays.asList("X-Trace-Id", "Authorization"));
 
         // Cho phép nhận Cookie/Credentials nếu có
         configuration.setAllowCredentials(true);
@@ -85,7 +89,7 @@ public class SecurityConfig {
 
                 // Phân quyền endpoints
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket
+                        // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket, Actuator Health & Metrics
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/customer/tables/verify-qr",
@@ -96,7 +100,8 @@ public class SecurityConfig {
                                 "/ws-roms-native/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html")
+                                "/swagger-ui.html",
+                                "/actuator/**")
                         .permitAll()
 
                         // 2. Nghiệp vụ gọi món và vận hành tại bàn: Bắt buộc phải có Dining Token (ROLE_CUSTOMER) hoặc tài khoản Nhân viên
@@ -106,7 +111,9 @@ public class SecurityConfig {
                         // 3. Các request còn lại bắt buộc phải xác thực
                         .anyRequest().authenticated())
 
-                // Đặt bộ lọc JWT chạy trước UsernamePasswordAuthenticationFilter
+                // 1. Chạy TraceIdFilter ở đầu tiên để mọi request đều có Trace ID trong MDC
+                .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
+                // 2. Đặt bộ lọc JWT chạy trước UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

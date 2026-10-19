@@ -706,7 +706,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             diningSessionRepository.save(session);
         }
 
-        String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 10000);
+        String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 100000) + "-" + (100 + new java.util.Random().nextInt(900));
         Order newOrder = new Order();
         newOrder.setSession(session);
         newOrder.setOrderCode(orderCode);

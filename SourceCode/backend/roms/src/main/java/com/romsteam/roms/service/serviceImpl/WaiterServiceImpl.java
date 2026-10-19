@@ -511,7 +511,7 @@ public class WaiterServiceImpl implements WaiterService {
             sessionRepository.save(activeSession);
         }
 
-        String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 10000);
+        String orderCode = "ORD-" + table.getTableNumber() + "-" + (System.currentTimeMillis() % 100000) + "-" + (100 + new java.util.Random().nextInt(900));
         Order newOrder = new Order();
         newOrder.setSession(activeSession);
         newOrder.setOrderCode(orderCode);

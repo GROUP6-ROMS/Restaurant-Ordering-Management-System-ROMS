@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.romsteam.roms.entity.enums.OrderItemStatus;
 
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
@@ -54,4 +55,10 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+    // Đếm số lượng món theo trạng thái (ví dụ: COOKING, READY)
+    long countByStatus(OrderItemStatus status);
+
+    // Đếm số lượng món thuộc danh sách các trạng thái (ví dụ: PENDING, COOKING)
+    long countByStatusIn(List<OrderItemStatus> statuses);
 }

@@ -17,6 +17,8 @@ import com.romsteam.roms.service.MenuService;
 import com.romsteam.roms.service.RealtimeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,6 +87,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"customerMenu", "categories"}, allEntries = true)
     public AdminMenuItemResponse createMenuItem(CreateMenuItemRequest request) {
         String cleanSku = request.getSku().trim().toUpperCase();
 
@@ -132,6 +135,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"customerMenu", "categories"}, allEntries = true)
     public AdminMenuItemResponse updateMenuItem(Long id, UpdateMenuItemRequest request) {
         MenuItem item = menuItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại với ID: " + id));
@@ -192,6 +196,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"customerMenu", "categories"}, allEntries = true)
     public AdminMenuItemResponse toggleMenuItemAvailability(Long id) {
         MenuItem item = menuItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại với ID: " + id));
@@ -216,6 +221,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"customerMenu", "categories"}, allEntries = true)
     public void deleteMenuItem(Long id) {
         MenuItem item = menuItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại với ID: " + id));
@@ -228,6 +234,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "categories", key = "'all_active'")
     public List<CategoryResponse> getAllCategories() {
         List<Category> categories = categoryRepository.findByIsActiveTrueOrderByDisplayOrderAsc();
         return categories.stream().map(cat -> {
@@ -247,6 +254,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"customerMenu", "categories"}, allEntries = true)
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         String cleanName = request.getName().trim();
         if (categoryRepository.existsByName(cleanName)) {
@@ -280,6 +288,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"customerMenu", "categories"}, allEntries = true)
     public CategoryResponse updateCategory(Long id, UpdateCategoryRequest request) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Danh mục không tồn tại với ID: " + id));
@@ -310,6 +319,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"customerMenu", "categories"}, allEntries = true)
     public void deleteCategory(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Danh mục không tồn tại với ID: " + id));

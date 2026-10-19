@@ -26,4 +26,7 @@ public interface DiningSessionRepository extends JpaRepository<DiningSession, Lo
 
     // Lấy các phiên ăn được khởi tạo trong khoảng thời gian bắt đầu (startTime)
     List<DiningSession> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
+
+    // Đếm số lượng phiên ăn theo trạng thái (ví dụ: ACTIVE)
+    long countByStatus(SessionStatus status);
 }
