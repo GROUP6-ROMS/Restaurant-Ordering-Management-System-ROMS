@@ -33,4 +33,25 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+    // Truy vấn thống kê chi tiết món ăn kèm giá vốn COGS và doanh thu từ các hóa đơn PAID
+    @Query("SELECT oi.menuItem.id, oi.menuItem.name, c.name, " +
+            "CAST(SUM(oi.quantity) AS integer), SUM(oi.subtotal), " +
+            "COALESCE(mi.costPrice, 0), mi.price, " +
+            "SUM(oi.quantity * COALESCE(mi.costPrice, 0)) " +
+            "FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN o.session s " +
+            "JOIN Bill b ON b.session.id = s.id " +
+            "JOIN oi.menuItem mi " +
+            "JOIN mi.category c " +
+            "WHERE b.status = 'PAID' " +
+            "AND oi.status <> 'CANCELLED' " +
+            "AND b.paymentTime BETWEEN :start AND :end " +
+            "GROUP BY oi.menuItem.id, oi.menuItem.name, c.name, mi.costPrice, mi.price " +
+            "ORDER BY SUM(oi.subtotal) DESC")
+    List<Object[]> findMenuItemSalesAndCost(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
 }

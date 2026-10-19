@@ -2,6 +2,7 @@ package com.romsteam.roms.service;
 
 import com.romsteam.roms.dto.request.CashierCheckoutRequest;
 import com.romsteam.roms.dto.request.ManagerApprovalRequest;
+import com.romsteam.roms.dto.request.CloseShiftRequest;
 import com.romsteam.roms.dto.response.*;
 
 import java.time.LocalDate;
@@ -35,8 +36,8 @@ public interface CashierService {
     // 8. Hủy món trên hóa đơn tạm tính có Quản lý duyệt mã PIN
     void voidOrderItem(Long itemId, ManagerApprovalRequest request);
 
-    // 9. Xác nhận chốt ca làm việc có Quản lý duyệt mã PIN
-    void closeShift(ManagerApprovalRequest request, String cashierUsername);
+    // 9. Xác nhận chốt ca két tiền có Quản lý duyệt mã PIN và duyệt chênh lệch két
+    CloseShiftResponse closeShift(CloseShiftRequest request, String cashierUsername);
 
     // 10. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món hoặc mở nhầm bàn
     CashierTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request);

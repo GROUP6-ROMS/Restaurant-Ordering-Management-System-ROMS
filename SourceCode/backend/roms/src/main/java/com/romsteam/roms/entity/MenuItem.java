@@ -70,6 +70,42 @@ public class MenuItem {
     @Column(name = "is_available", nullable = false)
     private Boolean isAvailable = true;
 
+    // Định mức suất ăn phục vụ tối đa trong ngày (null = không giới hạn)
+    @Column(name = "daily_stock")
+    private Integer dailyStock;
+
+    // Số suất ăn còn lại thực tế trong ngày (null = không giới hạn)
+    @Column(name = "remaining_stock")
+    private Integer remainingStock;
+
+    /**
+     * Giảm số lượng tồn kho còn lại khi khách gọi món
+     * @param quantity số lượng đặt
+     */
+    public void decreaseStock(int quantity) {
+        if (remainingStock != null) {
+            this.remainingStock = Math.max(0, this.remainingStock - quantity);
+            if (this.remainingStock <= 0) {
+                this.isAvailable = false;
+                this.tag = "Tạm Hết (86d)";
+            }
+        }
+    }
+
+    /**
+     * Bổ sung hoặc cài đặt lại tồn kho trong ngày
+     */
+    public void replenishStock(Integer newStock) {
+        this.dailyStock = newStock;
+        this.remainingStock = newStock;
+        if (newStock != null && newStock > 0) {
+            this.isAvailable = true;
+            if ("Tạm Hết (86d)".equals(this.tag)) {
+                this.tag = "Đang Bán";
+            }
+        }
+    }
+
     // Thứ tự hiển thị sắp xếp trên thực đơn (số nhỏ đứng trước)
     @Builder.Default
     @Column(name = "display_order")

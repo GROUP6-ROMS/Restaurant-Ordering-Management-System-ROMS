@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
 import { customerApi } from '../../api/customerApi';
-import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
+import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 // Icon Material Symbols (Reusable component)
 function Icon({ name, size = 22, fill = 0, style = {} }) {
@@ -29,15 +29,23 @@ function formatVND(amount) {
 
 // --- Dish Card: 2 cot theo dung thiet ke Stitch SCR-10 ---
 function DishCard({ item, inCartCount, onAdd }) {
+  const isOutOfStock = !item.isAvailable || (item.remainingStock !== undefined && item.remainingStock !== null && item.remainingStock <= 0);
+  const isLowStock = !isOutOfStock && item.remainingStock !== undefined && item.remainingStock !== null && item.remainingStock <= 5;
+
   const tagBg = item.tag?.includes('Bán chạy') || item.tag?.includes('Bestseller')
     ? 'var(--tertiary-fixed)'
+    : isLowStock
+    ? '#FFDBC9'
     : 'rgba(255, 219, 201, 0.5)';
   const tagColor = item.tag?.includes('Bán chạy') || item.tag?.includes('Bestseller')
     ? 'var(--on-tertiary-fixed)'
+    : isLowStock
+    ? '#9D4124'
     : 'var(--secondary)';
+  const displayTag = isLowStock ? `Chỉ còn ${item.remainingStock} phần` : item.tag;
 
   return (
-    <div className="dish-card" style={{ opacity: item.isAvailable ? 1 : 0.6 }}>
+    <div className="dish-card" style={{ opacity: isOutOfStock ? 0.6 : 1 }}>
       {/* Anh mon an */}
       <div>
         <div style={{
@@ -69,7 +77,7 @@ function DishCard({ item, inCartCount, onAdd }) {
             {item.prepTime || '10-15p'}
           </div>
           {/* Tag (Ban chay, etc.) */}
-          {item.tag && (
+          {displayTag && (
             <span style={{
               position: 'absolute', top: 8, right: 8,
               padding: '2px 8px',
@@ -80,24 +88,25 @@ function DishCard({ item, inCartCount, onAdd }) {
               fontFamily: 'Plus Jakarta Sans',
               boxShadow: 'var(--shadow-xs)',
             }}>
-              {item.tag}
+              {displayTag}
             </span>
           )}
           {/* Mon het hang */}
-          {!item.isAvailable && (
+          {isOutOfStock && (
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'rgba(255,248,246,0.7)',
+              background: 'rgba(255,248,246,0.85)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               backdropFilter: 'blur(2px)',
             }}>
               <span style={{
-                background: 'var(--surface-container)',
-                color: 'var(--on-surface-variant)',
+                background: '#BA1A1A',
+                color: '#FFFFFF',
                 padding: '4px 12px', borderRadius: '9999px',
-                fontSize: 11, fontWeight: 700,
+                fontSize: 11, fontWeight: 800,
                 fontFamily: 'Plus Jakarta Sans',
-              }}>Tạm Hết</span>
+                boxShadow: '0 2px 6px rgba(186, 26, 26, 0.3)'
+              }}>Tạm Hết Món</span>
             </div>
           )}
         </div>
@@ -140,7 +149,7 @@ function DishCard({ item, inCartCount, onAdd }) {
             {formatVND(item.price)}
           </span>
         </div>
-        {item.isAvailable && (
+        {!isOutOfStock && (
           <button
             onClick={() => onAdd(item)}
             aria-label={`Them ${item.name}`}
@@ -409,6 +418,29 @@ export default function CustomerMenuPage() {
     };
 
     fetchMenu();
+  }, []);
+
+  // Lắng nghe sự kiện cập nhật trạng thái món ăn 86'd tức thì qua WebSocket STOMP
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable, remainingStock } = event.payload;
+        setAllItems(prev => prev.map(item => {
+          if (item.id === id) {
+            return {
+              ...item,
+              isAvailable: isAvailable,
+              remainingStock: remainingStock !== undefined ? remainingStock : item.remainingStock
+            };
+          }
+          return item;
+        }));
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const handleRequestAssistance = async (reqType, note) => {

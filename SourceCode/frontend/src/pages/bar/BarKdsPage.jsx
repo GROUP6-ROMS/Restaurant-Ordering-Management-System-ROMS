@@ -10,7 +10,7 @@ const INITIAL_BAR_TICKETS = [
     elapsedMinutes: 4,
     status: 'IN_PREP', // QUEUED, IN_PREP, READY, SERVED
     items: [
-      { id: 'b1', name: 'Cocktail Signature Hoàng Gia', qty: 2, note: 'Ít ngọt, trang trí thêm lá bạc hà tươi', size: 'Ly Cao', status: 'IN_PREP' },
+      { id: 'b1', name: 'Cocktail Trái Cây Đặc Biệt', qty: 2, note: 'Ít ngọt, trang trí thêm lá bạc hà tươi', size: 'Ly Cao', status: 'IN_PREP' },
       { id: 'b2', name: 'Nước Ép Bưởi Hồng Ép Lạnh', qty: 1, note: 'Không đường, không đá', size: 'Tiêu Chuẩn', status: 'READY' }
     ]
   },

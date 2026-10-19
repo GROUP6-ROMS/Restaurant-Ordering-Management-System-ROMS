@@ -204,6 +204,7 @@ export default function StaffManagementPage() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [selectedStaffForPin, setSelectedStaffForPin] = useState(null);
   const [newPinCode, setNewPinCode] = useState('');
+  const [activeStaffMenuId, setActiveStaffMenuId] = useState(null); // Menu 3 chấm thao tác nhân viên
 
   // Weekly Print Modal States
   const [showWeeklyPrintModal, setShowWeeklyPrintModal] = useState(false);
@@ -344,6 +345,21 @@ export default function StaffManagementPage() {
   useEffect(() => {
     fetchDaySchedule(selectedDate);
   }, [selectedDate, fetchDaySchedule]);
+
+  // Đóng Menu 3 chấm tác vụ nhân viên khi click ra ngoài
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.roms-staff-menu-container')) {
+        setActiveStaffMenuId(null);
+      }
+    };
+    if (activeStaffMenuId) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [activeStaffMenuId]);
 
   // ===================================================================
   // ACTIONS & HANDLERS
@@ -2125,63 +2141,181 @@ export default function StaffManagementPage() {
                               {staff.currentShift || 'Chưa phân ca'}
                             </span>
                           </td>
+                          {/* Cột 5: Trạng thái tài khoản (Toggle Switch thông minh) */}
                           <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                            <span style={{
-                              padding: '3px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              background: staff.isActive ? '#E6F4EA' : '#FFDAD6',
-                              color: staff.isActive ? '#137333' : '#93000A'
-                            }}>
-                              {staff.isActive ? 'Hoạt động' : 'Đã khóa'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                              {/* Đổi PIN */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedStaffForPin(staff);
-                                  setShowPinModal(true);
-                                }}
-                                title="Đổi / Cấp lại mã PIN"
-                                style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #EAE0DE', background: '#FCF1EF', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                              >
-                                <Icon name="dialpad" size={16} />
-                              </button>
-
-                              {/* Sửa thông tin */}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditStaff(staff)}
-                                title="Chỉnh sửa hồ sơ"
-                                style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #EAE0DE', background: '#FCF1EF', color: '#56423D', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                              >
-                                <Icon name="edit" size={16} />
-                              </button>
-
-                              {/* Khóa / Mở khóa tài khoản */}
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                               <button
                                 type="button"
                                 onClick={() => handleToggleStatus(staff)}
-                                title={staff.isActive ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+                                title={staff.isActive ? 'Nhấn để khóa tài khoản' : 'Nhấn để mở khóa tài khoản'}
+                                style={{
+                                  width: '38px',
+                                  height: '22px',
+                                  borderRadius: '9999px',
+                                  background: staff.isActive ? '#059669' : '#D1D5DB',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  position: 'relative',
+                                  transition: 'background-color 0.2s ease',
+                                  padding: 0
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    width: '16px',
+                                    height: '16px',
+                                    borderRadius: '50%',
+                                    background: '#FFFFFF',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                                    position: 'absolute',
+                                    top: '3px',
+                                    left: staff.isActive ? '19px' : '3px',
+                                    transition: 'left 0.2s ease'
+                                  }}
+                                />
+                              </button>
+                              <span style={{
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                color: staff.isActive ? '#059669' : '#6B7280'
+                              }}>
+                                {staff.isActive ? 'Hoạt động' : 'Đã khóa'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Cột 6: Thao tác (Kebab Context Menu 3 chấm) */}
+                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            <div className="roms-staff-menu-container" style={{ position: 'relative', display: 'inline-block' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveStaffMenuId(activeStaffMenuId === staff.id ? null : staff.id);
+                                }}
+                                title="Thao tác với nhân viên"
                                 style={{
                                   width: '32px',
                                   height: '32px',
                                   borderRadius: '8px',
                                   border: '1px solid #EAE0DE',
-                                  background: staff.isActive ? '#FCF1EF' : '#FFDAD6',
-                                  color: staff.isActive ? '#56423D' : '#93000A',
+                                  background: activeStaffMenuId === staff.id ? '#FDF0EC' : '#FAFAFA',
+                                  color: activeStaffMenuId === staff.id ? '#9D4124' : '#56423D',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
                                 }}
                               >
-                                <Icon name={staff.isActive ? 'lock' : 'lock_open'} size={16} />
+                                <Icon name="more_vert" size={18} />
                               </button>
+
+                              {activeStaffMenuId === staff.id && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: '36px',
+                                    right: 0,
+                                    zIndex: 60,
+                                    width: '185px',
+                                    background: '#FFFFFF',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 10px 25px rgba(0,0,0,0.14), 0 3px 8px rgba(0,0,0,0.06)',
+                                    border: '1px solid #F0E6E4',
+                                    padding: '6px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '2px',
+                                    textAlign: 'left'
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveStaffMenuId(null);
+                                      handleOpenEditStaff(staff);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      borderRadius: '8px',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 600,
+                                      color: '#1F1B1A',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#FFF8F6')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                  >
+                                    <Icon name="edit" size={16} style={{ color: '#56423D' }} />
+                                    Chỉnh Sửa Hồ Sơ
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveStaffMenuId(null);
+                                      setSelectedStaffForPin(staff);
+                                      setShowPinModal(true);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      borderRadius: '8px',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 600,
+                                      color: '#9D4124',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#FFF8F6')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                  >
+                                    <Icon name="dialpad" size={16} style={{ color: '#9D4124' }} />
+                                    Cấp Lại Mã PIN
+                                  </button>
+
+                                  <div style={{ height: '1px', background: '#F0E6E4', margin: '4px 0' }} />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveStaffMenuId(null);
+                                      handleToggleStatus(staff);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      borderRadius: '8px',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 600,
+                                      color: staff.isActive ? '#DC2626' : '#059669',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = staff.isActive ? '#FEF2F2' : '#ECFDF5')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                  >
+                                    <Icon name={staff.isActive ? 'lock' : 'lock_open'} size={16} style={{ color: staff.isActive ? '#DC2626' : '#059669' }} />
+                                    {staff.isActive ? 'Khóa Tài Khoản' : 'Mở Khóa Tài Khoản'}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>

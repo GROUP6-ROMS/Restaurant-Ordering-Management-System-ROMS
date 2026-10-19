@@ -43,4 +43,13 @@ public class ReportSummaryResponse {
 
     // Danh sách các món ăn bán chạy nhất
     private List<BestsellerDishResponse> bestsellers;
+
+    // Phân tích doanh thu và đối soát theo Ca trực (Ca Sáng vs Ca Tối)
+    private List<ShiftRevenueResponse> shiftBreakdown;
+
+    // Ma trận Kỹ thuật Thực đơn (BCG Menu Engineering Matrix)
+    private List<MenuEngineeringItemResponse> menuEngineering;
+
+    // Sổ chi tiết hóa đơn kế toán
+    private List<InvoiceAuditDetailResponse> invoiceAudit;
 }

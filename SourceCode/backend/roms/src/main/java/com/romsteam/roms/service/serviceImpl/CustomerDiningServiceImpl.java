@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.romsteam.roms.service.RealtimeService;
 import java.util.*;
 
 @Service
@@ -35,6 +36,7 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
     private final MenuItemRepository menuItemRepository;
     private final CategoryRepository categoryRepository;
     private final ServiceRequestRepository requestRepository;
+    private final RealtimeService realtimeService;
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -77,6 +79,7 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
                     .tag(item.getTag())
                     .imageUrl(item.getImageUrl())
                     .isAvailable(Boolean.TRUE.equals(item.getIsAvailable()))
+                    .remainingStock(item.getRemainingStock())
                     .prepTime(prepTime)
                     .build());
         }
@@ -156,6 +159,19 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
             }
 
             int qty = (itemReq.getQuantity() != null && itemReq.getQuantity() > 0) ? itemReq.getQuantity() : 1;
+            if (menuItem.getRemainingStock() != null && menuItem.getRemainingStock() < qty) {
+                throw new AppException("Món '" + menuItem.getName() + "' chỉ còn lại " + menuItem.getRemainingStock() + " phần! Vui lòng chọn lại số lượng.", HttpStatus.BAD_REQUEST);
+            }
+
+            // Trừ tồn kho trong ngày
+            menuItem.decreaseStock(qty);
+            menuItemRepository.save(menuItem);
+            if (!Boolean.TRUE.equals(menuItem.getIsAvailable())) {
+                try {
+                    realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), false, menuItem.getRemainingStock());
+                } catch (Exception ignored) {}
+            }
+
             BigDecimal unitPrice = menuItem.getPrice() != null ? menuItem.getPrice() : BigDecimal.ZERO;
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(qty));
             totalOrderAmount = totalOrderAmount.add(subtotal);
@@ -189,6 +205,14 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
         newOrder.setStatus(hasCookingItems ? OrderStatus.SUBMITTED : OrderStatus.READY);
         newOrder.setTotalAmount(totalOrderAmount);
         orderRepository.save(newOrder);
+
+        // Bắn sự kiện realtime STOMP tới Bếp KDS và Sơ đồ sảnh
+        try {
+            realtimeService.notifyKitchenOrder(newOrder.getId(), table.getTableNumber(), "ORDER_NEW", newOrder.getId());
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), table.getStatus() != null ? table.getStatus().name() : "OCCUPIED", "Đơn gọi món mới từ khách");
+        } catch (Exception e) {
+            // Không làm gián đoạn transaction nếu WebSocket có trục trặc
+        }
 
         // 3. Trả về thông tin trạng thái bàn và đĩa món cập nhật
         return getOrderTracking(table.getId(), table.getTableNumber());
@@ -364,6 +388,13 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
 
         requestRepository.save(newReq);
 
+        // Bắn sự kiện chuông gọi phục vụ qua WebSocket STOMP
+        try {
+            realtimeService.notifyServiceRequest(newReq.getId(), table.getId(), table.getTableNumber(), type, note);
+        } catch (Exception e) {
+            // Fallback an toàn
+        }
+
         result.put("success", true);
         result.put("alreadySent", false);
         result.put("requestId", newReq.getId());
@@ -403,6 +434,14 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
                     .status("PENDING")
                     .build();
             requestRepository.save(billReq);
+
+            // Bắn sự kiện yêu cầu thanh toán qua WebSocket STOMP tới POS và Phục vụ
+            try {
+                realtimeService.notifyServiceRequest(billReq.getId(), table.getId(), table.getTableNumber(), "BILL", note);
+                realtimeService.notifyPaymentUpdate(null, table.getId(), table.getTableNumber(), "PAYMENT_REQUEST", null);
+            } catch (Exception e) {
+                // Fallback an toàn
+            }
         }
 
         result.put("success", true);
@@ -415,6 +454,24 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
     // ===================================================================
 
     private RestaurantTable resolveTable(Long tableId, String tableNumber) {
+        // 1. CHỐNG GIẢ MẠO SỐ BÀN (ANTI-SPOOFING):
+        // Nếu request gửi từ Thực khách có Dining Token (ROLE_CUSTOMER), bắt buộc ép sử dụng tableId từ Token!
+        org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities() != null &&
+                auth.getAuthorities().stream().anyMatch(a -> "ROLE_CUSTOMER".equals(a.getAuthority()))) {
+            if (auth.getDetails() instanceof Map) {
+                Map<?, ?> details = (Map<?, ?>) auth.getDetails();
+                Object tIdObj = details.get("tableId");
+                if (tIdObj instanceof Number) {
+                    Long tokenTableId = ((Number) tIdObj).longValue();
+                    return tableRepository.findById(tokenTableId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Bàn ăn theo Token không tồn tại với ID: " + tokenTableId));
+                }
+            }
+        }
+
+        // 2. Trường hợp Nhân viên gọi hộ hoặc fallback
         if (tableId != null) {
             Optional<RestaurantTable> opt = tableRepository.findById(tableId);
             if (opt.isPresent()) return opt.get();

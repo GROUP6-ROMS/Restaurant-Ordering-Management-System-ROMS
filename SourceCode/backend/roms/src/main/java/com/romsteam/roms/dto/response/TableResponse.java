@@ -58,6 +58,9 @@ public class TableResponse {
     private String qrToken;
     private String qrUrl;         // Link ảnh hoặc link điều hướng quét QR
 
+    // Token JWT cấp riêng cho phiên gọi món của Thực khách (Dining Token)
+    private String diningToken;
+
     private Boolean isActive;
     private LocalDateTime updatedAt;
 }

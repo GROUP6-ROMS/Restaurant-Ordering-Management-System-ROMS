@@ -4,11 +4,13 @@ import { useCart } from '../../context/CartContext';
 import { tableApi } from '../../api/tableApi';
 import Icon from '../../components/common/Icon';
 import RomsLogo from '../../components/common/RomsLogo';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
 export default function TableWelcomePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { tableInfo, setTableInfo, cartItems, totalCount, totalPrice } = useCart();
+  const restaurantProfile = useRestaurantProfile();
 
   const rawTable = searchParams.get('table') || '5';
   const tableNumberFormatted = rawTable.padStart(2, '0');
@@ -45,6 +47,10 @@ export default function TableWelcomePage() {
           const res = await tableApi.verifyQr(tokenParam);
           if (res.data && res.data.success) {
             const tData = res.data.data;
+            // Lưu Dining Token có ký số bảo mật của Backend vào sessionStorage
+            if (tData.diningToken) {
+              sessionStorage.setItem('roms_dining_token', tData.diningToken);
+            }
             setVerifiedTable(tData);
             if (tData.capacity) setGuestCount(tData.capacity);
           }
@@ -69,9 +75,10 @@ export default function TableWelcomePage() {
   };
 
   const handleCopyWifi = () => {
-    navigator.clipboard?.writeText('dine2025');
+    const pw = restaurantProfile.wifiPassword || 'roms-welcome';
+    navigator.clipboard?.writeText(pw);
     setCopiedWifi(true);
-    showToast('Đã sao chép mật khẩu WiFi: dine2025');
+    showToast(`Đã sao chép mật khẩu WiFi: ${pw}`);
     setTimeout(() => setCopiedWifi(false), 2000);
   };
 
@@ -87,8 +94,12 @@ export default function TableWelcomePage() {
       tableName: verifiedTable?.name || '',
       zoneName: verifiedTable?.zoneName || '',
       guestCount,
-      token: tokenParam || `table-${tableNumberFormatted}-token`
+      token: tokenParam || `table-${tableNumberFormatted}-token`,
+      diningToken: verifiedTable?.diningToken || sessionStorage.getItem('roms_dining_token')
     };
+    if (verifiedTable?.diningToken) {
+      sessionStorage.setItem('roms_dining_token', verifiedTable.diningToken);
+    }
     setTableInfo(info);
     navigate('/dining/menu');
   };
@@ -267,10 +278,10 @@ export default function TableWelcomePage() {
         {/* Restaurant Headline */}
         <div>
           <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.45rem', color: '#1F1B1A', margin: '4px 0 2px', letterSpacing: '-0.02em' }}>
-            ROMS Restaurant
+            {restaurantProfile.brandName || restaurantProfile.name || 'ROMS Restaurant'}
           </h1>
           <p style={{ margin: 0, fontSize: '0.8rem', color: '#89726B' }}>
-            Modern Asian &amp; Fusion Fine Dining
+            {restaurantProfile.tagline || 'Trải nghiệm ẩm thực phong phú • Phục vụ tận tâm'}
           </p>
         </div>
 
@@ -526,10 +537,10 @@ export default function TableWelcomePage() {
             </div>
             <div>
               <div style={{ fontWeight: 700, color: '#1F1B1A' }}>
-                WiFi: ROMS_GUEST
+                WiFi: {restaurantProfile.wifiName || 'ROMS-GUEST'}
               </div>
               <div style={{ color: '#89726B', fontSize: '0.7rem' }}>
-                Pass: <code style={{ fontFamily: 'monospace', background: '#FCF1EF', padding: '1px 4px', borderRadius: '4px', color: '#9D4124', fontWeight: 700 }}>dine2025</code>
+                Pass: <code style={{ fontFamily: 'monospace', background: '#FCF1EF', padding: '1px 4px', borderRadius: '4px', color: '#9D4124', fontWeight: 700 }}>{restaurantProfile.wifiPassword || 'roms-welcome'}</code>
               </div>
             </div>
           </div>

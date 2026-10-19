@@ -502,6 +502,13 @@ export default function KitchenKdsPage() {
   const [toastMessage, setToastMessage] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
+  // State Quản lý món hết (86'd)
+  const [show86Modal, setShow86Modal] = useState(false);
+  const [menuItems86, setMenuItems86] = useState([]);
+  const [loading86, setLoading86] = useState(false);
+  const [search86, setSearch86] = useState('');
+  const [station86, setStation86] = useState('ALL');
+
   // Lưu cài đặt âm thanh vào localStorage
   const [soundEnabled, setSoundEnabled] = useState(() => {
     try {
@@ -605,6 +612,10 @@ export default function KitchenKdsPage() {
       if (event?.type === 'NEW_ORDER_CREATED' || event?.type === 'ORDER_UPDATE' || event?.type === 'TABLE_UPDATE') {
         loadOrders(true);
       }
+      if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable } = event.payload;
+        setMenuItems86(prev => prev.map(m => m.id === id ? { ...m, isAvailable } : m));
+      }
     });
 
     return () => {
@@ -614,6 +625,36 @@ export default function KitchenKdsPage() {
       unsubscribeRealtime();
     };
   }, [soundEnabled]);
+
+  // Tải danh sách thực đơn để Bếp quản lý trạng thái Tạm Hết (86'd)
+  const load86MenuItems = async () => {
+    try {
+      setLoading86(true);
+      const res = await kitchenApi.getKitchenMenuItems();
+      if (res.data && res.data.success) {
+        setMenuItems86(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách món 86d:', err);
+    } finally {
+      setLoading86(false);
+    }
+  };
+
+  // Bật/tắt trạng thái 86'd cho một món ăn
+  const handleToggle86 = async (itemId, currentName, currentAvailable) => {
+    try {
+      setMenuItems86(prev => prev.map(m => m.id === itemId ? { ...m, isAvailable: !m.isAvailable } : m));
+      const res = await kitchenApi.toggleItemAvailability(itemId);
+      if (res.data && res.data.success) {
+        showToast(currentAvailable ? `Đã báo hết món "${currentName}" (86'd)` : `Đã mở bán lại món "${currentName}"`);
+      }
+    } catch (err) {
+      console.error('Lỗi khi bật/tắt 86d:', err);
+      showToast('Không thể cập nhật trạng thái món. Vui lòng thử lại!', true);
+      load86MenuItems();
+    }
+  };
 
   // Cập nhật trạng thái cho cả đơn hàng
   const handleUpdateStatus = async (orderId, newStatus) => {
@@ -828,6 +869,25 @@ export default function KitchenKdsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
+              onClick={() => { setShow86Modal(true); load86MenuItems(); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8,
+                background: '#BA1A1A',
+                color: '#fff',
+                border: 'none', cursor: 'pointer',
+                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
+                boxShadow: '0 1px 3px rgba(186, 26, 26, 0.3)',
+                transition: 'all 0.15s ease',
+              }}
+              title="Bật/Tắt trạng thái Tạm Hết (86'd) cho từng món ăn ngay lập tức"
+            >
+              <Icon name="block" size={15} />
+              <span>Báo Hết Món (86'd)</span>
+            </button>
+
+            <button
+              type="button"
               onClick={toggleSound}
               title={soundEnabled ? "Bấm để tắt âm thanh chuông bếp" : "Bấm để bật âm thanh chuông bếp"}
               style={{
@@ -923,6 +983,163 @@ export default function KitchenKdsPage() {
           </div>
         )}
       </main>
+
+      {/* --- Drawer Quản Lý Món Tạm Hết 86'd --- */}
+      {show86Modal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(3px)',
+          display: 'flex', justifyContent: 'flex-end',
+        }} onClick={() => setShow86Modal(false)}>
+          <div style={{
+            width: '100%', maxWidth: '540px', height: '100%',
+            background: 'var(--surface, #FFFFFF)',
+            boxShadow: '-4px 0 24px rgba(0,0,0,0.25)',
+            display: 'flex', flexDirection: 'column',
+          }} onClick={e => e.stopPropagation()}>
+            {/* Drawer Header */}
+            <div style={{
+              padding: '18px 20px',
+              borderBottom: '1px solid var(--outline-variant, #EAE0DE)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: '#FFF8F6',
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icon name="block" size={20} style={{ color: '#BA1A1A' }} />
+                  <h3 style={{ margin: 0, fontFamily: 'Epilogue', fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A' }}>
+                    Quản Lý Món Hết (86'd Control)
+                  </h3>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '3px' }}>
+                  Bật/tắt món tạm hết để máy khách QR và bồi bàn cập nhật tức thì
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShow86Modal(false)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '6px', borderRadius: '50%', color: '#56423D',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+
+            {/* Drawer Filter & Search */}
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid #F0E6E4', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ position: 'relative' }}>
+                <Icon name="search" size={18} style={{ position: 'absolute', left: 10, top: 9, color: '#89726B' }} />
+                <input
+                  type="text"
+                  value={search86}
+                  onChange={e => setSearch86(e.target.value)}
+                  placeholder="Tìm theo tên món hoặc mã SKU..."
+                  style={{
+                    width: '100%', padding: '8px 12px 8px 34px',
+                    borderRadius: '10px', border: '1px solid #EAE0DE',
+                    fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {[
+                  { id: 'ALL', label: 'Tất Cả' },
+                  { id: 'KITCHEN', label: 'Bếp Nấu (Kitchen)' },
+                  { id: 'WAITER', label: 'Quầy Nước (Waiter)' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setStation86(tab.id)}
+                    style={{
+                      padding: '5px 12px', borderRadius: '8px',
+                      border: 'none',
+                      background: station86 === tab.id ? '#9D4124' : '#F6ECEA',
+                      color: station86 === tab.id ? '#FFFFFF' : '#56423D',
+                      fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Dish List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {loading86 ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#89726B' }}>
+                  Đang tải danh mục thực đơn...
+                </div>
+              ) : menuItems86
+                  .filter(m => {
+                    const matchSearch = !search86.trim() ||
+                      (m.name || '').toLowerCase().includes(search86.toLowerCase()) ||
+                      (m.sku || '').toLowerCase().includes(search86.toLowerCase());
+                    const matchStation = station86 === 'ALL' || m.station === station86;
+                    return matchSearch && matchStation;
+                  })
+                  .map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 14px', borderRadius: '12px',
+                        background: item.isAvailable ? '#FFFFFF' : '#FFF5F5',
+                        border: item.isAvailable ? '1px solid #F0E6E4' : '1px solid #FECACA',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                        <img
+                          src={item.imageUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=120'}
+                          alt={item.name}
+                          style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover' }}
+                          onError={e => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544025162-d76694265947?w=120'; }}
+                        />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#89726B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{item.categoryName}</span>
+                            <span>•</span>
+                            <span style={{ fontWeight: 700, color: item.remainingStock > 5 ? '#059669' : '#C5221F' }}>
+                              Tồn: {item.remainingStock ?? 100}/{item.dailyStock ?? 100}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 1-Click Toggle 86'd */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggle86(item.id, item.name, item.isAvailable)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          padding: '6px 12px', borderRadius: '8px',
+                          border: 'none', cursor: 'pointer',
+                          background: item.isAvailable ? '#D1E7DD' : '#BA1A1A',
+                          color: item.isAvailable ? '#0F5132' : '#FFFFFF',
+                          fontFamily: 'Epilogue', fontWeight: 800, fontSize: '0.78rem',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Icon name={item.isAvailable ? 'check_circle' : 'block'} size={15} />
+                        <span>{item.isAvailable ? 'Đang Bán' : 'Tạm Hết (86d)'}</span>
+                      </button>
+                    </div>
+                  ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- Toast Thông báo phản hồi người dùng --- */}
       {toastMessage && (

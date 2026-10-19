@@ -7,9 +7,11 @@ import { reservationApi } from '../../api/reservationApi';
 import { menuApi } from '../../api/menuApi';
 import { cashierApi } from '../../api/cashierApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
 export default function TableManagementPage() {
   const location = useLocation();
+  const restaurantProfile = useRestaurantProfile();
   const [tables, setTables] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -357,17 +359,16 @@ export default function TableManagementPage() {
     setCatalogCatFilter('ALL');
     setShowPreOrderModal(true);
 
-    if (menuCatalog.length === 0) {
-      try {
-        setMenuCatalogLoading(true);
-        const resMenu = await menuApi.getItems();
-        const dishes = resMenu.data || [];
-        setMenuCatalog(dishes.filter(d => d.isActive));
-      } catch (err) {
-        console.warn('Lỗi khi tải thực đơn cho đặt trước:', err);
-      } finally {
-        setMenuCatalogLoading(false);
-      }
+    try {
+      setMenuCatalogLoading(true);
+      const resMenu = await menuApi.getItems();
+      const rawDishes = resMenu.data?.data || (Array.isArray(resMenu.data) ? resMenu.data : []);
+      const dishes = rawDishes.filter(d => d.isActive !== false && d.isAvailable !== false);
+      setMenuCatalog(dishes);
+    } catch (err) {
+      console.warn('Lỗi khi tải thực đơn cho đặt trước:', err);
+    } finally {
+      setMenuCatalogLoading(false);
     }
   };
 
@@ -447,12 +448,14 @@ export default function TableManagementPage() {
       };
 
       const res = await reservationApi.updateReservationItems(selectedResForPreOrder.id, payload);
-      const updatedRes = res.data;
+      const updatedRes = res.data?.data || res.data;
 
       setReservations(prev => prev.map(r => r.id === updatedRes.id ? updatedRes : r));
       setSelectedResForPreOrder(updatedRes);
       showToast('Cập nhật danh sách món đặt trước thành công!');
       setShowPreOrderModal(false);
+      await loadData();
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE' });
     } catch (err) {
       console.error('Lỗi lưu món đặt trước:', err);
       const errMsg = err.response?.data?.message || 'Không thể lưu món đặt trước!';
@@ -867,6 +870,10 @@ export default function TableManagementPage() {
         showToast(`Đã cập nhật trạng thái bàn ${statusModalTable.code}!`);
         setStatusModalTable(null);
         await loadData(); // Tải lại dữ liệu mới nhất
+        broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: statusModalTable.id, status: payload.status });
+        if (payload.status === 'OCCUPIED') {
+          broadcastRealtimeEvent({ type: 'NEW_ORDER_CREATED', tableId: statusModalTable.id });
+        }
       }
     } catch (error) {
       console.error('Lỗi cập nhật trạng thái bàn:', error);
@@ -889,6 +896,10 @@ export default function TableManagementPage() {
       if (res.data && res.data.success) {
         showToast('Đã cập nhật trạng thái bàn!');
         await loadData();
+        broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: id, status: newStatus });
+        if (newStatus === 'OCCUPIED') {
+          broadcastRealtimeEvent({ type: 'NEW_ORDER_CREATED', tableId: id });
+        }
       }
     } catch (error) {
       console.error('Lỗi chuyển trạng thái bàn:', error);
@@ -916,8 +927,11 @@ export default function TableManagementPage() {
       if (res.data && res.data.success) {
         showToast(`Đã đón khách đặt bàn vào bàn ${checkInModalTable.code}! Đã mở phiên ăn và nạp món đặt trước.`);
         setShowCheckInModal(false);
+        const checkedInTableId = checkInModalTable.id;
         setCheckInModalTable(null);
-        broadcastRealtimeEvent('RESERVATION_UPDATED', { tableId: checkInModalTable.id });
+        broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: checkedInTableId, status: 'OCCUPIED' });
+        broadcastRealtimeEvent({ type: 'NEW_ORDER_CREATED', tableId: checkedInTableId });
+        broadcastRealtimeEvent('RESERVATION_UPDATED', { tableId: checkedInTableId });
         await loadData();
       }
     } catch (error) {
@@ -1293,17 +1307,17 @@ export default function TableManagementPage() {
     setOrderMenuSearch('');
     setOrderMenuCategory('ALL');
 
-    if (menuCatalog.length === 0) {
-      try {
-        setMenuCatalogLoading(true);
-        const resMenu = await menuApi.getItems();
-        const dishes = resMenu.data || [];
-        setMenuCatalog(dishes.filter(d => d.isActive));
-      } catch (err) {
-        console.warn('Lỗi tải thực đơn món ăn:', err);
-      } finally {
-        setMenuCatalogLoading(false);
-      }
+    try {
+      setMenuCatalogLoading(true);
+      const resMenu = await menuApi.getItems();
+      const rawDishes = resMenu.data?.data || (Array.isArray(resMenu.data) ? resMenu.data : []);
+      const dishes = rawDishes.filter(d => d.isActive !== false && d.isAvailable !== false);
+      setMenuCatalog(dishes);
+    } catch (err) {
+      console.warn('Lỗi tải thực đơn món ăn:', err);
+      showToast('Không thể tải danh sách thực đơn!');
+    } finally {
+      setMenuCatalogLoading(false);
     }
   };
 
@@ -1377,6 +1391,7 @@ export default function TableManagementPage() {
         setShowAddOrderModal(false);
         setOrderCart([]);
         showToast('Đã gửi đợt gọi món vào bàn thành công!');
+        setOrderDrawerTable(prev => prev ? { ...prev, status: 'OCCUPIED' } : prev);
         broadcastRealtimeEvent({ type: 'NEW_ORDER_CREATED', tableId: orderDrawerTable.id });
         loadData(true);
       }
@@ -1688,6 +1703,14 @@ export default function TableManagementPage() {
           0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
           50% { box-shadow: 0 0 16px 4px rgba(124, 58, 237, 0.35); }
           100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
+        }
+        @keyframes romsModalPopIn {
+          0% { opacity: 0; transform: scale(0.96) translateY(8px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes romsOverlayFadeIn {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
         @media print {
           body * {
@@ -2617,7 +2640,7 @@ export default function TableManagementPage() {
                     <button
                       type="button"
                       onClick={() => handleOpenOrderDrawer(t)}
-                      title="Xem chi tiết các món, chuyển bàn, gộp bàn và in tạm tính trong ngăn kéo"
+                      title="Xem chi tiết các món, chuyển bàn, gộp bàn và in tạm tính tại bàn"
                       style={{
                         width: '100%',
                         display: 'inline-flex',
@@ -3537,27 +3560,40 @@ export default function TableManagementPage() {
       {/* DRAWER: XEM NHANH ORDER VÀ TIẾN ĐỘ BẾP TẠI BÀN               */}
       {/* ============================================================= */}
       {/* ============================================================= */}
-      {/* NGĂN KÉO QUẢN LÝ ĐƠN MÓN TẠI BÀN (ORDER DRAWER FULL OPS)       */}
+      {/* ============================================================= */}
+      {/* MODAL TRUNG TÂM: QUẢN LÝ ĐƠN MÓN & THAO TÁC TẠI BÀN (CENTER) */}
       {/* ============================================================= */}
       {orderDrawerTable && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.45)',
-          zIndex: 10000,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          backdropFilter: 'blur(3px)'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '520px',
-            height: '100%',
+        <div
+          onClick={() => { setOrderDrawerTable(null); setActiveOrdersData(null); }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31, 27, 26, 0.65)',
+            zIndex: 10000,
             display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '-8px 0 32px rgba(0,0,0,0.15)'
-          }}>
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            backdropFilter: 'blur(4px)',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '94%',
+              maxWidth: '700px',
+              maxHeight: '88vh',
+              borderRadius: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+              overflow: 'hidden',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Header Drawer */}
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF7F5' }}>
               <div>
@@ -4242,7 +4278,7 @@ export default function TableManagementPage() {
 
                   {/* Footer WiFi */}
                   <div style={{ fontSize: '0.68rem', color: '#89726B', fontWeight: 600, borderTop: '1px solid #F0E6E4', paddingTop: '6px', marginTop: '6px' }}>
-                    📶 WiFi: <strong>dine2025</strong> | Mật khẩu: <strong>12345678</strong>
+                    📶 WiFi: <strong>{restaurantProfile.wifiName || 'ROMS-GUEST'}</strong> | Mật khẩu: <strong>{restaurantProfile.wifiPassword || 'roms-welcome'}</strong>
                   </div>
                 </div>
               ))}
@@ -7443,11 +7479,11 @@ export default function TableManagementPage() {
               ) : preCheckBillData ? (
                 <div id="thermal-receipt-print" style={{ background: '#FFFFFF', padding: '8px' }}>
                   <div style={{ textAlign: 'center', paddingBottom: '12px', borderBottom: '1px dashed #CCC' }}>
-                    <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.35rem', color: '#9D4124' }}>
-                      NHÀ HÀNG HOÀNG GIA ROMS
+                    <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#9D4124' }}>
+                      {restaurantProfile.name}
                     </div>
-                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>Số 123 Đường Ẩm Thực, Quận 1, TP. Hồ Chí Minh</div>
-                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>Hotline: 1900-8888 • MST: 0312345678</div>
+                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>{restaurantProfile.address}</div>
+                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>Hotline: {restaurantProfile.phone} • MST: {restaurantProfile.taxCode}</div>
                     <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.15rem', color: '#1F1B1A', marginTop: '10px' }}>
                       PHIẾU TẠM TÍNH TIỀN
                     </div>

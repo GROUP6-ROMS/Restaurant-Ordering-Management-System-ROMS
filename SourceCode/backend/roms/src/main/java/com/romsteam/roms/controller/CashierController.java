@@ -2,6 +2,7 @@ package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.CashierCheckoutRequest;
 import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
+import com.romsteam.roms.dto.request.CloseShiftRequest;
 import com.romsteam.roms.dto.request.ManagerApprovalRequest;
 import com.romsteam.roms.dto.response.*;
 import com.romsteam.roms.service.CashierService;
@@ -94,14 +95,14 @@ public class CashierController {
         return ResponseEntity.ok(ApiResponse.success(null, "Quản lý đã phê duyệt hủy món thành công"));
     }
 
-    // 9. POST /api/cashier/shift/close - Chốt ca có mã PIN quản lý duyệt
+    // 9. POST /api/cashier/shift/close - Chốt ca có mã PIN quản lý duyệt và duyệt két tiền chênh lệch
     @PostMapping("/shift/close")
-    public ResponseEntity<ApiResponse<Void>> closeShift(
-            @Valid @RequestBody ManagerApprovalRequest request,
+    public ResponseEntity<ApiResponse<CloseShiftResponse>> closeShift(
+            @Valid @RequestBody CloseShiftRequest request,
             Authentication authentication) {
         String cashierUsername = authentication != null ? authentication.getName() : null;
-        cashierService.closeShift(request, cashierUsername);
-        return ResponseEntity.ok(ApiResponse.success(null, "Quản lý đã phê duyệt chốt ca và bàn giao két tiền"));
+        CloseShiftResponse response = cashierService.closeShift(request, cashierUsername);
+        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 
     // 10. POST /api/cashier/tables/{id}/close-empty - Đóng phiên ăn bàn trống (0đ)

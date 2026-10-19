@@ -25,6 +25,8 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.romsteam.roms.service.RealtimeService;
+
 @Service
 @RequiredArgsConstructor
 public class KitchenServiceImpl implements KitchenService {
@@ -32,6 +34,7 @@ public class KitchenServiceImpl implements KitchenService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ZoneRepository zoneRepository;
+    private final RealtimeService realtimeService;
 
     @Override
     @Transactional(readOnly = true)
@@ -101,6 +104,14 @@ public class KitchenServiceImpl implements KitchenService {
                 order.setTotalAmount(recalculatedTotal);
 
                 orderRepository.save(order);
+
+                // Phát sự kiện realtime STOMP cho Phục vụ và Khách theo dõi món
+                try {
+                    Long tableId = order.getSession() != null && order.getSession().getTable() != null ? order.getSession().getTable().getId() : null;
+                    String tableNumber = order.getSession() != null && order.getSession().getTable() != null ? order.getSession().getTable().getTableNumber() : "Bàn";
+                    realtimeService.notifyOrderStatus(order.getId(), tableId, tableNumber, request.getStatus(), item.getId());
+                } catch (Exception e) {}
+
                 return mapToKitchenOrderResponse(order);
             }
 
@@ -138,6 +149,14 @@ public class KitchenServiceImpl implements KitchenService {
             }
 
             Order updated = orderRepository.save(order);
+
+            // Phát sự kiện realtime STOMP
+            try {
+                Long tableId = updated.getSession() != null && updated.getSession().getTable() != null ? updated.getSession().getTable().getId() : null;
+                String tableNumber = updated.getSession() != null && updated.getSession().getTable() != null ? updated.getSession().getTable().getTableNumber() : "Bàn";
+                realtimeService.notifyOrderStatus(updated.getId(), tableId, tableNumber, request.getStatus(), updated.getId());
+            } catch (Exception e) {}
+
             return mapToKitchenOrderResponse(updated);
         } catch (IllegalArgumentException e) {
             throw new AppException("Trạng thái đơn hàng không hợp lệ: " + request.getStatus(), HttpStatus.BAD_REQUEST);

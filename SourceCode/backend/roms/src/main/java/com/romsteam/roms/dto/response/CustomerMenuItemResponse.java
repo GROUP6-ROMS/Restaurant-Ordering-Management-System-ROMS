@@ -21,5 +21,6 @@ public class CustomerMenuItemResponse {
     private String tag;
     private String imageUrl;
     private Boolean isAvailable;
+    private Integer remainingStock;
     private String prepTime;
 }

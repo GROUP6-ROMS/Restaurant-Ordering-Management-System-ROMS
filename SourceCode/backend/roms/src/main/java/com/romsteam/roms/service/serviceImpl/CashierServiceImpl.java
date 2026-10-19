@@ -2,6 +2,7 @@ package com.romsteam.roms.service.serviceImpl;
 
 import com.romsteam.roms.dto.request.CashierCheckoutRequest;
 import com.romsteam.roms.dto.request.CloseEmptySessionRequest;
+import com.romsteam.roms.dto.request.CloseShiftRequest;
 import com.romsteam.roms.dto.request.ManagerApprovalRequest;
 import com.romsteam.roms.dto.response.*;
 import com.romsteam.roms.entity.*;
@@ -11,6 +12,7 @@ import com.romsteam.roms.exception.ResourceNotFoundException;
 import com.romsteam.roms.repository.*;
 import com.romsteam.roms.service.CashierService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CashierServiceImpl implements CashierService {
@@ -38,6 +41,7 @@ public class CashierServiceImpl implements CashierService {
     private final StaffRepository staffRepository;
     private final ZoneRepository zoneRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.romsteam.roms.service.RealtimeService realtimeService;
 
     @Override
     @Transactional(readOnly = true)
@@ -161,6 +165,13 @@ public class CashierServiceImpl implements CashierService {
                 session.setNote((existingNote + " [DRAFT_PRINTED]").trim());
                 sessionRepository.save(session);
             }
+        }
+
+        try {
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), "DRAFT_PRINTED", "Đã in phiếu tạm tính");
+            realtimeService.notifyPaymentUpdate(null, table.getId(), table.getTableNumber(), "DRAFT_PRINTED", Map.of("tableId", table.getId(), "tableNumber", table.getTableNumber()));
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast markDraftPrinted bàn {}: {}", table.getTableNumber(), e.getMessage());
         }
 
         return mapToCashierTableResponse(table);
@@ -303,6 +314,18 @@ public class CashierServiceImpl implements CashierService {
                 req.setStatus("RESOLVED");
                 requestRepository.save(req);
             }
+        }
+
+        try {
+            realtimeService.notifyPaymentUpdate(bill.getId(), table.getId(), table.getTableNumber(), "BILL_PAID", Map.of(
+                    "billId", bill.getId(),
+                    "billCode", bill.getBillCode(),
+                    "finalAmount", bill.getFinalAmount(),
+                    "paymentMethod", bill.getPaymentMethod().name()
+            ));
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), TableStatus.DIRTY.name(), "Thanh toán thành công. Bàn cần dọn");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast checkoutBill bàn {}: {}", table.getTableNumber(), e.getMessage());
         }
 
         return mapToInvoiceResponse(bill, itemDTOs, table);
@@ -450,20 +473,85 @@ public class CashierServiceImpl implements CashierService {
             if (allCancelled) order.setStatus(OrderStatus.CANCELLED);
 
             orderRepository.save(order);
+
+            try {
+                String tblNum = (order.getSession() != null && order.getSession().getTable() != null)
+                        ? order.getSession().getTable().getTableNumber() : "N/A";
+                Long tblId = (order.getSession() != null && order.getSession().getTable() != null)
+                        ? order.getSession().getTable().getId() : null;
+                realtimeService.notifyOrderStatus(order.getId(), tblId, tblNum, "CANCELLED", Map.of("itemId", item.getId(), "reason", request.getReason() != null ? request.getReason() : ""));
+            } catch (Exception e) {
+                log.warn("[Realtime] Lỗi broadcast voidOrderItem: {}", e.getMessage());
+            }
         }
     }
 
     @Override
-    public void closeShift(ManagerApprovalRequest request, String cashierUsername) {
-        validateManagerPin(request.getManagerPin());
-        // Chấp thuận chốt sổ bàn giao ca thành công
+    @Transactional
+    public CloseShiftResponse closeShift(CloseShiftRequest request, String cashierUsername) {
+        Staff manager = validateManagerPin(request.getManagerPin());
+
+        BigDecimal difference = request.getCashDifference() != null ? request.getCashDifference() : BigDecimal.ZERO;
+
+        // Nếu két tiền có chênh lệch (thừa hoặc thiếu tiền), BẮT BUỘC phải có lý do giải trình của Quản lý
+        if (difference.compareTo(BigDecimal.ZERO) != 0) {
+            if (request.getReason() == null || request.getReason().trim().length() < 3) {
+                throw new AppException(
+                        String.format("Két tiền có chênh lệch (%+,.0f₫)! Bắt buộc Quản lý phải ghi rõ lý do/giải trình chênh lệch két tiền trước khi phê duyệt.", difference),
+                        HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
+        Staff cashier = (cashierUsername != null) ? staffRepository.findByUsername(cashierUsername).orElse(null) : null;
+
+        log.info("[CASH SHIFT CLOSURE] Thu ngân '{}' ({}) đã chốt ca. Quản lý duyệt: '{}' ({}). Tiền thực đếm: {}₫, Lý thuyết: {}₫, Chênh lệch: {}₫, Giải trình: '{}'",
+                cashierUsername, (cashier != null ? cashier.getFullName() : "N/A"),
+                manager.getFullName(), manager.getUsername(),
+                request.getCountedCash(), request.getTheoreticalCash(), difference, request.getReason());
+
+        String message;
+        if (difference.compareTo(BigDecimal.ZERO) == 0) {
+            message = String.format("Quản lý %s (%s) đã phê duyệt chốt ca thành công (Két tiền khớp 100%%).",
+                    manager.getFullName(), manager.getUsername());
+        } else {
+            message = String.format("Quản lý %s (%s) đã phê duyệt chốt ca và chấp thuận chênh lệch két tiền (%+,.0f₫).",
+                    manager.getFullName(), manager.getUsername(), difference);
+        }
+
+        try {
+            com.romsteam.roms.dto.response.RomsRealtimeEvent shiftEvent = com.romsteam.roms.dto.response.RomsRealtimeEvent.builder()
+                    .type("SHIFT_CLOSED")
+                    .status("CLOSED")
+                    .note(message)
+                    .payload(Map.of("shiftType", request.getShiftType(), "cashier", cashierUsername != null ? cashierUsername : "POS", "difference", difference))
+                    .build();
+            realtimeService.publish("/topic/pos", shiftEvent);
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast closeShift: {}", e.getMessage());
+        }
+
+        return CloseShiftResponse.builder()
+                .shiftType(request.getShiftType())
+                .cashierUsername(cashierUsername)
+                .cashierFullName(cashier != null ? cashier.getFullName() : "Thu Ngân POS")
+                .approvedByManager(manager.getFullName() + " (" + manager.getUsername() + ")")
+                .countedCash(request.getCountedCash())
+                .theoreticalCash(request.getTheoreticalCash())
+                .cashDifference(difference)
+                .reason(request.getReason())
+                .handoverNote(request.getHandoverNote())
+                .closedAt(LocalDateTime.now())
+                .status("CLOSED")
+                .message(message)
+                .build();
     }
 
     // ===================================================================
     // HELPER METHODS
     // ===================================================================
 
-    private void validateManagerPin(String pin) {
+    private Staff validateManagerPin(String pin) {
         if (pin == null || pin.trim().length() != 6) {
             throw new AppException("Mã PIN Quản lý phải gồm đúng 6 chữ số!", HttpStatus.BAD_REQUEST);
         }
@@ -471,17 +559,13 @@ public class CashierServiceImpl implements CashierService {
         // Tìm tài khoản Quản lý có role MANAGER
         List<Staff> managers = staffRepository.findByRole(UserRole.MANAGER);
 
-        boolean matched = false;
         for (Staff m : managers) {
             if (m.getPinCode() != null && passwordEncoder.matches(pin.trim(), m.getPinCode())) {
-                matched = true;
-                break;
+                return m;
             }
         }
 
-        if (!matched) {
-            throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.UNAUTHORIZED);
-        }
+        throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.UNAUTHORIZED);
     }
 
     private CashierTableResponse mapToCashierTableResponse(RestaurantTable table) {
@@ -684,6 +768,13 @@ public class CashierServiceImpl implements CashierService {
         }
         table.setStatus(targetStatus);
         tableRepository.save(table);
+
+        try {
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), targetStatus.name(), "Đóng phiên bàn trống");
+            realtimeService.notifyPaymentUpdate(null, table.getId(), table.getTableNumber(), "EMPTY_SESSION_CLOSED", Map.of("tableId", table.getId(), "tableNumber", table.getTableNumber()));
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast closeEmptySession bàn {}: {}", table.getTableNumber(), e.getMessage());
+        }
 
         return mapToCashierTableResponse(table);
     }

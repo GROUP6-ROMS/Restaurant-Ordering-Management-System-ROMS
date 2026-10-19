@@ -43,4 +43,8 @@ public class UpdateMenuItemRequest {
     private Integer displayOrder;
 
     private Boolean isAvailable;
+
+    private Integer dailyStock;
+
+    private Integer remainingStock;
 }

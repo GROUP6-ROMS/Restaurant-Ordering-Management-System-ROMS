@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { cashierApi } from '../../api/cashierApi';
 import { waiterApi } from '../../api/waiterApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
 // Material Symbols Icon helper
 function Icon({ name, size = 20, fill = 0, style = {} }) {
@@ -22,15 +24,13 @@ function Icon({ name, size = 20, fill = 0, style = {} }) {
   );
 }
 
-// Cấu hình thông tin tài khoản ngân hàng nhà hàng ROMS phục vụ VietQR động
-const BANK_ID = 'MB'; // MB Bank (Ngân hàng Quân Đội)
-const ACCOUNT_NO = '0988889999'; // Số tài khoản thụ hưởng
-const ACCOUNT_NAME = 'NHA HANG HOANG GIA ROMS';
-
 // Hàm sinh URL ảnh QR động chuẩn NAPAS 247
-const generateVietQrUrl = (amount, billCode, tableCode) => {
+const generateVietQrUrl = (amount, billCode, tableCode, profile) => {
+  const bank = profile?.bankName || 'MB';
+  const accNo = profile?.bankAccountNumber || '090123456789';
+  const accName = profile?.bankAccountName || profile?.name || 'NHA HANG ROMS';
   const memo = encodeURIComponent(`${billCode || 'ROMS'} ${tableCode || ''}`.trim());
-  return `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact2.png?amount=${amount || 0}&addInfo=${memo}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+  return `https://img.vietqr.io/image/${bank}-${accNo}-compact2.png?amount=${amount || 0}&addInfo=${memo}&accountName=${encodeURIComponent(accName)}`;
 };
 
 // Hàm phát âm thanh chuông ting-ting bằng Web Audio API khi có yêu cầu tính tiền mới
@@ -59,7 +59,10 @@ const playBillChime = () => {
 };
 
 export default function PosCheckoutPage() {
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const restaurantProfile = useRestaurantProfile();
 
   // Navigation tab chính: 'POS' | 'HISTORY' | 'SHIFT'
   const [activePosTab, setActivePosTab] = useState('POS');
@@ -111,8 +114,21 @@ export default function PosCheckoutPage() {
     10000: 2
   });
   const [handoverNote, setHandoverNote] = useState('Ca trực hoàn tất tốt, không phát sinh sai sót lớn.');
-  const [isShiftClosed, setIsShiftClosed] = useState(false);
+  const [isShiftClosed, setIsShiftClosed] = useState(() => {
+    return sessionStorage.getItem('roms_cashier_shift_closed') === 'true';
+  });
   const [shiftApprovedAt, setShiftApprovedAt] = useState(null);
+
+  // Lắng nghe URL params ?tab=SHIFT&trigger=approval từ nút Đăng Xuất StaffLayout
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'SHIFT') {
+      setActivePosTab('SHIFT');
+      if (searchParams.get('trigger') === 'approval') {
+        setShowShiftApprovalModal(true);
+      }
+    }
+  }, [searchParams]);
 
   // Modals & Thông báo
   const [showVietQrModal, setShowVietQrModal] = useState(false);
@@ -708,6 +724,14 @@ export default function PosCheckoutPage() {
     }
   };
 
+  // Kiểm đếm két tiền thực tế
+  const totalCountedCash = Object.entries(denominations).reduce(
+    (sum, [denom, count]) => sum + Number(denom) * (Number(count) || 0),
+    0
+  );
+  const theoreticalDrawerCash = shiftSummary ? Number(shiftSummary.theoreticalDrawerCash || 0) : 0;
+  const cashDifference = totalCountedCash - theoreticalDrawerCash;
+
   // Xác nhận chốt ca làm việc có Quản lý duyệt
   const handleOpenShiftApproval = () => {
     setShiftManagerPin('');
@@ -721,29 +745,31 @@ export default function PosCheckoutPage() {
       setShiftApprovalError('Mã PIN Quản lý phải gồm đúng 6 chữ số!');
       return;
     }
+    if (cashDifference !== 0 && (!shiftManagerNote || shiftManagerNote.trim().length < 3)) {
+      setShiftApprovalError(`Két tiền có chênh lệch (${cashDifference > 0 ? '+' : ''}${cashDifference.toLocaleString('vi-VN')}₫)! Bắt buộc Quản lý phải nhập lý do/giải trình chênh lệch két tiền.`);
+      return;
+    }
     try {
-      await cashierApi.closeShift({
+      const res = await cashierApi.closeShift({
         managerPin: shiftManagerPin.trim(),
-        reason: shiftManagerNote
+        reason: shiftManagerNote.trim(),
+        shiftType: shiftType,
+        countedCash: totalCountedCash,
+        theoreticalCash: theoreticalDrawerCash,
+        cashDifference: cashDifference,
+        handoverNote: handoverNote
       });
       const approvedTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
       setIsShiftClosed(true);
       setShiftApprovedAt(approvedTime);
+      sessionStorage.setItem('roms_cashier_shift_closed', 'true');
       setShowShiftApprovalModal(false);
-      showToast(`Quản lý đã phê duyệt chốt ca và bàn giao két tiền lúc ${approvedTime}!`);
+      showToast(res.data?.message || `Quản lý đã phê duyệt chốt ca và bàn giao két tiền lúc ${approvedTime}!`);
       fetchShiftSummary();
     } catch (err) {
       setShiftApprovalError(err.response?.data?.message || 'Mã PIN Quản lý không chính xác!');
     }
   };
-
-  // Kiểm đếm két tiền thực tế
-  const totalCountedCash = Object.entries(denominations).reduce(
-    (sum, [denom, count]) => sum + Number(denom) * (Number(count) || 0),
-    0
-  );
-  const theoreticalDrawerCash = shiftSummary ? Number(shiftSummary.theoreticalDrawerCash || 0) : 0;
-  const cashDifference = totalCountedCash - theoreticalDrawerCash;
 
   // Lọc catalog menu theo tìm kiếm và danh mục
   const filteredCatalog = menuCatalog.filter(item => {
@@ -2316,6 +2342,33 @@ export default function PosCheckoutPage() {
                   >
                     In Biên Bản Z-Report (K80)
                   </button>
+                  {isShiftClosed && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        sessionStorage.removeItem('roms_cashier_shift_closed');
+                        await logout();
+                        navigate('/login');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: '#BA1A1A',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icon name="logout" size={18} />
+                      Hoàn Tất Ca & Đăng Xuất An Toàn
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2367,7 +2420,7 @@ export default function PosCheckoutPage() {
 
             <div style={{ background: '#FFF8F6', padding: '16px', borderRadius: '20px', border: '2px dashed #9D4124', display: 'inline-block', marginBottom: '14px' }}>
               <img
-                src={generateVietQrUrl(finalCalculatedAmount, billPreview?.billCode, currentTable?.code)}
+                src={generateVietQrUrl(finalCalculatedAmount, billPreview?.billCode, currentTable?.code, restaurantProfile)}
                 alt="VietQR Code"
                 style={{ width: '220px', height: '220px', display: 'block', borderRadius: '12px' }}
               />
@@ -2447,11 +2500,11 @@ export default function PosCheckoutPage() {
                 </div>
               )}
               <div style={{ textAlign: 'center', paddingBottom: '14px', borderBottom: '1px dashed #CCC' }}>
-                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.4rem', color: '#9D4124' }}>
-                  NHÀ HÀNG HOÀNG GIA ROMS
+                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#9D4124' }}>
+                  {restaurantProfile.name}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>Số 123 Đường Ẩm Thực, Quận 1, TP. Hồ Chí Minh</div>
-                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>Hotline: 1900-8888 • MST: 0312345678</div>
+                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>{restaurantProfile.address}</div>
+                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>Hotline: {restaurantProfile.phone} • MST: {restaurantProfile.taxCode}</div>
                 <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', marginTop: '8px' }}>
                   {receiptData.isDraft ? 'PHIẾU TẠM TÍNH TIỀN' : (receiptData.isReprint ? 'HÓA ĐƠN THANH TOÁN (IN LẠI)' : 'HÓA ĐƠN THANH TOÁN')}
                 </div>
@@ -2509,7 +2562,7 @@ export default function PosCheckoutPage() {
               </div>
 
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#89726B', padding: '12px 0 6px' }}>
-                {receiptData.isDraft ? '* Quý khách vui lòng kiểm tra lại món trước khi thanh toán *' : 'Xin cảm ơn quý khách và hẹn gặp lại!'}
+                {receiptData.isDraft ? '* Quý khách vui lòng kiểm tra lại món trước khi thanh toán *' : (restaurantProfile.footerMessage || 'Cảm ơn Quý khách & Hẹn gặp lại!')}
               </div>
             </div>
 
@@ -2714,15 +2767,53 @@ export default function PosCheckoutPage() {
               </div>
             </div>
 
+            {cashDifference !== 0 && (
+              <div style={{
+                background: '#FFF0F0',
+                border: '1.5px solid #BA1A1A',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-start'
+              }}>
+                <Icon name="warning" size={22} style={{ color: '#BA1A1A', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.8rem', color: '#93000A', lineHeight: 1.4 }}>
+                  <strong>Cảnh báo chênh lệch két tiền: {cashDifference > 0 ? `Thừa +${cashDifference.toLocaleString('vi-VN')}₫` : `Thiếu ${cashDifference.toLocaleString('vi-VN')}₫`}!</strong>
+                  <div style={{ marginTop: '3px', color: '#BA1A1A', fontSize: '0.76rem' }}>
+                    * Quy định ROMS: Quản lý bắt buộc phải nhập mã PIN 6 số và ghi rõ lý do giải trình chênh lệch để bảo đảm tính minh bạch kiểm toán két tiền.
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
-                Ghi Chú Phê Duyệt Của Quản Lý:
+                {cashDifference !== 0 ? (
+                  <span>Lý Do / Giải Trình Chênh Lệch Két Tiền <span style={{ color: '#BA1A1A' }}>* (Bắt buộc)</span></span>
+                ) : (
+                  <span>Ghi Chú Phê Duyệt Của Quản Lý (Tùy chọn):</span>
+                )}
               </label>
               <textarea
                 rows={2}
                 value={shiftManagerNote}
-                onChange={(e) => setShiftManagerNote(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #EAE0DE', fontSize: '0.82rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                placeholder={cashDifference !== 0 ? "Nhập nguyên nhân thừa/thiếu tiền (vd: thối nhầm khách bàn 3, tiền lẻ đầu ca...)" : "Ghi chú ca trực..."}
+                onChange={(e) => {
+                  setShiftManagerNote(e.target.value);
+                  setShiftApprovalError(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: (cashDifference !== 0 && !shiftManagerNote.trim()) ? '1.5px solid #BA1A1A' : '1px solid #EAE0DE',
+                  fontSize: '0.82rem',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
               />
             </div>
 

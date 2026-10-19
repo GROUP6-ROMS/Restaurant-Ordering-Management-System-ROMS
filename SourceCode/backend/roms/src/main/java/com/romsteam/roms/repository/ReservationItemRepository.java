@@ -12,6 +12,10 @@ public interface ReservationItemRepository extends JpaRepository<ReservationItem
     // Lấy toàn bộ món đặt trước theo mã phiếu đặt bàn
     List<ReservationItem> findByReservationId(Long reservationId);
 
+    // Lấy toàn bộ món đặt trước kèm MenuItem và Category để nạp vào Bếp KDS / Phục vụ
+    @org.springframework.data.jpa.repository.Query("SELECT ri FROM ReservationItem ri JOIN FETCH ri.menuItem m LEFT JOIN FETCH m.category WHERE ri.reservation.id = :reservationId")
+    List<ReservationItem> findByReservationIdWithMenuItem(@org.springframework.data.repository.query.Param("reservationId") Long reservationId);
+
     // Xóa toàn bộ món đặt trước của một phiếu đặt bàn
     void deleteByReservationId(Long reservationId);
 }

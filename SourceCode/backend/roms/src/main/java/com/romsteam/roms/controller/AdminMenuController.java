@@ -24,13 +24,14 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/menu")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'WAITER', 'CASHIER')")
 public class AdminMenuController {
 
     private final MenuService menuService;
 
     // 1. GET /api/admin/menu/summary - Lấy số liệu 3 thẻ KPI
     @GetMapping("/summary")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<MenuSummaryResponse>> getMenuSummary() {
         MenuSummaryResponse summary = menuService.getMenuSummary();
         return ResponseEntity.ok(ApiResponse.success(summary, "Lấy số liệu KPI thực đơn thành công!"));
@@ -57,6 +58,7 @@ public class AdminMenuController {
 
     // 4. POST /api/admin/menu/items - Tạo món ăn mới
     @PostMapping("/items")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<AdminMenuItemResponse>> createMenuItem(
             @Valid @RequestBody CreateMenuItemRequest request
     ) {
@@ -67,6 +69,7 @@ public class AdminMenuController {
 
     // 5. PUT /api/admin/menu/items/{id} - Cập nhật cấu hình món ăn
     @PutMapping("/items/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<AdminMenuItemResponse>> updateMenuItem(
             @PathVariable Long id,
             @Valid @RequestBody UpdateMenuItemRequest request
@@ -77,6 +80,7 @@ public class AdminMenuController {
 
     // 6. PATCH /api/admin/menu/items/{id}/toggle-availability - Chuyển trạng thái 86'd
     @PatchMapping("/items/{id}/toggle-availability")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<AdminMenuItemResponse>> toggleAvailability(@PathVariable Long id) {
         AdminMenuItemResponse toggled = menuService.toggleMenuItemAvailability(id);
         return ResponseEntity.ok(ApiResponse.success(toggled, "Đã cập nhật trạng thái phục vụ của món!"));
@@ -84,6 +88,7 @@ public class AdminMenuController {
 
     // 7. DELETE /api/admin/menu/items/{id} - Xóa món ăn khỏi thực đơn
     @DeleteMapping("/items/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteMenuItem(@PathVariable Long id) {
         menuService.deleteMenuItem(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa món ăn khỏi thực đơn!"));
@@ -98,6 +103,7 @@ public class AdminMenuController {
 
     // 9. POST /api/admin/menu/categories - Tạo nhóm danh mục mới
     @PostMapping("/categories")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
             @Valid @RequestBody CreateCategoryRequest request
     ) {
@@ -108,6 +114,7 @@ public class AdminMenuController {
 
     // 10. PUT /api/admin/menu/categories/{id} - Sửa danh mục
     @PutMapping("/categories/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable Long id,
             @Valid @RequestBody UpdateCategoryRequest request
@@ -118,6 +125,7 @@ public class AdminMenuController {
 
     // 11. DELETE /api/admin/menu/categories/{id} - Xóa danh mục
     @DeleteMapping("/categories/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {
         menuService.deleteCategory(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa nhóm danh mục thành công!"));
@@ -125,6 +133,7 @@ public class AdminMenuController {
 
     // 12. POST /api/admin/menu/sync - Đồng bộ xuống Bếp KDS và Thu Ngân POS
     @PostMapping("/sync")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> syncMenu() {
         menuService.syncMenuToKdsAndPos();
         return ResponseEntity.ok(ApiResponse.success(null, "Đã đồng bộ thực đơn xuống tất cả trạm Bếp KDS và Máy Thu Ngân POS!"));

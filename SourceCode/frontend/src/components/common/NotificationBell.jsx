@@ -114,11 +114,15 @@ export default function NotificationBell() {
       fetchNotifications();
     }, 4000);
 
-    // Lắng nghe sự kiện đồng bộ realtime từ các tab khác
+    // Lắng nghe sự kiện đồng bộ realtime từ WebSocket STOMP và BroadcastChannel
     const unsubscribe = subscribeRealtimeEvents((event) => {
       if (
         event?.type === 'CALL_WAITER' ||
+        event?.type === 'PAYMENT_REQUEST' ||
+        event?.type === 'SERVICE_REQUEST_RESOLVED' ||
         event?.type === 'TABLE_UPDATE' ||
+        event?.type === 'NEW_ORDER_CREATED' ||
+        event?.type === 'ORDER_UPDATE' ||
         event?.type === 'NEW_RESERVATION' ||
         event?.type === 'RESERVATION_UPDATE'
       ) {

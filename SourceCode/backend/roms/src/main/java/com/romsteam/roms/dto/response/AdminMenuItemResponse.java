@@ -25,6 +25,8 @@ public class AdminMenuItemResponse {
     private BigDecimal profit; // price - costPrice
     private Double marginPercent; // ((price - costPrice) / price) * 100
     private Boolean isAvailable;
+    private Integer dailyStock;
+    private Integer remainingStock;
     private String tag; // "Bestseller", "Chef's Choice"...
     private String description;
     private String imageUrl;

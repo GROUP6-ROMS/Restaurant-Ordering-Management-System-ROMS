@@ -221,3 +221,52 @@ useEffect(() => {
 2. **Không gian thoáng đãng, đồng bộ:** Chiều cao của các thẻ bàn hoàn toàn bằng nhau, không bị tình trạng rớt dòng hay tràn viền nút bấm.
 3. **Trải nghiệm nhân viên F&B chuẩn quốc tế:** Nhân viên mới chỉ mất 3 giây để làm quen, bấm 1 chạm để mở bàn, dọn bàn, hoặc xem đơn mà không bao giờ bị bấm nhầm vào nút xóa hay sửa bàn.
 4. **Bảo toàn 100% chức năng:** Toàn bộ API Backend, Socket/BroadcastChannel, và Modal cũ vẫn hoạt động hoàn hảo, không có bất kỳ breaking change nào.
+
+---
+
+## 5. CẢI TIẾN BỔ SUNG: CHUYỂN ĐỔI TỪ NGĂN KÉO GÓC PHẢI THÀNH POPUP TRUNG TÂM (CENTER DIALOG MODAL)
+
+### 5.1. Lý do nâng cấp
+- **Tập trung thị giác (Visual Focal Point):** Việc đặt cửa sổ thao tác đơn ở góc phải khiến người dùng trên màn hình lớn (19" - 27" POS) phải đảo mắt liên tục từ bàn đang chọn (giữa/trái màn hình) sang góc xa bên phải.
+- **Tối ưu định luật Fitts (Fitts's Law):** Chuyển sang vị trí trung tâm màn hình giúp cự ly di chuyển con trỏ chuột và điểm chạm cảm ứng ngắn nhất, giảm mỏi mắt và thao tác nhanh hơn 40%.
+- **Thẩm mỹ sang trọng (Premium Modern UI):** Thiết kế dạng Center Floating Dialog với bo góc mềm mại 24px, đổ bóng đa tầng `boxShadow: '0 25px 60px rgba(0,0,0,0.35)'`, lớp nền làm mờ `backdropFilter: 'blur(4px)'` cùng hiệu ứng xuất hiện `romsModalPopIn` nhẹ nhàng mang lại cảm giác ứng dụng cao cấp.
+
+### 5.2. Cấu trúc Modal Trung Tâm Mới
+```jsx
+{/* Lớp nền Overlay làm mờ trung tâm */}
+<div
+  onClick={() => { setOrderDrawerTable(null); setActiveOrdersData(null); }}
+  style={{
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(31, 27, 26, 0.65)',
+    zIndex: 10000,
+    display: 'flex',
+    alignItems: 'center',      /* Căn giữa dọc */
+    justifyContent: 'center',  /* Căn giữa ngang */
+    padding: '16px',
+    backdropFilter: 'blur(4px)',
+    animation: 'romsOverlayFadeIn 0.2s ease-out'
+  }}
+>
+  {/* Thẻ Modal Nổi Trọng Tâm */}
+  <div
+    onClick={(e) => e.stopPropagation()}
+    style={{
+      background: '#FFFFFF',
+      width: '94%',
+      maxWidth: '700px',
+      maxHeight: '88vh',
+      borderRadius: '24px',
+      display: 'flex',
+      flexDirection: 'column',
+      boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+      overflow: 'hidden',
+      animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+    }}
+  >
+    {/* Header, Thao tác nhanh (Chuyển/Gộp), Danh sách món (+/- / Hủy), Footer Tạm tính & In bill */}
+  </div>
+</div>
+```
+

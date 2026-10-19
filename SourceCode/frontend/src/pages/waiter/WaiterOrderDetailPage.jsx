@@ -88,8 +88,12 @@ export default function WaiterOrderDetailPage() {
     document.addEventListener('visibilitychange', handleTabActive);
 
     const unsubscribe = subscribeRealtimeEvents((event) => {
-      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE') {
+      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE' || event?.type === 'NEW_ORDER_CREATED') {
         fetchTablesAndDetails();
+      }
+      if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable, remainingStock } = event.payload;
+        setMenuCatalog(prev => prev.map(m => m.id === id ? { ...m, isAvailable, remainingStock } : m));
       }
     });
 

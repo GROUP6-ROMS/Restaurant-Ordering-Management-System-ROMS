@@ -55,7 +55,7 @@ SET IDENTITY_INSERT zones ON;
 INSERT INTO zones (id, zone_code, name, description, display_order, is_active, created_at, updated_at) VALUES
 (1, 'ZONE_1', N'Tầng 1 - Sảnh Chính', N'Không gian hiện đại, âm nhạc du dương, điều hòa mát rượi, lý tưởng cho gia đình và nhóm bạn', 1, 1, GETDATE(), GETDATE()),
 (2, 'ZONE_2', N'Tầng 2 - Ban Công & Sân Vườn', N'Tầm nhìn phố cổ thoáng đãng, lãng mạn về đêm, gió trời tự nhiên cho cặp đôi và tiệc ngoài trời', 2, 1, GETDATE(), GETDATE()),
-(3, 'VIP',    N'Phòng VIP Hoàng Gia', N'Không gian cách âm tuyệt đối, nội thất da cao cấp, phục vụ riêng cho tiếp khách đối tác', 3, 1, GETDATE(), GETDATE());
+(3, 'VIP',    N'Phòng VIP Riêng Tư', N'Không gian riêng tư, ấm cúng, cách âm tốt, phục vụ tiệc gia đình và đối tác', 3, 1, GETDATE(), GETDATE());
 SET IDENTITY_INSERT zones OFF;
 
 PRINT N'==> Đã chèn 3 phân khu bàn (ZONE_1, ZONE_2, VIP).';
@@ -71,7 +71,7 @@ DECLARE @PIN_123456 VARCHAR(255) = '$2a$10$mmAQG4aK9I1ErPf33jRj5uYUccfmbaNkTvoj8
 SET IDENTITY_INSERT staffs ON;
 INSERT INTO staffs (id, username, pin_code, full_name, phone, role, is_active, is_on_shift, created_at, updated_at) VALUES
 -- 1. Quản lý (MANAGER)
-(1, 'MGR-001', @PIN_123456, N'Dương Trọng (Tổng Quản Lý)', '0901000001', 'MANAGER', 1, 1, GETDATE(), GETDATE()),
+(1, 'MGR-001', @PIN_123456, N'Dương Trong (Tổng Quản Lý)', '0901000001', 'MANAGER', 1, 1, GETDATE(), GETDATE()),
 (2, 'MGR-002', @PIN_123456, N'Trần Anh Thư (Phó Quản Lý)',  '0901000002', 'MANAGER', 1, 0, GETDATE(), GETDATE()),
 
 -- 2. Phục vụ bàn (WAITER)
@@ -149,9 +149,9 @@ INSERT INTO restaurant_tables (id, table_number, name, zone, capacity, status, b
 (15, 'B-05', N'Ban Công 05 Sân Vườn','ZONE_2', 4,  'DIRTY',     NULL, NULL, NULL, 'TOKEN-QR-B05-851403', 1, GETDATE(), GETDATE()),
 (16, 'B-06', N'Ban Công 06 Đôi Cặp', 'ZONE_2', 2,  'RESERVED',  NULL, N'Khách: Trần Thảo Ly (0987654321)', N'20:00', 'TOKEN-QR-B06-940392', 1, GETDATE(), GETDATE()),
 
--- PHÒNG VIP HOÀNG GIA (VIP) - 2 phòng
-(17, 'VIP-01', N'Phòng VIP Hoàng Gia 1', 'VIP', 10, 'OCCUPIED',  NULL, NULL, NULL, 'TOKEN-QR-VIP01-039281', 1, GETDATE(), GETDATE()),
-(18, 'VIP-02', N'Phòng VIP Cung Đình 2', 'VIP', 12, 'AVAILABLE', NULL, NULL, NULL, 'TOKEN-QR-VIP02-128170', 1, GETDATE(), GETDATE());
+-- PHÒNG VIP RIÊNG TƯ (VIP) - 2 phòng
+(17, 'VIP-01', N'Phòng VIP Tiệc Gia Đình 1', 'VIP', 10, 'OCCUPIED',  NULL, NULL, NULL, 'TOKEN-QR-VIP01-039281', 1, GETDATE(), GETDATE()),
+(18, 'VIP-02', N'Phòng VIP Hội Nghị & Đối Tác 2', 'VIP', 12, 'AVAILABLE', NULL, NULL, NULL, 'TOKEN-QR-VIP02-128170', 1, GETDATE(), GETDATE());
 SET IDENTITY_INSERT restaurant_tables OFF;
 
 PRINT N'==> Đã chèn 18 bàn ăn phủ đều 3 khu vực với đầy đủ các trạng thái thực tế.';

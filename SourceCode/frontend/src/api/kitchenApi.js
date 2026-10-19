@@ -28,4 +28,15 @@ export const kitchenApi = {
   getKitchenSummary: () => {
     return axiosClient.get('/kitchen/summary');
   },
+
+  // 6. Lấy danh sách món để Bếp quản lý trạng thái 86'd
+  getKitchenMenuItems: () => {
+    return axiosClient.get('/kitchen/menu-items');
+  },
+
+  // 7. Bật / Tắt trạng thái 86'd (Tạm hết / Mở bán) trực tiếp từ Bếp
+  toggleItemAvailability: (itemId) => {
+    return axiosClient.patch(`/kitchen/items/${itemId}/availability`, {});
+  },
 };
+

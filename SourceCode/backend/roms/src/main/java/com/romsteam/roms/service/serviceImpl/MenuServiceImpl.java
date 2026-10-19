@@ -14,6 +14,7 @@ import com.romsteam.roms.exception.ResourceNotFoundException;
 import com.romsteam.roms.repository.CategoryRepository;
 import com.romsteam.roms.repository.MenuItemRepository;
 import com.romsteam.roms.service.MenuService;
+import com.romsteam.roms.service.RealtimeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,7 @@ public class MenuServiceImpl implements MenuService {
 
     private final MenuItemRepository menuItemRepository;
     private final CategoryRepository categoryRepository;
+    private final RealtimeService realtimeService;
 
     @Override
     @Transactional(readOnly = true)
@@ -104,6 +106,8 @@ public class MenuServiceImpl implements MenuService {
             displayOrder = (int) menuItemRepository.count() + 1;
         }
 
+        Integer dailyStock = request.getDailyStock() != null && request.getDailyStock() > 0 ? request.getDailyStock() : 100;
+
         MenuItem menuItem = MenuItem.builder()
                 .category(category)
                 .sku(cleanSku)
@@ -115,6 +119,8 @@ public class MenuServiceImpl implements MenuService {
                 .tag(request.getTag() != null ? request.getTag().trim() : "Món Mới")
                 .imageUrl(request.getImageUrl() != null ? request.getImageUrl().trim() : "https://images.unsplash.com/photo-1544025162-d76694265947?w=500")
                 .isAvailable(true)
+                .dailyStock(dailyStock)
+                .remainingStock(dailyStock)
                 .displayOrder(displayOrder)
                 .isActive(true)
                 .build();
@@ -165,6 +171,16 @@ public class MenuServiceImpl implements MenuService {
         if (request.getDisplayOrder() != null) {
             item.setDisplayOrder(request.getDisplayOrder());
         }
+        if (request.getDailyStock() != null) {
+            item.setDailyStock(request.getDailyStock());
+        }
+        if (request.getRemainingStock() != null) {
+            item.setRemainingStock(request.getRemainingStock());
+            if (request.getRemainingStock() <= 0) {
+                item.setIsAvailable(false);
+                item.setTag("Tạm Hết (86d)");
+            }
+        }
         if (request.getIsAvailable() != null) {
             item.setIsAvailable(request.getIsAvailable());
         }
@@ -190,6 +206,11 @@ public class MenuServiceImpl implements MenuService {
 
         MenuItem updated = menuItemRepository.save(item);
         log.info("Toggled availability for dish [{}] -> {}", updated.getName(), nextStatus ? "AVAILABLE" : "86d SOLD-OUT");
+        try {
+            realtimeService.notifyMenuItemAvailability(updated.getId(), updated.getName(), updated.getIsAvailable(), updated.getRemainingStock());
+        } catch (Exception e) {
+            log.warn("Lỗi phát realtime khi toggle availability món {}: {}", updated.getName(), e.getMessage());
+        }
         return mapToAdminResponse(updated);
     }
 
@@ -330,6 +351,8 @@ public class MenuServiceImpl implements MenuService {
                 .profit(profit)
                 .marginPercent(marginPercent)
                 .isAvailable(item.getIsAvailable())
+                .dailyStock(item.getDailyStock())
+                .remainingStock(item.getRemainingStock())
                 .tag(item.getTag())
                 .description(item.getDescription())
                 .imageUrl(item.getImageUrl())

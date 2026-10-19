@@ -17,6 +17,7 @@ import com.romsteam.roms.exception.ResourceNotFoundException;
 import com.romsteam.roms.repository.*;
 import com.romsteam.roms.service.WaiterService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WaiterServiceImpl implements WaiterService {
@@ -39,6 +41,9 @@ public class WaiterServiceImpl implements WaiterService {
     private final MenuItemRepository menuItemRepository;
     private final CategoryRepository categoryRepository;
     private final ZoneRepository zoneRepository;
+    private final ReservationRepository reservationRepository;
+    private final ReservationItemRepository reservationItemRepository;
+    private final com.romsteam.roms.service.RealtimeService realtimeService;
 
     @Override
     @Transactional(readOnly = true)
@@ -66,32 +71,120 @@ public class WaiterServiceImpl implements WaiterService {
             throw new AppException("Chỉ có thể mở phiên cho bàn đang Trống hoặc bàn Đặt Trước!", HttpStatus.BAD_REQUEST);
         }
 
+        // 1. Kiểm tra đơn đặt bàn trước (nếu có)
+        Reservation matchedReservation = null;
+        List<Reservation> confirmed = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(tableId, com.romsteam.roms.entity.enums.ReservationStatus.CONFIRMED);
+        if (!confirmed.isEmpty()) {
+            matchedReservation = confirmed.get(0);
+        } else {
+            List<Reservation> pending = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(tableId, com.romsteam.roms.entity.enums.ReservationStatus.PENDING);
+            if (!pending.isEmpty()) {
+                matchedReservation = pending.get(0);
+            }
+        }
+
         String sessionNote = request != null && request.getNote() != null ? request.getNote() : null;
-        if (table.getStatus() == TableStatus.RESERVED) {
+        if (matchedReservation != null) {
+            sessionNote = "Khách đặt trước: " + matchedReservation.getCustomerName() + " (" + matchedReservation.getBookingCode() + ")";
+            matchedReservation.setStatus(com.romsteam.roms.entity.enums.ReservationStatus.COMPLETED);
+            reservationRepository.save(matchedReservation);
+        } else if (table.getStatus() == TableStatus.RESERVED) {
             if (sessionNote == null && table.getReservationInfo() != null) {
                 sessionNote = "Khách đặt trước: " + table.getReservationInfo();
             }
-            table.setReservationInfo(null);
-            table.setReservedTime(null);
         }
+        table.setReservationInfo(null);
+        table.setReservedTime(null);
+        table.setBlockedReason(null);
 
-        // Tạo phiên ăn mới nếu chưa có phiên active
+        // 2. Tạo phiên ăn mới nếu chưa có phiên active
         Optional<DiningSession> activeSessionOpt = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE);
-        if (activeSessionOpt.isEmpty()) {
+        DiningSession session;
+        if (activeSessionOpt.isPresent()) {
+            session = activeSessionOpt.get();
+        } else {
             String sessionToken = "sess-" + table.getTableNumber().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
-            DiningSession newSession = new DiningSession();
-            newSession.setTable(table);
-            newSession.setSessionToken(sessionToken);
-            newSession.setStatus(SessionStatus.ACTIVE);
-            newSession.setGuestCount(request != null && request.getGuestCount() != null ? request.getGuestCount() : table.getCapacity());
-            newSession.setStartTime(LocalDateTime.now());
-            newSession.setNote(sessionNote);
-            sessionRepository.save(newSession);
+            session = new DiningSession();
+            session.setTable(table);
+            session.setSessionToken(sessionToken);
+            session.setStatus(SessionStatus.ACTIVE);
+            int guests = (request != null && request.getGuestCount() != null && request.getGuestCount() > 0)
+                    ? request.getGuestCount()
+                    : (matchedReservation != null && matchedReservation.getGuestCount() != null ? matchedReservation.getGuestCount() : table.getCapacity());
+            session.setGuestCount(guests);
+            session.setStartTime(LocalDateTime.now());
+            session.setNote(sessionNote);
+            session = sessionRepository.save(session);
         }
 
-        // Đổi trạng thái bàn thành OCCUPIED
+        // 3. Tự động nạp toàn bộ món đặt trước vào Order đẩy xuống Bếp KDS và Phục vụ
+        if (matchedReservation != null) {
+            List<ReservationItem> preOrderItems = reservationItemRepository.findByReservationIdWithMenuItem(matchedReservation.getId());
+            if (preOrderItems != null && !preOrderItems.isEmpty()) {
+                Order newOrder = new Order();
+                newOrder.setSession(session);
+                String dateStr = java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                String orderCode = "ORD-PRE-" + dateStr + "-" + (1000 + new Random().nextInt(9000));
+                newOrder.setOrderCode(orderCode);
+                newOrder.setOrderTime(LocalDateTime.now());
+                newOrder.setNote("Món đặt trước - Đơn #" + matchedReservation.getBookingCode());
+
+                List<OrderItem> orderItems = new ArrayList<>();
+                BigDecimal totalAmount = BigDecimal.ZERO;
+                boolean hasCookingItems = false;
+
+                for (ReservationItem resItem : preOrderItems) {
+                    if (resItem.getQuantity() == null || resItem.getQuantity() <= 0) continue;
+                    MenuItem menuItem = resItem.getMenuItem();
+                    if (menuItem == null) continue;
+
+                    OrderItem orderItem = new OrderItem();
+                    orderItem.setOrder(newOrder);
+                    orderItem.setMenuItem(menuItem);
+                    orderItem.setQuantity(resItem.getQuantity());
+                    orderItem.setUnitPrice(resItem.getUnitPrice() != null ? resItem.getUnitPrice() : menuItem.getPrice());
+                    BigDecimal subtotal = orderItem.getUnitPrice().multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+                    orderItem.setSubtotal(subtotal);
+                    orderItem.setNote(resItem.getNote() != null ? resItem.getNote() : "Món đặt trước");
+
+                    boolean isDrink = false;
+                    if (menuItem.getCategory() != null && menuItem.getCategory().getName() != null) {
+                        String catLower = menuItem.getCategory().getName().toLowerCase();
+                        if (catLower.contains("uống") || catLower.contains("drink") || catLower.contains("nước")) {
+                            isDrink = true;
+                        }
+                    }
+
+                    if (isDrink) {
+                        orderItem.setStatus(OrderItemStatus.READY);
+                    } else {
+                        orderItem.setStatus(OrderItemStatus.COOKING);
+                        hasCookingItems = true;
+                    }
+
+                    orderItems.add(orderItem);
+                    totalAmount = totalAmount.add(subtotal);
+                }
+
+                if (!orderItems.isEmpty()) {
+                    newOrder.setStatus(hasCookingItems ? OrderStatus.CONFIRMED : OrderStatus.READY);
+                    newOrder.setTotalAmount(totalAmount);
+                    newOrder.setItems(orderItems);
+                    orderRepository.save(newOrder);
+                    orderItemRepository.saveAll(orderItems);
+                }
+            }
+        }
+
+        // 4. Đổi trạng thái bàn thành OCCUPIED
         table.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(table);
+
+        try {
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), TableStatus.OCCUPIED.name(), "Mở bàn đón khách");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast openTableSession bàn {}: {}", table.getTableNumber(), e.getMessage());
+        }
 
         return mapToWaiterTableResponse(table);
     }
@@ -112,6 +205,12 @@ public class WaiterServiceImpl implements WaiterService {
             session.setStatus(SessionStatus.COMPLETED);
             session.setEndTime(LocalDateTime.now());
             sessionRepository.save(session);
+        }
+
+        try {
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), TableStatus.AVAILABLE.name(), "Đã dọn sạch bàn");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast completeCleaning bàn {}: {}", table.getTableNumber(), e.getMessage());
         }
 
         return mapToWaiterTableResponse(table);
@@ -158,6 +257,13 @@ public class WaiterServiceImpl implements WaiterService {
         // Bàn mới chuyển thành OCCUPIED
         targetTable.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(targetTable);
+
+        try {
+            realtimeService.notifyTableUpdate(sourceTable.getId(), sourceTable.getTableNumber(), TableStatus.DIRTY.name(), "Chuyển bàn sang " + targetTable.getTableNumber());
+            realtimeService.notifyTableUpdate(targetTable.getId(), targetTable.getTableNumber(), TableStatus.OCCUPIED.name(), "Nhận bàn chuyển từ " + sourceTable.getTableNumber());
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast transferTable: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -236,6 +342,13 @@ public class WaiterServiceImpl implements WaiterService {
 
         targetTable.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(targetTable);
+
+        try {
+            realtimeService.notifyTableUpdate(sourceTable.getId(), sourceTable.getTableNumber(), sourceTable.getStatus().name(), "Đã gộp vào " + targetTable.getTableNumber());
+            realtimeService.notifyTableUpdate(targetTable.getId(), targetTable.getTableNumber(), TableStatus.OCCUPIED.name(), "Đã gộp từ " + sourceTable.getTableNumber());
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast mergeTables: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -263,6 +376,14 @@ public class WaiterServiceImpl implements WaiterService {
 
         RestaurantTable table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
+
+        try {
+            realtimeService.notifyOrderStatus(order != null ? order.getId() : null, tableId, table.getTableNumber(), OrderItemStatus.SERVED.name(), Map.of("itemId", orderItemId));
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), table.getStatus().name(), "Đã bưng món lên bàn");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast confirmDeliverSingleItem bàn {}: {}", table.getTableNumber(), e.getMessage());
+        }
+
         return mapToWaiterTableResponse(table);
     }
 
@@ -296,6 +417,14 @@ public class WaiterServiceImpl implements WaiterService {
 
         RestaurantTable table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại"));
+
+        try {
+            realtimeService.notifyOrderStatus(null, tableId, table.getTableNumber(), OrderItemStatus.SERVED.name(), "Đã bưng toàn bộ món");
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), table.getStatus().name(), "Đã bưng toàn bộ món lên bàn");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast confirmDeliverFood bàn {}: {}", table.getTableNumber(), e.getMessage());
+        }
+
         return mapToWaiterTableResponse(table);
     }
 
@@ -306,6 +435,13 @@ public class WaiterServiceImpl implements WaiterService {
                 .orElseThrow(() -> new ResourceNotFoundException("Yêu cầu chuông gọi không tồn tại: " + requestId));
         req.setStatus("RESOLVED");
         requestRepository.save(req);
+
+        try {
+            realtimeService.notifyServiceRequest(req.getId(), req.getTable() != null ? req.getTable().getId() : null,
+                    req.getTable() != null ? req.getTable().getTableNumber() : "N/A", req.getRequestType(), "RESOLVED");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast resolveServiceRequest: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -349,6 +485,13 @@ public class WaiterServiceImpl implements WaiterService {
             requestRepository.save(billReq);
         }
 
+        try {
+            realtimeService.notifyPaymentUpdate(null, table.getId(), table.getTableNumber(), "PAYMENT_REQUEST", Map.of("tableId", table.getId(), "tableNumber", table.getTableNumber()));
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), "AWAITING_PAYMENT", "Yêu cầu thanh toán");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast requestPayment bàn {}: {}", table.getTableNumber(), e.getMessage());
+        }
+
         return mapToWaiterTableResponse(table);
     }
 
@@ -388,6 +531,19 @@ public class WaiterServiceImpl implements WaiterService {
             }
 
             int qty = itemReq.getQuantity() != null && itemReq.getQuantity() > 0 ? itemReq.getQuantity() : 1;
+            if (menuItem.getRemainingStock() != null && menuItem.getRemainingStock() < qty) {
+                throw new AppException("Món '" + menuItem.getName() + "' chỉ còn lại " + menuItem.getRemainingStock() + " phần! Vui lòng chọn lại số lượng.", HttpStatus.BAD_REQUEST);
+            }
+
+            // Trừ tồn kho trong ngày
+            menuItem.decreaseStock(qty);
+            menuItemRepository.save(menuItem);
+            if (!Boolean.TRUE.equals(menuItem.getIsAvailable())) {
+                try {
+                    realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), false, menuItem.getRemainingStock());
+                } catch (Exception ignored) {}
+            }
+
             BigDecimal unitPrice = menuItem.getPrice();
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(qty));
             totalOrderAmount = totalOrderAmount.add(subtotal);
@@ -430,6 +586,13 @@ public class WaiterServiceImpl implements WaiterService {
         if (table.getStatus() != TableStatus.OCCUPIED) {
             table.setStatus(TableStatus.OCCUPIED);
             tableRepository.save(table);
+        }
+
+        try {
+            realtimeService.notifyKitchenOrder(newOrder.getId(), table.getTableNumber(), "ORDER_NEW", Map.of("orderId", newOrder.getId(), "itemsCount", newOrder.getItems().size()));
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), table.getStatus().name(), "Đã gọi thêm món");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast addOrderToTable bàn {}: {}", table.getTableNumber(), e.getMessage());
         }
 
         return mapToWaiterTableResponse(table);
@@ -571,28 +734,41 @@ public class WaiterServiceImpl implements WaiterService {
                     .category(catName)
                     .categoryId(item.getCategory() != null ? item.getCategory().getId() : null)
                     .isAvailable(item.getIsAvailable())
+                    .remainingStock(item.getRemainingStock())
                     .build());
         }
         return result;
     }
 
     private void seedDefaultMenuData() {
-        Category catAppetizer = getOrCreateCategory("Khai Vị", "Món khai vị thanh đạm kích thích vị giác", 1);
-        Category catMain = getOrCreateCategory("Món Chính", "Món chính chuẩn vị hoàng gia ROMS", 2);
-        Category catDrink = getOrCreateCategory("Đồ Uống", "Nước uống thanh mát & đóng chai", 3);
+        Category catAppetizer = getOrCreateCategory("Khai Vị & Ăn Vặt", "Món khai vị và ăn vặt thanh đạm kích thích vị giác", 1);
+        Category catMain = getOrCreateCategory("Món Chính & Cơm Mì", "Món chính chuẩn vị thơm ngon đậm đà", 2);
+        Category catHotpot = getOrCreateCategory("Lẩu & Nướng", "Các món lẩu và nướng hấp dẫn cho gia đình và bạn bè", 3);
+        Category catDrink = getOrCreateCategory("Đồ Uống & Tráng Miệng", "Nước giải khát, trà hoa quả và đồ uống đóng chai", 4);
 
         List<MenuItem> defaultItems = List.of(
-                new MenuItem(null, catAppetizer, "Gỏi Cuốn Tôm Thịt", "Tôm tươi, thịt ba chỉ kèm rau sống thanh mát", BigDecimal.valueOf(55000), "https://images.unsplash.com/photo-1544025162-d76694265947?w=500", true, 1, true, null, null),
-                new MenuItem(null, catAppetizer, "Nem Rán Hải Sản", "Giòn rụm bên ngoài, nhân hải sản tươi béo ngậy", BigDecimal.valueOf(85000), "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500", true, 2, true, null, null),
-                new MenuItem(null, catMain, "Bò Bít Tết Sốt Tiêu Đen ROMS", "Thịt thăn bò mềm mọng dùng kèm sốt tiêu thơm lừng", BigDecimal.valueOf(210000), "https://images.unsplash.com/photo-1544025162-d76694265947?w=500", true, 3, true, null, null),
-                new MenuItem(null, catMain, "Cơm Chiên Hải Sản Hoàng Kim", "Hạt cơm vàng óng ánh kết hợp mực, tôm, trứng muối", BigDecimal.valueOf(95000), "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500", true, 4, true, null, null),
-                new MenuItem(null, catMain, "Phở Áp Chảo Bò Giòn", "Bánh phở áp chảo giòn tan, bò mềm xào cải ngọt", BigDecimal.valueOf(85000), "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=500", true, 5, true, null, null),
-                new MenuItem(null, catMain, "Mì Ý Tôm Hùm Sốt Kem", "Mì Ý sợi tươi cùng tôm hùm nướng sốt kem phô mai", BigDecimal.valueOf(280000), "https://images.unsplash.com/photo-1621996346565-e3d5d6281699?w=500", true, 6, true, null, null),
-                new MenuItem(null, catMain, "Bò Wagyu Nướng Tảng", "Thịt bò Wagyu vân mỡ cẩm thạch nướng đá muối", BigDecimal.valueOf(390000), "https://images.unsplash.com/photo-1558030006-450675393462?w=500", true, 7, true, null, null),
-                new MenuItem(null, catDrink, "Trà Đào Cam Sả", "Đào giòn mọng nước cùng sả thơm thanh mát", BigDecimal.valueOf(35000), "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500", true, 8, true, null, null),
-                new MenuItem(null, catDrink, "Cà Phê Muối ROMS", "Cà phê pha phin truyền thống phủ kem béo ngậy", BigDecimal.valueOf(32000), "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=500", true, 9, true, null, null),
-                new MenuItem(null, catDrink, "Trà Ô Long TEA+ Chai 455ml", "Trà ô long đóng chai ướp lạnh giải nhiệt", BigDecimal.valueOf(18000), "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500", true, 10, true, null, null),
-                new MenuItem(null, catDrink, "Bia Tiger Crystal Lon 330ml", "Bia Tiger bạc mát lạnh sảng khoái", BigDecimal.valueOf(28000), "https://images.unsplash.com/photo-1608270116664-5085ef158e23?w=500", true, 11, true, null, null)
+                // 1. Khai vị & Ăn vặt (35k - 65k)
+                new MenuItem(null, catAppetizer, "Gỏi Cuốn Tôm Thịt", "Tôm tươi, thịt ba chỉ kèm rau sống chấm tương đậu", BigDecimal.valueOf(45000), "https://images.unsplash.com/photo-1544025162-d76694265947?w=500", true, 1, true, null, null),
+                new MenuItem(null, catAppetizer, "Nem Rán Truyền Thống", "Nem rán giòn rụm bên ngoài, nhân thịt mộc nhĩ đậm đà", BigDecimal.valueOf(55000), "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500", true, 2, true, null, null),
+                new MenuItem(null, catAppetizer, "Khoai Tây Chiên Bơ Tỏi", "Khoai tây giòn rụm lắc bơ tỏi thơm lừng", BigDecimal.valueOf(35000), "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500", true, 3, true, null, null),
+
+                // 2. Món chính & Cơm Mì Phở (55k - 95k)
+                new MenuItem(null, catMain, "Phở Bò Tái Nạm Hà Nội", "Bánh phở mềm mượt, bò tái nạm tươi nước dùng hầm xương 12h", BigDecimal.valueOf(55000), "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=500", true, 4, true, null, null),
+                new MenuItem(null, catMain, "Cơm Tấm Sườn Bì Chả", "Sườn nướng than hoa thơm lừng, bì dai giòn và chả trứng béo ngậy", BigDecimal.valueOf(55000), "https://images.unsplash.com/photo-1544025162-d76694265947?w=500", true, 5, true, null, null),
+                new MenuItem(null, catMain, "Bún Chả Nướng Than Hoa", "Chả viên và thịt ba chỉ nướng than hoa ăn kèm bún và nước mắm chua ngọt", BigDecimal.valueOf(50000), "https://images.unsplash.com/photo-1559847844-5315695dadae?w=500", true, 6, true, null, null),
+                new MenuItem(null, catMain, "Cơm Chiên Hải Sản", "Cơm chiên hạt giòn kết hợp tôm, mực tươi và trứng vàng óng", BigDecimal.valueOf(75000), "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500", true, 7, true, null, null),
+                new MenuItem(null, catMain, "Bò Bít Tết Sốt Tiêu Đen", "Thịt thăn bò mềm mọng dùng kèm khoai tây và sốt tiêu đen đậm đà", BigDecimal.valueOf(145000), "https://images.unsplash.com/photo-1544025162-d76694265947?w=500", true, 8, true, null, null),
+
+                // 3. Lẩu & Nướng (185k - 250k)
+                new MenuItem(null, catHotpot, "Lẩu Thái Hải Sản Chua Cay", "Nước lẩu tom yum chua cay đậm đà kèm tôm, mực, bò và nấm tươi", BigDecimal.valueOf(195000), "https://images.unsplash.com/photo-1547592180-85f173990554?w=500", true, 9, true, null, null),
+                new MenuItem(null, catHotpot, "Bò Nướng Tảng Sốt Phô Mai", "Thịt bò tảng nướng xèo xèo nhúng sốt phô mai béo ngậy", BigDecimal.valueOf(185000), "https://images.unsplash.com/photo-1558030006-450675393462?w=500", true, 10, true, null, null),
+
+                // 4. Đồ uống & Tráng miệng (15k - 35k)
+                new MenuItem(null, catDrink, "Trà Đào Cam Sả Tươi", "Trà thanh mát kết hợp đào giòn mọng nước và sả thơm", BigDecimal.valueOf(32000), "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500", true, 11, true, null, null),
+                new MenuItem(null, catDrink, "Trà Tắc Khổng Lồ", "Trà tắc chua ngọt sảng khoái giải nhiệt ngày hè", BigDecimal.valueOf(20000), "https://images.unsplash.com/photo-1556881286-fc6915169721?w=500", true, 12, true, null, null),
+                new MenuItem(null, catDrink, "Cà Phê Muối Đặc Biệt", "Cà phê pha phin truyền thống phủ lớp kem muối béo mặn", BigDecimal.valueOf(28000), "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=500", true, 13, true, null, null),
+                new MenuItem(null, catDrink, "Trà Ô Long TEA+ Chai 455ml", "Trà ô long đóng chai ướp lạnh sảng khoái", BigDecimal.valueOf(15000), "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500", true, 14, true, null, null),
+                new MenuItem(null, catDrink, "Bia Tiger Crystal Lon 330ml", "Bia Tiger bạc mát lạnh sảng khoái", BigDecimal.valueOf(25000), "https://images.unsplash.com/photo-1608270116664-5085ef158e23?w=500", true, 15, true, null, null)
         );
         menuItemRepository.saveAll(defaultItems);
     }
@@ -624,6 +800,12 @@ public class WaiterServiceImpl implements WaiterService {
         table.setReservationInfo(null);
         table.setReservedTime(null);
         tableRepository.save(table);
+
+        try {
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), TableStatus.AVAILABLE.name(), "Hủy đặt bàn");
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast cancelReservation bàn {}: {}", table.getTableNumber(), e.getMessage());
+        }
 
         return mapToWaiterTableResponse(table);
     }
@@ -689,6 +871,13 @@ public class WaiterServiceImpl implements WaiterService {
         }
         table.setStatus(targetStatus);
         tableRepository.save(table);
+
+        try {
+            realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), targetStatus.name(), "Đóng phiên bàn trống");
+            realtimeService.notifyPaymentUpdate(null, table.getId(), table.getTableNumber(), "EMPTY_SESSION_CLOSED", Map.of("tableId", table.getId(), "tableNumber", table.getTableNumber()));
+        } catch (Exception e) {
+            log.warn("[Realtime] Lỗi broadcast closeEmptySession bàn {}: {}", table.getTableNumber(), e.getMessage());
+        }
 
         return mapToWaiterTableResponse(table);
     }

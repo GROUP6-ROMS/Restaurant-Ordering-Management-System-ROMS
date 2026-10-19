@@ -36,4 +36,16 @@ public class KpiReportResponse {
 
     // Tổng số lượng hóa đơn thanh toán thành công
     private Long totalBills;
+
+    // Tổng giá vốn hàng bán (COGS - Cost of Goods Sold)
+    private BigDecimal totalCost;
+
+    // Tổng lợi nhuận gộp thực tế (Gross Profit = totalRevenue - totalCost)
+    private BigDecimal grossProfit;
+
+    // Tỷ suất lợi nhuận gộp (%) = (grossProfit / totalRevenue) * 100
+    private BigDecimal grossMarginPercent;
+
+    // Tổng số tiền giảm giá / khuyến mãi đã áp dụng trong kỳ
+    private BigDecimal totalDiscounts;
 }

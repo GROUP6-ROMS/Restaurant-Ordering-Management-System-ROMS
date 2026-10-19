@@ -240,6 +240,8 @@ export default function WaiterFloorPlanPage() {
       await waiterApi.openTable(tableId, { guestCount: target?.seats || 4 });
       showToast(`Đã mở phiên phục vụ cho ${target?.label || target?.tableNumber || tableId}!`);
       await loadFloorPlan();
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: tableId, status: 'OCCUPIED' });
+      broadcastRealtimeEvent({ type: 'NEW_ORDER_CREATED', tableId: tableId });
     } catch (err) {
       showToast(err.response?.data?.message || 'Lỗi mở phiên phục vụ bàn');
     }

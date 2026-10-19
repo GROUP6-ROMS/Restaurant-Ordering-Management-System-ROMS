@@ -4,11 +4,15 @@ import { useAuth } from '../../context/AuthContext';
 import Icon from '../common/Icon';
 import RomsLogo from '../common/RomsLogo';
 import NotificationBell from '../common/NotificationBell';
+import RestaurantProfileModal from '../admin/RestaurantProfileModal';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const restaurantProfile = useRestaurantProfile();
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -43,9 +47,20 @@ export default function AdminLayout() {
     }
   ];
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const [showConfirmLogoutModal, setShowConfirmLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleConfirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      setShowConfirmLogoutModal(false);
+      navigate('/login');
+    } catch (err) {
+      navigate('/login');
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -82,6 +97,31 @@ export default function AdminLayout() {
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#596232' }} />
             <span>Chi nhánh Q.1 (Chính)</span>
           </div>
+
+          {/* Quick Restaurant Profile Switcher / Config Button */}
+          <button
+            type="button"
+            onClick={() => setShowProfileModal(true)}
+            title="Tùy biến thương hiệu & thông tin quán (K80, VietQR, Báo cáo)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#FFFFFF',
+              border: '1.5px solid #FFDBC9',
+              padding: '5px 12px',
+              borderRadius: '9999px',
+              fontSize: '0.78rem',
+              color: '#9D4124',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}
+          >
+            <Icon name="storefront" size={16} />
+            <span>{restaurantProfile.brandName || 'Cấu Hình Quán'}</span>
+            <Icon name="tune" size={14} style={{ color: '#89726B' }} />
+          </button>
         </div>
 
         {/* Center: Clock */}
@@ -123,7 +163,7 @@ export default function AdminLayout() {
           {/* Unified Logout Button */}
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => setShowConfirmLogoutModal(true)}
             title="Đăng xuất khỏi tài khoản"
             style={{
               display: 'flex',
@@ -215,6 +255,135 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* CONFIRM DIALOG ĐĂNG XUẤT CHO QUẢN TRỊ VIÊN / QUẢN LÝ */}
+      {showConfirmLogoutModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(31, 27, 26, 0.65)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '440px',
+            width: '100%',
+            padding: '26px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
+            border: '1.5px solid #EAE0DE',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                background: '#FFDAD6',
+                color: '#BA1A1A',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Icon name="logout" size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#1F1B1A', margin: 0 }}>
+                  Xác Nhận Đăng Xuất
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 600 }}>
+                  Thoát phiên làm việc Quản trị ROMS
+                </span>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#FFF8F6',
+              borderRadius: '14px',
+              padding: '14px',
+              border: '1px solid #F0E6E4',
+              marginBottom: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: '0.82rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#89726B' }}>Quản trị viên:</span>
+                <strong style={{ color: '#1F1B1A' }}>{user?.fullName || 'Quản trị viên'} ({user?.username})</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#89726B' }}>Vai trò:</span>
+                <span style={{ fontWeight: 700, color: '#753400', background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  {user?.role || 'ADMIN'}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#56423D', lineHeight: 1.5 }}>
+              Bạn có chắc chắn muốn đăng xuất khỏi Trung Tâm Điều Hành Quản Trị?
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirmLogoutModal(false)}
+                disabled={isLoggingOut}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#F0E6E4',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#56423D',
+                  cursor: 'pointer'
+                }}
+              >
+                Ở Lại
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLogout}
+                disabled={isLoggingOut}
+                style={{
+                  flex: 1.3,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#BA1A1A',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Icon name="logout" size={18} />
+                {isLoggingOut ? 'Đang Đăng Xuất...' : 'Xác Nhận Đăng Xuất'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cấu hình Thông tin Quán & Thương hiệu Versatile */}
+      <RestaurantProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
     </div>
   );
 }

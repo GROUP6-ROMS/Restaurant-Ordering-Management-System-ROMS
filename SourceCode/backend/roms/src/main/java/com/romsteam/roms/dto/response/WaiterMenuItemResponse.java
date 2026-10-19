@@ -20,4 +20,5 @@ public class WaiterMenuItemResponse {
     private String category;
     private Long categoryId;
     private Boolean isAvailable;
+    private Integer remainingStock;
 }

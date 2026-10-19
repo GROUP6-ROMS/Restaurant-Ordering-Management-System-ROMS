@@ -72,9 +72,9 @@ export default function CustomerTrackingPage() {
       fetchTracking(true);
     }, 6000);
 
-    // Lắng nghe sự kiện realtime từ tab khác (Bếp hoặc Phục vụ vừa thao tác)
+    // Lắng nghe sự kiện realtime qua WebSocket STOMP & BroadcastChannel
     const unsubscribe = subscribeRealtimeEvents((event) => {
-      if (['ORDER_STATUS_CHANGED', 'ITEM_STATUS_UPDATED', 'NEW_ORDER_CREATED', 'CALL_WAITER', 'CALL_BILL'].includes(event?.type)) {
+      if (['ORDER_STATUS_CHANGED', 'ITEM_STATUS_UPDATED', 'NEW_ORDER_CREATED', 'CALL_WAITER', 'CALL_BILL', 'ORDER_UPDATE', 'TABLE_UPDATE', 'BILL_PAID', 'SESSION_CLOSED'].includes(event?.type)) {
         fetchTracking(true);
       }
     });

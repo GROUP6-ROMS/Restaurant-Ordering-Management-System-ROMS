@@ -7,7 +7,6 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Bất kỳ request nào bắt đầu bằng /api đều được chuyển sang Backend Spring Boot
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
@@ -15,6 +14,16 @@ export default defineConfig({
         headers: {
           Origin: 'http://localhost:5173'
         }
+      },
+      '/ws-roms-native': {
+        target: 'http://localhost:8080',
+        ws: true,
+        changeOrigin: true
+      },
+      '/ws-roms': {
+        target: 'http://localhost:8080',
+        ws: true,
+        changeOrigin: true
       }
     }
   }

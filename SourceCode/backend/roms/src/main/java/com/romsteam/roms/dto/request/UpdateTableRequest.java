@@ -16,7 +16,7 @@ public class UpdateTableRequest {
     @NotBlank(message = "Mã bàn không được để trống")
     private String tableNumber;
 
-    // Tên bàn hiển thị (ví dụ: "Bàn T-01", "Phòng Hoàng Gia")
+    // Tên bàn hiển thị (ví dụ: "Bàn T-01", "Bàn Tiệc Gia Đình")
     private String name;
 
     // Khu vực: "ZONE_1" (Sảnh chính), "ZONE_2" (Ban công), "VIP" (Phòng VIP)

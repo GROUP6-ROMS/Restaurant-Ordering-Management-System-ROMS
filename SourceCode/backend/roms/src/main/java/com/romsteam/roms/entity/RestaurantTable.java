@@ -30,7 +30,7 @@ public class RestaurantTable {
     @Column(name = "table_number", nullable = false, unique = true, length = 30)
     private String tableNumber;
 
-    // Tên bàn hiển thị thân thiện (ví dụ: "Bàn T-01", "Ban Công 01", "Hoàng Gia")
+    // Tên bàn hiển thị thân thiện (ví dụ: "Bàn T-01", "Ban Công 01", "Bàn Tiệc Gia Đình")
     @Column(name = "name", columnDefinition = "NVARCHAR(100)")
     private String name;
 

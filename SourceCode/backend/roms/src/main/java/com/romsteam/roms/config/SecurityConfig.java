@@ -85,14 +85,25 @@ public class SecurityConfig {
 
                 // Phân quyền endpoints
                 .authorizeHttpRequests(auth -> auth
+                        // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/customer/**",
+                                "/api/customer/tables/verify-qr",
+                                "/api/customer/reservations/**",
+                                "/api/customer/dining/menu",
                                 "/api/reservations/book",
+                                "/ws-roms/**",
+                                "/ws-roms-native/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html")
                         .permitAll()
+
+                        // 2. Nghiệp vụ gọi món và vận hành tại bàn: Bắt buộc phải có Dining Token (ROLE_CUSTOMER) hoặc tài khoản Nhân viên
+                        .requestMatchers("/api/customer/dining/**")
+                        .hasAnyRole("CUSTOMER", "WAITER", "MANAGER", "ADMIN")
+
+                        // 3. Các request còn lại bắt buộc phải xác thực
                         .anyRequest().authenticated())
 
                 // Đặt bộ lọc JWT chạy trước UsernamePasswordAuthenticationFilter

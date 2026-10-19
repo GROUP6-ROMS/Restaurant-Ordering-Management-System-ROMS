@@ -145,7 +145,7 @@ public class ReservationServiceImpl implements ReservationService {
                     break;
                 case "VIP":
                     zoneName = "Phòng Riêng VIP Sang Trọng";
-                    desc = "Cách âm tuyệt đối, nội thất hoàng gia, thích hợp tiếp khách đối tác và tiệc gia đình thân mật.";
+                    desc = "Cách âm tốt, không gian riêng tư ấm cúng, thích hợp họp mặt đối tác, liên hoan và tiệc gia đình thân mật.";
                     badge = "Riêng tư";
                     break;
                 case "ZONE_1":

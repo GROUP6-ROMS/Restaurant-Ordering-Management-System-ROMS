@@ -4,7 +4,9 @@ import com.romsteam.roms.dto.request.UpdateKitchenStatusRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.KitchenOrderResponse;
 import com.romsteam.roms.dto.response.KitchenSummaryResponse;
+import com.romsteam.roms.dto.response.AdminMenuItemResponse;
 import com.romsteam.roms.service.KitchenService;
+import com.romsteam.roms.service.MenuService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ import java.util.List;
 public class KitchenController {
 
     private final KitchenService kitchenService;
+    private final MenuService menuService;
 
     /**
      * 1. Lấy toàn bộ danh sách các đơn đang cần chế biến
@@ -78,5 +81,26 @@ public class KitchenController {
     public ResponseEntity<ApiResponse<KitchenSummaryResponse>> getSummary() {
         KitchenSummaryResponse summary = kitchenService.getKitchenSummary();
         return ResponseEntity.ok(ApiResponse.success(summary, "Lấy thông số hiệu suất bếp thành công"));
+    }
+
+    /**
+     * 6. Lấy danh sách thực đơn để Bếp quản lý trạng thái Tạm Hết (86'd)
+     * GET /api/kitchen/menu-items
+     */
+    @GetMapping("/menu-items")
+    public ResponseEntity<ApiResponse<List<AdminMenuItemResponse>>> getKitchenMenuItems() {
+        List<AdminMenuItemResponse> dishes = menuService.searchMenuItems(null, null, null, null);
+        return ResponseEntity.ok(ApiResponse.success(dishes, "Lấy danh sách món cho Bếp thành công"));
+    }
+
+    /**
+     * 7. Bật / Tắt trạng thái 86'd (Tạm hết / Mở bán) trực tiếp từ màn hình Bếp
+     * PATCH /api/kitchen/items/{itemId}/availability
+     */
+    @PatchMapping("/items/{itemId}/availability")
+    public ResponseEntity<ApiResponse<AdminMenuItemResponse>> toggleItemAvailability(
+            @PathVariable Long itemId) {
+        AdminMenuItemResponse updated = menuService.toggleMenuItemAvailability(itemId);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái món thành công"));
     }
 }

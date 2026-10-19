@@ -42,4 +42,6 @@ public class CreateMenuItemRequest {
     private String imageUrl;
 
     private Integer displayOrder;
+
+    private Integer dailyStock; // Định mức mở bán trong ngày (ví dụ: 50 phần)
 }
