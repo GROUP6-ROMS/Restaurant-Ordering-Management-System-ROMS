@@ -2,22 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { kitchenApi } from '../../api/kitchenApi';
 import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
-// Icon Material Symbols
-function Icon({ name, size = 20, fill = 0, style = {} }) {
-  return (
-    <span
-      className="material-icon"
-      style={{
-        fontSize: size,
-        fontVariationSettings: `'FILL' ${fill}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
-        lineHeight: 1, verticalAlign: 'middle',
-        ...style
-      }}
-    >
-      {name}
-    </span>
-  );
-}
+import Icon from '../../components/common/Icon';
 
 // Đồng hồ đếm thời gian - trả về số giây đã trôi qua
 function useElapsedSeconds(startTimeString) {

@@ -50,6 +50,18 @@ export default function AdminLayout() {
   const [showConfirmLogoutModal, setShowConfirmLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // Accessibility: Lắng nghe phím Escape để đóng nhanh các modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showConfirmLogoutModal) setShowConfirmLogoutModal(false);
+        if (showProfileModal) setShowProfileModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showConfirmLogoutModal, showProfileModal]);
+
   const handleConfirmLogout = async () => {
     try {
       setIsLoggingOut(true);

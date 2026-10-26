@@ -43,6 +43,18 @@ export default function StaffLayout() {
   const [showCashierShiftModal, setShowCashierShiftModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // Accessibility: Lắng nghe phím Escape để đóng nhanh các modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showConfirmLogoutModal) setShowConfirmLogoutModal(false);
+        if (showCashierShiftModal) setShowCashierShiftModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showConfirmLogoutModal, showCashierShiftModal]);
+
   // Digital clock update
   useEffect(() => {
     const update = () => {

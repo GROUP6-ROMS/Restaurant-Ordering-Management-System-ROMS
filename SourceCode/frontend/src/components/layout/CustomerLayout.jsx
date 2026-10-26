@@ -1,26 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import RomsLogo from '../common/RomsLogo';
+import Icon from '../common/Icon';
 import { customerApi } from '../../api/customerApi';
 import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
-
-// Icon Material Symbols
-function Icon({ name, size = 22, fill = 0, style = {} }) {
-  return (
-    <span
-      className="material-icon"
-      style={{
-        fontSize: size,
-        fontVariationSettings: `'FILL' ${fill}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
-        lineHeight: 1, verticalAlign: 'middle',
-        ...style
-      }}
-    >
-      {name}
-    </span>
-  );
-}
 
 function formatVND(amount) {
   return amount.toLocaleString('vi-VN') + 'đ';
@@ -68,6 +52,17 @@ export default function CustomerLayout() {
   const isMenu = location.pathname.includes('/menu');
   const isCart = location.pathname.includes('/cart');
   const isTracking = location.pathname.includes('/tracking');
+
+  // Accessibility: Lắng nghe phím Escape để đóng Modal hỗ trợ
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showAssistModal) {
+        setShowAssistModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAssistModal]);
 
   return (
     <div style={{
@@ -122,6 +117,7 @@ export default function CustomerLayout() {
         {/* Nut goi phu vu */}
         <button
           onClick={handleCallWaiter}
+          aria-label="Gọi nhân viên phục vụ tại bàn"
           style={{
             width: 40, height: 40, borderRadius: '50%',
             background: 'var(--surface-container-high)',
@@ -306,7 +302,11 @@ export default function CustomerLayout() {
 
       {/* --- Modal Bảng Chọn Nhanh Yêu Cầu Hỗ Trợ --- */}
       {showAssistModal && (
-        <div style={{
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Bảng chọn nhanh yêu cầu hỗ trợ tại bàn"
+          style={{
           position: 'fixed', inset: 0, zIndex: 9999,
           background: 'rgba(31, 27, 26, 0.65)',
           backdropFilter: 'blur(4px)',
@@ -334,6 +334,7 @@ export default function CustomerLayout() {
               <button
                 type="button"
                 onClick={() => setShowAssistModal(false)}
+                aria-label="Đóng bảng yêu cầu hỗ trợ"
                 style={{
                   width: 32, height: 32, borderRadius: '50%',
                   background: '#F6ECEA', border: 'none',

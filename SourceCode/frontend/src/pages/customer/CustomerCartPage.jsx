@@ -4,22 +4,7 @@ import { useCart } from '../../context/CartContext';
 import { customerApi } from '../../api/customerApi';
 import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
 
-// Icon Material Symbols
-function Icon({ name, size = 22, fill = 0, style = {} }) {
-  return (
-    <span
-      className="material-icon"
-      style={{
-        fontSize: size,
-        fontVariationSettings: `'FILL' ${fill}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
-        lineHeight: 1, verticalAlign: 'middle',
-        ...style
-      }}
-    >
-      {name}
-    </span>
-  );
-}
+import Icon from '../../components/common/Icon';
 
 // Format tien VND
 function formatVND(amount) {

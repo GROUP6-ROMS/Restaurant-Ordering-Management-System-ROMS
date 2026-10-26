@@ -4,6 +4,8 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import AppRoutes from './routes/AppRoutes';
 
+import ConnectionStatusBar from './components/common/ConnectionStatusBar';
+
 // Component goc boc cac Context Provider toan cuc cho ROMS
 export default function App() {
   return (
@@ -13,6 +15,7 @@ export default function App() {
         {/* Quan ly gio hang thuc khach va phien ban an */}
         <CartProvider>
           <div className="roms-application-root">
+            <ConnectionStatusBar />
             <AppRoutes />
           </div>
         </CartProvider>

@@ -4,9 +4,7 @@
    Primary: #9d4124 | Surface: #fff8f6 | Secondary: #994703 | Tertiary: #596232
    ========================================================================== */
 
-/* --- Import Fonts: Inter, JetBrains Mono & Material Symbols (Hỗ trợ 100% tiếng Việt mượt mà, thanh thoát) --- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+/* Note: Fonts & Material Symbols are loaded via <link> in index.html for non-blocking parallel fetch */
 
 /* --- Map font-family Epilogue and Plus Jakarta Sans sang Inter để nét chữ thanh mảnh, cân đối --- */
 @font-face {
