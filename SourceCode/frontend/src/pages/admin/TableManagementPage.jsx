@@ -2738,7 +2738,13 @@ export default function TableManagementPage() {
               display: 'inline-block'
             }}>
               <img
-                src={selectedQrTable.qrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://roms.restaurant/order/${selectedQrTable.code}`}
+                src={(() => {
+                  const baseDomain = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost'))
+                    ? window.location.origin
+                    : 'http://roms-restaurant.duckdns.org';
+                  const target = `${baseDomain}/dining/welcome?table=${selectedQrTable.id}&token=${selectedQrTable.qrToken || ''}`;
+                  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(target)}`;
+                })()}
                 alt={`Mã QR ${selectedQrTable.code}`}
                 style={{ width: '200px', height: '200px', borderRadius: '12px', display: 'block' }}
               />
@@ -4260,7 +4266,13 @@ export default function TableManagementPage() {
                     marginBottom: '8px'
                   }}>
                     <img
-                      src={t.qrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=http://192.168.0.92:5173/dining/welcome?table=${t.id}%26token=${t.qrToken}`}
+                      src={(() => {
+                        const baseDomain = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost'))
+                          ? window.location.origin
+                          : 'http://roms-restaurant.duckdns.org';
+                        const target = `${baseDomain}/dining/welcome?table=${t.id}&token=${t.qrToken || ''}`;
+                        return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(target)}`;
+                      })()}
                       alt={`Mã QR ${t.code}`}
                       style={{ width: '170px', height: '170px', display: 'block', borderRadius: '8px' }}
                     />

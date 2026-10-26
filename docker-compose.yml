@@ -61,7 +61,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:sqlserver://${DB_HOST:-database}:1433;databaseName=ROMS_DB;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true;
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-sa}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
-      - APP_FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - APP_FRONTEND_URL=${FRONTEND_URL:-http://roms-restaurant.duckdns.org}
       - JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     depends_on:
       db-init:

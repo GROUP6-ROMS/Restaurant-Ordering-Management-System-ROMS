@@ -2482,9 +2482,14 @@ export default function WaiterFloorPlanPage() {
             }}>
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  selectedTable.qrToken
-                    ? `${window.location.origin}/dining/welcome?table=${selectedTable.id}&token=${selectedTable.qrToken}`
-                    : `${window.location.origin}/dining/welcome?table=${selectedTable.tableNumber}`
+                  (() => {
+                    const baseDomain = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost'))
+                      ? window.location.origin
+                      : 'http://roms-restaurant.duckdns.org';
+                    return selectedTable.qrToken
+                      ? `${baseDomain}/dining/welcome?table=${selectedTable.id}&token=${selectedTable.qrToken}`
+                      : `${baseDomain}/dining/welcome?table=${selectedTable.tableNumber}`;
+                  })()
                 )}`}
                 alt="QR Code Bàn"
                 style={{ width: '180px', height: '180px', display: 'block' }}

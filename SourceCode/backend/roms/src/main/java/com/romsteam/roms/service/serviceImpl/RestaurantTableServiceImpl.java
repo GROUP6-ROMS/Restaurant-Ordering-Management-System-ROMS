@@ -65,7 +65,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
     private final com.romsteam.roms.security.JwtTokenProvider jwtTokenProvider;
     private final com.romsteam.roms.service.RealtimeService realtimeService;
 
-    @Value("${app.frontend.url:http://localhost:5173}")
+    @Value("${app.frontend.url:http://roms-restaurant.duckdns.org}")
     private String frontendBaseUrl;
 
     // ===================================================================
@@ -509,10 +509,10 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             bufferLockCustomer = table.getReservationInfo();
         }
 
-        // Tạo link gọi món thực tế dẫn tới màn hình chào bàn của khách
-        String baseUrl = (frontendBaseUrl != null && !frontendBaseUrl.trim().isEmpty())
+        // Tạo link gọi món thực tế dẫn tới màn hình chào bàn của khách (ưu tiên domain công khai)
+        String baseUrl = (frontendBaseUrl != null && !frontendBaseUrl.trim().isEmpty() && !frontendBaseUrl.contains("localhost"))
                 ? frontendBaseUrl.trim()
-                : "http://localhost:5173";
+                : "http://roms-restaurant.duckdns.org";
         String targetDiningUrl = baseUrl + "/dining/welcome?table=" + table.getId() + "&token=" + table.getQrToken();
 
         // Tạo URL ảnh mã QR (sử dụng API QR server chuẩn mã hóa UTF-8)
