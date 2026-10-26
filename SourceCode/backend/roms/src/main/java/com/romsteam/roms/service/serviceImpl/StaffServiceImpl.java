@@ -88,6 +88,9 @@ public class StaffServiceImpl implements StaffService {
         staff.setRole(request.getRole());
         if (request.getIsActive() != null) {
             staff.setIsActive(request.getIsActive());
+            if (Boolean.TRUE.equals(request.getIsActive())) {
+                staff.resetFailedAttempts();
+            }
         }
 
         Staff updated = staffRepository.save(staff);
@@ -102,8 +105,10 @@ public class StaffServiceImpl implements StaffService {
                 .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
 
         staff.setPinCode(passwordEncoder.encode(request.getNewPinCode().trim()));
+        // Khi Quản lý cấp lại mã PIN, tự động mở khóa tài khoản và đặt lại số lần nhập sai
+        staff.unlock();
         staffRepository.save(staff);
-        log.info("Manager reset PIN code for staff ID={}", id);
+        log.info("Manager reset PIN code and unlocked staff ID={}", id);
     }
 
     @Override
@@ -116,10 +121,25 @@ public class StaffServiceImpl implements StaffService {
         staff.setIsActive(newStatus);
         if (!newStatus) {
             staff.setIsOnShift(false);
+        } else {
+            // Khi mở khóa lại, đặt lại số lần nhập sai PIN về 0
+            staff.resetFailedAttempts();
         }
 
         Staff saved = staffRepository.save(staff);
         log.info("Manager toggled active status for staff ID={} -> {}", id, newStatus);
+        return mapToStaffResponse(saved, LocalDate.now());
+    }
+
+    @Override
+    @Transactional
+    public StaffResponse unlockStaff(Long id) {
+        Staff staff = staffRepository.findById(id)
+                .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
+
+        staff.unlock();
+        Staff saved = staffRepository.save(staff);
+        log.info("Manager unlocked staff ID={}, reset failed attempts to 0", id);
         return mapToStaffResponse(saved, LocalDate.now());
     }
 
@@ -257,15 +277,20 @@ public class StaffServiceImpl implements StaffService {
         List<StaffSchedule> todaySchedules = staffScheduleRepository.findByStaffAndWorkDate(s, today);
         String shiftInfo = formatShiftInfo(todaySchedules);
 
+        boolean isLocked = s.isLocked();
         return StaffResponse.builder()
                 .id(s.getId())
                 .username(s.getUsername())
                 .fullName(s.getFullName())
                 .phone(s.getPhone())
+                .email(s.getEmail())
                 .role(s.getRole())
                 .roleLabel(getRoleLabel(s.getRole()))
                 .isActive(s.getIsActive())
                 .isOnShift(s.getIsOnShift())
+                .failedPinAttempts(s.getFailedPinAttempts() != null ? s.getFailedPinAttempts() : 0)
+                .isLocked(isLocked)
+                .lockedAt(s.getLockedAt())
                 .currentShift(shiftInfo)
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())

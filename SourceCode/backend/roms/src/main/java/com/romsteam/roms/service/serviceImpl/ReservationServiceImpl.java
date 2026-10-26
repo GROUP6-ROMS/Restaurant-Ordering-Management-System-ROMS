@@ -217,9 +217,32 @@ public class ReservationServiceImpl implements ReservationService {
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt bàn #" + reservationId));
 
         // Lấy toàn bộ các bàn đang trống (AVAILABLE) đang hoạt động trong nhà hàng
-        // Quản lý có thể linh hoạt chọn bất kỳ bàn nào còn trống mà không bị ràng buộc sức chứa hay khu vực
         List<RestaurantTable> tables = tableRepository.findByStatusAndIsActiveTrue(TableStatus.AVAILABLE);
-        tables.sort(Comparator.comparing(RestaurantTable::getTableNumber));
+
+        final String reqZone = res.getRequestedZone();
+        final int guests = res.getGuestCount() != null ? res.getGuestCount() : 1;
+
+        // Ưu tiên sắp xếp:
+        // 1. Các bàn thuộc đúng phân khu khách yêu cầu lên đầu
+        // 2. Bàn có sức chứa phù hợp (capacity >= số khách)
+        // 3. Sắp xếp tự nhiên theo số bàn (tableNumber)
+        tables.sort((t1, t2) -> {
+            boolean t1Zone = reqZone != null && reqZone.equalsIgnoreCase(t1.getZone());
+            boolean t2Zone = reqZone != null && reqZone.equalsIgnoreCase(t2.getZone());
+            if (t1Zone != t2Zone) {
+                return t1Zone ? -1 : 1;
+            }
+
+            boolean t1Fit = t1.getCapacity() != null && t1.getCapacity() >= guests;
+            boolean t2Fit = t2.getCapacity() != null && t2.getCapacity() >= guests;
+            if (t1Fit != t2Fit) {
+                return t1Fit ? -1 : 1;
+            }
+
+            String num1 = t1.getTableNumber() != null ? t1.getTableNumber() : "";
+            String num2 = t2.getTableNumber() != null ? t2.getTableNumber() : "";
+            return num1.compareToIgnoreCase(num2);
+        });
 
         return tables.stream().map(t -> {
             String zName = "Sảnh Chính";

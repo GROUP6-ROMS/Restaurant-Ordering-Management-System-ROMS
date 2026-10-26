@@ -23,6 +23,8 @@ public interface StaffService {
 
     StaffResponse toggleActiveStatus(Long id);
 
+    StaffResponse unlockStaff(Long id);
+
     StaffSummaryResponse getStaffSummary();
 
     // 2. Quản lý Phân ca Trực (Shift Scheduling)

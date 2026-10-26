@@ -16,10 +16,14 @@ public class StaffResponse {
     private String username;
     private String fullName;
     private String phone;
+    private String email;
     private UserRole role;
     private String roleLabel;
     private Boolean isActive;
     private Boolean isOnShift;
+    private Integer failedPinAttempts;
+    private Boolean isLocked;
+    private LocalDateTime lockedAt;
     private String currentShift;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

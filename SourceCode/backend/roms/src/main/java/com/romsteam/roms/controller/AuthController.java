@@ -1,6 +1,8 @@
 package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.LoginRequest;
+import com.romsteam.roms.dto.request.RequestOtpRequest;
+import com.romsteam.roms.dto.request.ResetPinRequest;
 import com.romsteam.roms.dto.request.VerifyManagerPinRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.LoginResponse;
@@ -51,5 +53,19 @@ public class AuthController {
             authService.logout(username);
         }
         return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất ca làm việc thành công!"));
+    }
+
+    // POST /api/auth/forgot-pin/request-otp - Yeu cau ma OTP dat lai ma PIN Quan ly
+    @PostMapping("/forgot-pin/request-otp")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> requestPinResetOtp(@Valid @RequestBody RequestOtpRequest request) {
+        Map<String, Object> result = authService.requestPinResetOtp(request);
+        return ResponseEntity.ok(ApiResponse.success(result, "Yêu cầu mã xác thực OTP thành công!"));
+    }
+
+    // POST /api/auth/forgot-pin/reset - Dat lai ma PIN bang OTP hoac Master Recovery Key
+    @PostMapping("/forgot-pin/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPinWithOtpOrRecoveryKey(@Valid @RequestBody ResetPinRequest request) {
+        authService.resetPinWithOtpOrRecoveryKey(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mã PIN thành công! Bạn có thể sử dụng mã PIN mới để đăng nhập."));
     }
 }

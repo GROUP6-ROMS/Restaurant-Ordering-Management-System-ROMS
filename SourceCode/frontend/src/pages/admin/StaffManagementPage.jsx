@@ -455,13 +455,18 @@ export default function StaffManagementPage() {
 
   // Khóa / Mở khóa tài khoản nhân viên
   const handleToggleStatus = async (staff) => {
-    const actionName = staff.isActive ? 'tạm khóa' : 'mở khóa kích hoạt';
-    if (!window.confirm(`Bạn có chắc chắn muốn ${actionName} tài khoản của [${staff.fullName}] (${staff.username})?`)) {
+    const isLockedDueToPin = (staff.failedPinAttempts != null && staff.failedPinAttempts >= 5) || !staff.isActive;
+    const actionName = !staff.isActive ? 'mở khóa kích hoạt' : 'tạm khóa';
+    const confirmPrompt = isLockedDueToPin && !staff.isActive
+      ? `Tài khoản của [${staff.fullName}] (${staff.username}) đang bị KHÓA do nhập sai mã PIN ${staff.failedPinAttempts || 5} lần. Bạn có chắc chắn muốn MỞ KHÓA và đặt lại số lần thử?`
+      : `Bạn có chắc chắn muốn ${actionName} tài khoản của [${staff.fullName}] (${staff.username})?`;
+
+    if (!window.confirm(confirmPrompt)) {
       return;
     }
 
     try {
-      const res = await staffApi.toggleStatus(staff.id);
+      const res = !staff.isActive ? await staffApi.unlockStaff(staff.id) : await staffApi.toggleStatus(staff.id);
       const msg = res?.data?.message || res?.message || 'Cập nhật trạng thái tài khoản thành công!';
       showToast(msg);
       fetchStaff();
@@ -2178,9 +2183,13 @@ export default function StaffManagementPage() {
                               <span style={{
                                 fontSize: '0.74rem',
                                 fontWeight: 700,
-                                color: staff.isActive ? '#059669' : '#6B7280'
+                                color: staff.isActive ? (staff.failedPinAttempts > 0 ? '#D97706' : '#059669') : '#DC2626'
                               }}>
-                                {staff.isActive ? 'Hoạt động' : 'Đã khóa'}
+                                {staff.isActive ? (
+                                  staff.failedPinAttempts > 0 ? `Hoạt động (Sai PIN: ${staff.failedPinAttempts}/5)` : 'Hoạt động'
+                                ) : (
+                                  (staff.failedPinAttempts >= 5 || staff.isLocked) ? 'Đã khóa (Sai PIN 5 lần)' : 'Đã khóa'
+                                )}
                               </span>
                             </div>
                           </td>
@@ -2312,7 +2321,7 @@ export default function StaffManagementPage() {
                                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                                   >
                                     <Icon name={staff.isActive ? 'lock' : 'lock_open'} size={16} style={{ color: staff.isActive ? '#DC2626' : '#059669' }} />
-                                    {staff.isActive ? 'Khóa Tài Khoản' : 'Mở Khóa Tài Khoản'}
+                                    {staff.isActive ? 'Khóa Tài Khoản' : ((staff.failedPinAttempts >= 5 || staff.isLocked) ? 'Mở Khóa (Sai PIN 5 lần)' : 'Mở Khóa Tài Khoản')}
                                   </button>
                                 </div>
                               )}

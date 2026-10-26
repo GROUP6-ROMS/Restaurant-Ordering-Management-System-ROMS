@@ -4,6 +4,7 @@ import com.romsteam.roms.dto.request.AssignTableReservationRequest;
 import com.romsteam.roms.dto.request.CreateReservationRequest;
 import com.romsteam.roms.dto.request.ReservationItemRequest;
 import com.romsteam.roms.dto.response.ReservationResponse;
+import com.romsteam.roms.dto.response.TableResponse;
 import com.romsteam.roms.entity.*;
 import com.romsteam.roms.entity.enums.ReservationStatus;
 import com.romsteam.roms.entity.enums.TableStatus;
@@ -185,4 +186,38 @@ class ReservationServiceTest {
                 .isInstanceOf(AppException.class)
                 .hasMessageContaining("hiện không ở trạng thái trống");
     }
+
+    @Test
+    @DisplayName("5. Gợi ý bàn trống khả dụng: Ưu tiên bàn thuộc khu vực khách đặt và đủ sức chứa lên trước")
+    void getAvailableTablesForReservation_PrioritizesRequestedZoneAndCapacity() {
+        // Đơn đặt cho 4 khách tại khu vực VIP
+        Reservation reservation = Reservation.builder()
+                .id(10L)
+                .requestedZone("VIP")
+                .guestCount(4)
+                .build();
+
+        // 3 bàn trống ở các khu vực khác nhau
+        RestaurantTable t1 = RestaurantTable.builder()
+                .id(1L).tableNumber("T-01").name("Bàn 1").zone("ZONE_1").capacity(4).status(TableStatus.AVAILABLE).isActive(true).build();
+        RestaurantTable t2 = RestaurantTable.builder()
+                .id(2L).tableNumber("VIP-01").name("Phòng VIP 1").zone("VIP").capacity(2).status(TableStatus.AVAILABLE).isActive(true).build();
+        RestaurantTable t3 = RestaurantTable.builder()
+                .id(3L).tableNumber("VIP-02").name("Phòng VIP 2").zone("VIP").capacity(6).status(TableStatus.AVAILABLE).isActive(true).build();
+
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(tableRepository.findByStatusAndIsActiveTrue(TableStatus.AVAILABLE))
+                .thenReturn(new ArrayList<>(List.of(t1, t2, t3)));
+
+        // Act
+        List<TableResponse> results = reservationService.getAvailableTablesForReservation(10L);
+
+        // Assert: Bàn VIP-02 (VIP + đủ 6 chỗ) phải đứng đầu, tiếp theo là VIP-01 (VIP), sau cùng là T-01 (ZONE_1)
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).getCode()).isEqualTo("VIP-02");
+        assertThat(results.get(0).getZone()).isEqualTo("VIP");
+        assertThat(results.get(1).getCode()).isEqualTo("VIP-01");
+        assertThat(results.get(2).getCode()).isEqualTo("T-01");
+    }
 }
+

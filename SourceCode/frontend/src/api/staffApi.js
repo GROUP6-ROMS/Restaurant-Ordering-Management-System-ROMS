@@ -36,6 +36,11 @@ export const staffApi = {
         return axiosClient.patch(`/admin/staff/${id}/toggle-status`);
     },
 
+    // 7.1. Mở khóa tài khoản nhân viên (đặt lại số lần thử PIN sai về 0)
+    unlockStaff: (id) => {
+        return axiosClient.patch(`/admin/staff/${id}/unlock`);
+    },
+
     // 8. Lấy lịch phân ca của một ngày (Ca Sáng & Ca Tối)
     getDaySchedule: (date) => {
         return axiosClient.get('/admin/staff/schedules', { params: { date } });

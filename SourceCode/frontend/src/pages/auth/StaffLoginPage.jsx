@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth, getRoleHome } from '../../context/AuthContext';
 import Icon from '../../components/common/Icon';
 import RomsLogo from '../../components/common/RomsLogo';
+import { authApi } from '../../api/authApi';
 
 const PRESET_ACCOUNTS = [
   { role: 'MANAGER', roleLabel: 'Quản Lý', code: 'MGR-001', pin: '123456', name: 'Dương Trong', icon: 'shield_person', color: '#9D4124' },
@@ -21,6 +22,19 @@ export default function StaffLoginPage() {
   const [activeRole, setActiveRole] = useState('MANAGER');
   const [activeField, setActiveField] = useState('pin'); // 'code' or 'pin'
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Modal Khôi phục mã PIN Quản lý
+  const [showForgotPinModal, setShowForgotPinModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1); // 1: request OTP, 2: reset PIN
+  const [forgotUsername, setForgotUsername] = useState('MGR-001');
+  const [otpOrKey, setOtpOrKey] = useState('');
+  const [newPinCode, setNewPinCode] = useState('');
+  const [confirmPinCode, setConfirmPinCode] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState(null);
+  const [forgotSuccess, setForgotSuccess] = useState(null);
+  const [otpHint, setOtpHint] = useState(null);
+  const [maskedEmail, setMaskedEmail] = useState(null);
 
   // Không ép tự động chuyển hướng để cho phép nhân viên đổi ca / chọn vai trò khác
   // Nếu muốn vào tiếp ca hiện tại, người dùng có nút bấm nhanh "Vào ca →" trên thông báo
@@ -84,6 +98,89 @@ export default function StaffLoginPage() {
     } else {
       // 3. Nếu sai mã PIN hoặc tài khoản không tồn tại -> Báo lỗi đỏ lên giao diện
       setErrorMessage(result.message);
+    }
+  };
+
+  // Mở modal Khôi phục mã PIN Quản lý
+  const handleOpenForgotPin = () => {
+    if (employeeCode.startsWith('MGR') || activeRole === 'MANAGER') {
+      setForgotUsername(employeeCode);
+    } else {
+      setForgotUsername('MGR-001');
+    }
+    setForgotStep(1);
+    setForgotError(null);
+    setForgotSuccess(null);
+    setOtpOrKey('');
+    setNewPinCode('');
+    setConfirmPinCode('');
+    setOtpHint(null);
+    setShowForgotPinModal(true);
+  };
+
+  // Bước 1: Yêu cầu cấp mã OTP
+  const handleRequestOtp = async (e) => {
+    if (e) e.preventDefault();
+    if (!forgotUsername.trim()) {
+      setForgotError('Vui lòng nhập Mã Nhân Viên Quản lý!');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError(null);
+    try {
+      const res = await authApi.requestPinResetOtp(forgotUsername.trim());
+      const data = res.data?.data || res.data || {};
+      setOtpHint(data.otpHint || null);
+      setMaskedEmail(data.maskedEmail || 'email');
+      setForgotSuccess(data.message || 'Đã tạo mã OTP khôi phục thành công!');
+      setForgotStep(2);
+      if (data.otpHint) {
+        setOtpOrKey(data.otpHint);
+      }
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Không thể yêu cầu mã OTP. Vui lòng kiểm tra lại!');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // Bước 2: Đặt lại mã PIN bằng OTP hoặc Master Key
+  const handleResetPin = async (e) => {
+    if (e) e.preventDefault();
+    if (!otpOrKey.trim()) {
+      setForgotError('Vui lòng nhập mã OTP hoặc Master Recovery Key!');
+      return;
+    }
+    if (!newPinCode || newPinCode.length !== 6 || !/^\d{6}$/.test(newPinCode)) {
+      setForgotError('Mã PIN mới phải gồm chính xác 6 chữ số!');
+      return;
+    }
+    if (newPinCode !== confirmPinCode) {
+      setForgotError('Mã PIN xác nhận không trùng khớp!');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError(null);
+    try {
+      await authApi.resetPinWithOtpOrRecoveryKey({
+        username: forgotUsername.trim(),
+        otpOrRecoveryKey: otpOrKey.trim(),
+        newPinCode: newPinCode.trim(),
+        confirmPinCode: confirmPinCode.trim()
+      });
+      setForgotSuccess('Đặt lại mã PIN thành công! Đang tự động điền mã PIN mới...');
+      setEmployeeCode(forgotUsername.trim());
+      setPin(newPinCode.trim());
+      setActiveRole('MANAGER');
+      setErrorMessage(null);
+      setTimeout(() => {
+        setShowForgotPinModal(false);
+        setForgotSuccess(null);
+      }, 1500);
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Không thể đặt lại mã PIN. Vui lòng thử lại!');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -328,6 +425,32 @@ export default function StaffLoginPage() {
                 <Icon name="login" size={20} />
                 Vào Ca Làm Việc
               </button>
+
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={handleOpenForgotPin}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#9D4124',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  <Icon name="lock_reset" size={16} />
+                  Quên mã PIN Quản Lý?
+                </button>
+              </div>
             </form>
           </div>
 
@@ -477,6 +600,303 @@ export default function StaffLoginPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Khôi Phục Mã PIN Quản Lý */}
+      {showForgotPinModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '28px',
+            boxShadow: '0 25px 60px -15px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: '#FFF8F6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#9D4124'
+                }}>
+                  <Icon name="lock_reset" size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#1F1B1A', fontFamily: "'Epilogue', sans-serif" }}>
+                    Khôi Phục Mã PIN Quản Lý
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#89726B' }}>
+                    {forgotStep === 1 ? 'Bước 1: Xác thực tài khoản' : 'Bước 2: Cài đặt mã PIN mới'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForgotPinModal(false)}
+                style={{
+                  background: '#F6ECEA',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#56423D'
+                }}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            {/* Error / Success Messages */}
+            {forgotError && (
+              <div style={{
+                background: '#FFDAD6',
+                color: '#BA1A1A',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                marginBottom: '14px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Icon name="error" size={16} />
+                <span>{forgotError}</span>
+              </div>
+            )}
+
+            {forgotSuccess && (
+              <div style={{
+                background: '#D4EDDA',
+                color: '#155724',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                marginBottom: '14px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Icon name="check_circle" size={16} />
+                <span>{forgotSuccess}</span>
+              </div>
+            )}
+
+            {/* STEP 1: Request OTP */}
+            {forgotStep === 1 && (
+              <form onSubmit={handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ background: '#FDF7F5', border: '1px solid #EAE0DE', borderRadius: '12px', padding: '12px', fontSize: '0.8rem', color: '#56423D', lineHeight: '1.4' }}>
+                  <div style={{ fontWeight: 800, color: '#9D4124', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon name="info" size={16} />
+                    Chính sách bảo mật hệ thống ROMS:
+                  </div>
+                  Chỉ tài khoản Quản lý cơ sở (role <b>MANAGER</b>) mới có quyền tự khôi phục mã PIN. Nhân viên khác vui lòng liên hệ trực tiếp Quản lý ca trực.
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
+                    Mã Nhân Viên Quản Lý
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: MGR-001"
+                    value={forgotUsername}
+                    onChange={(e) => setForgotUsername(e.target.value.toUpperCase())}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      background: '#FFF8F6',
+                      border: '1.5px solid #9D4124',
+                      fontSize: '0.95rem',
+                      fontWeight: 800,
+                      color: '#1F1B1A',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#9D4124',
+                    color: '#FFF',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(157, 65, 36, 0.25)',
+                    opacity: forgotLoading ? 0.7 : 1
+                  }}
+                >
+                  <Icon name="send" size={18} />
+                  {forgotLoading ? 'Đang tạo mã OTP...' : 'Gửi Mã Xác Thực OTP'}
+                </button>
+              </form>
+            )}
+
+            {/* STEP 2: Reset PIN */}
+            {forgotStep === 2 && (
+              <form onSubmit={handleResetPin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* OTP Demo/Test badge */}
+                <div style={{ background: '#FFF8F6', border: '1px dashed #9D4124', borderRadius: '12px', padding: '10px 12px', fontSize: '0.78rem', color: '#56423D' }}>
+                  <div style={{ fontWeight: 800, color: '#9D4124', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="key" size={16} />
+                    Mã Xác Thực Dự Phòng (Demo/Hội đồng chấm thi):
+                  </div>
+                  <div>Mã OTP vừa sinh: <b style={{ letterSpacing: '2px', color: '#9D4124', fontSize: '0.9rem' }}>{otpHint || 'Chờ gửi'}</b></div>
+                  <div style={{ marginTop: '2px', fontSize: '0.74rem', color: '#89726B' }}>Hoặc dùng Master Recovery Key: <code style={{ fontWeight: 700, color: '#1F1B1A' }}>ROMS-RECOVERY-2026</code></div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '4px' }}>
+                    Mã Xác Thực OTP (6 Số) Hoặc Master Key
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nhập 6 số OTP hoặc Khóa Master"
+                    value={otpOrKey}
+                    onChange={(e) => setOtpOrKey(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid #EAE0DE',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '4px' }}>
+                      Mã PIN Mới (6 Số)
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={6}
+                      required
+                      placeholder="••••••"
+                      value={newPinCode}
+                      onChange={(e) => setNewPinCode(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #EAE0DE',
+                        fontSize: '1rem',
+                        fontWeight: 800,
+                        letterSpacing: '4px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '4px' }}>
+                      Xác Nhận PIN Mới
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={6}
+                      required
+                      placeholder="••••••"
+                      value={confirmPinCode}
+                      onChange={(e) => setConfirmPinCode(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #EAE0DE',
+                        fontSize: '1rem',
+                        fontWeight: 800,
+                        letterSpacing: '4px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setForgotStep(1)}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      background: '#F6ECEA',
+                      color: '#56423D',
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ← Quay lại
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: '10px',
+                      background: '#9D4124',
+                      color: '#FFF',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 12px rgba(157, 65, 36, 0.25)',
+                      opacity: forgotLoading ? 0.7 : 1
+                    }}
+                  >
+                    <Icon name="check" size={18} />
+                    {forgotLoading ? 'Đang cập nhật...' : 'Xác Nhận Đặt Lại Mã PIN'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

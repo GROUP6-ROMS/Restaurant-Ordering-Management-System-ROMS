@@ -27,8 +27,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         Staff staff = staffRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy nhân viên với tên đăng nhập: " + username));
 
-        // 2. Kiem tra xem tai khoan co dang bi khoa (nghi viec) hay khong
-        if (!staff.getIsActive()) {
+        // 2. Kiem tra xem tai khoan co dang bi khoa (nghi viec hoac sai PIN 5 lan) hay khong
+        if (staff.isLocked()) {
             throw new UsernameNotFoundException("Tài khoản này hiện đang bị khóa hoặc đã ngưng hoạt động!");
         }
 

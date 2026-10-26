@@ -94,6 +94,13 @@ public class AdminStaffController {
         return ResponseEntity.ok(ApiResponse.success(updated, msg));
     }
 
+    // 1.8. PATCH /api/admin/staff/{id}/unlock - Quản lý mở khóa tài khoản nhân viên bị khóa do nhập sai PIN 5 lần
+    @PatchMapping("/{id}/unlock")
+    public ResponseEntity<ApiResponse<StaffResponse>> unlockStaff(@PathVariable Long id) {
+        StaffResponse updated = staffService.unlockStaff(id);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Đã mở khóa tài khoản và đặt lại số lần thử mã PIN!"));
+    }
+
     // ===================================================================
     // 2. QUẢN LÝ PHÂN CA TRỰC (SHIFT SCHEDULING)
     // ===================================================================
