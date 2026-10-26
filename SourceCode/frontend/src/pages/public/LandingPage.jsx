@@ -136,7 +136,7 @@ export default function LandingPage() {
           {/* Action Hub */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Link
-              to="/dining/welcome?table=01"
+              to="/dining/welcome?table=19&token=qr-t01-token-8841"
               title="Mô phỏng trải nghiệm thực khách quét QR gọi món tại bàn"
               style={{
                 textDecoration: 'none',

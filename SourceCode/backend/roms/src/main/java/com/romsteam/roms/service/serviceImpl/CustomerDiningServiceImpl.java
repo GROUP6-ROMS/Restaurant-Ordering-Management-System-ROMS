@@ -487,6 +487,30 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
             Optional<RestaurantTable> opt = tableRepository.findByTableNumber(cleanNum);
             if (opt.isPresent()) return opt.get();
 
+            // Chuẩn hóa loại bỏ tiền tố chữ như "BÀN", "Bàn", "BAN"
+            String normalized = cleanNum.toUpperCase()
+                    .replace("BÀN", "")
+                    .replace("BAN", "")
+                    .replace("B\u00C0N", "")
+                    .trim();
+
+            if (!normalized.isEmpty()) {
+                Optional<RestaurantTable> optNorm = tableRepository.findByTableNumber(normalized);
+                if (optNorm.isPresent()) return optNorm.get();
+
+                Optional<RestaurantTable> optT = tableRepository.findByTableNumber("T-" + normalized);
+                if (optT.isPresent()) return optT.get();
+
+                if (normalized.matches("^\\d+$")) {
+                    String padded = String.format("%02d", Integer.parseInt(normalized));
+                    Optional<RestaurantTable> optPadded = tableRepository.findByTableNumber("T-" + padded);
+                    if (optPadded.isPresent()) return optPadded.get();
+
+                    Optional<RestaurantTable> optBPadded = tableRepository.findByTableNumber("B-" + padded);
+                    if (optBPadded.isPresent()) return optBPadded.get();
+                }
+            }
+
             // Thử thêm tiền tố "T-" hoặc bỏ "T-"
             if (!cleanNum.toUpperCase().startsWith("T-")) {
                 Optional<RestaurantTable> opt2 = tableRepository.findByTableNumber("T-" + cleanNum);

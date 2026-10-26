@@ -94,34 +94,34 @@ PRINT N'------------------------------------------------------------------------
 PRINT N'BƯỚC 4: CHÈN LỊCH PHÂN CA TRỰC HÔM NAY (STAFF_SCHEDULES)...';
 PRINT N'--------------------------------------------------------------------------------';
 
-DECLARE @TODAY DATE = CAST(GETDATE() AS DATE);
-DECLARE @YESTERDAY DATE = DATEADD(DAY, -1, @TODAY);
-DECLARE @TOMORROW DATE = DATEADD(DAY, 1, @TODAY);
+-- Tự động sinh ca trực sáng (MORNING) và tối (EVENING) cho TOÀN BỘ nhân viên từ quá khứ 3 ngày đến 30 ngày tiếp theo
+DECLARE @Offset INT = -3;
+WHILE @Offset <= 30
+BEGIN
+    DECLARE @TargetDate DATE = DATEADD(DAY, @Offset, CAST(GETDATE() AS DATE));
+    
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+    SELECT s.id, @TargetDate, 'MORNING', GETDATE(), GETDATE()
+    FROM staffs s
+    WHERE s.is_active = 1
+      AND NOT EXISTS (
+          SELECT 1 FROM staff_schedules sc
+          WHERE sc.staff_id = s.id AND sc.work_date = @TargetDate AND sc.shift_type = 'MORNING'
+      );
 
-INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at) VALUES
--- Ca sáng hôm nay (MORNING)
-(1, @TODAY, 'MORNING', GETDATE(), GETDATE()),
-(3, @TODAY, 'MORNING', GETDATE(), GETDATE()),
-(6, @TODAY, 'MORNING', GETDATE(), GETDATE()),
-(8, @TODAY, 'MORNING', GETDATE(), GETDATE()),
+    INSERT INTO staff_schedules (staff_id, work_date, shift_type, created_at, updated_at)
+    SELECT s.id, @TargetDate, 'EVENING', GETDATE(), GETDATE()
+    FROM staffs s
+    WHERE s.is_active = 1
+      AND NOT EXISTS (
+          SELECT 1 FROM staff_schedules sc
+          WHERE sc.staff_id = s.id AND sc.work_date = @TargetDate AND sc.shift_type = 'EVENING'
+      );
 
--- Ca tối hôm nay (EVENING)
-(1, @TODAY, 'EVENING', GETDATE(), GETDATE()),
-(2, @TODAY, 'EVENING', GETDATE(), GETDATE()),
-(3, @TODAY, 'EVENING', GETDATE(), GETDATE()),
-(4, @TODAY, 'EVENING', GETDATE(), GETDATE()),
-(5, @TODAY, 'EVENING', GETDATE(), GETDATE()),
-(6, @TODAY, 'EVENING', GETDATE(), GETDATE()),
-(7, @TODAY, 'EVENING', GETDATE(), GETDATE()),
-(8, @TODAY, 'EVENING', GETDATE(), GETDATE()),
+    SET @Offset = @Offset + 1;
+END;
 
--- Ca sáng ngày mai
-(2, @TOMORROW, 'MORNING', GETDATE(), GETDATE()),
-(4, @TOMORROW, 'MORNING', GETDATE(), GETDATE()),
-(7, @TOMORROW, 'MORNING', GETDATE(), GETDATE()),
-(9, @TOMORROW, 'MORNING', GETDATE(), GETDATE());
-
-PRINT N'==> Đã chèn lịch phân ca trực mẫu cho hôm nay và ngày mai.';
+PRINT N'==> Đã chèn lịch phân ca trực tự động toàn diện (MORNING & EVENING) cho toàn bộ nhân sự.';
 
 PRINT N'--------------------------------------------------------------------------------';
 PRINT N'BƯỚC 5: CHÈN SƠ ĐỒ BÀN ĂN NHÀ HÀNG (RESTAURANT_TABLES)...';

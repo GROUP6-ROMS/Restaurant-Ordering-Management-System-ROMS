@@ -40,11 +40,17 @@ export default function TableWelcomePage() {
   // Xác thực mã QR Token với CSDL qua Backend API
   useEffect(() => {
     const verifyToken = async () => {
-      if (tokenParam) {
+      let activeToken = tokenParam;
+      // Hỗ trợ demo quét bàn T-01 nếu không có tokenParam
+      if (!activeToken && (rawTable === '01' || rawTable === '1' || rawTable === '19' || rawTable.toUpperCase() === 'T-01')) {
+        activeToken = 'qr-t01-token-8841';
+      }
+
+      if (activeToken) {
         try {
           setIsVerifying(true);
           setVerifyError(null);
-          const res = await tableApi.verifyQr(tokenParam);
+          const res = await tableApi.verifyQr(activeToken);
           if (res.data && res.data.success) {
             const tData = res.data.data;
             // Lưu Dining Token có ký số bảo mật của Backend vào sessionStorage
@@ -67,7 +73,7 @@ export default function TableWelcomePage() {
     };
 
     verifyToken();
-  }, [tokenParam]);
+  }, [tokenParam, rawTable]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -88,13 +94,18 @@ export default function TableWelcomePage() {
   };
 
   const handleStartDining = () => {
+    // Nếu chưa xác thực qua QR Token, dự đoán chuẩn mã bàn T-XX để gửi API chính xác
+    const defaultTableCode = rawTable.toUpperCase().startsWith('T-') || rawTable.toUpperCase().startsWith('B-') || rawTable.toUpperCase().startsWith('VIP-')
+      ? rawTable.toUpperCase()
+      : `T-${tableNumberFormatted}`;
+
     const info = {
-      tableNumber: verifiedTable?.code || `BÀN ${tableNumberFormatted}`,
-      tableId: verifiedTable?.id || parseInt(rawTable, 10) || 5,
-      tableName: verifiedTable?.name || '',
+      tableNumber: verifiedTable?.code || defaultTableCode,
+      tableId: verifiedTable?.id || (parseInt(rawTable, 10) >= 19 ? parseInt(rawTable, 10) : null),
+      tableName: verifiedTable?.name || `Bàn ${tableNumberFormatted}`,
       zoneName: verifiedTable?.zoneName || '',
       guestCount,
-      token: tokenParam || `table-${tableNumberFormatted}-token`,
+      token: tokenParam || verifiedTable?.qrToken || `table-${tableNumberFormatted}-token`,
       diningToken: verifiedTable?.diningToken || sessionStorage.getItem('roms_dining_token')
     };
     if (verifiedTable?.diningToken) {
