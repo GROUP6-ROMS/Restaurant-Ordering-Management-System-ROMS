@@ -448,8 +448,8 @@ export default function WaiterFloorPlanPage() {
     const isOccupied = t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'AWAITING_PAYMENT' || t.status === 'CALLING';
     if (!isOccupied) return null;
 
-    const minutes = typeof t.durationMinutes === 'number' ? t.durationMinutes : 0;
-    const timeText = t.duration || `${minutes} phút`;
+    const minutes = typeof t.durationMinutes === 'number' ? Math.max(0, t.durationMinutes) : 0;
+    const timeText = (t.duration && !t.duration.startsWith('-')) ? t.duration : `${minutes} phút`;
 
     if (minutes >= 90) {
       // Cảnh báo đỏ (> 90 phút) - Ngồi lâu
@@ -679,7 +679,7 @@ export default function WaiterFloorPlanPage() {
         alignItems: 'center',
         gap: '4px'
       }}>
-        <Icon name="schedule" size={14} /> {t.duration || 'Đang ăn'}
+        <Icon name="schedule" size={14} /> {(t.duration && !t.duration.startsWith('-')) ? t.duration : 'Đang ăn'}
       </span>
     );
   };
@@ -760,7 +760,7 @@ export default function WaiterFloorPlanPage() {
               <div style={{ textAlign: 'right' }}>
                 <span style={{ fontSize: '0.72rem', color: '#89726B', display: 'block' }}>Giờ vào</span>
                 <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1F1B1A' }}>
-                  {table.duration ? `${table.duration} trước` : 'Chưa có'}
+                  {(table.duration && !table.duration.startsWith('-')) ? `${table.duration} trước` : 'Vừa vào'}
                 </span>
               </div>
               <button

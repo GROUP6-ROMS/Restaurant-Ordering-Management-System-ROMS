@@ -5,23 +5,48 @@ import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 import Icon from '../../components/common/Icon';
 
 // Đồng hồ đếm thời gian - trả về số giây đã trôi qua
-function useElapsedSeconds(startTimeString) {
-  const [seconds, setSeconds] = useState(0);
+function useElapsedSeconds(startTimeString, initialElapsedSeconds) {
+  const hasInitial = typeof initialElapsedSeconds === 'number' && initialElapsedSeconds >= 0;
+  const mountTimeRef = useRef(Date.now());
+  const baseSecondsRef = useRef(hasInitial ? initialElapsedSeconds : null);
 
-  useEffect(() => {
-    const getElapsed = () => {
-      if (!startTimeString) return 0;
+  const calculateElapsed = () => {
+    // 1. Ưu tiên số giây từ Backend tính toán (không phụ thuộc lệch múi giờ client/server)
+    if (baseSecondsRef.current !== null) {
+      const clientDiff = Math.floor((Date.now() - mountTimeRef.current) / 1000);
+      return baseSecondsRef.current + Math.max(0, clientDiff);
+    }
+
+    // 2. Fallback: Parse startTimeString
+    if (!startTimeString) return 0;
+    try {
       const start = new Date(startTimeString);
       if (isNaN(start.getTime())) return 0;
       const now = new Date();
       const diff = Math.floor((now - start) / 1000);
       return diff >= 0 ? diff : 0;
-    };
+    } catch {
+      return 0;
+    }
+  };
 
-    setSeconds(getElapsed());
-    const timer = setInterval(() => setSeconds(getElapsed()), 1000);
+  const [seconds, setSeconds] = useState(calculateElapsed);
+
+  // Khi order được cập nhật từ polling hoặc WebSocket, đồng bộ lại mốc chuẩn
+  useEffect(() => {
+    if (typeof initialElapsedSeconds === 'number' && initialElapsedSeconds >= 0) {
+      baseSecondsRef.current = initialElapsedSeconds;
+      mountTimeRef.current = Date.now();
+      setSeconds(initialElapsedSeconds);
+    }
+  }, [initialElapsedSeconds, startTimeString]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds(calculateElapsed());
+    }, 1000);
     return () => clearInterval(timer);
-  }, [startTimeString]);
+  }, [startTimeString, initialElapsedSeconds]);
 
   return seconds;
 }
@@ -98,7 +123,7 @@ function playKitchenChime() {
 
 // --- KDS Ticket Card ---
 function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemStatus, onToggleRush }) {
-  const elapsedSeconds = useElapsedSeconds(order.startedAt);
+  const elapsedSeconds = useElapsedSeconds(order.startedAt, order.elapsedSeconds);
   const isOverdue = elapsedSeconds > 15 * 60; // Trễ hơn 15 phút (Overdue SLA)
   const isUrgent = elapsedSeconds > 10 * 60;  // Cảnh báo sau 10 phút
   const isOrderUpdating = actionLoadingId === `order-${order.id}`;

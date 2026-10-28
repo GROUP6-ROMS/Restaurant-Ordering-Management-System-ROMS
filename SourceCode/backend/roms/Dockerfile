@@ -20,8 +20,9 @@ RUN mvn clean package -DskipTests
 # ===================================================================
 FROM eclipse-temurin:21-jre-alpine AS runner
 
-# Cài đặt curl / wget phục vụ Docker Healthcheck
-RUN apk add --no-cache curl wget
+# Cài đặt curl / wget phục vụ Docker Healthcheck và tzdata cho múi giờ Việt Nam
+RUN apk add --no-cache curl wget tzdata
+ENV TZ=Asia/Ho_Chi_Minh
 
 # Tạo người dùng và nhóm không có quyền root (DevSecOps Non-root user)
 RUN addgroup -S romsgroup && adduser -S romsuser -G romsgroup
@@ -40,8 +41,8 @@ USER romsuser
 # Khai báo cổng ứng dụng
 EXPOSE 8080
 
-# Cấu hình biến môi trường JVM tối ưu hóa cho Container
-ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8"
+# Cấu hình biến môi trường JVM tối ưu hóa cho Container và múi giờ Việt Nam GMT+7
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Ho_Chi_Minh"
 
 # Khởi chạy ứng dụng Spring Boot
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

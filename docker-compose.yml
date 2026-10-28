@@ -10,6 +10,7 @@ services:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
       - MSSQL_PID=Developer
+      - TZ=Asia/Ho_Chi_Minh
     ports:
       - "1433:1433"
     volumes:
@@ -35,6 +36,7 @@ services:
     restart: "no"
     environment:
       - DB_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
+      - TZ=Asia/Ho_Chi_Minh
     entrypoint: >
       bash -c "
       echo 'Dang kiem tra va khoi tao database ROMS_DB...'
@@ -57,6 +59,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      - TZ=Asia/Ho_Chi_Minh
       # Kết nối trực tiếp tới container database nội bộ qua cổng 1433
       - SPRING_DATASOURCE_URL=jdbc:sqlserver://${DB_HOST:-database}:1433;databaseName=ROMS_DB;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true;
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-sa}
