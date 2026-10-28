@@ -95,6 +95,7 @@ public class SecurityConfig {
                                 "/api/customer/tables/verify-qr",
                                 "/api/customer/reservations/**",
                                 "/api/customer/dining/menu",
+                                "/api/customer/ai/**",
                                 "/api/reservations/book",
                                 "/ws-roms/**",
                                 "/ws-roms-native/**",

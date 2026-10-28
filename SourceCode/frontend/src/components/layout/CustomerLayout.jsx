@@ -1,3 +1,4 @@
+import CustomerAiChatModal from '../customer/CustomerAiChatModal';
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
@@ -20,6 +21,8 @@ export default function CustomerLayout() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('Đã gửi yêu cầu gọi nhân viên!');
   const [showAssistModal, setShowAssistModal] = useState(false);
+  // State đóng mở Trợ lý AI Chatbox
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -307,12 +310,12 @@ export default function CustomerLayout() {
           aria-modal="true"
           aria-label="Bảng chọn nhanh yêu cầu hỗ trợ tại bàn"
           style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
           <div style={{
             background: '#FFFFFF',
             width: '100%', maxWidth: 430,
@@ -436,6 +439,36 @@ export default function CustomerLayout() {
         <Icon name="check_circle" size={18} style={{ color: 'var(--secondary-fixed-dim)' }} />
         {toastMessage}
       </div>
+      {/* ============================================================== */}
+      {/* 👉 DÁN ĐOẠN NÀY VÀO ĐÂY (NGAY TRƯỚC THẺ </div> NGOÀI CÙNG)     */}
+      {/* ============================================================== */}
+      {/* --- Nút Nổi AI Trợ Lý Ẩm Thực (Floating Action Button) --- */}
+      <button
+        onClick={() => setIsAiModalOpen(true)}
+        aria-label="Mở Trợ lý Ẩm thực AI"
+        style={{
+          position: 'fixed',
+          bottom: totalCount > 0 && !isCart ? 145 : 78,
+          right: 'calc(50% - 200px)',
+          width: 50, height: 50, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #A04020 0%, #D86030 100%)',
+          color: '#FFFFFF',
+          border: '2px solid rgba(255, 255, 255, 0.8)',
+          boxShadow: '0 4px 16px rgba(160, 64, 32, 0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', zIndex: 45,
+          transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+      >
+        <span style={{ fontSize: 22 }}>✨</span>
+      </button>
+      {/* --- Modal Trợ Lý Ẩm Thực AI --- */}
+      <CustomerAiChatModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+      />
     </div>
   );
 }
