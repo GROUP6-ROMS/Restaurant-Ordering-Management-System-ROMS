@@ -213,4 +213,19 @@ class KitchenServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("9999");
     }
+
+    @Test
+    @DisplayName("6. Đơn hàng có thời gian trong tương lai (do lệch múi giờ/clock skew) -> elapsedSeconds luôn >= 0")
+    void getActiveKitchenOrders_WhenOrderTimeInFuture_ElapsedSecondsIsNonNegative() {
+        // Arrange
+        order.setOrderTime(LocalDateTime.now().plusHours(7)); // Giả lập lệch 7 tiếng trong tương lai
+        when(orderRepository.findByStatusInOrderByCreatedAtAsc(anyList())).thenReturn(Collections.singletonList(order));
+
+        // Act
+        List<KitchenOrderResponse> orders = kitchenService.getActiveKitchenOrders();
+
+        // Assert
+        assertThat(orders).isNotEmpty();
+        assertThat(orders.get(0).getElapsedSeconds()).isEqualTo(0L);
+    }
 }

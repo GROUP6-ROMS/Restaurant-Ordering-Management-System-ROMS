@@ -625,7 +625,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
         long duration = 0;
         if (session.getStartTime() != null) {
-            duration = java.time.Duration.between(session.getStartTime(), java.time.LocalDateTime.now()).toMinutes();
+            duration = Math.max(0L, java.time.Duration.between(session.getStartTime(), java.time.LocalDateTime.now()).toMinutes());
         }
 
         return TableOrdersResponse.builder()

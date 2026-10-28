@@ -623,7 +623,7 @@ public class WaiterServiceImpl implements WaiterService {
             actualGuests = session.getGuestCount() != null ? session.getGuestCount() : table.getCapacity();
 
             if (session.getStartTime() != null) {
-                durationMin = Duration.between(session.getStartTime(), LocalDateTime.now()).toMinutes();
+                durationMin = Math.max(0L, Duration.between(session.getStartTime(), LocalDateTime.now()).toMinutes());
                 durationStr = durationMin + " phút";
             }
 

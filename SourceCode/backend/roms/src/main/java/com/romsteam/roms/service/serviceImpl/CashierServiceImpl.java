@@ -186,8 +186,9 @@ public class CashierServiceImpl implements CashierService {
         DiningSession session = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE)
                 .orElseThrow(() -> new AppException("Bàn không có phiên ăn đang hoạt động để thanh toán!", HttpStatus.BAD_REQUEST));
 
-        // 1. Kiểm tra Idempotency - Không cho phép thanh toán 2 lần cùng một phiên ăn (chống double click / race condition)
-        if (billRepository.findBySessionId(session.getId()).isPresent()) {
+        // 1. Kiểm tra Idempotency - Không cho phép thanh toán 2 lần nếu phiên ăn đã có hóa đơn PAID (chống double click / race condition)
+        Optional<Bill> existingBillOpt = billRepository.findBySessionId(session.getId());
+        if (existingBillOpt.isPresent() && existingBillOpt.get().getStatus() == BillStatus.PAID) {
             throw new AppException("Hóa đơn cho phiên ăn này đã được thanh toán! Vui lòng không thực hiện lại.", HttpStatus.CONFLICT);
         }
 
@@ -278,11 +279,13 @@ public class CashierServiceImpl implements CashierService {
 
         String billCode = "BILL-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + (System.currentTimeMillis() % 10000);
 
-        // 1. Tạo bản ghi Bill
-        Bill bill = new Bill();
+        // 1. Tái sử dụng bản ghi Bill tạm tính (UNPAID) nếu có hoặc tạo mới bản ghi Bill
+        Bill bill = existingBillOpt.orElseGet(Bill::new);
         bill.setSession(session);
         bill.setCashier(cashier);
-        bill.setBillCode(billCode);
+        if (bill.getBillCode() == null || bill.getBillCode().trim().isEmpty()) {
+            bill.setBillCode(billCode);
+        }
         bill.setSubtotal(subtotal);
         bill.setTaxAmount(taxAmount);
         bill.setDiscountAmount(discountAmount);
@@ -293,7 +296,7 @@ public class CashierServiceImpl implements CashierService {
         bill.setNote(request.getNote());
 
         try {
-            billRepository.save(bill);
+            bill = billRepository.save(bill);
         } catch (Exception ex) {
             throw new AppException("Giao dịch bị trùng lặp hoặc hóa đơn đã được thanh toán bởi phiên khác!", HttpStatus.CONFLICT);
         }

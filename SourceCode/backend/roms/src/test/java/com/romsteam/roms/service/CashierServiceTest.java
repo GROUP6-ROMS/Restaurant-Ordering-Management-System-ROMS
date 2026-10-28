@@ -231,9 +231,11 @@ class CashierServiceTest {
     @Test
     @DisplayName("5. Chặn thanh toán nếu phiên ăn đã được thanh toán trước đó (Duplicate Payment - CONFLICT)")
     void checkout_WhenSessionAlreadyPaid_ThrowsConflictException() {
+        Bill paidBill = new Bill();
+        paidBill.setStatus(BillStatus.PAID);
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
         when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.of(new Bill()));
+        when(billRepository.findBySessionId(50L)).thenReturn(Optional.of(paidBill));
 
         CashierCheckoutRequest request = new CashierCheckoutRequest();
         request.setPaymentMethod("CASH");
@@ -307,5 +309,34 @@ class CashierServiceTest {
         assertThatThrownBy(() -> cashierService.checkoutBill(1L, request, "cashier01"))
                 .isInstanceOf(AppException.class)
                 .hasMessageContaining("Tiền mặt khách đưa chưa đủ");
+    }
+
+    @Test
+    @DisplayName("9. Tái sử dụng hóa đơn tạm tính UNPAID và cập nhật sang PAID thành công")
+    void checkout_WhenExistingBillIsUnpaid_UpdatesBillToPaidAndSucceeds() {
+        Bill draftBill = new Bill();
+        draftBill.setStatus(BillStatus.UNPAID);
+        draftBill.setBillCode("BILL-DRAFT-001");
+
+        when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
+        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionId(50L)).thenReturn(Optional.of(draftBill));
+        when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
+        when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CashierCheckoutRequest request = new CashierCheckoutRequest();
+        request.setPaymentMethod("CASH");
+        request.setCashGiven(BigDecimal.valueOf(500000));
+
+        // Act
+        CashierInvoiceResponse response = cashierService.checkoutBill(1L, request, "cashier01");
+
+        // Assert
+        assertThat(response).isNotNull();
+        assertThat(draftBill.getStatus()).isEqualTo(BillStatus.PAID);
+        assertThat(draftBill.getPaymentTime()).isNotNull();
+        assertThat(session.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+        assertThat(table.getStatus()).isEqualTo(TableStatus.DIRTY);
+        verify(billRepository).save(draftBill);
     }
 }

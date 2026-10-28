@@ -52,7 +52,7 @@ export default function WaiterOrderDetailPage() {
             orderCode: `#ORD-${currentTable.tableNumber}`,
             guests: currentTable.actualGuests || currentTable.capacity || 2,
             waiter: 'Nhân viên trực ca',
-            timeIn: currentTable.duration || 'Chưa có',
+            timeIn: (currentTable.duration && !currentTable.duration.startsWith('-')) ? currentTable.duration : 'Vừa vào',
             status: currentTable.status,
             statusNote: currentTable.statusNote,
             items: (currentTable.items || []).map((item, idx) => ({
