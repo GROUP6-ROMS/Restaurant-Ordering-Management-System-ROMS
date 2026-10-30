@@ -37,6 +37,10 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
         'Có món thanh đạm, ít dầu mỡ không?',
         'Món ngon cho trẻ nhỏ'
     ]);
+    // State hiển thị thông báo Toast trong khung chat
+    const [toastMessage, setToastMessage] = useState(null);
+    // State lưu ID món vừa bấm để đổi hiệu ứng nút thành "✓ Đã thêm"
+    const [justAddedId, setJustAddedId] = useState(null);
 
     // Ref cuộn xuống đáy tin nhắn mới nhất
     const messagesEndRef = useRef(null);
@@ -114,10 +118,21 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
         }
     };
 
-    // Thêm món vào giỏ hàng ngay từ thẻ trong khung chat
+    // Thêm món vào giỏ hàng kèm thông báo mượt mà trên giao diện
     const handleAddToCart = (dish) => {
         addToCart(dish, 1, '');
-        alert(`Đã thêm "${dish.name}" vào giỏ hàng!`);
+
+        // 1. Hiển thị thông báo Toast tự tắt sau 2 giây
+        setToastMessage(`Đã thêm "${dish.name}" vào giỏ!`);
+        setTimeout(() => {
+            setToastMessage(null);
+        }, 2000);
+
+        // 2. Đổi trạng thái nút bấm thành "✓ Đã thêm" trong 1.5 giây
+        setJustAddedId(dish.id);
+        setTimeout(() => {
+            setJustAddedId(null);
+        }, 1500);
     };
 
     if (!isOpen) return null;
@@ -137,7 +152,10 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                 display: 'flex', flexDirection: 'column',
                 boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
                 animation: 'slideUp 0.25s ease-out',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                overflowX: 'hidden',       // 👈 Khóa tuyệt đối không cho cuộn ngang
+                boxSizing: 'border-box',    // 👈 Đảm bảo không phình khung
+                position: 'relative'        // 👈 Giữ chân thông báo Toast
             }}>
 
                 {/* --- Header Chatbox --- */}
@@ -181,6 +199,34 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                         <Icon name="close" size={18} />
                     </button>
                 </div>
+
+                {/* --- Toast thông báo thêm món thành công (Tự ẩn sau 2s) --- */}
+                {toastMessage && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 66,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 60,
+                        background: 'rgba(22, 101, 52, 0.95)',
+                        color: '#FFFFFF',
+                        padding: '8px 16px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
+                        backdropFilter: 'blur(4px)',
+                        animation: 'fadeIn 0.2s ease-out',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '90%'
+                    }}>
+                        <Icon name="check_circle" size={16} style={{ color: '#4ADE80' }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{toastMessage}</span>
+                    </div>
+                )}
 
                 {/* --- Danh sách tin nhắn (Scrollable) --- */}
                 <div style={{
@@ -250,18 +296,21 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                                                     )}
                                                 </div>
 
-                                                {/* Nút thêm vào giỏ hàng 1-chạm */}
+                                                {/* Nút thêm vào giỏ hàng tương tác 1-chạm */}
                                                 <button
                                                     onClick={() => handleAddToCart(dish)}
                                                     style={{
-                                                        background: 'var(--primary, #A04020)', color: '#FFF',
+                                                        background: justAddedId === dish.id ? '#16A34A' : 'var(--primary, #A04020)',
+                                                        color: '#FFF',
                                                         border: 'none', borderRadius: 8,
                                                         padding: '6px 10px', fontSize: 11, fontWeight: 700,
-                                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                                                        transition: 'all 0.2s ease',
+                                                        flexShrink: 0
                                                     }}
                                                 >
-                                                    <Icon name="add" size={14} />
-                                                    Thêm
+                                                    <Icon name={justAddedId === dish.id ? "check" : "add"} size={14} />
+                                                    {justAddedId === dish.id ? 'Đã thêm' : 'Thêm'}
                                                 </button>
                                             </div>
                                         ))}
@@ -307,12 +356,17 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                     ))}
                 </div>
 
-                {/* --- Thanh nhập liệu (Input Bar) --- */}
+                {/* --- Thanh nhập liệu (Input Bar) Cố định 100% trên Android & iOS --- */}
                 <div style={{
-                    padding: '8px 12px 14px',
+                    padding: '8px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
                     background: 'var(--surface, #FFF8F6)',
                     borderTop: '1px solid rgba(220,192,185,0.3)',
-                    display: 'flex', alignItems: 'center', gap: 8
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    flexShrink: 0
                 }}>
                     <input
                         type="text"
@@ -323,10 +377,16 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                             if (e.key === 'Enter') handleSend();
                         }}
                         style={{
-                            flex: 1, height: 42, borderRadius: 21,
+                            flex: 1,
+                            minWidth: 0,
+                            height: 42,
+                            borderRadius: 21,
                             border: '1px solid rgba(220,192,185,0.6)',
-                            padding: '0 16px', fontSize: 13,
-                            outline: 'none', background: '#FFFFFF'
+                            padding: '0 16px',
+                            fontSize: 15,
+                            outline: 'none',
+                            background: '#FFFFFF',
+                            boxSizing: 'border-box'
                         }}
                     />
 
@@ -334,12 +394,18 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                         onClick={() => handleSend()}
                         disabled={!inputValue.trim() || loading}
                         style={{
-                            width: 42, height: 42, borderRadius: '50%',
+                            width: 42,
+                            height: 42,
+                            borderRadius: '50%',
                             background: inputValue.trim() && !loading ? 'var(--primary, #A04020)' : 'var(--outline, #C4B5B0)',
-                            color: '#FFF', border: 'none',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#FFF',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             cursor: inputValue.trim() && !loading ? 'pointer' : 'not-allowed',
-                            transition: 'background 0.2s'
+                            transition: 'background 0.2s',
+                            flexShrink: 0
                         }}
                     >
                         <Icon name="arrow_upward" size={20} />
