@@ -458,21 +458,412 @@
   font-size: 16px !important;
 }
 
-/* Dishes Grid inside Pre-order Step 3 */
+/* ==========================================================================
+   DATE PICKER RESPONSIVE (STEP 1) - KHẮC PHỤC TRIỆT ĐỂ TRÀN KHUNG TRÊN MOBILE
+   ========================================================================== */
+.reservation-date-box {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mobile-date-quick-chips {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .mobile-date-quick-chips {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+}
+
+.mobile-date-chip {
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid #EAE0DE;
+  background: #FFF8F6;
+  color: #1F1B1A;
+  font-family: 'Epilogue', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: all 0.15s ease;
+  min-height: 48px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.mobile-date-chip.active {
+  border: 2px solid #9D4124;
+  background: #9D4124;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(157, 65, 36, 0.2);
+}
+
+.mobile-date-chip.custom-active {
+  border: 2px solid #9D4124;
+  background: #FFDBC9;
+  color: #9D4124;
+}
+
+.reservation-date-input-wrap {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.reservation-date-input {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 12px 14px !important;
+  border-radius: 14px !important;
+  border: 1.5px solid #EAE0DE !important;
+  font-size: 16px !important; /* Tránh auto-zoom trên iOS */
+  font-weight: 700 !important;
+  color: #1F1B1A !important;
+  background: #FFF8F6 !important;
+  outline: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
+  display: block !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+.reservation-date-input:focus {
+  border-color: #9D4124 !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 0 0 3px rgba(157, 65, 36, 0.12) !important;
+}
+
+/* ==========================================================================
+   STEP 3 PRE-ORDER RESPONSIVE MOBILE STYLES
+   ========================================================================== */
+
+/* Thanh tìm kiếm & lọc danh mục chia 2 hàng trên Mobile */
+.preorder-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: #FFF8F6;
+  border: 1.5px solid #EAE0DE;
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.preorder-search-bar:focus-within {
+  border-color: #9D4124;
+  background: #FFFFFF;
+}
+
+.preorder-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-size: 0.9rem;
+  color: #1F1B1A;
+  font-weight: 500;
+}
+
+.preorder-categories-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 18px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.preorder-categories-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.preorder-cat-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preorder-cat-btn.active {
+  background: #9D4124;
+  color: #FFFFFF;
+  box-shadow: 0 3px 10px rgba(157, 65, 36, 0.25);
+}
+
+.preorder-cat-btn.inactive {
+  background: #F6ECEA;
+  color: #56423D;
+}
+
+.preorder-cat-btn.inactive:hover {
+  background: #EDDFDC;
+}
+
+/* Danh sách món ăn Step 3 */
 .reservation-preorder-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
-  max-height: 420px;
+  max-height: 480px;
   overflow-y: auto;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
   padding-right: 4px;
 }
 
 @media (max-width: 640px) {
   .reservation-preorder-grid {
     grid-template-columns: 1fr;
-    max-height: 360px;
+    max-height: 420px;
+    gap: 12px;
+  }
+}
+
+/* Thẻ món ăn Pre-order tối ưu chạm ngón tay */
+.preorder-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #F0E6E4;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.preorder-card.selected {
+  background: #FFF8F6;
+  border: 2px solid #9D4124;
+  box-shadow: 0 4px 14px rgba(157, 65, 36, 0.08);
+}
+
+.preorder-card-body {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.preorder-card-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+}
+
+.preorder-card-thumb {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+}
+
+.preorder-card-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #9D4124;
+  color: #FFFFFF;
+  font-size: 0.72rem;
+  font-weight: 800;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  border: 2px solid #FFFFFF;
+}
+
+.preorder-card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.preorder-card-title {
+  margin: 0;
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #1F1B1A;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.preorder-card-desc {
+  margin: 3px 0 0;
+  font-size: 0.75rem;
+  color: #89726B;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.preorder-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px dashed #F0E6E4;
+}
+
+.preorder-card-price {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #9D4124;
+}
+
+/* Nút tăng giảm số lượng to rõ, chuẩn tap ngón tay */
+.preorder-qty-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFF;
+  border-radius: 10px;
+  border: 1px solid #EAE0DE;
+  padding: 2px;
+}
+
+.preorder-btn-minus,
+.preorder-btn-plus {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  transition: all 0.12s ease;
+}
+
+.preorder-btn-minus {
+  background: #F6ECEA;
+  color: #56423D;
+}
+
+.preorder-btn-minus:hover {
+  background: #EDDFDC;
+}
+
+.preorder-btn-plus {
+  background: #9D4124;
+  color: #FFFFFF;
+}
+
+.preorder-btn-plus:hover {
+  background: #84361C;
+}
+
+.preorder-qty-num {
+  font-weight: 800;
+  font-size: 0.95rem;
+  min-width: 24px;
+  text-align: center;
+  color: #1F1B1A;
+}
+
+.preorder-btn-add {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #9D4124;
+  background: #FFF8F6;
+  color: #9D4124;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  transition: all 0.15s ease;
+}
+
+.preorder-btn-add:hover {
+  background: #9D4124;
+  color: #FFFFFF;
+}
+
+/* Mini Cart Bar trong Step 3 */
+.preorder-mini-cart {
+  background: linear-gradient(135deg, #FFF8F6 0%, #FCF1EF 100%);
+  border: 1.5px solid #FFDBC9;
+  border-radius: 16px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 500px) {
+  .preorder-mini-cart {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Cụm nút điều hướng Step 3 Mobile First */
+.preorder-actions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preorder-actions-secondary-row {
+  display: flex;
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .preorder-actions-secondary-row {
+    flex-direction: column-reverse;
   }
 }
 
@@ -506,4 +897,5 @@
     flex: none !important;
   }
 }
+
 

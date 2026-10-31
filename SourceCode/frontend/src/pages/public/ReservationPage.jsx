@@ -37,14 +37,17 @@ const formatShortDate = (dateStr) => {
 };
 
 export default function ReservationPage() {
-  // Lấy ngày hôm nay theo giờ địa phương (YYYY-MM-DD) làm giá trị mặc định cho ngày đặt bàn
+  // Lấy ngày hôm nay, ngày mai, ngày kia theo giờ địa phương (YYYY-MM-DD)
   const todayStr = getLocalDateString(0);
+  const tomorrowStr = getLocalDateString(1);
+  const dayAfterStr = getLocalDateString(2);
 
   // 1. Quản lý trạng thái bước đặt chỗ (1 -> 4)
   const [currentStep, setCurrentStep] = useState(1);
 
   // 2. Ngày dùng bữa: Chọn ngày cụ thể (mặc định hôm nay - ngày đặt bàn)
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [isCustomDate, setIsCustomDate] = useState(false);
 
   // 3. Khung giờ: Giờ đại diện + chế độ nhập giờ khác
   const representativeTimes = ['11:30', '12:00', '18:00', '19:00', '20:00'];
@@ -150,6 +153,17 @@ export default function ReservationPage() {
     fetchZones();
     fetchMenu();
   }, []);
+
+  // Xử lý chọn ngày đặt bàn (Preset hoặc Custom)
+  const handleSelectPresetDate = (date) => {
+    setIsCustomDate(false);
+    setSelectedDate(date);
+  };
+
+  const handleCustomDateChange = (date) => {
+    setIsCustomDate(true);
+    setSelectedDate(date || todayStr);
+  };
 
   // Xử lý chọn khung giờ
   const handleSelectPresetTime = (time) => {
@@ -426,42 +440,77 @@ export default function ReservationPage() {
                   </div>
                 </div>
 
-                {/* Date Selection: BỘ CHỌN NGÀY CỤ THỂ (MẶC ĐỊNH LÀ NGÀY ĐẶT BÀN / HÔM NAY) */}
-                <div style={{ marginBottom: '24px' }}>
+                {/* Date Selection: BỘ CHỌN NGÀY CỤ THỂ KHÔNG BỊ TRÀN TRÊN MOBILE */}
+                <div className="reservation-date-box" style={{ marginBottom: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '4px' }}>
                     <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Icon name="event" size={18} style={{ color: '#9D4124' }} />
                       Ngày đặt bàn / dùng bữa: <span style={{ color: '#9D4124' }}>*</span>
                     </label>
                     <span style={{ fontSize: '0.75rem', color: '#89726B', fontWeight: 600 }}>
-                      Mặc định: Hôm nay ({formatShortDate(todayStr)})
+                      {formatDisplayDate(selectedDate)}
                     </span>
                   </div>
 
-                  {/* Input date picker chọn ngày */}
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="date"
-                      min={todayStr}
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value || todayStr)}
-                      className="touch-input"
-                      style={{
-                        width: '100%',
-                        padding: '13px 18px',
-                        borderRadius: '14px',
-                        border: '1.5px solid #EAE0DE',
-                        fontSize: '1rem',
-                        fontWeight: 700,
-                        color: '#1F1B1A',
-                        background: '#FFF8F6',
-                        outline: 'none',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-                        boxSizing: 'border-box'
-                      }}
-                    />
+                  {/* Bộ chọn nhanh ngày (Hôm nay, Ngày mai, Ngày kia, Ngày khác) */}
+                  <div className="mobile-date-quick-chips">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPresetDate(todayStr)}
+                      className={`mobile-date-chip ${!isCustomDate && selectedDate === todayStr ? 'active' : ''}`}
+                    >
+                      <span style={{ fontSize: '0.74rem', opacity: 0.85 }}>Hôm nay</span>
+                      <span style={{ fontWeight: 800 }}>{formatShortDate(todayStr)}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPresetDate(tomorrowStr)}
+                      className={`mobile-date-chip ${!isCustomDate && selectedDate === tomorrowStr ? 'active' : ''}`}
+                    >
+                      <span style={{ fontSize: '0.74rem', opacity: 0.85 }}>Ngày mai</span>
+                      <span style={{ fontWeight: 800 }}>{formatShortDate(tomorrowStr)}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPresetDate(dayAfterStr)}
+                      className={`mobile-date-chip ${!isCustomDate && selectedDate === dayAfterStr ? 'active' : ''}`}
+                    >
+                      <span style={{ fontSize: '0.74rem', opacity: 0.85 }}>Ngày kia</span>
+                      <span style={{ fontWeight: 800 }}>{formatShortDate(dayAfterStr)}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomDate(true)}
+                      className={`mobile-date-chip ${isCustomDate ? 'custom-active' : ''}`}
+                    >
+                      <span style={{ fontSize: '0.74rem', opacity: 0.85, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <Icon name="calendar_month" size={14} /> Ngày khác
+                      </span>
+                      <span style={{ fontWeight: 800, fontSize: '0.78rem' }}>
+                        {isCustomDate ? formatShortDate(selectedDate) : 'Chọn lịch...'}
+                      </span>
+                    </button>
                   </div>
+
+                  {/* Ô nhập lịch ngày tùy chọn (Hiển thị mượt mà không bị tràn khung) */}
+                  {isCustomDate && (
+                    <div className="reservation-date-input-wrap" style={{ marginTop: '8px' }}>
+                      <input
+                        type="date"
+                        min={todayStr}
+                        value={selectedDate}
+                        onChange={(e) => handleCustomDateChange(e.target.value)}
+                        className="reservation-date-input touch-input"
+                      />
+                      <div style={{ fontSize: '0.76rem', color: '#89726B', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon name="info" size={14} style={{ color: '#9D4124' }} />
+                        <span>Đang chọn ngày: <strong style={{ color: '#9D4124' }}>{formatDisplayDate(selectedDate)}</strong></span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Time Selection: KHUNG GIỜ ĐẠI DIỆN + NHẬP GIỜ KHÁC */}
@@ -818,14 +867,15 @@ export default function ReservationPage() {
             )}
 
             {/* ============================================================== */}
-            {/* STEP 3: PRE-ORDER GỌI MÓN TRƯỚC (TÙY CHỌN)                       */}
+            {/* STEP 3: PRE-ORDER GỌI MÓN TRƯỚC (TỐI ƯU WEB MOBILE FIRST)        */}
             {/* ============================================================== */}
             {currentStep === 3 && (
               <div className="reservation-step-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                {/* Header Bước 3 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124' }}>
-                      <Icon name="restaurant_menu" size={20} />
+                    <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124', flexShrink: 0 }}>
+                      <Icon name="restaurant_menu" size={22} />
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -836,253 +886,274 @@ export default function ReservationPage() {
                           Tùy chọn
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '2px' }}>
-                        Bếp sẽ sơ chế chuẩn bị sẵn khi bạn tới bàn vào ngày: <strong style={{ color: '#9D4124' }}>{formatDisplayDate(selectedDate)}</strong> ({selectedTime})
+                      <div style={{ fontSize: '0.78rem', color: '#89726B', marginTop: '2px' }}>
+                        Bếp chuẩn bị sẵn khi bạn tới bàn vào ngày: <strong style={{ color: '#9D4124' }}>{formatDisplayDate(selectedDate)}</strong> ({selectedTime})
                       </div>
                     </div>
                   </div>
 
-                  <span style={{ fontSize: '0.82rem', color: '#9D4124', fontWeight: 700, background: '#FFF8F6', border: '1px solid #FFDBC9', padding: '6px 12px', borderRadius: '10px' }}>
-                    Đã chọn: <b>{totalDishesCount} phần</b> ({preOrderTotal.toLocaleString('vi-VN')}₫)
-                  </span>
+                  {totalDishesCount > 0 && (
+                    <span style={{ fontSize: '0.82rem', color: '#9D4124', fontWeight: 800, background: '#FFF8F6', border: '1.5px solid #FFDBC9', padding: '6px 12px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Icon name="shopping_bag" size={16} />
+                      {totalDishesCount} phần ({preOrderTotal.toLocaleString('vi-VN')}₫)
+                    </span>
+                  )}
                 </div>
 
-                {/* Filter and Search */}
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px', background: '#FFF8F6', border: '1px solid #EAE0DE', borderRadius: '12px', padding: '8px 12px' }}>
-                    <Icon name="search" size={18} style={{ color: '#89726B' }} />
-                    <input
-                      type="text"
-                      placeholder="Tìm món ngon khai vị, lẩu..."
-                      value={menuSearch}
-                      onChange={(e) => setMenuSearch(e.target.value)}
-                      className="touch-input"
-                      style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem' }}
-                    />
-                  </div>
-
-                  <div className="public-menu-categories-bar" style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: 1 }}>
+                {/* Hàng 1: Ô tìm kiếm Full Width trên Mobile */}
+                <div className="preorder-search-bar">
+                  <Icon name="search" size={20} style={{ color: '#89726B', flexShrink: 0 }} />
+                  <input
+                    type="text"
+                    placeholder="Tìm món ngon khai vị, lẩu, nướng..."
+                    value={menuSearch}
+                    onChange={(e) => setMenuSearch(e.target.value)}
+                    className="preorder-search-input touch-input"
+                  />
+                  {menuSearch && (
                     <button
                       type="button"
-                      onClick={() => setMenuCatFilter('ALL')}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        background: menuCatFilter === 'ALL' ? '#9D4124' : '#F6ECEA',
-                        color: menuCatFilter === 'ALL' ? '#FFFFFF' : '#56423D',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0
-                      }}
+                      onClick={() => setMenuSearch('')}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#89726B', padding: '2px', display: 'flex' }}
                     >
-                      Tất cả
+                      <Icon name="close" size={18} />
                     </button>
-                    {menuCategories.map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setMenuCatFilter(c.id)}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: '10px',
-                          border: 'none',
-                          background: menuCatFilter === c.id ? '#9D4124' : '#F6ECEA',
-                          color: menuCatFilter === c.id ? '#FFFFFF' : '#56423D',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0
-                        }}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
-                  </div>
+                  )}
                 </div>
 
-                {/* Dishes Grid (Responsive 2 cột trên PC, 1 cột trên điện thoại) */}
+                {/* Hàng 2: Thanh danh mục trượt ngang mượt mà */}
+                <div className="preorder-categories-bar">
+                  <button
+                    type="button"
+                    onClick={() => setMenuCatFilter('ALL')}
+                    className={`preorder-cat-btn ${menuCatFilter === 'ALL' ? 'active' : 'inactive'}`}
+                  >
+                    Tất cả món
+                  </button>
+                  {menuCategories.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setMenuCatFilter(c.id)}
+                      className={`preorder-cat-btn ${menuCatFilter === c.id ? 'active' : 'inactive'}`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Danh sách món ăn Step 3 */}
                 {isLoadingMenu ? (
-                  <div style={{ textAlign: 'center', padding: '40px', color: '#89726B' }}>
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#89726B' }}>
                     <Icon name="sync" size={32} style={{ animation: 'spin 1s linear infinite', color: '#9D4124' }} />
                     <p style={{ margin: '8px 0 0', fontSize: '0.88rem' }}>Đang nạp thực đơn món ăn từ CSDL...</p>
                   </div>
                 ) : filteredMenuItems.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px', color: '#89726B', background: '#FFF8F6', borderRadius: '16px', marginBottom: '22px' }}>
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#89726B', background: '#FFF8F6', borderRadius: '16px', marginBottom: '22px' }}>
                     <Icon name="search_off" size={36} style={{ color: '#C4B5B0', marginBottom: '6px' }} />
-                    <p style={{ margin: 0, fontSize: '0.88rem' }}>Không tìm thấy món ăn nào phù hợp với bộ lọc</p>
+                    <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: 600 }}>Không tìm thấy món ăn nào phù hợp với bộ lọc</p>
                   </div>
                 ) : (
                   <div className="reservation-preorder-grid">
                     {filteredMenuItems.map(dish => {
-                    const selected = preOrderItems.find(i => i.id === dish.id);
-                    return (
-                      <div
-                        key={dish.id}
-                        style={{
-                          background: selected ? '#FFF8F6' : '#FFFFFF',
-                          borderRadius: '16px',
-                          border: selected ? '2px solid #9D4124' : '1px solid #F0E6E4',
-                          padding: '12px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          gap: '10px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                          <img
-                            src={dish.imageUrl}
-                            alt={dish.name}
-                            style={{ width: '68px', height: '68px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
-                          />
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <h4 style={{ margin: 0, fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {dish.name}
-                            </h4>
-                            <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#89726B', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                              {dish.description}
-                            </p>
+                      const selected = preOrderItems.find(i => i.id === dish.id);
+                      return (
+                        <div
+                          key={dish.id}
+                          className={`preorder-card ${selected ? 'selected' : ''}`}
+                        >
+                          <div className="preorder-card-body">
+                            <div className="preorder-card-thumb-wrap">
+                              <img
+                                src={dish.imageUrl}
+                                alt={dish.name}
+                                className="preorder-card-thumb"
+                              />
+                              {selected && (
+                                <span className="preorder-card-badge">
+                                  {selected.qty}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="preorder-card-info">
+                              <h4 className="preorder-card-title">
+                                {dish.name}
+                              </h4>
+                              {dish.description && (
+                                <p className="preorder-card-desc">
+                                  {dish.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {selected && (
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                type="text"
+                                placeholder="Ghi chú món (chín vừa, ít sốt...)"
+                                value={selected.note || ''}
+                                onChange={(e) => handleUpdateDishNote(dish.id, e.target.value)}
+                                className="touch-input"
+                                style={{
+                                  width: '100%',
+                                  padding: '7px 10px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #FFDBC9',
+                                  background: '#FFFFFF',
+                                  fontSize: '0.78rem',
+                                  outline: 'none',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          <div className="preorder-card-bottom">
+                            <span className="preorder-card-price">
+                              {dish.price.toLocaleString('vi-VN')}₫
+                            </span>
+
+                            {selected ? (
+                              <div className="preorder-qty-group">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDishQty(dish.id, -1)}
+                                  className="preorder-btn-minus"
+                                  title="Giảm số lượng"
+                                >
+                                  -
+                                </button>
+                                <span className="preorder-qty-num">{selected.qty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDishQty(dish.id, 1)}
+                                  className="preorder-btn-plus"
+                                  title="Tăng số lượng"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAddDish(dish)}
+                                className="preorder-btn-add"
+                              >
+                                <Icon name="add" size={16} /> Chọn Món
+                              </button>
+                            )}
                           </div>
                         </div>
-
-                        {selected && (
-                          <input
-                            type="text"
-                            placeholder="Ghi chú (chín vừa, ít sốt...)"
-                            value={selected.note || ''}
-                            onChange={(e) => handleUpdateDishNote(dish.id, e.target.value)}
-                            className="touch-input"
-                            style={{
-                              padding: '5px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #EAE0DE',
-                              background: '#FFFFFF',
-                              fontSize: '0.76rem',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px dashed #F6ECEA' }}>
-                          <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.95rem', color: '#9D4124' }}>
-                            {dish.price.toLocaleString('vi-VN')}₫
-                          </span>
-
-                          {selected ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateDishQty(dish.id, -1)}
-                                style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #EAE0DE', background: '#F6ECEA', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
-                              >
-                                -
-                              </button>
-                              <span style={{ fontWeight: 800, fontSize: '0.88rem' }}>{selected.qty}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateDishQty(dish.id, 1)}
-                                style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: '#9D4124', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
-                              >
-                                +
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleAddDish(dish)}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '8px',
-                                border: '1px solid #9D4124',
-                                background: '#FFF8F6',
-                                color: '#9D4124',
-                                fontWeight: 700,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <Icon name="add" size={16} /> Chọn Món
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                   </div>
                 )}
 
-                {/* Pre-order Navigation */}
-                <div className="reservation-actions-group">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(2)}
-                    style={{
-                      padding: '14px 20px',
-                      borderRadius: '16px',
-                      background: '#F0E6E4',
-                      color: '#56423D',
-                      border: 'none',
-                      fontWeight: 700,
-                      fontSize: '0.95rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Quay lại
-                  </button>
+                {/* Mini Cart Bar (Tóm tắt giỏ món pre-order khi có món được chọn) */}
+                {totalDishesCount > 0 && (
+                  <div className="preorder-mini-cart">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124', flexShrink: 0 }}>
+                        <Icon name="shopping_bag" size={20} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A' }}>
+                          Đã chọn {totalDishesCount} phần món ăn
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: '#9D4124', fontWeight: 800 }}>
+                          Tổng tạm tính: {preOrderTotal.toLocaleString('vi-VN')}₫
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPreOrderItems([])}
+                      style={{ border: 'none', background: 'transparent', color: '#89726B', fontSize: '0.78rem', textDecoration: 'underline', cursor: 'pointer', padding: '4px' }}
+                    >
+                      Xóa chọn lại
+                    </button>
+                  </div>
+                )}
 
+                {/* Pre-order Navigation Mobile-First */}
+                <div className="preorder-actions-container">
+                  {/* Nút Primary CTA to rõ trên cùng */}
                   <button
                     type="button"
                     onClick={() => setCurrentStep(4)}
                     style={{
-                      flex: 1,
-                      padding: '14px',
-                      borderRadius: '16px',
-                      background: '#FFF8F6',
-                      color: '#9D4124',
-                      border: '1.5px solid #FFDBC9',
-                      fontWeight: 700,
-                      fontSize: '0.92rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Bỏ qua & Chọn tại bàn
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(4)}
-                    style={{
-                      flex: 1.5,
-                      padding: '14px',
+                      width: '100%',
+                      padding: '15px 20px',
                       borderRadius: '16px',
                       background: '#9D4124',
                       color: '#FFF',
                       border: 'none',
                       fontFamily: "'Epilogue', sans-serif",
                       fontWeight: 800,
-                      fontSize: '0.95rem',
+                      fontSize: '0.98rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 6px 18px rgba(157, 65, 36, 0.3)'
+                      boxShadow: '0 6px 18px rgba(157, 65, 36, 0.28)'
                     }}
                   >
                     <span>
-                      {totalDishesCount > 0 ? `Xác nhận (${totalDishesCount}) & Tiếp` : 'Tiếp tục điền thông tin'}
+                      {totalDishesCount > 0
+                        ? `Xác nhận ${totalDishesCount} món & Tiếp tục`
+                        : 'Tiếp tục điền thông tin (Chọn món tại bàn)'}
                     </span>
                     <Icon name="arrow_forward" size={18} />
                   </button>
+
+                  {/* Hàng 2 nút phụ bên dưới */}
+                  <div className="preorder-actions-secondary-row">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      style={{
+                        flex: 1,
+                        padding: '12px 16px',
+                        borderRadius: '14px',
+                        background: '#F0E6E4',
+                        color: '#56423D',
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icon name="arrow_back" size={16} /> Quay lại (Bước 2)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreOrderItems([]);
+                        setCurrentStep(4);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '12px 16px',
+                        borderRadius: '14px',
+                        background: '#FFF8F6',
+                        color: '#89726B',
+                        border: '1.5px solid #EAE0DE',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Bỏ qua món trước
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
