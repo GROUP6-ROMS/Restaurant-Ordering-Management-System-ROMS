@@ -20,7 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/notifications")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'WAITER', 'CASHIER')")
+@PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'CASHIER')")
 public class AdminNotificationController {
 
     private final NotificationService notificationService;

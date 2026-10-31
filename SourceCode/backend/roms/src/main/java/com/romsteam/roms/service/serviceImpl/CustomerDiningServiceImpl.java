@@ -23,8 +23,10 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import com.romsteam.roms.service.RealtimeService;
+import lombok.extern.slf4j.Slf4j;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CustomerDiningServiceImpl implements CustomerDiningService {
@@ -397,7 +399,7 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
         try {
             realtimeService.notifyServiceRequest(newReq.getId(), table.getId(), table.getTableNumber(), type, note);
         } catch (Exception e) {
-            // Fallback an toàn
+            log.warn("[Realtime Service] Không thể phát chuông phục vụ bàn {}: {}", table.getTableNumber(), e.getMessage());
         }
 
         result.put("success", true);
@@ -445,7 +447,7 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
                 realtimeService.notifyServiceRequest(billReq.getId(), table.getId(), table.getTableNumber(), "BILL", note);
                 realtimeService.notifyPaymentUpdate(null, table.getId(), table.getTableNumber(), "PAYMENT_REQUEST", null);
             } catch (Exception e) {
-                // Fallback an toàn
+                log.warn("[Realtime Service] Không thể phát yêu cầu thanh toán bàn {}: {}", table.getTableNumber(), e.getMessage());
             }
         }
 

@@ -49,11 +49,11 @@ export default function AppRoutes() {
           <Route path="orders/tracking" element={<CustomerTrackingPage />} />
         </Route>
 
-        {/* 4. Bo phan Quan tri vien / Manager (Role MANAGER hoac ADMIN) */}
+        {/* 4. Bo phan Quan ly / Manager (Role MANAGER) */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+            <ProtectedRoute allowedRoles={['MANAGER']}>
               <AdminLayout />
             </ProtectedRoute>
           }

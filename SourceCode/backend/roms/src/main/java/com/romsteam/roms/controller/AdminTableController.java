@@ -25,7 +25,7 @@ import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
 @RestController
 @RequestMapping("/api/admin/tables")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'CASHIER', 'ADMIN')")
+@PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'CASHIER')")
 public class AdminTableController {
 
     private final RestaurantTableService tableService;

@@ -335,7 +335,7 @@ export default function AdminLayout() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#89726B' }}>Vai trò:</span>
                 <span style={{ fontWeight: 700, color: '#753400', background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  {user?.role || 'ADMIN'}
+                  {user?.role || 'MANAGER'}
                 </span>
               </div>
             </div>

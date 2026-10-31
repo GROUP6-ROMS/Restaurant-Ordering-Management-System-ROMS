@@ -29,7 +29,7 @@ public class ReportController {
      * Yêu cầu phân quyền: Chỉ tài khoản có vai trò Quản lý (MANAGER) mới được xem
      */
     @GetMapping("/summary")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<ReportSummaryResponse>> getReportSummary(
             @RequestParam(defaultValue = "TODAY") ReportTimeframe timeframe,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -44,7 +44,7 @@ public class ReportController {
      * Lấy danh sách các món ăn bán chạy nhất theo khoảng thời gian
      */
     @GetMapping("/bestsellers")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<List<BestsellerDishResponse>>> getTopBestsellers(
             @RequestParam(defaultValue = "TODAY") ReportTimeframe timeframe,
             @RequestParam(defaultValue = "10") int limit,
@@ -60,7 +60,7 @@ public class ReportController {
      * Tải xuống file báo cáo Excel chuyên nghiệp (.xls định dạng bảng biểu, màu sắc và định dạng số)
      */
     @GetMapping({"/export/excel", "/export/csv"})
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<byte[]> exportReportExcel(
             @RequestParam(defaultValue = "TODAY") ReportTimeframe timeframe,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,

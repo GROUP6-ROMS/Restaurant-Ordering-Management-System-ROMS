@@ -25,7 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/waiter")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('WAITER', 'MANAGER', 'KITCHEN', 'CASHIER', 'ADMIN')")
+@PreAuthorize("hasAnyRole('WAITER', 'MANAGER', 'KITCHEN', 'CASHIER')")
 public class WaiterController {
 
     private final WaiterService waiterService;

@@ -22,7 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/kitchen")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('KITCHEN', 'MANAGER', 'WAITER', 'CASHIER', 'ADMIN')")
+@PreAuthorize("hasAnyRole('KITCHEN', 'MANAGER', 'WAITER', 'CASHIER')")
 public class KitchenController {
 
     private final KitchenService kitchenService;

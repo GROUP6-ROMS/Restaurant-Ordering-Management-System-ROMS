@@ -6,10 +6,8 @@ const AuthContext = createContext();
 export function getRoleHome(role) {
   switch (role?.toUpperCase()) {
     case 'MANAGER':
-    case 'ADMIN':
       return '/admin/reports';
     case 'WAITER':
-    case 'BARTENDER':
       return '/waiter/floor-plan';
     case 'KITCHEN':
       return '/kitchen/kds';

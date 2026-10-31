@@ -107,7 +107,7 @@ public class SecurityConfig {
 
                         // 2. Nghiệp vụ gọi món và vận hành tại bàn: Bắt buộc phải có Dining Token (ROLE_CUSTOMER) hoặc tài khoản Nhân viên
                         .requestMatchers("/api/customer/dining/**")
-                        .hasAnyRole("CUSTOMER", "WAITER", "MANAGER", "ADMIN")
+                        .hasAnyRole("CUSTOMER", "WAITER", "MANAGER")
 
                         // 3. Các request còn lại bắt buộc phải xác thực
                         .anyRequest().authenticated())
