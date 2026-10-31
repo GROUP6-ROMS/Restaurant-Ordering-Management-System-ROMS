@@ -26,6 +26,21 @@ export default function TableWelcomePage() {
   const [verifiedTable, setVerifiedTable] = useState(null);
   const [verifyError, setVerifyError] = useState(null);
 
+  // Xác định mã bàn chuẩn kỹ thuật (T-01, B-02, VIP-01)
+  const tableCode = verifiedTable?.code || (
+    rawTable.toUpperCase().startsWith('T-') || rawTable.toUpperCase().startsWith('B-') || rawTable.toUpperCase().startsWith('VIP')
+      ? rawTable.toUpperCase()
+      : `Bàn ${tableNumberFormatted}`
+  );
+
+  // Xác định xem có phải bàn VIP hay không
+  const isVip = Boolean(
+    verifiedTable?.code?.toUpperCase().includes('VIP') ||
+    verifiedTable?.zone?.toUpperCase().includes('VIP') ||
+    verifiedTable?.zoneName?.toUpperCase().includes('VIP') ||
+    rawTable.toUpperCase().includes('VIP')
+  );
+
   // Clock
   useEffect(() => {
     const updateTime = () => {
@@ -89,21 +104,17 @@ export default function TableWelcomePage() {
   };
 
   const handleCallStaff = () => {
-    const tableLabel = verifiedTable?.code || `Bàn ${tableNumberFormatted}`;
+    const tableLabel = isVip && verifiedTable?.name ? `${tableCode} (${verifiedTable.name})` : tableCode;
     showToast(`Đã rung chuông! Nhân viên đang đến hỗ trợ ${tableLabel}.`);
   };
 
   const handleStartDining = () => {
-    // Nếu chưa xác thực qua QR Token, dự đoán chuẩn mã bàn T-XX để gửi API chính xác
-    const defaultTableCode = rawTable.toUpperCase().startsWith('T-') || rawTable.toUpperCase().startsWith('B-') || rawTable.toUpperCase().startsWith('VIP-')
-      ? rawTable.toUpperCase()
-      : `T-${tableNumberFormatted}`;
-
     const info = {
-      tableNumber: verifiedTable?.code || defaultTableCode,
+      tableNumber: tableCode,
       tableId: verifiedTable?.id || (parseInt(rawTable, 10) >= 19 ? parseInt(rawTable, 10) : null),
-      tableName: verifiedTable?.name || `Bàn ${tableNumberFormatted}`,
+      tableName: verifiedTable?.name || '',
       zoneName: verifiedTable?.zoneName || '',
+      isVip,
       guestCount,
       token: tokenParam || verifiedTable?.qrToken || `table-${tableNumberFormatted}-token`,
       diningToken: verifiedTable?.diningToken || sessionStorage.getItem('roms_dining_token')
@@ -313,23 +324,29 @@ export default function TableWelcomePage() {
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            background: '#9D4124',
+            background: isVip ? '#78350F' : '#9D4124',
             color: '#FFFFFF',
-            padding: '3px 10px',
+            padding: '4px 12px',
             borderRadius: '10px',
             fontWeight: 900,
-            fontSize: '0.9rem',
+            fontSize: '0.95rem',
             letterSpacing: '0.04em'
           }}>
-            <Icon name="table_restaurant" size={18} fill={1} />
-            <span>{verifiedTable?.code || `BÀN ${tableNumberFormatted}`}</span>
+            <Icon name={isVip ? "stars" : "table_restaurant"} size={18} fill={1} />
+            <span>{tableCode}</span>
           </div>
-          <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1F1B1A' }}>
-            {verifiedTable?.name || `Table ${tableNumberFormatted}`}
-            <span style={{ fontWeight: 500, color: '#89726B', fontSize: '0.78rem' }}>
-              {verifiedTable?.zoneName ? ` • ${verifiedTable.zoneName}` : ''} • {guestCount} Chỗ ngồi
+          {isVip && verifiedTable?.name ? (
+            <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1F1B1A' }}>
+              {verifiedTable.name}
+              <span style={{ fontWeight: 500, color: '#89726B', fontSize: '0.78rem' }}>
+                {verifiedTable?.zoneName ? ` • ${verifiedTable.zoneName}` : ''} • {guestCount} Chỗ ngồi
+              </span>
             </span>
-          </span>
+          ) : (
+            <span style={{ fontWeight: 600, color: '#89726B', fontSize: '0.82rem' }}>
+              {verifiedTable?.zoneName ? `${verifiedTable.zoneName} • ` : ''}{guestCount} Chỗ ngồi
+            </span>
+          )}
         </div>
       </header>
 
@@ -360,7 +377,7 @@ export default function TableWelcomePage() {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            padding: '4px 12px',
+            padding: '4px 14px',
             borderRadius: '9999px',
             background: '#E8F5E9',
             border: '1px solid #C8E6C9',
@@ -371,7 +388,9 @@ export default function TableWelcomePage() {
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2E7D32', animation: 'subtlePulse 1.5s infinite' }} />
             <Icon name="check_circle" size={15} fill={1} />
-            <span>Đã kết nối Bàn {tableNumberFormatted} • Sẵn sàng phục vụ</span>
+            <span>
+              Đã kết nối {tableCode}{isVip && verifiedTable?.name ? ` (${verifiedTable.name})` : ''} • Sẵn sàng phục vụ
+            </span>
           </div>
 
           {/* Room Service Icon Circle */}
@@ -394,10 +413,15 @@ export default function TableWelcomePage() {
             Xin chào quý khách!
           </h2>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{ padding: '3px 10px', borderRadius: '10px', background: '#9D4124', color: '#FFFFFF', fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.05rem', boxShadow: '0 2px 6px rgba(157, 65, 36, 0.25)' }}>
-              BÀN {tableNumberFormatted}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <span style={{ padding: '4px 12px', borderRadius: '10px', background: isVip ? '#78350F' : '#9D4124', color: '#FFFFFF', fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.05rem', boxShadow: '0 2px 6px rgba(157, 65, 36, 0.25)' }}>
+              {isVip ? `PHÒNG ${tableCode}` : `BÀN ${tableCode}`}
             </span>
+            {isVip && verifiedTable?.name && (
+              <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#78350F' }}>
+                {verifiedTable.name}
+              </span>
+            )}
             <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#9D4124' }}>
               của bạn đã sẵn sàng!
             </span>

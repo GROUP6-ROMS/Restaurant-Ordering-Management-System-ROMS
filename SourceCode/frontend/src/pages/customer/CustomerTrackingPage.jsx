@@ -174,7 +174,7 @@ export default function CustomerTrackingPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
               <span style={{
-                background: '#C85A32',
+                background: (trackingData?.tableNumber?.toUpperCase().includes('VIP') || tableInfo?.tableNumber?.toUpperCase().includes('VIP')) ? '#78350F' : '#C85A32',
                 color: '#FFFFFF',
                 fontFamily: "'Epilogue', sans-serif",
                 fontWeight: 800,
@@ -183,7 +183,8 @@ export default function CustomerTrackingPage() {
                 borderRadius: '10px',
                 letterSpacing: '-0.01em'
               }}>
-                BÀN {trackingData?.tableNumber || tableInfo?.tableNumber || 'Bàn ăn'}
+                {(trackingData?.tableNumber?.toUpperCase().includes('VIP') || tableInfo?.tableNumber?.toUpperCase().includes('VIP')) ? 'PHÒNG ' : 'BÀN '}
+                {trackingData?.tableNumber || tableInfo?.tableNumber || 'Bàn ăn'}
               </span>
               <span style={{
                 background: '#DDE8AB',
@@ -208,7 +209,10 @@ export default function CustomerTrackingPage() {
             </div>
             <p style={{ margin: 0, fontSize: '0.85rem', color: '#56423D', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Icon name="location_on" size={16} style={{ color: '#89726B' }} />
-              {trackingData?.tableName || 'Khu vực chính'} ({trackingData?.guestCount || tableInfo?.guestCount || 2} khách)
+              {(trackingData?.tableNumber?.toUpperCase().includes('VIP') || tableInfo?.tableNumber?.toUpperCase().includes('VIP')) && (trackingData?.tableName || tableInfo?.tableName)
+                ? `${trackingData?.tableName || tableInfo?.tableName} • `
+                : ''}
+              {trackingData?.zoneName || trackingData?.zone || tableInfo?.zoneName || 'Khu vực phục vụ'} ({trackingData?.guestCount || tableInfo?.guestCount || 2} khách)
             </p>
           </div>
 
@@ -664,7 +668,13 @@ export default function CustomerTrackingPage() {
                   <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.1rem', color: '#1F1B1A', margin: 0 }}>
                     Chọn phương thức thanh toán
                   </h3>
-                  <span style={{ fontSize: '0.78rem', color: '#89726B' }}>Bàn {trackingData?.tableNumber || tableInfo?.tableNumber || 'Bàn ăn'}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                    {(trackingData?.tableNumber?.toUpperCase().includes('VIP') || tableInfo?.tableNumber?.toUpperCase().includes('VIP')) ? 'Phòng ' : 'Bàn '}
+                    {trackingData?.tableNumber || tableInfo?.tableNumber || 'Bàn ăn'}
+                    {(trackingData?.tableNumber?.toUpperCase().includes('VIP') || tableInfo?.tableNumber?.toUpperCase().includes('VIP')) && (trackingData?.tableName || tableInfo?.tableName)
+                      ? ` (${trackingData?.tableName || tableInfo?.tableName})`
+                      : ''}
+                  </span>
                 </div>
               </div>
               <button

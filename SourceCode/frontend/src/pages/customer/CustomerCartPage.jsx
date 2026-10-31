@@ -168,7 +168,9 @@ export default function CustomerCartPage() {
                 fontFamily: 'Epilogue', fontWeight: 800, fontSize: 24,
                 color: 'var(--on-surface)', lineHeight: 1.1,
               }}>
-                {tableInfo?.tableNumber || 'Bàn ăn'}
+                {tableInfo?.isVip || tableInfo?.tableNumber?.toUpperCase().includes('VIP')
+                  ? `${tableInfo.tableNumber}${tableInfo?.tableName ? ` • ${tableInfo.tableName}` : ''}`
+                  : (tableInfo?.tableNumber || 'Bàn ăn')}
               </h2>
               <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 12, color: 'var(--on-surface-variant)' }}>
                 • {tableInfo?.guestCount || 2} Khách

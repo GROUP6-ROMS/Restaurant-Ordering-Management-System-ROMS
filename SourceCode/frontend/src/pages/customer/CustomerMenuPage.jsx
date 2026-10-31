@@ -526,8 +526,10 @@ export default function CustomerMenuPage() {
                   color: 'var(--on-primary-fixed-variant)',
                   fontSize: 11, fontWeight: 700, fontFamily: 'Plus Jakarta Sans',
                 }}>
-                  <Icon name="table_restaurant" size={13} style={{ color: 'var(--primary)' }} />
-                  {tableInfo?.tableNumber || 'Bàn ăn'}
+                  <Icon name={tableInfo?.isVip || tableInfo?.tableNumber?.toUpperCase().includes('VIP') ? "stars" : "table_restaurant"} size={13} style={{ color: 'var(--primary)' }} />
+                  {tableInfo?.isVip || tableInfo?.tableNumber?.toUpperCase().includes('VIP')
+                    ? `${tableInfo.tableNumber}${tableInfo?.tableName ? ` • ${tableInfo.tableName}` : ''}`
+                    : (tableInfo?.tableNumber || 'Bàn ăn')}
                 </span>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
