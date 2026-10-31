@@ -2673,12 +2673,12 @@ export default function PosCheckoutPage() {
                 <span style={{ color: '#64748B' }}>Nội dung CK:</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontWeight: 800, color: '#9D4124', fontFamily: 'monospace' }}>
-                    {payOsData?.description || `ROMS Ban ${(currentTable?.code || currentTable?.name || '').replace(/[^a-zA-Z0-9]/g, '')}`}
+                    {payOsData?.description || (payOsData?.orderCode ? String(payOsData.orderCode) : '')}
                   </span>
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(payOsData?.description || '');
+                      navigator.clipboard.writeText(payOsData?.description || (payOsData?.orderCode ? String(payOsData.orderCode) : ''));
                       showToast('Đã sao chép nội dung chuyển khoản!');
                     }}
                     style={{ background: 'none', border: 'none', color: '#0284C7', cursor: 'pointer', padding: 0 }}

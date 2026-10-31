@@ -156,28 +156,23 @@ public class PayOsServiceImpl implements PayOsService {
             cashier = staffRepository.findByUsername(cashierUsername).orElse(null);
         }
 
-        // 4. Kiểm tra hóa đơn hiện tại: Nếu đã có mã QR payOS hợp lệ và số tiền không đổi, tái sử dụng (Idempotent)
+        // 4. Kiểm tra hóa đơn hiện tại: Bắt buộc là chính mã đơn hàng orderCode và QR phải chứa orderCode để payOS tự động khớp lệnh 100%
         Bill bill = existingBillOpt.orElseGet(Bill::new);
         boolean canReuseExistingQr = bill.getId() != null
                 && bill.getStatus() == BillStatus.UNPAID
                 && bill.getPayosOrderCode() != null
                 && bill.getPayosQrCode() != null
+                && bill.getPayosQrCode().contains(String.valueOf(bill.getPayosOrderCode()))
                 && bill.getFinalAmount() != null
                 && bill.getFinalAmount().compareTo(finalAmount) == 0;
 
-        // Chuẩn hóa tên bàn: Xóa bỏ hoàn toàn ký tự đặc biệt, dấu gạch ngang (VD: B-03 -> B03)
-        String cleanTableNum = (table.getTableNumber() != null ? table.getTableNumber() : "").replaceAll("[^a-zA-Z0-9]", "");
-        String description = "ROMS Ban " + cleanTableNum;
-        if (description.length() > 25) {
-            description = description.substring(0, 25);
-        }
-
         if (canReuseExistingQr) {
+            String existingDesc = String.valueOf(bill.getPayosOrderCode());
             log.info("[PayOS] Tái sử dụng mã VietQR hiện có cho orderCode: {}, số tiền: {}đ", bill.getPayosOrderCode(), finalAmount);
             return PayOsPaymentResponse.builder()
                     .orderCode(bill.getPayosOrderCode())
                     .amount(bill.getFinalAmount())
-                    .description(description)
+                    .description(existingDesc)
                     .qrCode(bill.getPayosQrCode())
                     .checkoutUrl(bill.getPayosPaymentLinkId() != null ? "https://pay.payos.vn/web/" + bill.getPayosPaymentLinkId() : null)
                     .paymentLinkId(bill.getPayosPaymentLinkId())
@@ -192,8 +187,9 @@ public class PayOsServiceImpl implements PayOsService {
                     .build();
         }
 
-        // 5. Sinh mã giao dịch orderCode duy nhất (10 chữ số) nếu chưa có hoặc số tiền thay đổi
+        // 5. Sinh mã giao dịch orderCode duy nhất (10 chữ số) nếu chưa có hoặc cần làm mới QR
         long orderCode = (System.currentTimeMillis() % 9000000000L) + 1000000000L;
+        String description = String.valueOf(orderCode);
 
         String billCode = "BILL-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + (System.currentTimeMillis() % 10000);
 
