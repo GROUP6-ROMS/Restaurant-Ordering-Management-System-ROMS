@@ -20,6 +20,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.romsteam.roms.dto.response.RomsRealtimeEvent;
+import com.romsteam.roms.service.RealtimeService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -45,6 +47,7 @@ public class AuthServiceImpl implements AuthService {
     private final StaffScheduleRepository staffScheduleRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final RealtimeService realtimeService;
 
     @Value("${app.security.master-recovery-key:ROMS-RECOVERY-2026}")
     private String masterRecoveryKey = "ROMS-RECOVERY-2026";
@@ -66,16 +69,19 @@ public class AuthServiceImpl implements AuthService {
 
     private final Map<String, OtpEntry> otpStorage = new ConcurrentHashMap<>();
 
+    // CODE MỚI SAU KHI SỬA:
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            StaffRepository staffRepository,
                            StaffScheduleRepository staffScheduleRepository,
                            JwtTokenProvider jwtTokenProvider,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           RealtimeService realtimeService) { // <-- THÊM THAM SỐ NÀY
         this.authenticationManager = authenticationManager;
         this.staffRepository = staffRepository;
         this.staffScheduleRepository = staffScheduleRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.passwordEncoder = passwordEncoder;
+        this.realtimeService = realtimeService;           // <-- THÊM DÒNG NÀY
     }
 
     @Override
@@ -176,6 +182,14 @@ public class AuthServiceImpl implements AuthService {
             staff.setIsOnShift(true);
             staffRepository.save(staff);
 
+// Phát sự kiện WebSocket STOMP báo nhân viên vừa đăng nhập vào ca trực
+            realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                    .type("STAFF_LOGIN")
+                    .status("ONLINE")
+                    .note("Nhân viên " + staff.getFullName() + " đã đăng nhập vào ca trực")
+                    .payload(staff.getUsername())
+                    .build());
+
             // 8. Sinh token JWT
             String token = jwtTokenProvider.generateToken(authentication);
 
@@ -232,9 +246,17 @@ public class AuthServiceImpl implements AuthService {
         if (username == null || username.trim().isEmpty()) return;
 
         staffRepository.findByUsername(username).ifPresent(staff -> {
-            // Khi nhan vien dang xuat, cap nhat isOnShift = false
+            // Khi nhân viên đăng xuất, cập nhật isOnShift = false
             staff.setIsOnShift(false);
             staffRepository.save(staff);
+
+            // Phát sự kiện WebSocket STOMP báo nhân viên vừa rời ca trực
+            realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                    .type("STAFF_LOGOUT")
+                    .status("OFFLINE")
+                    .note("Nhân viên " + staff.getFullName() + " đã kết thúc ca trực")
+                    .payload(staff.getUsername())
+                    .build());
         });
     }
 
