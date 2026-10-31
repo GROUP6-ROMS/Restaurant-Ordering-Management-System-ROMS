@@ -8,6 +8,7 @@ import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/rea
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
 import Icon from '../../components/common/Icon';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Hàm sinh URL ảnh QR động chuẩn NAPAS 247
 const generateVietQrUrl = (amount, billCode, tableCode, profile) => {
@@ -2617,9 +2618,18 @@ export default function PosCheckoutPage() {
                   <span style={{ fontWeight: 800, color: '#065F46', fontSize: '1.05rem' }}>ĐÃ NHẬN TIỀN!</span>
                   <span style={{ fontSize: '0.75rem', color: '#047857' }}>Đang tự động xuất hóa đơn...</span>
                 </div>
+              ) : payOsData?.qrCode ? (
+                <div style={{ width: '220px', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', borderRadius: '12px', padding: '10px' }}>
+                  <QRCodeSVG
+                    value={payOsData.qrCode}
+                    size={200}
+                    level="M"
+                    includeMargin={false}
+                  />
+                </div>
               ) : (
                 <img
-                  src={`https://img.vietqr.io/image/970422-0905982428-compact2.png?amount=${payOsData?.amount || finalCalculatedAmount}&addInfo=${encodeURIComponent(payOsData?.description || `${billPreview?.billCode || 'ROMS'} ${currentTable?.code || ''}`.trim())}&accountName=${encodeURIComponent(payOsData?.accountName || 'NGO VIET BAO HUY')}`}
+                  src={`https://img.vietqr.io/image/970422-${payOsData?.accountNumber || '0905982428'}-compact2.png?amount=${payOsData?.amount || finalCalculatedAmount}&addInfo=${encodeURIComponent(payOsData?.description || (payOsData?.orderCode ? String(payOsData.orderCode) : ''))}&accountName=${encodeURIComponent(payOsData?.accountName || 'NGO VIET BAO HUY')}`}
                   alt="VietQR MB Bank"
                   style={{ width: '220px', height: '220px', display: 'block', borderRadius: '12px' }}
                 />
@@ -2651,11 +2661,13 @@ export default function PosCheckoutPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <span style={{ color: '#64748B' }}>Số tài khoản:</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace', fontSize: '0.9rem' }}>0905 982 428</span>
+                  <span style={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                    {payOsData?.accountNumber || '0905 982 428'}
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText('0905982428');
+                      navigator.clipboard.writeText(payOsData?.accountNumber || '0905982428');
                       showToast('Đã sao chép số tài khoản!');
                     }}
                     style={{ background: 'none', border: 'none', color: '#0284C7', cursor: 'pointer', padding: 0 }}
@@ -2667,9 +2679,9 @@ export default function PosCheckoutPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ color: '#64748B' }}>Chủ tài khoản:</span>
-                <span style={{ fontWeight: 700, color: '#0F172A' }}>NGO VIET BAO HUY</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{payOsData?.accountName || 'NGO VIET BAO HUY'}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: payOsData?.checkoutUrl ? '6px' : '0' }}>
                 <span style={{ color: '#64748B' }}>Nội dung CK:</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontWeight: 800, color: '#9D4124', fontFamily: 'monospace' }}>
@@ -2688,6 +2700,18 @@ export default function PosCheckoutPage() {
                   </button>
                 </div>
               </div>
+              {payOsData?.checkoutUrl && (
+                <div style={{ borderTop: '1px dashed #E2E8F0', paddingTop: '6px', textAlign: 'center' }}>
+                  <a
+                    href={payOsData.checkoutUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: '0.75rem', color: '#0284C7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
+                  >
+                    Mở cổng thanh toán payOS <Icon name="open_in_new" size={13} />
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Realtime Status Indicator */}

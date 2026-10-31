@@ -169,6 +169,7 @@ public class PayOsServiceImpl implements PayOsService {
         if (canReuseExistingQr) {
             String existingDesc = String.valueOf(bill.getPayosOrderCode());
             log.info("[PayOS] Tái sử dụng mã VietQR hiện có cho orderCode: {}, số tiền: {}đ", bill.getPayosOrderCode(), finalAmount);
+            String accNo = extractAccountNumberFromQr(bill.getPayosQrCode(), defaultAccountNumber);
             return PayOsPaymentResponse.builder()
                     .orderCode(bill.getPayosOrderCode())
                     .amount(bill.getFinalAmount())
@@ -177,7 +178,7 @@ public class PayOsServiceImpl implements PayOsService {
                     .checkoutUrl(bill.getPayosPaymentLinkId() != null ? "https://pay.payos.vn/web/" + bill.getPayosPaymentLinkId() : null)
                     .paymentLinkId(bill.getPayosPaymentLinkId())
                     .status("PENDING")
-                    .accountNumber(defaultAccountNumber)
+                    .accountNumber(accNo)
                     .accountName(defaultAccountName)
                     .bankName(defaultBankName)
                     .bankBin(defaultBankBin)
@@ -518,5 +519,23 @@ public class PayOsServiceImpl implements PayOsService {
             }
         }
         throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.UNAUTHORIZED);
+    }
+
+    private String extractAccountNumberFromQr(String qrCode, String fallback) {
+        if (qrCode == null) return fallback;
+        try {
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("0006\\d{6}01(\\d{2})([A-Za-z0-9]+)0208");
+            java.util.regex.Matcher matcher = pattern.matcher(qrCode);
+            if (matcher.find()) {
+                int len = Integer.parseInt(matcher.group(1));
+                String raw = matcher.group(2);
+                if (raw.length() >= len) {
+                    return raw.substring(0, len);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[PayOS] Không thể bóc tách số tài khoản từ QR: {}", e.getMessage());
+        }
+        return fallback;
     }
 }
