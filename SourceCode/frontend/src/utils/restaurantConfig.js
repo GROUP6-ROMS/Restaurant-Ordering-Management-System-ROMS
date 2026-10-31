@@ -1,10 +1,11 @@
 /**
  * Quản lý Cấu hình Thông tin Nhà hàng / Quán ăn động (Versatile Restaurant Profile)
- * Giúp hệ thống ROMS áp dụng linh hoạt cho mọi mô hình: từ quán ăn bình dân, quán phở,
- * cơm tấm, lẩu nướng, quán cafe - trà sữa cho đến nhà hàng tiệc và fine-dining.
+ * Đồng bộ hai chiều thời gian thực giữa CSDL SQL Server (Backend REST API + WebSocket) và Trình duyệt
  */
 
 import { useState, useEffect } from 'react';
+import { restaurantProfileApi } from '../api/restaurantProfileApi';
+import { subscribeRealtimeEvents } from './realtimeSync';
 
 const STORAGE_KEY = 'roms_restaurant_profile';
 
@@ -18,9 +19,11 @@ export const DEFAULT_PROFILE = {
   wifiName: 'ROMS-GUEST',
   wifiPassword: 'roms-welcome',
   footerMessage: 'Cảm ơn Quý khách & Hẹn gặp lại!',
-  bankAccountName: 'NHA HANG ROMS',
-  bankName: 'MBBANK',
-  bankAccountNumber: '090123456789',
+  logoUrl: '',
+  bankAccountName: 'NGO VIET BAO HUY',
+  bankName: 'MBBank',
+  bankAccountNumber: '0905982428',
+  bankBin: '970422',
 };
 
 export const RESTAURANT_PRESETS = [
@@ -39,9 +42,11 @@ export const RESTAURANT_PRESETS = [
       wifiName: 'PHO-ROMS-FREE',
       wifiPassword: 'anngonmoingay',
       footerMessage: 'Kính chúc Quý khách ngon miệng và tràn đầy năng lượng!',
-      bankAccountName: 'QUAN AN ROMS',
-      bankName: 'MBBANK',
-      bankAccountNumber: '0903111222',
+      logoUrl: '',
+      bankAccountName: 'NGO VIET BAO HUY',
+      bankName: 'MBBank',
+      bankAccountNumber: '0905982428',
+      bankBin: '970422',
     }
   },
   {
@@ -59,9 +64,11 @@ export const RESTAURANT_PRESETS = [
       wifiName: 'ROMS-BBQ-5G',
       wifiPassword: 'launuongthomngon',
       footerMessage: 'Cảm ơn Quý khách đã quây quần cùng ROMS BBQ!',
-      bankAccountName: 'ROMS BBQ HOTPOT',
-      bankName: 'MBBANK',
-      bankAccountNumber: '0908333444',
+      logoUrl: '',
+      bankAccountName: 'NGO VIET BAO HUY',
+      bankName: 'MBBank',
+      bankAccountNumber: '0905982428',
+      bankBin: '970422',
     }
   },
   {
@@ -79,9 +86,11 @@ export const RESTAURANT_PRESETS = [
       wifiName: 'ROMS-Coffee-FreeWifi',
       wifiPassword: 'coffeeandtea',
       footerMessage: 'Chúc Quý khách một ngày tuyệt vời & Hẹn gặp lại!',
-      bankAccountName: 'ROMS COFFEE TEA',
-      bankName: 'MBBANK',
-      bankAccountNumber: '0909555666',
+      logoUrl: '',
+      bankAccountName: 'NGO VIET BAO HUY',
+      bankName: 'MBBank',
+      bankAccountNumber: '0905982428',
+      bankBin: '970422',
     }
   },
   {
@@ -99,9 +108,11 @@ export const RESTAURANT_PRESETS = [
       wifiName: 'ROMS-GUEST',
       wifiPassword: 'roms-welcome',
       footerMessage: 'Cảm ơn Quý khách & Hẹn gặp lại!',
-      bankAccountName: 'NHA HANG ROMS',
-      bankName: 'MBBANK',
-      bankAccountNumber: '090123456789',
+      logoUrl: '',
+      bankAccountName: 'NGO VIET BAO HUY',
+      bankName: 'MBBank',
+      bankAccountNumber: '0905982428',
+      bankBin: '970422',
     }
   }
 ];
@@ -113,7 +124,7 @@ export const getRestaurantProfile = () => {
       return { ...DEFAULT_PROFILE, ...JSON.parse(saved) };
     }
   } catch (e) {
-    console.warn('Lỗi đọc cấu hình nhà hàng:', e);
+    console.warn('Lỗi đọc cấu hình nhà hàng cục bộ:', e);
   }
   return DEFAULT_PROFILE;
 };
@@ -125,18 +136,36 @@ export const saveRestaurantProfile = (newProfile) => {
     window.dispatchEvent(new CustomEvent('roms_restaurant_profile_changed', { detail: updated }));
     return updated;
   } catch (e) {
-    console.error('Lỗi lưu cấu hình nhà hàng:', e);
+    console.error('Lỗi lưu cấu hình nhà hàng cục bộ:', e);
     return DEFAULT_PROFILE;
   }
 };
 
 /**
- * Hook phản ứng tự động cập nhật khi cấu hình quán thay đổi ở bất kỳ đâu
+ * Hook phản ứng tự động lấy thông tin từ Backend CSDL và cập nhật Realtime đa thiết bị
  */
 export const useRestaurantProfile = () => {
   const [profile, setProfile] = useState(() => getRestaurantProfile());
 
   useEffect(() => {
+    // 1. Tải cấu hình mới nhất từ Backend (SQL Server)
+    const fetchLatestProfile = async () => {
+      try {
+        const res = await restaurantProfileApi.getProfile();
+        if (res && res.data) {
+          const remoteProfile = { ...DEFAULT_PROFILE, ...res.data };
+          setProfile(remoteProfile);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteProfile));
+        }
+      } catch (err) {
+        // Giữ fallback từ localStorage / DEFAULT_PROFILE
+        console.warn('[Restaurant Profile] Dùng cấu hình dự phòng offline:', err.message);
+      }
+    };
+
+    fetchLatestProfile();
+
+    // 2. Lắng nghe thay đổi cục bộ (cùng tab hoặc giữa các tab trình duyệt)
     const handleProfileChange = (e) => {
       if (e?.detail) {
         setProfile(e.detail);
@@ -148,9 +177,21 @@ export const useRestaurantProfile = () => {
     window.addEventListener('roms_restaurant_profile_changed', handleProfileChange);
     window.addEventListener('storage', handleProfileChange);
 
+    // 3. Lắng nghe sự kiện WebSocket thời gian thực từ Backend khi Quản lý lưu
+    const unsubscribeWs = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'RESTAURANT_PROFILE_UPDATE' && event.payload) {
+        const updated = { ...DEFAULT_PROFILE, ...event.payload };
+        setProfile(updated);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      }
+    });
+
     return () => {
       window.removeEventListener('roms_restaurant_profile_changed', handleProfileChange);
       window.removeEventListener('storage', handleProfileChange);
+      if (typeof unsubscribeWs === 'function') {
+        unsubscribeWs();
+      }
     };
   }, []);
 

@@ -97,6 +97,7 @@ public class SecurityConfig {
                                 "/api/customer/ai/**",
                                 "/api/reservations/book",
                                 "/api/payment/payos/webhook",
+                                "/api/public/restaurant/**",
                                 "/ws-roms/**",
                                 "/ws-roms-native/**",
                                 "/v3/api-docs/**",

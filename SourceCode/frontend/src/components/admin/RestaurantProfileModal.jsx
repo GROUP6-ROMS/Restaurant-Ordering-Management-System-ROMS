@@ -6,16 +6,19 @@ import {
   RESTAURANT_PRESETS,
   DEFAULT_PROFILE
 } from '../../utils/restaurantConfig';
+import { restaurantProfileApi } from '../../api/restaurantProfileApi';
 
 export default function RestaurantProfileModal({ isOpen, onClose }) {
   const [profile, setProfile] = useState(() => getRestaurantProfile());
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activePresetId, setActivePresetId] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
       setProfile(getRestaurantProfile());
       setSavedSuccess(false);
+      setIsSubmitting(false);
       setActivePresetId(null);
     }
   }, [isOpen]);
@@ -30,14 +33,30 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
     }));
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    saveRestaurantProfile(profile);
-    setSavedSuccess(true);
-    setTimeout(() => {
-      setSavedSuccess(false);
-      onClose();
-    }, 1200);
+    setIsSubmitting(true);
+    try {
+      // 1. Lưu vĩnh viễn vào CSDL SQL Server ở Backend
+      await restaurantProfileApi.updateProfile(profile);
+      // 2. Cập nhật cache cục bộ và broadcast
+      saveRestaurantProfile(profile);
+      setSavedSuccess(true);
+      setTimeout(() => {
+        setSavedSuccess(false);
+        onClose();
+      }, 1000);
+    } catch (err) {
+      console.warn('Không thể lưu lên server, fallback lưu local:', err);
+      saveRestaurantProfile(profile);
+      setSavedSuccess(true);
+      setTimeout(() => {
+        setSavedSuccess(false);
+        onClose();
+      }, 1000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
@@ -303,6 +322,28 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
                 }}
               />
             </div>
+
+            {/* Logo Thương Hiệu Quán (URL hình ảnh) */}
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1F1B1A', marginBottom: '6px' }}>
+                Đường dẫn ảnh Logo quán (Logo URL tùy chỉnh)
+              </label>
+              <input
+                type="url"
+                value={profile.logoUrl || ''}
+                onChange={(e) => setProfile({ ...profile, logoUrl: e.target.value })}
+                placeholder="VD: https://domain.com/logo.png (Để trống sẽ sử dụng Logo ROMS mặc định)"
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  border: '1.5px solid #EAE0DE',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
           </div>
 
           {/* Thông Tin Mạng WiFi Quán (Hiển thị tại màn hình gọi món & QR bàn ăn) */}
@@ -519,15 +560,16 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
               </button>
               <button
                 type="submit"
+                disabled={isSubmitting}
                 style={{
                   padding: '10px 22px',
                   borderRadius: '12px',
                   border: 'none',
-                  background: '#9D4124',
+                  background: isSubmitting ? '#CCC' : '#9D4124',
                   color: '#FFFFFF',
                   fontWeight: 800,
                   fontSize: '0.88rem',
-                  cursor: 'pointer',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -535,7 +577,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
                 }}
               >
                 <Icon name="save" size={18} />
-                Lưu Cấu Hình Quán
+                {isSubmitting ? 'Đang Lưu...' : 'Lưu Cấu Hình Quán'}
               </button>
             </div>
           </div>

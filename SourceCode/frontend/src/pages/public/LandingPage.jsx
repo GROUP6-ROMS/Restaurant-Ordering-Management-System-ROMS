@@ -1,16 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import RomsLogo from '../../components/common/RomsLogo';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
+import { customerApi } from '../../api/customerApi';
 
 import Icon from '../../components/common/Icon';
 
 export default function LandingPage() {
   const restaurantProfile = useRestaurantProfile();
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [menuItems, setMenuItems] = useState([]);
 
-  // Danh mục món ăn thực tế phong phú, phù hợp đa dạng mô hình ẩm thực (bình dân, lẩu nướng, cafe, nhà hàng)
-  const dishes = [
+  // Tải danh mục thực đơn thực tế từ CSDL Backend
+  useEffect(() => {
+    const fetchLiveMenu = async () => {
+      try {
+        const res = await customerApi.getMenu();
+        if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped = res.data
+            .filter(item => item.isAvailable)
+            .map(item => ({
+              id: item.id,
+              category: (item.station === 'BAR' || item.categoryName?.toUpperCase().includes('NƯỚC') || item.categoryName?.toUpperCase().includes('UỐNG')) 
+                ? 'DRINK' 
+                : (item.categoryName?.toUpperCase().includes('KHAI VỊ') ? 'APPETIZER' : 'MAIN'),
+              categoryName: item.categoryName || 'Món Ngon',
+              name: item.name,
+              desc: item.description || 'Món ăn tinh hoa chế biến nóng sốt, chuẩn vị và đảm bảo vệ sinh an toàn thực phẩm.',
+              price: item.price,
+              rating: '5.0',
+              tag: item.tag || 'Bestseller',
+              tagBg: item.tag?.includes('Bán chạy') ? '#9D4124' : '#596232',
+              image: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80'
+            }));
+          if (mapped.length > 0) {
+            setMenuItems(mapped);
+          }
+        }
+      } catch (err) {
+        console.warn('Landing Page sử dụng danh mục thực đơn dự phòng:', err.message);
+      }
+    };
+    fetchLiveMenu();
+  }, []);
+
+  // Danh mục món ăn dự phòng (fallback) khi CSDL nhà hàng mới khởi tạo chưa có món
+  const defaultDishes = [
     {
       id: 1,
       category: 'MAIN',
@@ -85,7 +120,9 @@ export default function LandingPage() {
     }
   ];
 
-  const filteredDishes = dishes.filter(d => {
+  const activeDishes = menuItems.length > 0 ? menuItems : defaultDishes;
+
+  const filteredDishes = activeDishes.filter(d => {
     if (selectedCategory === 'ALL') return true;
     return d.category === selectedCategory;
   });
