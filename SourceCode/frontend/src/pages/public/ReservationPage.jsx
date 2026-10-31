@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import RomsLogo from '../../components/common/RomsLogo';
 import { reservationApi } from '../../api/reservationApi';
 import { customerApi } from '../../api/customerApi';
-
 import Icon from '../../components/common/Icon';
+import './publicPages.css';
 
 // Helper tính toán ngày theo múi giờ địa phương chuẩn định dạng YYYY-MM-DD (tránh lệch timezone UTC)
 const getLocalDateString = (offsetDays = 0) => {
@@ -293,15 +293,7 @@ export default function ReservationPage() {
         backdropFilter: 'blur(16px)',
         borderBottom: '1px solid #F0E6E4'
       }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '0 24px',
-          height: '76px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
+        <div className="public-header-container">
           <Link to="/" style={{ textDecoration: 'none' }}>
             <RomsLogo size={42} showText={true} textSubtitle="Culinary Experience" />
           </Link>
@@ -325,7 +317,7 @@ export default function ReservationPage() {
       </header>
 
       {/* 2. Top Banner & 4-Step Stepper */}
-      <section style={{ background: '#FCF1EF', padding: '40px 24px 30px', borderBottom: '1px solid #EAE0DE' }}>
+      <section className="reservation-banner-section">
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
           <div style={{
             display: 'inline-flex',
@@ -345,15 +337,15 @@ export default function ReservationPage() {
             Hệ thống đặt bàn & điều phối thông minh
           </div>
 
-          <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '2.4rem', color: '#1F1B1A', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+          <h1 className="reservation-title">
             Đặt Bàn & Giữ Chỗ Trực Tuyến Tại <span style={{ color: '#9D4124' }}>ROMS</span>
           </h1>
-          <p style={{ fontSize: '1rem', color: '#56423D', margin: 0, maxWidth: '680px' }}>
+          <p style={{ fontSize: '0.98rem', color: '#56423D', margin: 0, maxWidth: '680px', lineHeight: 1.5 }}>
             Chọn trước ngày giờ, số khách và không gian yêu thích. Quản lý sẽ liên hệ trực tiếp qua số điện thoại để tư vấn và xếp vị trí bàn ưng ý nhất cho quý khách.
           </p>
 
-          {/* Stepper (4 Steps) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginTop: '30px' }}>
+          {/* Stepper (4 Steps - Cuộn ngang mượt mà trên mobile) */}
+          <div className="reservation-stepper-grid">
             {[
               { step: 1, title: 'Ngày, Giờ & Số Khách' },
               { step: 2, title: 'Khu Vực Bàn Ăn' },
@@ -365,6 +357,7 @@ export default function ReservationPage() {
               return (
                 <div
                   key={s.step}
+                  className="reservation-stepper-item"
                   onClick={() => isPast && setCurrentStep(s.step)}
                   style={{
                     display: 'flex',
@@ -411,16 +404,16 @@ export default function ReservationPage() {
       </section>
 
       {/* 3. Main Form & Summary Rail */}
-      <section style={{ maxWidth: '1280px', margin: '40px auto 80px', padding: '0 24px', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '30px', alignItems: 'flex-start' }}>
+      <section className="reservation-content-section">
+        <div className="reservation-main-layout">
           {/* Left Form Flow (8 cols) */}
-          <div style={{ gridColumn: 'span 8', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="reservation-form-col">
 
             {/* ============================================================== */}
             {/* STEP 1: CHỌN NGÀY CỤ THỂ, KHUNG GIỜ & SỐ LƯỢNG KHÁCH             */}
             {/* ============================================================== */}
             {currentStep === 1 && (
-              <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+              <div className="reservation-step-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124' }}>
                     <Icon name="calendar_today" size={20} />
@@ -435,7 +428,7 @@ export default function ReservationPage() {
 
                 {/* Date Selection: BỘ CHỌN NGÀY CỤ THỂ (MẶC ĐỊNH LÀ NGÀY ĐẶT BÀN / HÔM NAY) */}
                 <div style={{ marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '4px' }}>
                     <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Icon name="event" size={18} style={{ color: '#9D4124' }} />
                       Ngày đặt bàn / dùng bữa: <span style={{ color: '#9D4124' }}>*</span>
@@ -445,7 +438,6 @@ export default function ReservationPage() {
                     </span>
                   </div>
 
-
                   {/* Input date picker chọn ngày */}
                   <div style={{ position: 'relative' }}>
                     <input
@@ -453,6 +445,7 @@ export default function ReservationPage() {
                       min={todayStr}
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value || todayStr)}
+                      className="touch-input"
                       style={{
                         width: '100%',
                         padding: '13px 18px',
@@ -473,7 +466,7 @@ export default function ReservationPage() {
 
                 {/* Time Selection: KHUNG GIỜ ĐẠI DIỆN + NHẬP GIỜ KHÁC */}
                 <div style={{ marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '4px' }}>
                     <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Icon name="schedule" size={18} style={{ color: '#9D4124' }} />
                       Khung giờ dùng bữa: <span style={{ color: '#9D4124' }}>*</span>
@@ -483,8 +476,8 @@ export default function ReservationPage() {
                     </span>
                   </div>
 
-                  {/* Danh sách nút giờ đại diện */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                  {/* Danh sách nút giờ đại diện (tự động wrap theo cột responsive) */}
+                  <div className="mobile-time-grid" style={{ marginBottom: '12px' }}>
                     {representativeTimes.map(t => {
                       const isSel = !isCustomTime && selectedTime === t;
                       return (
@@ -493,14 +486,14 @@ export default function ReservationPage() {
                           type="button"
                           onClick={() => handleSelectPresetTime(t)}
                           style={{
-                            padding: '12px 8px',
+                            padding: '12px 6px',
                             borderRadius: '12px',
                             border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
                             background: isSel ? '#9D4124' : '#FFF8F6',
                             color: isSel ? '#FFFFFF' : '#1F1B1A',
                             fontFamily: "'Epilogue', sans-serif",
                             fontWeight: 800,
-                            fontSize: '0.95rem',
+                            fontSize: '0.92rem',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease'
                           }}
@@ -515,18 +508,18 @@ export default function ReservationPage() {
                       type="button"
                       onClick={() => setIsCustomTime(true)}
                       style={{
-                        padding: '12px 8px',
+                        padding: '12px 6px',
                         borderRadius: '12px',
                         border: isCustomTime ? '2px solid #9D4124' : '1px dashed #9D4124',
                         background: isCustomTime ? '#FFDBC9' : '#FFFFFF',
                         color: '#9D4124',
                         fontWeight: 800,
-                        fontSize: '0.85rem',
+                        fontSize: '0.82rem',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px'
+                        gap: '2px'
                       }}
                     >
                       <Icon name="edit_calendar" size={16} /> Giờ khác
@@ -535,7 +528,7 @@ export default function ReservationPage() {
 
                   {/* Ô nhập giờ tùy ý (nếu chọn Giờ khác) */}
                   {isCustomTime && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
                         Nhập giờ mong muốn của bạn:
                       </span>
@@ -543,6 +536,7 @@ export default function ReservationPage() {
                         type="time"
                         value={customTimeInput}
                         onChange={handleApplyCustomTime}
+                        className="touch-input"
                         style={{
                           padding: '8px 14px',
                           borderRadius: '10px',
@@ -563,7 +557,7 @@ export default function ReservationPage() {
 
                 {/* Guest Count: SỐ KHÁCH ĐẠI DIỆN + NHẬP SỐ KHÁCH KHÁC */}
                 <div style={{ marginBottom: '28px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '4px' }}>
                     <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Icon name="groups" size={18} style={{ color: '#9D4124' }} />
                       Số lượng khách: <span style={{ color: '#9D4124' }}>*</span>
@@ -574,7 +568,7 @@ export default function ReservationPage() {
                   </div>
 
                   {/* Danh sách nút số khách đại diện */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                  <div className="mobile-guest-grid" style={{ marginBottom: '12px' }}>
                     {representativeGuests.map(g => {
                       const isSel = !isCustomGuests && selectedGuests === g;
                       return (
@@ -583,7 +577,7 @@ export default function ReservationPage() {
                           type="button"
                           onClick={() => handleSelectPresetGuests(g)}
                           style={{
-                            padding: '12px 6px',
+                            padding: '12px 4px',
                             borderRadius: '12px',
                             border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
                             background: isSel ? '#9D4124' : '#FFF8F6',
@@ -597,7 +591,7 @@ export default function ReservationPage() {
                           }}
                         >
                           <Icon name="person" size={20} />
-                          <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{g} người</span>
+                          <span style={{ fontWeight: 800, fontSize: '0.82rem' }}>{g} người</span>
                         </button>
                       );
                     })}
@@ -607,7 +601,7 @@ export default function ReservationPage() {
                       type="button"
                       onClick={() => setIsCustomGuests(true)}
                       style={{
-                        padding: '12px 6px',
+                        padding: '12px 4px',
                         borderRadius: '12px',
                         border: isCustomGuests ? '2px solid #9D4124' : '1px dashed #9D4124',
                         background: isCustomGuests ? '#FFDBC9' : '#FFFFFF',
@@ -621,13 +615,13 @@ export default function ReservationPage() {
                       }}
                     >
                       <Icon name="add" size={20} />
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>Số khác</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.82rem' }}>Số khác</span>
                     </button>
                   </div>
 
                   {/* Ô nhập số lượng khách tùy ý (nếu chọn Số khác) */}
                   {isCustomGuests && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
                         Nhập số lượng khách chính xác:
                       </span>
@@ -637,6 +631,7 @@ export default function ReservationPage() {
                         max="50"
                         value={customGuestInput}
                         onChange={handleApplyCustomGuests}
+                        className="touch-input"
                         style={{
                           width: '80px',
                           padding: '8px 12px',
@@ -689,7 +684,7 @@ export default function ReservationPage() {
             {/* STEP 2: CHỌN KHU VỰC BÀN ĂN (LOAD ĐỘNG TỪ CSDL DATABASE)          */}
             {/* ============================================================== */}
             {currentStep === 2 && (
-              <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+              <div className="reservation-step-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124' }}>
                     <Icon name="storefront" size={20} />
@@ -719,7 +714,7 @@ export default function ReservationPage() {
                             setSelectedZoneName(z.zoneName);
                           }}
                           style={{
-                            padding: '18px 20px',
+                            padding: '16px 18px',
                             borderRadius: '18px',
                             border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
                             background: isSel ? '#FFF8F6' : '#FFFFFF',
@@ -727,23 +722,24 @@ export default function ReservationPage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            gap: '16px',
+                            flexWrap: 'wrap',
+                            gap: '12px',
                             boxShadow: isSel ? '0 4px 14px rgba(157, 65, 36, 0.1)' : 'none',
                             transition: 'all 0.15s ease'
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '220px', flex: 1 }}>
                             <div style={{
-                              width: '24px',
-                              height: '24px',
+                              width: '22px',
+                              height: '22px',
                               borderRadius: '50%',
                               border: isSel ? '6px solid #9D4124' : '2px solid #C4B5B0',
                               background: '#FFFFFF',
                               flexShrink: 0
                             }} />
                             <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1rem', color: '#1F1B1A' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.98rem', color: '#1F1B1A' }}>
                                   {z.zoneName}
                                 </span>
                                 {z.badge && (
@@ -776,7 +772,7 @@ export default function ReservationPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="reservation-actions-group">
                   <button
                     type="button"
                     onClick={() => setCurrentStep(1)}
@@ -825,14 +821,14 @@ export default function ReservationPage() {
             {/* STEP 3: PRE-ORDER GỌI MÓN TRƯỚC (TÙY CHỌN)                       */}
             {/* ============================================================== */}
             {currentStep === 3 && (
-              <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+              <div className="reservation-step-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124' }}>
                       <Icon name="restaurant_menu" size={20} />
                     </div>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
                           3. Đặt trước món ăn (Pre-order)
                         </h2>
@@ -853,18 +849,19 @@ export default function ReservationPage() {
 
                 {/* Filter and Search */}
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px', background: '#FFF8F6', border: '1px solid #EAE0DE', borderRadius: '12px', padding: '8px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px', background: '#FFF8F6', border: '1px solid #EAE0DE', borderRadius: '12px', padding: '8px 12px' }}>
                     <Icon name="search" size={18} style={{ color: '#89726B' }} />
                     <input
                       type="text"
-                      placeholder="Tìm món ngon khai vị, steak, vang..."
+                      placeholder="Tìm món ngon khai vị, lẩu..."
                       value={menuSearch}
                       onChange={(e) => setMenuSearch(e.target.value)}
+                      className="touch-input"
                       style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem' }}
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+                  <div className="public-menu-categories-bar" style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: 1 }}>
                     <button
                       type="button"
                       onClick={() => setMenuCatFilter('ALL')}
@@ -877,7 +874,8 @@ export default function ReservationPage() {
                         fontWeight: 700,
                         fontSize: '0.8rem',
                         cursor: 'pointer',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
                       }}
                     >
                       Tất cả
@@ -896,7 +894,8 @@ export default function ReservationPage() {
                           fontWeight: 700,
                           fontSize: '0.8rem',
                           cursor: 'pointer',
-                          whiteSpace: 'nowrap'
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
                         }}
                       >
                         {c.name}
@@ -905,7 +904,7 @@ export default function ReservationPage() {
                   </div>
                 </div>
 
-                {/* Dishes Grid */}
+                {/* Dishes Grid (Responsive 2 cột trên PC, 1 cột trên điện thoại) */}
                 {isLoadingMenu ? (
                   <div style={{ textAlign: 'center', padding: '40px', color: '#89726B' }}>
                     <Icon name="sync" size={32} style={{ animation: 'spin 1s linear infinite', color: '#9D4124' }} />
@@ -917,7 +916,7 @@ export default function ReservationPage() {
                     <p style={{ margin: 0, fontSize: '0.88rem' }}>Không tìm thấy món ăn nào phù hợp với bộ lọc</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', maxHeight: '400px', overflowY: 'auto', marginBottom: '22px', paddingRight: '4px' }}>
+                  <div className="reservation-preorder-grid">
                     {filteredMenuItems.map(dish => {
                     const selected = preOrderItems.find(i => i.id === dish.id);
                     return (
@@ -939,7 +938,7 @@ export default function ReservationPage() {
                           <img
                             src={dish.imageUrl}
                             alt={dish.name}
-                            style={{ width: '70px', height: '70px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
+                            style={{ width: '68px', height: '68px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
                           />
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <h4 style={{ margin: 0, fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.9rem', color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -957,12 +956,13 @@ export default function ReservationPage() {
                             placeholder="Ghi chú (chín vừa, ít sốt...)"
                             value={selected.note || ''}
                             onChange={(e) => handleUpdateDishNote(dish.id, e.target.value)}
+                            className="touch-input"
                             style={{
-                              padding: '4px 8px',
+                              padding: '5px 8px',
                               borderRadius: '6px',
                               border: '1px solid #EAE0DE',
                               background: '#FFFFFF',
-                              fontSize: '0.72rem',
+                              fontSize: '0.76rem',
                               outline: 'none',
                               boxSizing: 'border-box'
                             }}
@@ -979,15 +979,15 @@ export default function ReservationPage() {
                               <button
                                 type="button"
                                 onClick={() => handleUpdateDishQty(dish.id, -1)}
-                                style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #EAE0DE', background: '#F6ECEA', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
+                                style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid #EAE0DE', background: '#F6ECEA', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
                               >
                                 -
                               </button>
-                              <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{selected.qty}</span>
+                              <span style={{ fontWeight: 800, fontSize: '0.88rem' }}>{selected.qty}</span>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateDishQty(dish.id, 1)}
-                                style={{ width: '26px', height: '26px', borderRadius: '6px', border: 'none', background: '#9D4124', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
+                                style={{ width: '28px', height: '28px', borderRadius: '6px', border: 'none', background: '#9D4124', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}
                               >
                                 +
                               </button>
@@ -997,7 +997,7 @@ export default function ReservationPage() {
                               type="button"
                               onClick={() => handleAddDish(dish)}
                               style={{
-                                padding: '5px 12px',
+                                padding: '6px 14px',
                                 borderRadius: '8px',
                                 border: '1px solid #9D4124',
                                 background: '#FFF8F6',
@@ -1017,11 +1017,11 @@ export default function ReservationPage() {
                       </div>
                     );
                   })}
-                </div>
-              )}
+                  </div>
+                )}
 
                 {/* Pre-order Navigation */}
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="reservation-actions-group">
                   <button
                     type="button"
                     onClick={() => setCurrentStep(2)}
@@ -1054,7 +1054,7 @@ export default function ReservationPage() {
                       cursor: 'pointer'
                     }}
                   >
-                    Bỏ qua & Gọi món tại bàn
+                    Bỏ qua & Chọn tại bàn
                   </button>
 
                   <button
@@ -1079,7 +1079,7 @@ export default function ReservationPage() {
                     }}
                   >
                     <span>
-                      {totalDishesCount > 0 ? `Xác nhận ${totalDishesCount} món & Tiếp tục` : 'Tiếp tục điền thông tin'}
+                      {totalDishesCount > 0 ? `Xác nhận (${totalDishesCount}) & Tiếp` : 'Tiếp tục điền thông tin'}
                     </span>
                     <Icon name="arrow_forward" size={18} />
                   </button>
@@ -1091,7 +1091,7 @@ export default function ReservationPage() {
             {/* STEP 4: ĐIỀN THÔNG TIN KHÁCH & XÁC NHẬN GIỮ CHỖ (SUBMIT PENDING)  */}
             {/* ============================================================== */}
             {currentStep === 4 && (
-              <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px', border: '1px solid #F0E6E4', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+              <div className="reservation-step-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124' }}>
                     <Icon name="person" size={20} />
@@ -1116,6 +1116,7 @@ export default function ReservationPage() {
                       placeholder="Ví dụ: Nguyễn Văn A"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
+                      className="touch-input"
                       style={{
                         width: '100%',
                         padding: '13px 16px',
@@ -1130,7 +1131,7 @@ export default function ReservationPage() {
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="reservation-contact-grid">
                     <div>
                       <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '6px' }}>
                         Số điện thoại nhận cuộc gọi xác nhận <span style={{ color: '#9D4124' }}>*</span>
@@ -1140,6 +1141,7 @@ export default function ReservationPage() {
                         placeholder="090xxxxxxx (10 số)"
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
+                        className="touch-input"
                         style={{
                           width: '100%',
                           padding: '13px 16px',
@@ -1163,6 +1165,7 @@ export default function ReservationPage() {
                         placeholder="email@example.com"
                         value={customerEmail}
                         onChange={(e) => setCustomerEmail(e.target.value)}
+                        className="touch-input"
                         style={{
                           width: '100%',
                           padding: '13px 16px',
@@ -1187,6 +1190,7 @@ export default function ReservationPage() {
                       placeholder="Ví dụ: Kỷ niệm ngày cưới, chuẩn bị ghế trẻ em, không ăn hành tây..."
                       value={specialNote}
                       onChange={(e) => setSpecialNote(e.target.value)}
+                      className="touch-input"
                       style={{
                         width: '100%',
                         padding: '12px 16px',
@@ -1203,7 +1207,7 @@ export default function ReservationPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="reservation-actions-group">
                   <button
                     type="button"
                     onClick={() => setCurrentStep(3)}
@@ -1258,14 +1262,8 @@ export default function ReservationPage() {
           </div>
 
           {/* Right Summary Card (4 cols) */}
-          <div style={{ gridColumn: 'span 4', position: 'sticky', top: '96px' }}>
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '24px',
-              border: '1px solid #F0E6E4',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
-            }}>
+          <div className="reservation-summary-col">
+            <div className="reservation-step-card" style={{ padding: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <Icon name="receipt_long" size={22} style={{ color: '#9D4124' }} />
                 <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', margin: 0 }}>
@@ -1361,15 +1359,16 @@ export default function ReservationPage() {
             width: '100%',
             maxWidth: '540px',
             borderRadius: '28px',
-            padding: '36px',
+            padding: '28px 20px',
             textAlign: 'center',
             boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
             maxHeight: '90vh',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            boxSizing: 'border-box'
           }}>
             <div style={{
-              width: '72px',
-              height: '72px',
+              width: '64px',
+              height: '64px',
               borderRadius: '50%',
               background: '#DDE8AB',
               color: '#596232',
@@ -1378,10 +1377,10 @@ export default function ReservationPage() {
               justifyContent: 'center',
               margin: '0 auto 16px'
             }}>
-              <Icon name="phone_callback" size={40} fill={1} />
+              <Icon name="phone_callback" size={36} fill={1} />
             </div>
 
-            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#1F1B1A', margin: '0 0 8px' }}>
+            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: 'clamp(1.2rem, 3.5vw, 1.5rem)', color: '#1F1B1A', margin: '0 0 8px' }}>
               Yêu Cầu Đã Gửi Tới Quản Lý!
             </h3>
             <p style={{ fontSize: '0.9rem', color: '#56423D', margin: '0 0 20px', lineHeight: 1.5 }}>
@@ -1391,7 +1390,7 @@ export default function ReservationPage() {
             {/* Hộp thông báo quản lý gọi điện */}
             <div style={{
               background: '#FFF8F6',
-              padding: '16px',
+              padding: '14px 16px',
               borderRadius: '16px',
               border: '1.5px solid #FFDBC9',
               marginBottom: '20px',
@@ -1400,17 +1399,17 @@ export default function ReservationPage() {
               gap: '12px',
               textAlign: 'left'
             }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124', flexShrink: 0 }}>
-                <Icon name="phone_in_talk" size={22} />
+              <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124', flexShrink: 0 }}>
+                <Icon name="phone_in_talk" size={20} />
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#56423D' }}>
-                Quản lý nhà hàng sẽ gọi điện thoại tới số <strong style={{ color: '#9D4124', fontSize: '0.95rem' }}>{customerPhone}</strong> trong vòng <strong>5-10 phút</strong> để xác nhận và sắp xếp vị trí bàn ưng ý nhất cho bạn!
+              <div style={{ fontSize: '0.82rem', color: '#56423D', lineHeight: 1.45 }}>
+                Quản lý nhà hàng sẽ gọi điện thoại tới số <strong style={{ color: '#9D4124', fontSize: '0.92rem' }}>{customerPhone}</strong> trong vòng <strong>5-10 phút</strong> để xác nhận và sắp xếp vị trí bàn ưng ý nhất cho bạn!
               </div>
             </div>
 
             {/* Chi tiết phiếu đặt chỗ */}
-            <div style={{ background: '#FAF5F4', padding: '16px 18px', borderRadius: '18px', border: '1px dashed #C4B5B0', marginBottom: '24px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ background: '#FAF5F4', padding: '16px', borderRadius: '18px', border: '1px dashed #C4B5B0', marginBottom: '24px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#89726B' }}>Mã đặt chỗ tra cứu:</span>
                 <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, color: '#9D4124', fontSize: '1.1rem' }}>{bookingCode}</span>
               </div>
@@ -1438,7 +1437,7 @@ export default function ReservationPage() {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="reservation-actions-group">
               <Link
                 to="/"
                 style={{
@@ -1450,7 +1449,10 @@ export default function ReservationPage() {
                   textDecoration: 'none',
                   fontWeight: 700,
                   fontSize: '0.92rem',
-                  display: 'inline-block'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box'
                 }}
               >
                 Về Trang Chủ

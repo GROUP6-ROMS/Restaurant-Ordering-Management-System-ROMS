@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import RomsLogo from '../../components/common/RomsLogo';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import { customerApi } from '../../api/customerApi';
-
 import Icon from '../../components/common/Icon';
+import './publicPages.css';
 
 export default function LandingPage() {
   const restaurantProfile = useRestaurantProfile();
@@ -140,16 +140,7 @@ export default function LandingPage() {
         borderBottom: '1px solid #F0E6E4',
         boxShadow: '0 1px 8px rgba(0,0,0,0.03)'
       }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '0 24px',
-          height: '76px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '20px'
-        }}>
+        <div className="public-header-container">
           {/* Brand Logo with Dynamic Restaurant Name */}
           <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <RomsLogo size={44} />
@@ -163,18 +154,19 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          {/* Navigation Links */}
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '26px' }}>
+          {/* Navigation Links (Ẩn trên mobile để tối ưu không gian) */}
+          <nav className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '26px' }}>
             <a href="#about" style={{ textDecoration: 'none', color: '#56423D', fontSize: '0.9rem', fontWeight: 700, transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#9D4124'} onMouseLeave={e => e.target.style.color = '#56423D'}>Về Chúng Tôi</a>
             <a href="#menu" style={{ textDecoration: 'none', color: '#56423D', fontSize: '0.9rem', fontWeight: 700, transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#9D4124'} onMouseLeave={e => e.target.style.color = '#56423D'}>Thực Đơn Món Ngon</a>
             <a href="#workflow" style={{ textDecoration: 'none', color: '#56423D', fontSize: '0.9rem', fontWeight: 700, transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = '#9D4124'} onMouseLeave={e => e.target.style.color = '#56423D'}>Quy Trình Vận Hành</a>
           </nav>
 
           {/* Action Hub */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="public-header-actions">
             <Link
               to="/dining/welcome?table=19&token=qr-t01-token-8841"
               title="Mô phỏng trải nghiệm thực khách quét QR gọi món tại bàn"
+              className="hide-on-mobile"
               style={{
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -195,6 +187,7 @@ export default function LandingPage() {
 
             <Link
               to="/login"
+              className="hide-on-mobile"
               style={{
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -215,6 +208,7 @@ export default function LandingPage() {
 
             <Link
               to="/reservation"
+              className="public-header-btn-primary"
               style={{
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -226,7 +220,8 @@ export default function LandingPage() {
                 color: '#FFFFFF',
                 fontWeight: 700,
                 fontSize: '0.88rem',
-                boxShadow: '0 4px 14px rgba(157, 65, 36, 0.3)'
+                boxShadow: '0 4px 14px rgba(157, 65, 36, 0.3)',
+                whiteSpace: 'nowrap'
               }}
             >
               <Icon name="calendar_month" size={18} />
@@ -237,12 +232,7 @@ export default function LandingPage() {
       </header>
 
       {/* 2. Hero Section */}
-      <section style={{
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '65px 24px 85px',
-        background: 'linear-gradient(180deg, #FFF8F6 0%, #FCF1EF 55%, #FFF8F6 100%)'
-      }}>
+      <section className="public-hero-section">
         {/* Soft background aura glow */}
         <div style={{
           position: 'absolute',
@@ -256,10 +246,10 @@ export default function LandingPage() {
           pointerEvents: 'none'
         }} />
 
-        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '40px', alignItems: 'center' }}>
+        <div className="public-hero-grid">
 
-          {/* Left Column (7 cols): Heading & Quick Actions */}
-          <div style={{ gridColumn: 'span 7', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Left Column (7 cols on desktop, 1 col on mobile): Heading & Quick Actions */}
+          <div className="public-hero-left">
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -278,23 +268,15 @@ export default function LandingPage() {
               <span>{restaurantProfile.name || 'HỆ THỐNG NHÀ HÀNG & QUÁN ĂN ROMS'}</span>
             </div>
 
-            <h1 style={{
-              fontFamily: "'Epilogue', sans-serif",
-              fontWeight: 800,
-              fontSize: '3.2rem',
-              lineHeight: 1.15,
-              color: '#1F1B1A',
-              letterSpacing: '-0.02em',
-              margin: 0
-            }}>
+            <h1 className="public-hero-title">
               Vận Hành Thông Minh • <span style={{ color: '#9D4124', fontStyle: 'italic' }}>Món Ngon Chuẩn Vị</span> Mọi Mô Hình
             </h1>
 
-            <p style={{ fontSize: '1.1rem', color: '#56423D', lineHeight: 1.6, margin: 0, maxWidth: '620px' }}>
+            <p style={{ fontSize: '1.05rem', color: '#56423D', lineHeight: 1.6, margin: 0, maxWidth: '620px' }}>
               {restaurantProfile.tagline || 'Phục vụ tận tâm • Món ngon chuẩn vị • Vận hành thông minh'} — Trải nghiệm gọi món không chạm QR tại bàn, điều phối trạm Bếp KDS thời gian thực, quản lý sơ đồ bàn trực quan và thanh toán hóa đơn siêu tốc.
             </p>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', paddingTop: '8px', flexWrap: 'wrap' }}>
+            <div className="public-hero-cta-group" style={{ paddingTop: '8px' }}>
               <Link
                 to="/reservation"
                 style={{
@@ -302,13 +284,13 @@ export default function LandingPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '10px',
-                  padding: '15px 28px',
+                  padding: '14px 26px',
                   borderRadius: '9999px',
                   background: '#9D4124',
                   color: '#FFFFFF',
                   fontFamily: "'Epilogue', sans-serif",
                   fontWeight: 800,
-                  fontSize: '1rem',
+                  fontSize: '0.98rem',
                   boxShadow: '0 8px 24px rgba(157, 65, 36, 0.35)',
                   transition: 'all 0.15s ease'
                 }}
@@ -322,35 +304,36 @@ export default function LandingPage() {
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '20px',
-              paddingTop: '22px',
-              marginTop: '10px',
+              gap: '16px',
+              paddingTop: '20px',
+              marginTop: '8px',
               borderTop: '1px solid #EAE0DE',
-              maxWidth: '540px'
+              maxWidth: '540px',
+              width: '100%'
             }}>
               <div>
-                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.65rem', color: '#9D4124' }}>100%</div>
-                <div style={{ fontSize: '0.8rem', color: '#56423D' }}>Đồng bộ bàn ăn & Bếp KDS</div>
+                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#9D4124' }}>100%</div>
+                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>Đồng bộ bàn ăn & Bếp KDS</div>
               </div>
               <div>
-                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.65rem', color: '#9D4124' }}>VietQR</div>
-                <div style={{ fontSize: '0.8rem', color: '#56423D' }}>Thanh toán quét mã tức thì</div>
+                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#9D4124' }}>VietQR</div>
+                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>Thanh toán quét mã tức thì</div>
               </div>
               <div>
-                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.65rem', color: '#9D4124' }}>4.9 ★</div>
-                <div style={{ fontSize: '0.8rem', color: '#56423D' }}>Sự hài lòng của thực khách</div>
+                <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#9D4124' }}>4.9 ★</div>
+                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>Sự hài lòng của thực khách</div>
               </div>
             </div>
           </div>
 
-          {/* Right Column (5 cols): Real-world Live Terminal Showcase (Thực tế mô hình bàn ăn ROMS) */}
-          <div style={{ gridColumn: 'span 5', position: 'relative' }}>
+          {/* Right Column (5 cols on desktop, 1 col on mobile): Real-world Live Terminal Showcase */}
+          <div className="public-hero-right">
 
             {/* Background Atmosphere Image */}
             <div style={{
               position: 'relative',
               width: '100%',
-              height: '470px',
+              height: '420px',
               borderRadius: '28px',
               overflow: 'hidden',
               boxShadow: '0 20px 50px rgba(0,0,0,0.14)',
@@ -389,20 +372,7 @@ export default function LandingPage() {
             </div>
 
             {/* Real-time Order Card (Mô phỏng chính xác đơn gọi món thực tế của ROMS) */}
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '-24px',
-                left: '-16px',
-                right: '16px',
-                padding: '16px 18px',
-                borderRadius: '20px',
-                background: '#FFFFFF',
-                boxShadow: '0 18px 40px rgba(0,0,0,0.18)',
-                border: '1px solid #F0E6E4',
-                zIndex: 10
-              }}
-            >
+            <div className="public-hero-order-card">
               {/* Table header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -456,15 +426,15 @@ export default function LandingPage() {
       </section>
 
       {/* 3. About Us (Về Chúng Tôi - Thực tế, gần gũi, chuẩn ATTP & tận tâm) */}
-      <section id="about" style={{ padding: '80px 24px', background: '#FFFFFF', borderTop: '1px solid #F0E6E4', borderBottom: '1px solid #F0E6E4' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '48px', alignItems: 'center' }}>
+      <section id="about" className="public-about-section">
+        <div className="public-about-grid">
 
           {/* Left Text */}
-          <div style={{ gridColumn: 'span 6' }}>
+          <div className="public-about-col">
             <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#9D4124', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '8px' }}>
               Tâm Huyết Phục Vụ
             </span>
-            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '2.3rem', color: '#1F1B1A', margin: '0 0 16px', lineHeight: 1.25 }}>
+            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: 'clamp(1.6rem, 3.5vw, 2.3rem)', color: '#1F1B1A', margin: '0 0 16px', lineHeight: 1.25 }}>
               Hương Vị Chuẩn Gu & Trải Nghiệm Ẩm Thực Tận Tâm
             </h2>
             <p style={{ fontSize: '0.98rem', color: '#56423D', lineHeight: 1.6, margin: '0 0 16px' }}>
@@ -474,7 +444,7 @@ export default function LandingPage() {
               Mỗi đĩa món dọn lên bàn đều trải qua quy trình chế biến khắt khe: tuyển chọn nguồn thực phẩm tươi sạch mỗi ngày, nêm nếm đậm đà vừa miệng và được theo dõi chính xác qua hệ thống màn hình bếp KDS để phục vụ nhanh nhất, không để thực khách phải chờ đợi lâu.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+            <div className="public-about-badges">
               <div style={{ background: '#FFF8F6', padding: '16px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
                 <Icon name="verified" size={24} style={{ color: '#596232' }} />
                 <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#1F1B1A', marginTop: '6px' }}>Tươi Sạch 100%</div>
@@ -494,8 +464,8 @@ export default function LandingPage() {
           </div>
 
           {/* Right Image with Realistic ATTP Quality Badge */}
-          <div style={{ gridColumn: 'span 6', position: 'relative' }}>
-            <div style={{ borderRadius: '28px', overflow: 'hidden', boxShadow: '0 16px 40px rgba(0,0,0,0.12)', height: '420px' }}>
+          <div className="public-about-col" style={{ position: 'relative' }}>
+            <div style={{ borderRadius: '28px', overflow: 'hidden', boxShadow: '0 16px 40px rgba(0,0,0,0.12)', height: '360px' }}>
               <img
                 src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80"
                 alt="Không Gian Ẩm Thực Ấm Cúng"
@@ -503,14 +473,14 @@ export default function LandingPage() {
               />
             </div>
 
-            {/* Quality Commitment Badge (Thay thế hoàn toàn mác Michelin Guide bị lố) */}
+            {/* Quality Commitment Badge */}
             <div style={{
               position: 'absolute',
-              bottom: '-20px',
-              right: '-10px',
+              bottom: '-16px',
+              right: '8px',
               background: '#FFFFFF',
               borderRadius: '20px',
-              padding: '16px 20px',
+              padding: '14px 18px',
               boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
               border: '1px solid #F0E6E4',
               display: 'flex',
@@ -518,12 +488,12 @@ export default function LandingPage() {
               gap: '12px',
               zIndex: 10
             }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#EFF2E5', color: '#596232', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="verified_user" size={24} />
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#EFF2E5', color: '#596232', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="verified_user" size={22} />
               </div>
               <div>
-                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#1F1B1A' }}>Cam Kết Chuẩn Vị & Sạch</div>
-                <div style={{ fontSize: '0.75rem', color: '#89726B' }}>Nấu từ tâm • Phục vụ chu đáo mọi thực khách</div>
+                <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1F1B1A' }}>Cam Kết Chuẩn Vị & Sạch</div>
+                <div style={{ fontSize: '0.74rem', color: '#89726B' }}>Nấu từ tâm • Phục vụ chu đáo mọi thực khách</div>
               </div>
             </div>
           </div>
@@ -531,19 +501,19 @@ export default function LandingPage() {
       </section>
 
       {/* 4. Signature Dishes Showcase */}
-      <section id="menu" style={{ padding: '80px 24px', maxWidth: '1280px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '36px', flexWrap: 'wrap', gap: '16px' }}>
+      <section id="menu" className="public-menu-section">
+        <div className="public-menu-header">
           <div>
             <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#9D4124', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
               Thực Đơn Đa Dạng
             </span>
-            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '2.3rem', color: '#1F1B1A', margin: 0 }}>
+            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: 'clamp(1.6rem, 3.5vw, 2.3rem)', color: '#1F1B1A', margin: 0 }}>
               Món Ngon Được Yêu Thích Nhất
             </h2>
           </div>
 
           {/* Filter Pills */}
-          <div style={{ display: 'flex', gap: '8px', background: '#F0E6E4', padding: '6px', borderRadius: '9999px', flexWrap: 'wrap' }}>
+          <div className="public-menu-categories-bar" style={{ background: '#F0E6E4', padding: '6px', borderRadius: '9999px' }}>
             {[
               { id: 'ALL', label: 'Tất cả món' },
               { id: 'MAIN', label: 'Món chính & Lẩu' },
@@ -563,7 +533,9 @@ export default function LandingPage() {
                   fontWeight: 700,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {tab.label}
@@ -573,7 +545,7 @@ export default function LandingPage() {
         </div>
 
         {/* Dishes Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+        <div className="public-dish-grid">
           {filteredDishes.map(dish => (
             <div
               key={dish.id}
@@ -655,13 +627,13 @@ export default function LandingPage() {
       </section>
 
       {/* 5. How ROMS Works (4 Bước Vận Hành Liền Mạch) */}
-      <section id="workflow" style={{ background: '#FCF1EF', padding: '80px 24px' }}>
+      <section id="workflow" className="public-workflow-section">
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', maxWidth: '650px', margin: '0 auto 48px' }}>
+          <div style={{ textAlign: 'center', maxWidth: '650px', margin: '0 auto 40px' }}>
             <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#9D4124', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
               Vận Hành Đồng Bộ
             </span>
-            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '2.3rem', color: '#1F1B1A', margin: '0 0 12px' }}>
+            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: 'clamp(1.6rem, 3.5vw, 2.3rem)', color: '#1F1B1A', margin: '0 0 12px' }}>
               Quy Trình 4 Bước Đơn Giản & Tối Ưu
             </h2>
             <p style={{ fontSize: '0.98rem', color: '#56423D', lineHeight: 1.5, margin: 0 }}>
@@ -669,7 +641,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
+          <div className="public-steps-grid">
             {[
               {
                 num: '01',
@@ -733,11 +705,11 @@ export default function LandingPage() {
       </section>
 
       {/* 6. Footer (Đồng bộ hoàn toàn với Cấu Hình Thương Hiệu & Thông Tin Quán) */}
-      <footer style={{ background: '#F6ECEA', padding: '60px 24px 30px', marginTop: 'auto', borderTop: '1px solid #EAE0DE' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '40px', paddingBottom: '40px', borderBottom: '1px solid #EAE0DE' }}>
+      <footer className="public-footer-section">
+        <div className="public-footer-grid">
 
           {/* Cột 1: Thông tin thương hiệu */}
-          <div style={{ gridColumn: 'span 4' }}>
+          <div className="public-footer-col">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
               <RomsLogo size={40} />
               <div>
@@ -755,7 +727,7 @@ export default function LandingPage() {
           </div>
 
           {/* Cột 2: Địa chỉ & Hotline liên hệ */}
-          <div style={{ gridColumn: 'span 4' }}>
+          <div className="public-footer-col">
             <h4 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.98rem', color: '#1F1B1A', margin: '0 0 14px' }}>
               Địa Chỉ & Liên Hệ Quán
             </h4>
@@ -776,7 +748,7 @@ export default function LandingPage() {
           </div>
 
           {/* Cột 3: Giờ Phục Vụ & Mạng WiFi Quán */}
-          <div style={{ gridColumn: 'span 4' }}>
+          <div className="public-footer-col">
             <h4 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.98rem', color: '#1F1B1A', margin: '0 0 14px' }}>
               Giờ Phục Vụ & Mạng WiFi
             </h4>
