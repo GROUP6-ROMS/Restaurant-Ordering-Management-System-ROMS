@@ -156,13 +156,45 @@ public class PayOsServiceImpl implements PayOsService {
             cashier = staffRepository.findByUsername(cashierUsername).orElse(null);
         }
 
-        // 4. Sinh mã giao dịch orderCode duy nhất (10 chữ số)
+        // 4. Kiểm tra hóa đơn hiện tại: Nếu đã có mã QR payOS hợp lệ và số tiền không đổi, tái sử dụng (Idempotent)
+        Bill bill = existingBillOpt.orElseGet(Bill::new);
+        boolean canReuseExistingQr = bill.getId() != null
+                && bill.getStatus() == BillStatus.UNPAID
+                && bill.getPayosOrderCode() != null
+                && bill.getPayosQrCode() != null
+                && bill.getFinalAmount() != null
+                && bill.getFinalAmount().compareTo(finalAmount) == 0;
+
+        if (canReuseExistingQr) {
+            log.info("[PayOS] Tái sử dụng mã VietQR hiện có cho orderCode: {}, số tiền: {}đ", bill.getPayosOrderCode(), finalAmount);
+            String description = "ROMS Ban " + table.getTableNumber();
+            if (description.length() > 25) {
+                description = description.substring(0, 25);
+            }
+            return PayOsPaymentResponse.builder()
+                    .orderCode(bill.getPayosOrderCode())
+                    .amount(bill.getFinalAmount())
+                    .description(description)
+                    .qrCode(bill.getPayosQrCode())
+                    .checkoutUrl(bill.getPayosPaymentLinkId() != null ? "https://pay.payos.vn/web/" + bill.getPayosPaymentLinkId() : null)
+                    .paymentLinkId(bill.getPayosPaymentLinkId())
+                    .status("PENDING")
+                    .accountNumber(defaultAccountNumber)
+                    .accountName(defaultAccountName)
+                    .bankName(defaultBankName)
+                    .bankBin(defaultBankBin)
+                    .billCode(bill.getBillCode())
+                    .tableId(table.getId())
+                    .tableNumber(table.getTableNumber())
+                    .build();
+        }
+
+        // 5. Sinh mã giao dịch orderCode duy nhất (10 chữ số) nếu chưa có hoặc số tiền thay đổi
         long orderCode = (System.currentTimeMillis() % 9000000000L) + 1000000000L;
 
         String billCode = "BILL-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + (System.currentTimeMillis() % 10000);
 
-        // 5. Lưu thông tin hóa đơn tạm tính (UNPAID)
-        Bill bill = existingBillOpt.orElseGet(Bill::new);
+        // 6. Lưu thông tin hóa đơn tạm tính (UNPAID)
         bill.setSession(session);
         bill.setCashier(cashier);
         if (bill.getBillCode() == null || bill.getBillCode().trim().isEmpty()) {

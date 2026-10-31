@@ -2721,7 +2721,7 @@ export default function PosCheckoutPage() {
             </div>
 
             {/* Buttons */}
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -2764,6 +2764,38 @@ export default function PosCheckoutPage() {
               >
                 <Icon name={isCheckingPayOsManual ? "sync" : "refresh"} size={16} />
                 {isCheckingPayOsManual ? 'Đang Kiểm Tra...' : (payOsSettled ? 'Đã Thanh Toán' : 'Kiểm Tra Thanh Toán')}
+              </button>
+            </div>
+
+            {/* Nút thoát hiểm F&B: Xác nhận thủ công nếu ngân hàng bị nghẽn mạng nhưng tiền đã vào App MB */}
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`XÁC NHẬN THỦ CÔNG:\nBạn đã kiểm tra App MB Bank và chắc chắn nhận đủ tiền cho bàn ${payOsData?.tableNumber || currentTable?.name}?\n\nHệ thống sẽ chốt đơn và in phiếu ngay lập tức.`)) {
+                    executeCheckoutPayment(true);
+                  }
+                }}
+                disabled={isSubmittingCheckout || payOsSettled}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  borderRadius: '12px',
+                  background: '#059669',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  color: '#FFFFFF',
+                  cursor: (isSubmittingCheckout || payOsSettled) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 10px rgba(5, 150, 105, 0.2)'
+                }}
+              >
+                <Icon name="verified" size={18} />
+                <span>Xác Nhận Đã Nhận Tiền (Thủ Công / App MB Đã Báo Có)</span>
               </button>
             </div>
           </div>
