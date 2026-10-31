@@ -165,12 +165,15 @@ public class PayOsServiceImpl implements PayOsService {
                 && bill.getFinalAmount() != null
                 && bill.getFinalAmount().compareTo(finalAmount) == 0;
 
+        // Chuẩn hóa tên bàn: Xóa bỏ hoàn toàn ký tự đặc biệt, dấu gạch ngang (VD: B-03 -> B03)
+        String cleanTableNum = (table.getTableNumber() != null ? table.getTableNumber() : "").replaceAll("[^a-zA-Z0-9]", "");
+        String description = "ROMS Ban " + cleanTableNum;
+        if (description.length() > 25) {
+            description = description.substring(0, 25);
+        }
+
         if (canReuseExistingQr) {
             log.info("[PayOS] Tái sử dụng mã VietQR hiện có cho orderCode: {}, số tiền: {}đ", bill.getPayosOrderCode(), finalAmount);
-            String description = "ROMS Ban " + table.getTableNumber();
-            if (description.length() > 25) {
-                description = description.substring(0, 25);
-            }
             return PayOsPaymentResponse.builder()
                     .orderCode(bill.getPayosOrderCode())
                     .amount(bill.getFinalAmount())
@@ -210,13 +213,8 @@ public class PayOsServiceImpl implements PayOsService {
         bill.setNote(request.getNote());
         bill = billRepository.save(bill);
 
-        // 6. Chuẩn bị gọi payOS API để sinh link & mã QR
+        // 7. Chuẩn bị gọi payOS API để sinh link & mã QR
         int amountInt = finalAmount.intValue();
-        // Mô tả tối đa 25 ký tự, không dấu để tương thích mọi ngân hàng
-        String description = "ROMS Ban " + table.getTableNumber();
-        if (description.length() > 25) {
-            description = description.substring(0, 25);
-        }
 
         String cancelUrl = frontendUrl + "/pos";
         String returnUrl = frontendUrl + "/pos";

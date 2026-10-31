@@ -2673,7 +2673,7 @@ export default function PosCheckoutPage() {
                 <span style={{ color: '#64748B' }}>Nội dung CK:</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontWeight: 800, color: '#9D4124', fontFamily: 'monospace' }}>
-                    {payOsData?.description || `${billPreview?.billCode} ${currentTable?.code}`}
+                    {payOsData?.description || `ROMS Ban ${(currentTable?.code || currentTable?.name || '').replace(/[^a-zA-Z0-9]/g, '')}`}
                   </span>
                   <button
                     type="button"
