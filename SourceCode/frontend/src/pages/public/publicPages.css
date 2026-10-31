@@ -1,0 +1,509 @@
+/* ==========================================================================
+   ROMS Public Pages - Responsive Mobile Styles (LandingPage & ReservationPage)
+   Tối ưu hóa trải nghiệm Mobile-First cho thực khách truy cập qua Smartphone
+   ========================================================================== */
+
+/* 1. Header Navigation Responsive */
+.public-header-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.public-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .public-header-container {
+    padding: 0 16px;
+    height: 64px;
+  }
+
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .public-header-btn-primary {
+    padding: 8px 16px !important;
+    font-size: 0.82rem !important;
+  }
+}
+
+/* 2. Hero Section Responsive */
+.public-hero-section {
+  position: relative;
+  overflow: hidden;
+  padding: 65px 24px 85px;
+  background: linear-gradient(180deg, #FFF8F6 0%, #FCF1EF 55%, #FFF8F6 100%);
+}
+
+.public-hero-grid {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 40px;
+  align-items: center;
+}
+
+.public-hero-left {
+  grid-column: span 7;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.public-hero-right {
+  grid-column: span 5;
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+.public-hero-title {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 800;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.18;
+  color: #1F1B1A;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.public-hero-cta-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.public-hero-order-card {
+  position: absolute;
+  bottom: -24px;
+  left: -16px;
+  right: 16px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: #FFFFFF;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+  border: 1px solid #F0E6E4;
+  z-index: 10;
+}
+
+@media (max-width: 992px) {
+  .public-hero-section {
+    padding: 36px 16px 48px;
+  }
+
+  .public-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .public-hero-left {
+    grid-column: span 1;
+    text-align: center;
+    align-items: center;
+  }
+
+  .public-hero-right {
+    grid-column: span 1;
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .public-hero-order-card {
+    position: static;
+    margin-top: 16px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .public-hero-cta-group {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .public-hero-cta-group a {
+    width: 100%;
+    max-width: 320px;
+    justify-content: center;
+  }
+}
+
+/* 3. About Us Section Responsive */
+.public-about-section {
+  padding: 80px 24px;
+  background: #FFFFFF;
+  border-top: 1px solid #F0E6E4;
+  border-bottom: 1px solid #F0E6E4;
+}
+
+.public-about-grid {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 48px;
+  align-items: center;
+}
+
+.public-about-col {
+  grid-column: span 6;
+}
+
+.public-about-badges {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 992px) {
+  .public-about-section {
+    padding: 48px 16px;
+  }
+
+  .public-about-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .public-about-col {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .public-about-badges {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* 4. Menu Section & Categories Filter Bar */
+.public-menu-section {
+  padding: 80px 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.public-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 36px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.public-menu-categories-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.public-menu-categories-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.public-dish-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .public-menu-section {
+    padding: 48px 16px;
+  }
+
+  .public-menu-header {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+
+  .public-menu-categories-bar {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .public-dish-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+/* 5. How It Works Steps (4 Steps) */
+.public-workflow-section {
+  background: #FCF1EF;
+  padding: 80px 24px;
+}
+
+.public-steps-grid {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 800px) {
+  .public-workflow-section {
+    padding: 48px 16px;
+  }
+
+  .public-steps-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* 6. Footer Responsive */
+.public-footer-section {
+  background: #F6ECEA;
+  padding: 60px 24px 30px;
+  margin-top: auto;
+  border-top: 1px solid #EAE0DE;
+}
+
+.public-footer-grid {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 40px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid #EAE0DE;
+}
+
+.public-footer-col {
+  grid-column: span 4;
+}
+
+@media (max-width: 860px) {
+  .public-footer-section {
+    padding: 40px 16px 24px;
+  }
+
+  .public-footer-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding-bottom: 24px;
+  }
+
+  .public-footer-col {
+    grid-column: span 1;
+  }
+}
+
+/* ==========================================================================
+   RESERVATION PAGE RESPONSIVE MOBILE STYLES
+   ========================================================================== */
+
+/* 7. Reservation Top Banner & Stepper */
+.reservation-banner-section {
+  background: #FCF1EF;
+  padding: 40px 24px 30px;
+  border-bottom: 1px solid #EAE0DE;
+}
+
+.reservation-title {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 800;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  color: #1F1B1A;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.reservation-stepper-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 30px;
+}
+
+@media (max-width: 860px) {
+  .reservation-banner-section {
+    padding: 24px 16px 20px;
+  }
+
+  .reservation-stepper-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-top: 20px;
+  }
+
+  .reservation-stepper-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reservation-stepper-item {
+    flex: 0 0 auto;
+    min-width: 175px;
+  }
+}
+
+/* 8. Main Form Layout & Summary Rail */
+.reservation-content-section {
+  max-width: 1280px;
+  margin: 40px auto 80px;
+  padding: 0 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.reservation-main-layout {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 30px;
+  align-items: flex-start;
+}
+
+.reservation-form-col {
+  grid-column: span 8;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.reservation-summary-col {
+  grid-column: span 4;
+  position: sticky;
+  top: 96px;
+}
+
+.reservation-step-card {
+  background: #FFFFFF;
+  border-radius: 24px;
+  padding: 28px;
+  border: 1px solid #F0E6E4;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+}
+
+@media (max-width: 992px) {
+  .reservation-content-section {
+    margin: 20px auto 48px;
+    padding: 0 16px;
+  }
+
+  .reservation-main-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .reservation-form-col {
+    grid-column: span 1;
+  }
+
+  .reservation-summary-col {
+    grid-column: span 1;
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .reservation-step-card {
+    padding: 18px 16px !important;
+    border-radius: 20px !important;
+  }
+}
+
+/* 9. Mobile Touch Targets and Grids */
+.mobile-time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+  gap: 10px;
+}
+
+.mobile-guest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+  gap: 10px;
+}
+
+.mobile-zone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 540px) {
+  .mobile-zone-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Touch-friendly inputs: 16px font-size to prevent iOS zoom */
+.touch-input {
+  font-size: 16px !important;
+}
+
+/* Dishes Grid inside Pre-order Step 3 */
+.reservation-preorder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-bottom: 22px;
+  padding-right: 4px;
+}
+
+@media (max-width: 640px) {
+  .reservation-preorder-grid {
+    grid-template-columns: 1fr;
+    max-height: 360px;
+  }
+}
+
+/* Contact form inputs grid in Step 4 */
+.reservation-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .reservation-contact-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* Button action groups in Steps */
+.reservation-actions-group {
+  display: flex;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .reservation-actions-group {
+    flex-direction: column-reverse;
+  }
+  .reservation-actions-group button,
+  .reservation-actions-group a {
+    width: 100% !important;
+    flex: none !important;
+  }
+}
+
