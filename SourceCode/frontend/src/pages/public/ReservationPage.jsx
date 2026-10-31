@@ -871,76 +871,124 @@ export default function ReservationPage() {
             {/* ============================================================== */}
             {currentStep === 3 && (
               <div className="reservation-step-card">
-                {/* Header Bước 3 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124', flexShrink: 0 }}>
-                      <Icon name="restaurant_menu" size={22} />
+                {/* Header Bước 3 Tinh Gọn */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9D4124', flexShrink: 0 }}>
+                      <Icon name="restaurant_menu" size={20} />
                     </div>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
-                          3. Đặt trước món ăn (Pre-order)
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', margin: 0 }}>
+                          3. Đặt trước món ăn
                         </h2>
-                        <span style={{ fontSize: '0.72rem', background: '#FEF3C7', color: '#78350F', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '0.7rem', background: '#FEF3C7', color: '#78350F', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
                           Tùy chọn
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#89726B', marginTop: '2px' }}>
-                        Bếp chuẩn bị sẵn khi bạn tới bàn vào ngày: <strong style={{ color: '#9D4124' }}>{formatDisplayDate(selectedDate)}</strong> ({selectedTime})
+                      <div style={{ fontSize: '0.74rem', color: '#89726B', marginTop: '1px' }}>
+                        Bếp chuẩn bị sẵn khi bạn tới bàn ({selectedTime})
                       </div>
                     </div>
                   </div>
 
                   {totalDishesCount > 0 && (
-                    <span style={{ fontSize: '0.82rem', color: '#9D4124', fontWeight: 800, background: '#FFF8F6', border: '1.5px solid #FFDBC9', padding: '6px 12px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Icon name="shopping_bag" size={16} />
-                      {totalDishesCount} phần ({preOrderTotal.toLocaleString('vi-VN')}₫)
+                    <span style={{ fontSize: '0.8rem', color: '#9D4124', fontWeight: 800, background: '#FFF8F6', border: '1.5px solid #FFDBC9', padding: '4px 10px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Icon name="shopping_bag" size={15} />
+                      {totalDishesCount} món ({preOrderTotal.toLocaleString('vi-VN')}₫)
                     </span>
                   )}
                 </div>
 
-                {/* Hàng 1: Ô tìm kiếm Full Width trên Mobile */}
-                <div className="preorder-search-bar">
-                  <Icon name="search" size={20} style={{ color: '#89726B', flexShrink: 0 }} />
-                  <input
-                    type="text"
-                    placeholder="Tìm món ngon khai vị, lẩu, nướng..."
-                    value={menuSearch}
-                    onChange={(e) => setMenuSearch(e.target.value)}
-                    className="preorder-search-input touch-input"
-                  />
-                  {menuSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setMenuSearch('')}
-                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#89726B', padding: '2px', display: 'flex' }}
+                {/* BỘ LỌC TINH GỌN (COMPACT TOOLBAR 1 HÀNG DUY NHẤT) */}
+                <div className="preorder-filter-toolbar">
+                  {/* Ô tìm kiếm nhỏ gọn */}
+                  <div className="preorder-search-box">
+                    <Icon name="search" size={18} style={{ color: '#89726B', flexShrink: 0 }} />
+                    <input
+                      type="text"
+                      placeholder="Tìm món ăn nhanh..."
+                      value={menuSearch}
+                      onChange={(e) => setMenuSearch(e.target.value)}
+                      className="preorder-search-input touch-input"
+                    />
+                    {menuSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setMenuSearch('')}
+                        className="preorder-search-clear-btn"
+                        title="Xóa tìm kiếm"
+                      >
+                        <Icon name="close" size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown danh mục nhỏ gọn (Không tràn màn hình) */}
+                  <div className="preorder-category-select-wrap">
+                    <Icon name="tune" size={16} style={{ color: '#9D4124', flexShrink: 0 }} />
+                    <select
+                      value={menuCatFilter}
+                      onChange={(e) => setMenuCatFilter(e.target.value)}
+                      className="preorder-category-select touch-input"
+                      title="Chọn danh mục món"
                     >
-                      <Icon name="close" size={18} />
-                    </button>
-                  )}
+                      <option value="ALL">Tất cả ({menuDishes.length})</option>
+                      {menuCategories.map(c => {
+                        const count = menuDishes.filter(d => d.categoryId === c.id).length;
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({count})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <Icon name="expand_more" size={18} style={{ color: '#89726B', pointerEvents: 'none', marginLeft: '-4px' }} />
+                  </div>
                 </div>
 
-                {/* Hàng 2: Thanh danh mục trượt ngang mượt mà */}
-                <div className="preorder-categories-bar">
-                  <button
-                    type="button"
-                    onClick={() => setMenuCatFilter('ALL')}
-                    className={`preorder-cat-btn ${menuCatFilter === 'ALL' ? 'active' : 'inactive'}`}
-                  >
-                    Tất cả món
-                  </button>
-                  {menuCategories.map(c => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setMenuCatFilter(c.id)}
-                      className={`preorder-cat-btn ${menuCatFilter === c.id ? 'active' : 'inactive'}`}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
+                {/* Thanh tag hiển thị trạng thái lọc (Chỉ xuất hiện khi đang lọc) */}
+                {(menuCatFilter !== 'ALL' || menuSearch.trim() !== '') && (
+                  <div className="preorder-active-filters-bar">
+                    <span style={{ fontSize: '0.74rem', color: '#56423D', fontWeight: 600 }}>
+                      Tìm thấy: <strong style={{ color: '#9D4124' }}>{filteredMenuItems.length} món</strong>
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {menuCatFilter !== 'ALL' && (
+                        <button
+                          type="button"
+                          onClick={() => setMenuCatFilter('ALL')}
+                          className="preorder-filter-tag"
+                          title="Hủy lọc danh mục"
+                        >
+                          <span>{menuCategories.find(c => c.id === menuCatFilter)?.name || 'Danh mục'}</span>
+                          <Icon name="close" size={12} />
+                        </button>
+                      )}
+                      {menuSearch.trim() !== '' && (
+                        <button
+                          type="button"
+                          onClick={() => setMenuSearch('')}
+                          className="preorder-filter-tag"
+                          title="Hủy từ khóa tìm kiếm"
+                        >
+                          <span>"{menuSearch}"</span>
+                          <Icon name="close" size={12} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuCatFilter('ALL');
+                          setMenuSearch('');
+                        }}
+                        className="preorder-filter-reset-link"
+                      >
+                        Đặt lại
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Danh sách món ăn Step 3 */}
                 {isLoadingMenu ? (
