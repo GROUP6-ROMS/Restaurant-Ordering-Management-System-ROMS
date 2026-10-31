@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { cashierApi } from '../../api/cashierApi';
 import { waiterApi } from '../../api/waiterApi';
+import { paymentApi } from '../../api/paymentApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
@@ -119,6 +120,16 @@ export default function PosCheckoutPage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+
+  // Trạng thái thanh toán payOS VietQR thời gian thực
+  const [payOsData, setPayOsData] = useState(null);
+  const [isGeneratingPayOsQr, setIsGeneratingPayOsQr] = useState(false);
+  const [payOsPollingActive, setPayOsPollingActive] = useState(false);
+  const [payOsSettled, setPayOsSettled] = useState(false);
+  const [isCheckingPayOsManual, setIsCheckingPayOsManual] = useState(false);
+  const handlePayOsPaymentSuccessRef = useRef();
+  const payOsDataRef = useRef();
+  payOsDataRef.current = payOsData;
 
   // Modal Quản lý duyệt hủy món (Void item)
   const [showVoidModal, setShowVoidModal] = useState(false);
@@ -306,7 +317,21 @@ export default function PosCheckoutPage() {
   // Lắng nghe realtime events từ BroadcastChannel & localStorage
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
-      if (event?.type === 'PAYMENT_REQUEST') {
+      if (event?.type === 'BILL_PAID' || event?.status === 'BILL_PAID') {
+        const currentPayOs = payOsDataRef.current;
+        if (currentPayOs && (event.tableId === selectedTableIdRef.current || event.payload?.payosOrderCode === currentPayOs.orderCode)) {
+          if (handlePayOsPaymentSuccessRef.current) {
+            handlePayOsPaymentSuccessRef.current({
+              orderCode: currentPayOs.orderCode,
+              billCode: event.payload?.billCode || currentPayOs.billCode,
+              amount: event.payload?.finalAmount || currentPayOs.amount,
+              tableId: event.tableId,
+              tableNumber: event.tableNumber
+            });
+          }
+        }
+        fetchPosTables(true);
+      } else if (event?.type === 'PAYMENT_REQUEST') {
         playBillChime();
         showToast(`🔔 ${event.tableName || 'Bàn mới'} vừa yêu cầu thanh toán hóa đơn!`);
         if (event.tableId) {
@@ -646,7 +671,7 @@ export default function PosCheckoutPage() {
     }
 
     if (paymentMethod === 'BANK_TRANSFER') {
-      setShowVietQrModal(true);
+      handleOpenVietQrPayment(false);
       return;
     }
     executeCheckoutPayment(false);
@@ -655,11 +680,148 @@ export default function PosCheckoutPage() {
   const handleConfirmDiningCheckout = () => {
     setShowDiningWarningModal(false);
     if (paymentMethod === 'BANK_TRANSFER') {
-      setShowVietQrModal(true);
+      handleOpenVietQrPayment(true);
       return;
     }
     executeCheckoutPayment(true);
   };
+
+  // Xử lý khi cổng payOS xác nhận thanh toán thành công (Webhook hoặc Polling)
+  const handlePayOsPaymentSuccess = useCallback(async (paidInfo) => {
+    setPayOsSettled(true);
+    setPayOsPollingActive(false);
+
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12);
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.24);
+        osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.36);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.8);
+      }
+    } catch (e) {}
+
+    showToast('🎉 ĐÃ NHẬN THANH TOÁN THÀNH CÔNG! MB Bank đã ghi nhận tiền.');
+
+    setTimeout(async () => {
+      setShowVietQrModal(false);
+
+      try {
+        const invoiceRes = await cashierApi.getInvoices({ search: paidInfo?.billCode || '' });
+        const found = invoiceRes.data?.data?.find(inv => inv.billCode === paidInfo?.billCode) || invoiceRes.data?.data?.[0];
+        if (found) {
+          setReceiptData({
+            isDraft: false,
+            ...found
+          });
+          setShowReceiptModal(true);
+        }
+      } catch (e) {
+        console.warn('Lỗi tải hóa đơn in:', e);
+      }
+
+      const completedTableId = currentTable?.id;
+      setSelectedTableId(null);
+      selectedTableIdRef.current = null;
+      setBillPreview(null);
+      setCashGiven('');
+      setCheckoutNote('');
+      setDiscountType('NONE');
+      setDiscountValue(0);
+      setDiscountManagerPin('');
+      setPayOsData(null);
+      await fetchPosTables(true);
+      if (completedTableId) {
+        broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: completedTableId, status: 'DIRTY' });
+      }
+    }, 1500);
+  }, [currentTable, fetchPosTables]);
+
+  handlePayOsPaymentSuccessRef.current = handlePayOsPaymentSuccess;
+
+  // Khởi tạo link thanh toán VietQR động từ payOS
+  const handleOpenVietQrPayment = async (forceCheckout = false) => {
+    if (isSubmittingCheckout || isGeneratingPayOsQr) return;
+    setIsGeneratingPayOsQr(true);
+    setPayOsData(null);
+    setPayOsSettled(false);
+
+    try {
+      const payload = {
+        tableId: currentTable.id,
+        discountType,
+        discountValue: Number(discountValue) || 0,
+        taxRate: 8.0,
+        note: checkoutNote,
+        forceCheckout: Boolean(forceCheckout),
+        managerPin: discountManagerPin ? discountManagerPin.trim() : null
+      };
+
+      const res = await paymentApi.createPayOsLink(payload);
+      const data = res.data?.data;
+      if (!data) {
+        throw new Error('Không nhận được dữ liệu link thanh toán từ máy chủ!');
+      }
+
+      setPayOsData(data);
+      setShowVietQrModal(true);
+      setPayOsPollingActive(true);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không thể tạo mã VietQR payOS!';
+      showToast(msg);
+    } finally {
+      setIsGeneratingPayOsQr(false);
+    }
+  };
+
+  // Tra cứu trạng thái thanh toán thủ công từ Thu ngân
+  const handleManualCheckPayOsStatus = async () => {
+    if (!payOsData?.orderCode || isCheckingPayOsManual) return;
+    setIsCheckingPayOsManual(true);
+    try {
+      const res = await paymentApi.checkPayOsStatus(payOsData.orderCode);
+      const status = res.data?.data?.status;
+      if (status === 'PAID') {
+        handlePayOsPaymentSuccess(res.data.data);
+      } else {
+        showToast('⏳ Chưa nhận được thanh toán. Vui lòng nhắc khách kiểm tra lại giao dịch trên App Ngân hàng!');
+      }
+    } catch (err) {
+      showToast('Lỗi khi tra cứu: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsCheckingPayOsManual(false);
+    }
+  };
+
+  // Cơ chế Polling tự động kiểm tra giao dịch mỗi 2.5 giây khi modal QR mở
+  useEffect(() => {
+    if (!showVietQrModal || !payOsData?.orderCode || !payOsPollingActive || payOsSettled) {
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await paymentApi.checkPayOsStatus(payOsData.orderCode);
+        if (res.data?.data?.status === 'PAID') {
+          handlePayOsPaymentSuccess(res.data.data);
+        }
+      } catch (err) {
+        // Polling silent retry
+      }
+    }, 2500);
+
+    return () => clearInterval(intervalId);
+  }, [showVietQrModal, payOsData, payOsPollingActive, payOsSettled, handlePayOsPaymentSuccess]);
 
   const executeCheckoutPayment = async (forceCheckout = false) => {
     if (isSubmittingCheckout) return;
@@ -1834,12 +1996,12 @@ export default function PosCheckoutPage() {
                     <button
                       type="button"
                       onClick={handleInitiateCheckout}
-                      disabled={isBtnDisabled}
+                      disabled={isBtnDisabled || isGeneratingPayOsQr}
                       style={{
                         width: '100%',
                         padding: '14px 20px',
                         borderRadius: '16px',
-                        background: isBtnDisabled ? '#CBD5E1' : '#9D4124',
+                        background: (isBtnDisabled || isGeneratingPayOsQr) ? '#CBD5E1' : '#9D4124',
                         color: '#FFFFFF',
                         border: 'none',
                         fontFamily: "'Epilogue', sans-serif",
@@ -1849,12 +2011,17 @@ export default function PosCheckoutPage() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
-                        cursor: isBtnDisabled ? 'not-allowed' : 'pointer',
-                        boxShadow: isBtnDisabled ? 'none' : '0 6px 18px rgba(157, 65, 36, 0.3)',
+                        cursor: (isBtnDisabled || isGeneratingPayOsQr) ? 'not-allowed' : 'pointer',
+                        boxShadow: (isBtnDisabled || isGeneratingPayOsQr) ? 'none' : '0 6px 18px rgba(157, 65, 36, 0.3)',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      {isSubmittingCheckout ? (
+                      {isGeneratingPayOsQr ? (
+                        <>
+                          <Icon name="sync" size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Đang Tạo Mã VietQR PayOS...</span>
+                        </>
+                      ) : isSubmittingCheckout ? (
                         <>
                           <Icon name="sync" size={20} style={{ animation: 'spin 1s linear infinite' }} />
                           <span>Đang Xử Lý Giao Dịch...</span>
@@ -2364,14 +2531,14 @@ export default function PosCheckoutPage() {
       {/* MODALS */}
       {/* =================================================================== */}
 
-      {/* MODAL 1: VIETQR CHUYỂN KHOẢN ĐỘNG CHUẨN NAPAS */}
+      {/* MODAL 1: VIETQR CHUYỂN KHOẢN ĐỘNG CHUẨN NAPAS 24/7 (PAYOS OPEN BANKING) */}
       {showVietQrModal && (
         <div style={{
           position: 'fixed',
           inset: 0,
           zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
+          background: 'rgba(31, 27, 26, 0.75)',
+          backdropFilter: 'blur(6px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2380,61 +2547,223 @@ export default function PosCheckoutPage() {
           <div style={{
             background: '#FFFFFF',
             width: '100%',
-            maxWidth: '420px',
-            borderRadius: '24px',
+            maxWidth: '430px',
+            borderRadius: '28px',
             padding: '24px',
             textAlign: 'center',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.25)'
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Icon name="qr_code_2" size={24} style={{ color: '#9D4124' }} />
-                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', margin: 0 }}>
-                  Quét Mã VietQR NAPAS 247
-                </h3>
+                <span style={{
+                  background: '#E0F2FE',
+                  color: '#0284C7',
+                  padding: '4px 8px',
+                  borderRadius: '8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px'
+                }}>
+                  VIETQR NAPAS 24/7
+                </span>
+                <span style={{
+                  background: '#ECFDF5',
+                  color: '#059669',
+                  padding: '4px 8px',
+                  borderRadius: '8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800
+                }}>
+                  MB BANK
+                </span>
               </div>
               <button
                 type="button"
-                onClick={() => setShowVietQrModal(false)}
+                onClick={() => {
+                  setShowVietQrModal(false);
+                  setPayOsPollingActive(false);
+                }}
                 style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F6ECEA', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <Icon name="close" size={18} />
               </button>
             </div>
 
-            <div style={{ background: '#FFF8F6', padding: '16px', borderRadius: '20px', border: '2px dashed #9D4124', display: 'inline-block', marginBottom: '14px' }}>
-              <img
-                src={generateVietQrUrl(finalCalculatedAmount, billPreview?.billCode, currentTable?.code, restaurantProfile)}
-                alt="VietQR Code"
-                style={{ width: '220px', height: '220px', display: 'block', borderRadius: '12px' }}
-              />
+            {/* Title */}
+            <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#1F1B1A', margin: '0 0 4px' }}>
+              Quét Mã Thanh Toán {currentTable?.name}
+            </h3>
+            <p style={{ fontSize: '0.78rem', color: '#89726B', margin: '0 0 16px' }}>
+              Mã GD: <strong>#{payOsData?.orderCode || 'ROMS'}</strong> • Mở mọi App Ngân hàng để quét
+            </p>
+
+            {/* QR Code Container */}
+            <div style={{
+              background: '#FFF8F6',
+              padding: '16px',
+              borderRadius: '20px',
+              border: payOsSettled ? '2px solid #059669' : '2px dashed #9D4124',
+              display: 'inline-block',
+              marginBottom: '14px',
+              position: 'relative',
+              boxShadow: '0 4px 16px rgba(157, 65, 36, 0.08)'
+            }}>
+              {payOsSettled ? (
+                <div style={{ width: '220px', height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#ECFDF5', borderRadius: '14px' }}>
+                  <Icon name="check_circle" size={64} style={{ color: '#059669', marginBottom: '8px' }} />
+                  <span style={{ fontWeight: 800, color: '#065F46', fontSize: '1.05rem' }}>ĐÃ NHẬN TIỀN!</span>
+                  <span style={{ fontSize: '0.75rem', color: '#047857' }}>Đang tự động xuất hóa đơn...</span>
+                </div>
+              ) : (
+                <img
+                  src={`https://img.vietqr.io/image/970422-0905982428-compact2.png?amount=${payOsData?.amount || finalCalculatedAmount}&addInfo=${encodeURIComponent(payOsData?.description || `${billPreview?.billCode || 'ROMS'} ${currentTable?.code || ''}`.trim())}&accountName=${encodeURIComponent(payOsData?.accountName || 'NGO VIET BAO HUY')}`}
+                  alt="VietQR MB Bank"
+                  style={{ width: '220px', height: '220px', display: 'block', borderRadius: '12px' }}
+                />
+              )}
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.78rem', color: '#89726B', display: 'block' }}>Số tiền thanh toán:</span>
-              <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#9D4124' }}>
-                {finalCalculatedAmount.toLocaleString('vi-VN')}₫
+            {/* Amount */}
+            <div style={{ marginBottom: '14px' }}>
+              <span style={{ fontSize: '0.75rem', color: '#89726B', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Số tiền thanh toán:</span>
+              <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.65rem', color: '#9D4124' }}>
+                {Number(payOsData?.amount || finalCalculatedAmount).toLocaleString('vi-VN')}₫
               </span>
-              <div style={{ fontSize: '0.78rem', color: '#56423D', marginTop: '4px' }}>
-                Nội dung: <strong>{billPreview?.billCode} {currentTable?.code}</strong>
+            </div>
+
+            {/* Bank details card */}
+            <div style={{
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: '16px',
+              padding: '12px 14px',
+              textAlign: 'left',
+              fontSize: '0.8rem',
+              marginBottom: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: '#64748B' }}>Ngân hàng:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>MB Bank (Quân Đội)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ color: '#64748B' }}>Số tài khoản:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace', fontSize: '0.9rem' }}>0905 982 428</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('0905982428');
+                      showToast('Đã sao chép số tài khoản!');
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#0284C7', cursor: 'pointer', padding: 0 }}
+                    title="Sao chép"
+                  >
+                    <Icon name="content_copy" size={14} />
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: '#64748B' }}>Chủ tài khoản:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>NGO VIET BAO HUY</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748B' }}>Nội dung CK:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontWeight: 800, color: '#9D4124', fontFamily: 'monospace' }}>
+                    {payOsData?.description || `${billPreview?.billCode} ${currentTable?.code}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(payOsData?.description || '');
+                      showToast('Đã sao chép nội dung chuyển khoản!');
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#0284C7', cursor: 'pointer', padding: 0 }}
+                    title="Sao chép"
+                  >
+                    <Icon name="content_copy" size={14} />
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* Realtime Status Indicator */}
+            <div style={{
+              background: payOsSettled ? '#ECFDF5' : '#FFFBEB',
+              border: payOsSettled ? '1px solid #A7F3D0' : '1px solid #FDE68A',
+              borderRadius: '12px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              textAlign: 'left'
+            }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: payOsSettled ? '#059669' : '#D97706',
+                boxShadow: payOsSettled ? '0 0 8px #059669' : '0 0 8px #D97706',
+                flexShrink: 0
+              }} />
+              <div style={{ fontSize: '0.78rem', color: payOsSettled ? '#065F46' : '#92400E' }}>
+                <div style={{ fontWeight: 700 }}>
+                  {payOsSettled ? 'Đã nhận được tiền thành công!' : 'Đang chờ khách quét mã và chuyển tiền...'}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: payOsSettled ? '#047857' : '#B45309' }}>
+                  {payOsSettled ? 'Hóa đơn đang được hoàn tất...' : 'Tự động xác nhận ngay khi tiền vào tài khoản MB Bank (NAPAS 24/7).'}
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 type="button"
-                onClick={() => setShowVietQrModal(false)}
-                style={{ flex: 1, padding: '11px', borderRadius: '12px', background: '#F0E6E4', border: 'none', fontWeight: 700, fontSize: '0.85rem', color: '#56423D', cursor: 'pointer' }}
+                onClick={() => {
+                  setShowVietQrModal(false);
+                  setPayOsPollingActive(false);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  borderRadius: '12px',
+                  background: '#F1F5F9',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
               >
-                Hủy
+                Hủy / Đóng
               </button>
               <button
                 type="button"
-                onClick={() => executeCheckoutPayment(true)}
-                disabled={isSubmittingCheckout}
-                style={{ flex: 1.4, padding: '11px', borderRadius: '12px', background: isSubmittingCheckout ? '#CBD5E1' : '#059669', border: 'none', fontWeight: 700, fontSize: '0.85rem', color: '#FFFFFF', cursor: isSubmittingCheckout ? 'not-allowed' : 'pointer' }}
+                onClick={handleManualCheckPayOsStatus}
+                disabled={isCheckingPayOsManual || payOsSettled}
+                style={{
+                  flex: 1.4,
+                  padding: '11px',
+                  borderRadius: '12px',
+                  background: payOsSettled ? '#059669' : (isCheckingPayOsManual ? '#94A3B8' : '#0284C7'),
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#FFFFFF',
+                  cursor: (isCheckingPayOsManual || payOsSettled) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
               >
-                {isSubmittingCheckout ? 'Đang Xử Lý...' : 'Xác Nhận Đã Nhận Tiền'}
+                <Icon name={isCheckingPayOsManual ? "sync" : "refresh"} size={16} />
+                {isCheckingPayOsManual ? 'Đang Kiểm Tra...' : (payOsSettled ? 'Đã Thanh Toán' : 'Kiểm Tra Thanh Toán')}
               </button>
             </div>
           </div>

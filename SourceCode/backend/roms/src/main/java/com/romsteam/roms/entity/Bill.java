@@ -77,6 +77,18 @@ public class Bill {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // Ma don hang giao dich payOS (So nguyen duy nhat dung de doi soat Webhook)
+    @Column(name = "payos_order_code", unique = true)
+    private Long payosOrderCode;
+
+    // Ma ID link thanh toan do payOS cap
+    @Column(name = "payos_payment_link_id", length = 100)
+    private String payosPaymentLinkId;
+
+    // Chuoi ma VietQR EMVCo chuan do payOS tra ve
+    @Column(name = "payos_qr_code", length = 1000)
+    private String payosQrCode;
+
     // ===================================================================
     // CONSTRUCTORS (HAM KHOI TAO)
     // ===================================================================
@@ -220,5 +232,29 @@ public class Bill {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Long getPayosOrderCode() {
+        return payosOrderCode;
+    }
+
+    public void setPayosOrderCode(Long payosOrderCode) {
+        this.payosOrderCode = payosOrderCode;
+    }
+
+    public String getPayosPaymentLinkId() {
+        return payosPaymentLinkId;
+    }
+
+    public void setPayosPaymentLinkId(String payosPaymentLinkId) {
+        this.payosPaymentLinkId = payosPaymentLinkId;
+    }
+
+    public String getPayosQrCode() {
+        return payosQrCode;
+    }
+
+    public void setPayosQrCode(String payosQrCode) {
+        this.payosQrCode = payosQrCode;
     }
 }

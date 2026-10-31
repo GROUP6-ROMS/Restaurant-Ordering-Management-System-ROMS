@@ -21,6 +21,9 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     // Tìm hóa đơn theo mã số hóa đơn duy nhất
     Optional<Bill> findByBillCode(String billCode);
 
+    // Tìm hóa đơn theo mã đơn hàng payOS
+    Optional<Bill> findByPayosOrderCode(Long payosOrderCode);
+
     // Lấy danh sách hóa đơn theo trạng thái và khoảng thời gian thanh toán (PaymentTime)
     List<Bill> findByStatusAndPaymentTimeBetween(BillStatus status, LocalDateTime start, LocalDateTime end);
 

@@ -47,9 +47,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Cho phép nguồn từ Vite Frontend (port 5173) và Preview (port 4173)
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173"));
+        // Cho phép nguồn từ Vite Frontend (port 5173, 4173), DuckDNS VPS và mọi clients
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
 
         // Cho phép toàn bộ các phương thức HTTP
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
@@ -89,7 +88,7 @@ public class SecurityConfig {
 
                 // Phân quyền endpoints
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket, Actuator Health & Metrics
+                        // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket, Actuator, Webhook payOS
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/customer/tables/verify-qr",
@@ -97,6 +96,7 @@ public class SecurityConfig {
                                 "/api/customer/dining/menu",
                                 "/api/customer/ai/**",
                                 "/api/reservations/book",
+                                "/api/payment/payos/webhook",
                                 "/ws-roms/**",
                                 "/ws-roms-native/**",
                                 "/v3/api-docs/**",
