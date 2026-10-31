@@ -30,7 +30,7 @@ public class PaymentController {
      * Tạo mã QR chuyển khoản động chuẩn VietQR NAPAS 24/7
      */
     @PostMapping("/create-link")
-    @PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'ADMIN', 'WAITER', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'WAITER', 'CUSTOMER')")
     @Operation(summary = "Tạo mã VietQR thanh toán động cho bàn ăn")
     public ResponseEntity<ApiResponse<PayOsPaymentResponse>> createPaymentLink(
             @Valid @RequestBody CreatePayOsPaymentRequest request,
@@ -57,7 +57,7 @@ public class PaymentController {
      * Tra cứu trạng thái đơn hàng (Polling dự phòng và kiểm tra tức thì)
      */
     @GetMapping("/status/{orderCode}")
-    @PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'ADMIN', 'WAITER', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'WAITER', 'CUSTOMER')")
     @Operation(summary = "Kiểm tra trạng thái thanh toán đơn hàng payOS")
     public ResponseEntity<ApiResponse<PayOsPaymentResponse>> checkPaymentStatus(@PathVariable Long orderCode) {
         PayOsPaymentResponse response = payOsService.checkPaymentStatus(orderCode);
