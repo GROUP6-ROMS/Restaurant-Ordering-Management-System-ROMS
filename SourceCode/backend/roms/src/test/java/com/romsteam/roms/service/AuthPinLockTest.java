@@ -4,6 +4,7 @@ import com.romsteam.roms.dto.request.LoginRequest;
 import com.romsteam.roms.dto.request.RequestOtpRequest;
 import com.romsteam.roms.dto.request.ResetPinRequest;
 import com.romsteam.roms.dto.response.LoginResponse;
+import com.romsteam.roms.dto.response.RomsRealtimeEvent;
 import com.romsteam.roms.dto.response.StaffResponse;
 import com.romsteam.roms.entity.Staff;
 import com.romsteam.roms.entity.StaffSchedule;
@@ -368,6 +369,66 @@ class AuthPinLockTest {
                     assertThat(appEx.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
                     assertThat(appEx.getMessage()).contains("Mã OTP xác thực hoặc Khóa khôi phục Master Key không chính xác");
                 });
+    }
+
+    @Test
+    @DisplayName("11. Heartbeat kích hoạt lại trạng thái isOnShift = true và broadcast realtime khi nhân viên trước đó đang offline")
+    void testHeartbeat_WhenStaffWasOffShift_SetsOnShiftAndPublishesRealtime() {
+        Staff staff = Staff.builder()
+                .id(20L)
+                .username("EMP-001")
+                .fullName("Phạm Minh Đức")
+                .role(UserRole.WAITER)
+                .isActive(true)
+                .isOnShift(false)
+                .build();
+        when(staffRepository.findByUsername("EMP-001")).thenReturn(Optional.of(staff));
+
+        Map<String, Object> res = authService.heartbeat("EMP-001");
+
+        assertThat(staff.getIsOnShift()).isTrue();
+        assertThat(res.get("isOnShift")).isEqualTo(true);
+        verify(staffRepository).save(staff);
+        verify(realtimeService).publish(eq("/topic/staff"), any(RomsRealtimeEvent.class));
+    }
+
+    @Test
+    @DisplayName("12. Quản lý chuyển đổi thủ công trạng thái ca trực (toggleShiftStatus)")
+    void testToggleShiftStatus_TogglesFlagAndPublishesRealtime() {
+        Staff staff = Staff.builder()
+                .id(30L)
+                .username("KDS-001")
+                .fullName("Ngô Viết Bảo Huy")
+                .role(UserRole.KITCHEN)
+                .isActive(true)
+                .isOnShift(false)
+                .build();
+        when(staffRepository.findById(30L)).thenReturn(Optional.of(staff));
+        when(staffRepository.save(any(Staff.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StaffResponse res = staffService.toggleShiftStatus(30L);
+
+        assertThat(res.getIsOnShift()).isTrue();
+        assertThat(staff.getIsOnShift()).isTrue();
+        verify(realtimeService).publish(eq("/topic/staff"), any(RomsRealtimeEvent.class));
+    }
+
+    @Test
+    @DisplayName("13. Quản lý đặt lại toàn bộ ca trực (resetAllShifts), loại trừ quản lý hiện tại")
+    void testResetAllShifts_ResetsOtherStaffs_ExcludesCallingManager() {
+        Staff mgr = Staff.builder().id(1L).username("MGR-001").fullName("Dương Trọng").role(UserRole.MANAGER).isOnShift(true).build();
+        Staff staff1 = Staff.builder().id(2L).username("EMP-001").fullName("Minh Đức").role(UserRole.WAITER).isOnShift(true).build();
+        Staff staff2 = Staff.builder().id(3L).username("KDS-001").fullName("Bảo Huy").role(UserRole.KITCHEN).isOnShift(true).build();
+
+        when(staffRepository.findAll()).thenReturn(List.of(mgr, staff1, staff2));
+
+        int count = staffService.resetAllShifts("MGR-001");
+
+        assertThat(count).isEqualTo(2);
+        assertThat(mgr.getIsOnShift()).isTrue();
+        assertThat(staff1.getIsOnShift()).isFalse();
+        assertThat(staff2.getIsOnShift()).isFalse();
+        verify(realtimeService).publish(eq("/topic/staff"), any(RomsRealtimeEvent.class));
     }
 }
 

@@ -20,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.romsteam.roms.dto.response.RomsRealtimeEvent;
 import com.romsteam.roms.service.RealtimeService;
 
@@ -270,6 +271,47 @@ public class AuthServiceImpl implements AuthService {
                 }
             }
         });
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> heartbeat(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            throw new AppException("Tên đăng nhập không hợp lệ", HttpStatus.BAD_REQUEST);
+        }
+
+        Staff staff = staffRepository.findByUsername(username.trim())
+                .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(staff.getIsActive())) {
+            throw new AppException("Tài khoản nhân viên đang bị khóa!", HttpStatus.FORBIDDEN);
+        }
+
+        boolean wasOffShift = !Boolean.TRUE.equals(staff.getIsOnShift());
+        if (wasOffShift) {
+            staff.setIsOnShift(true);
+            staffRepository.save(staff);
+
+            if (realtimeService != null) {
+                try {
+                    realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                            .type("STAFF_LOGIN")
+                            .status("ONLINE")
+                            .note("Nhân viên " + staff.getFullName() + " đã đồng bộ ca trực")
+                            .payload(staff.getUsername())
+                            .build());
+                } catch (Exception e) {
+                    log.warn("[Realtime] Không thể phát sự kiện STAFF_LOGIN từ heartbeat: {}", e.getMessage());
+                }
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("username", staff.getUsername());
+        response.put("fullName", staff.getFullName());
+        response.put("role", staff.getRole().name());
+        response.put("isOnShift", true);
+        return response;
     }
 
     @Override

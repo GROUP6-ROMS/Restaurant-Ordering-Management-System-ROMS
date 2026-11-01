@@ -172,7 +172,45 @@ export default function ShiftStatusWidget({ currentTime = new Date() }) {
         }
     }, []);
 
-    // 1. Tự động tải dữ liệu lần đầu, Polling ngầm mỗi 25s VÀ tự cập nhật khi click quay lại tab
+    // 1. Quản lý đặt lại toàn bộ ca trực về Ngoại tuyến (trừ Quản lý đang thao tác)
+    const handleResetAllShifts = async () => {
+        if (!window.confirm("Đặt lại toàn bộ nhân sự ca trực về Ngoại tuyến? (Phiên làm việc của Quản lý hiện tại vẫn được bảo lưu)")) {
+            return;
+        }
+        try {
+            setLoading(true);
+            const res = await staffApi.resetAllShifts();
+            if (res?.data?.success) {
+                await fetchStaffStatus(false);
+            }
+        } catch (err) {
+            console.error('Lỗi khi đặt lại ca:', err);
+            alert(err.response?.data?.message || 'Không thể đặt lại ca trực.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 2. Chuyển đổi trạng thái ca của một nhân viên cụ thể
+    const handleToggleStaffShift = async (staffId, staffName) => {
+        if (!window.confirm(`Chuyển trạng thái ca của "${staffName}" về Ngoại tuyến?`)) {
+            return;
+        }
+        try {
+            setLoading(true);
+            const res = await staffApi.toggleShiftStatus(staffId);
+            if (res?.data?.success) {
+                await fetchStaffStatus(false);
+            }
+        } catch (err) {
+            console.error('Lỗi chuyển trạng thái ca:', err);
+            alert(err.response?.data?.message || 'Không thể chuyển trạng thái ca.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 3. Tự động tải dữ liệu lần đầu, Polling ngầm mỗi 25s VÀ tự cập nhật khi click quay lại tab
     useEffect(() => {
         fetchStaffStatus(false);
         const timer = setInterval(() => fetchStaffStatus(true), 25000);
@@ -399,6 +437,26 @@ export default function ShiftStatusWidget({ currentTime = new Date() }) {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {/* Nút đặt lại toàn bộ ca trực về ngoại tuyến (dành cho Quản lý xóa ghost sessions) */}
+                            <button
+                                type="button"
+                                onClick={handleResetAllShifts}
+                                title="Đặt lại toàn bộ ca trực về Ngoại tuyến (trừ Quản lý hiện tại)"
+                                disabled={loading}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#BA1A1A',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <Icon name="restart_alt" size={18} />
+                            </button>
                             {/* Nút làm mới danh sách */}
                             <button
                                 type="button"
@@ -564,21 +622,40 @@ export default function ShiftStatusWidget({ currentTime = new Date() }) {
                                             </div>
                                         </div>
 
-                                        {/* Huy hiệu Online xanh lá */}
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            padding: '3px 8px',
-                                            borderRadius: '999px',
-                                            background: '#F1F8E9',
-                                            color: '#2E7D32',
-                                            fontSize: '0.68rem',
-                                            fontWeight: 700
-                                        }}>
-                                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#2E7D32' }} />
+                                        {/* Huy hiệu Online xanh lá (click để chuyển ngoại tuyến nếu cần) */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleStaffShift(staff.id, staff.fullName || staff.username)}
+                                            title="Nhấn để chuyển nhân viên này sang Ngoại tuyến"
+                                            disabled={loading}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                padding: '3px 8px',
+                                                borderRadius: '999px',
+                                                background: '#F1F8E9',
+                                                color: '#2E7D32',
+                                                fontSize: '0.68rem',
+                                                fontWeight: 700,
+                                                border: '1px solid #C8E6C9',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = '#FFEBEE';
+                                                e.currentTarget.style.color = '#C62828';
+                                                e.currentTarget.style.borderColor = '#FFCDD2';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = '#F1F8E9';
+                                                e.currentTarget.style.color = '#2E7D32';
+                                                e.currentTarget.style.borderColor = '#C8E6C9';
+                                            }}
+                                        >
+                                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
                                             <span>Online</span>
-                                        </div>
+                                        </button>
                                     </div>
                                 );
                             })

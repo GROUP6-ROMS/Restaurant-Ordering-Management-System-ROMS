@@ -101,6 +101,24 @@ public class AdminStaffController {
         return ResponseEntity.ok(ApiResponse.success(updated, "Đã mở khóa tài khoản và đặt lại số lần thử mã PIN!"));
     }
 
+    // 1.9. PATCH /api/admin/staff/{id}/toggle-shift - Quản lý chuyển đổi thủ công trạng thái ca trực (Trực ca <-> Ngoại tuyến)
+    @PatchMapping("/{id}/toggle-shift")
+    public ResponseEntity<ApiResponse<StaffResponse>> toggleShiftStatus(@PathVariable Long id) {
+        StaffResponse updated = staffService.toggleShiftStatus(id);
+        String msg = Boolean.TRUE.equals(updated.getIsOnShift())
+                ? "Đã chuyển nhân viên sang trạng thái Đang trực ca!"
+                : "Đã chuyển nhân viên sang trạng thái Ngoại tuyến!";
+        return ResponseEntity.ok(ApiResponse.success(updated, msg));
+    }
+
+    // 1.10. POST /api/admin/staff/reset-all-shifts - Quản lý đặt lại toàn bộ ca trực về Ngoại tuyến (trừ Quản lý hiện tại)
+    @PostMapping("/reset-all-shifts")
+    public ResponseEntity<ApiResponse<Integer>> resetAllShifts(org.springframework.security.core.Authentication authentication) {
+        String currentManager = (authentication != null) ? authentication.getName() : null;
+        int count = staffService.resetAllShifts(currentManager);
+        return ResponseEntity.ok(ApiResponse.success(count, "Đã đặt lại " + count + " nhân viên về trạng thái Ngoại tuyến thành công!"));
+    }
+
     // ===================================================================
     // 2. QUẢN LÝ PHÂN CA TRỰC (SHIFT SCHEDULING)
     // ===================================================================

@@ -71,6 +71,16 @@ export const staffApi = {
     // 13. Sao chép toàn bộ lịch phân ca từ một ngày sang ngày khác
     copySchedule: (fromDate, toDate) => {
         return axiosClient.post('/admin/staff/schedules/copy', { fromDate, toDate });
+    },
+
+    // 14. Quản lý chuyển đổi thủ công trạng thái ca trực (Trực ca <-> Ngoại tuyến)
+    toggleShiftStatus: (id) => {
+        return axiosClient.patch(`/admin/staff/${id}/toggle-shift`);
+    },
+
+    // 15. Quản lý đặt lại toàn bộ ca trực về Ngoại tuyến (trừ Quản lý hiện tại)
+    resetAllShifts: () => {
+        return axiosClient.post('/admin/staff/reset-all-shifts');
     }
 };
 

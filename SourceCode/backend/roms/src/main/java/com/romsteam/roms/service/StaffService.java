@@ -39,4 +39,9 @@ public interface StaffService {
     void removeShiftByDetails(Long staffId, LocalDate workDate, ShiftType shiftType);
 
     int copySchedule(LocalDate fromDate, LocalDate toDate);
+
+    // 3. Quản lý trạng thái trực ca (Shift / Online Status)
+    StaffResponse toggleShiftStatus(Long id);
+
+    int resetAllShifts(String currentManagerUsername);
 }

@@ -76,6 +76,47 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ===================================================================
+  // TỰ ĐỘNG ĐỒNG BỘ PHIÊN LÀM VIỆC & DUY TRÌ TRẠNG THÁI CA TRỰC (HEARTBEAT)
+  // ===================================================================
+  useEffect(() => {
+    if (!token || !user?.username) return;
+
+    const syncHeartbeat = async () => {
+      try {
+        const res = await authApi.heartbeat(user.username);
+        if (res?.data?.success && res.data.data?.isOnShift) {
+          setUser((prev) => {
+            if (!prev) return prev;
+            if (prev.isOnShift !== true) {
+              const updated = { ...prev, isOnShift: true };
+              sessionStorage.setItem('roms_user', JSON.stringify(updated));
+              return updated;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          console.warn('[AuthContext] Phiên làm việc hết hạn hoặc bị thu hồi:', err.response?.data?.message);
+          logout();
+        }
+      }
+    };
+
+    // Kích hoạt ngay khi mở tab / F5 và lặp lại định kỳ mỗi 60 giây
+    syncHeartbeat();
+    const heartbeatTimer = setInterval(syncHeartbeat, 60000);
+
+    const handleFocus = () => syncHeartbeat();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(heartbeatTimer);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [token, user?.username]);
+
   return (
     <AuthContext.Provider value={{
       user,

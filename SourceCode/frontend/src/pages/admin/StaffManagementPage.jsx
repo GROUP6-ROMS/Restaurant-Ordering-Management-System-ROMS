@@ -461,6 +461,24 @@ export default function StaffManagementPage() {
     }
   };
 
+  // Quản lý chuyển đổi thủ công trạng thái ca trực (Trực ca <-> Ngoại tuyến)
+  const handleToggleShiftStatus = async (staff) => {
+    const nextStatus = !staff.isOnShift ? 'Trực ca (Online)' : 'Ngoại tuyến (Offline)';
+    if (!window.confirm(`Bạn có chắc muốn chuyển trạng thái ca của [${staff.fullName}] (${staff.username}) sang "${nextStatus}"?`)) {
+      return;
+    }
+
+    try {
+      const res = await staffApi.toggleShiftStatus(staff.id);
+      const msg = res?.data?.message || 'Cập nhật trạng thái ca thành công!';
+      showToast(msg);
+      fetchStaff();
+      fetchSummary();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi cập nhật trạng thái ca!');
+    }
+  };
+
   // Phân ca cho nhân viên vào ca sáng hoặc ca tối
   const handleAssignShift = async (shiftType, staffId) => {
     const id = parseInt(staffId);
@@ -2110,20 +2128,28 @@ export default function StaffManagementPage() {
                             </span>
                           </td>
                           <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '3px 10px',
-                              borderRadius: '9999px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              background: staff.isOnShift ? '#E6F4EA' : '#F6ECEA',
-                              color: staff.isOnShift ? '#137333' : '#89726B'
-                            }}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleShiftStatus(staff)}
+                              title="Nhấn để chuyển đổi trạng thái ca trực (Trực ca <-> Ngoại tuyến)"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '3px 10px',
+                                borderRadius: '9999px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                background: staff.isOnShift ? '#E6F4EA' : '#F6ECEA',
+                                color: staff.isOnShift ? '#137333' : '#89726B',
+                                border: staff.isOnShift ? '1px solid #C8E6C9' : '1px solid #EAE0DE',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
                               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: staff.isOnShift ? '#137333' : '#89726B' }} />
                               {staff.isOnShift ? 'Đang trực ca' : 'Ngoại tuyến'}
-                            </span>
+                            </button>
                           </td>
                           <td style={{ padding: '14px 16px' }}>
                             <span style={{ fontSize: '0.8rem', color: staff.currentShift?.includes('Nghỉ') ? '#89726B' : '#9D4124', fontWeight: 600 }}>

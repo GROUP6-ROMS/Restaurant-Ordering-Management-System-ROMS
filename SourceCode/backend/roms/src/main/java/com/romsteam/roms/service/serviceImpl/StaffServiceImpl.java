@@ -9,6 +9,7 @@ import com.romsteam.roms.entity.enums.UserRole;
 import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.repository.StaffRepository;
 import com.romsteam.roms.repository.StaffScheduleRepository;
+import com.romsteam.roms.service.RealtimeService;
 import com.romsteam.roms.service.StaffService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class StaffServiceImpl implements StaffService {
     private final StaffRepository staffRepository;
     private final StaffScheduleRepository staffScheduleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RealtimeService realtimeService;
 
     // ===================================================================
     // 1. QUẢN LÝ HỒ SƠ NHÂN SỰ
@@ -340,5 +342,65 @@ public class StaffServiceImpl implements StaffService {
         } else {
             return "Ca Chiều / Tối (14:00 - 22:00)";
         }
+    }
+
+    @Override
+    @Transactional
+    public StaffResponse toggleShiftStatus(Long id) {
+        Staff staff = staffRepository.findById(id)
+                .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
+
+        boolean newStatus = !Boolean.TRUE.equals(staff.getIsOnShift());
+        staff.setIsOnShift(newStatus);
+        Staff saved = staffRepository.save(staff);
+
+        if (realtimeService != null) {
+            try {
+                realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                        .type(newStatus ? "STAFF_LOGIN" : "STAFF_LOGOUT")
+                        .status(newStatus ? "ONLINE" : "OFFLINE")
+                        .note("Quản lý đã chuyển trạng thái ca của " + staff.getFullName() + ": " + (newStatus ? "Trực ca" : "Ngoại tuyến"))
+                        .payload(staff.getUsername())
+                        .build());
+            } catch (Exception e) {
+                log.warn("[Realtime] Không thể phát sự kiện toggleShiftStatus: {}", e.getMessage());
+            }
+        }
+
+        return mapToStaffResponse(saved, LocalDate.now());
+    }
+
+    @Override
+    @Transactional
+    public int resetAllShifts(String currentManagerUsername) {
+        List<Staff> staffList = staffRepository.findAll();
+        int count = 0;
+        for (Staff s : staffList) {
+            // Không ngắt phiên của chính quản lý đang thực hiện thao tác
+            if (currentManagerUsername != null && currentManagerUsername.equalsIgnoreCase(s.getUsername())) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(s.getIsOnShift())) {
+                s.setIsOnShift(false);
+                staffRepository.save(s);
+                count++;
+            }
+        }
+
+        if (realtimeService != null) {
+            try {
+                realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                        .type("SHIFT_CLOSED")
+                        .status("OFFLINE")
+                        .note("Quản lý đã đặt lại toàn bộ ca trực (" + count + " nhân sự về Ngoại tuyến)")
+                        .payload("RESET_ALL")
+                        .build());
+            } catch (Exception e) {
+                log.warn("[Realtime] Không thể phát sự kiện resetAllShifts: {}", e.getMessage());
+            }
+        }
+
+        log.info("Manager {} reset {} staffs to off-shift", currentManagerUsername, count);
+        return count;
     }
 }

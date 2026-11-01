@@ -55,6 +55,27 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất ca làm việc thành công!"));
     }
 
+    // POST /api/auth/heartbeat - Duy trì phiên làm việc và tự động đồng bộ trạng thái ca trực (isOnShift = true)
+    @PostMapping("/heartbeat")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> heartbeat(
+            @RequestBody(required = false) Map<String, String> body,
+            Authentication authentication) {
+        String username = null;
+        if (body != null && body.containsKey("username")) {
+            username = body.get("username");
+        } else if (authentication != null) {
+            username = authentication.getName();
+        }
+
+        if (username == null || username.trim().isEmpty()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Không tìm thấy thông tin phiên làm việc", org.springframework.http.HttpStatus.UNAUTHORIZED.value()));
+        }
+
+        Map<String, Object> response = authService.heartbeat(username);
+        return ResponseEntity.ok(ApiResponse.success(response, "Duy trì phiên làm việc thành công!"));
+    }
+
     // POST /api/auth/forgot-pin/request-otp - Yeu cau ma OTP dat lai ma PIN Quan ly
     @PostMapping("/forgot-pin/request-otp")
     public ResponseEntity<ApiResponse<Map<String, Object>>> requestPinResetOtp(@Valid @RequestBody RequestOtpRequest request) {

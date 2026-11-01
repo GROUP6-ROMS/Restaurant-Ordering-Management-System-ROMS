@@ -11,6 +11,11 @@ export const authApi = {
         return axiosClient.post('/auth/logout', { username });
     },
 
+    // Duy trì phiên làm việc (Heartbeat / Keep-Alive) và tự động đồng bộ isOnShift = true
+    heartbeat: (username) => {
+        return axiosClient.post('/auth/heartbeat', { username });
+    },
+
     // Quản lý phê duyệt bằng mã PIN 6 số
     verifyManagerPin: (managerUsername, pinCode, reason) => {
         return axiosClient.post('/auth/verify-manager-pin', { managerUsername, pinCode, reason });

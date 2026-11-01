@@ -15,6 +15,9 @@ public interface AuthService {
     // LUU Y: Trong luc dang truc, du qua gio ca nhan vien van thao tac tren web binh thuong, chi bi chan khi da logout va co tinh dang nhap lai.
     void logout(String username);
 
+    // Duy trì phiên làm việc (Heartbeat / Keep-Alive) và tự động đồng bộ trạng thái ca trực isOnShift = true
+    java.util.Map<String, Object> heartbeat(String username);
+
     // Yeu cau sinh ma OTP khoi phuc ma PIN (danh cho Quan ly / Admin)
     java.util.Map<String, Object> requestPinResetOtp(com.romsteam.roms.dto.request.RequestOtpRequest request);
 
