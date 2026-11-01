@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../common/Icon';
 import { staffApi } from '../../api/staffApi';
 import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
+import { useDialog } from '../../context/DialogContext';
 
 /**
  * ===================================================================
@@ -172,20 +173,32 @@ export default function ShiftStatusWidget({ currentTime = new Date() }) {
         }
     }, []);
 
+    const { showConfirm, showAlert, showToast } = useDialog();
+
     // 1. Quản lý đặt lại toàn bộ ca trực về Ngoại tuyến (trừ Quản lý đang thao tác)
     const handleResetAllShifts = async () => {
-        if (!window.confirm("Đặt lại toàn bộ nhân sự ca trực về Ngoại tuyến? (Phiên làm việc của Quản lý hiện tại vẫn được bảo lưu)")) {
-            return;
-        }
+        const confirmed = await showConfirm({
+            title: 'Đặt lại toàn bộ ca trực',
+            message: 'Đặt lại toàn bộ nhân sự ca trực về Ngoại tuyến?\n(Phiên làm việc của Quản lý hiện tại vẫn được bảo lưu an toàn)',
+            confirmText: 'Đặt lại ca',
+            type: 'danger'
+        });
+        if (!confirmed) return;
+
         try {
             setLoading(true);
             const res = await staffApi.resetAllShifts();
             if (res?.data?.success) {
+                showToast(res.data.message || 'Đã đặt lại toàn bộ ca trực thành công!', 'success');
                 await fetchStaffStatus(false);
             }
         } catch (err) {
             console.error('Lỗi khi đặt lại ca:', err);
-            alert(err.response?.data?.message || 'Không thể đặt lại ca trực.');
+            showAlert({
+                title: 'Lỗi đặt lại ca trực',
+                message: err.response?.data?.message || 'Không thể đặt lại ca trực. Vui lòng thử lại!',
+                type: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -193,18 +206,28 @@ export default function ShiftStatusWidget({ currentTime = new Date() }) {
 
     // 2. Chuyển đổi trạng thái ca của một nhân viên cụ thể
     const handleToggleStaffShift = async (staffId, staffName) => {
-        if (!window.confirm(`Chuyển trạng thái ca của "${staffName}" về Ngoại tuyến?`)) {
-            return;
-        }
+        const confirmed = await showConfirm({
+            title: 'Chuyển trạng thái ca',
+            message: `Chuyển nhân viên "${staffName}" về trạng thái Ngoại tuyến?`,
+            confirmText: 'Chuyển ngoại tuyến',
+            type: 'warning'
+        });
+        if (!confirmed) return;
+
         try {
             setLoading(true);
             const res = await staffApi.toggleShiftStatus(staffId);
             if (res?.data?.success) {
+                showToast(`Đã chuyển ${staffName} sang Ngoại tuyến`, 'success');
                 await fetchStaffStatus(false);
             }
         } catch (err) {
             console.error('Lỗi chuyển trạng thái ca:', err);
-            alert(err.response?.data?.message || 'Không thể chuyển trạng thái ca.');
+            showAlert({
+                title: 'Lỗi cập nhật ca',
+                message: err.response?.data?.message || 'Không thể chuyển trạng thái ca.',
+                type: 'error'
+            });
         } finally {
             setLoading(false);
         }

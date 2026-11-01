@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { DialogProvider } from './context/DialogContext';
 import AppRoutes from './routes/AppRoutes';
 
 import ConnectionStatusBar from './components/common/ConnectionStatusBar';
@@ -14,10 +15,13 @@ export default function App() {
       <AuthProvider>
         {/* Quan ly gio hang thuc khach va phien ban an */}
         <CartProvider>
-          <div className="roms-application-root">
-            <ConnectionStatusBar />
-            <AppRoutes />
-          </div>
+          {/* Quan ly thong bao, bao loi va hop thoai tren giao dien web */}
+          <DialogProvider>
+            <div className="roms-application-root">
+              <ConnectionStatusBar />
+              <AppRoutes />
+            </div>
+          </DialogProvider>
         </CartProvider>
       </AuthProvider>
     </BrowserRouter>

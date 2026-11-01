@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { staffApi } from '../../api/staffApi';
+import { useDialog } from '../../context/DialogContext';
 
 import Icon from '../../components/common/Icon';
 
@@ -228,8 +229,11 @@ export default function StaffManagementPage() {
     isActive: true
   });
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
+  const { showConfirm, showAlert, showToast: globalShowToast } = useDialog();
+
+  const showToast = (msg, type = 'success') => {
+    globalShowToast(msg, type);
+    setToastMessage(typeof msg === 'string' ? msg : msg?.message);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -353,18 +357,26 @@ export default function StaffManagementPage() {
   const handleCreateStaff = async (e) => {
     e.preventDefault();
     if (!newStaffForm.fullName.trim() || !newStaffForm.username.trim()) {
-      alert('Vui lòng nhập họ tên và tên đăng nhập / mã nhân viên!');
+      showAlert({
+        title: 'Thiếu thông tin',
+        message: 'Vui lòng nhập họ tên và tên đăng nhập / mã nhân viên!',
+        type: 'warning'
+      });
       return;
     }
     if (!newStaffForm.pinCode || !/^\d{6}$/.test(newStaffForm.pinCode)) {
-      alert('Mã PIN phải gồm đúng 6 chữ số (ví dụ: 123456)!');
+      showAlert({
+        title: 'Mã PIN không hợp lệ',
+        message: 'Mã PIN phải gồm đúng 6 chữ số (ví dụ: 123456)!',
+        type: 'warning'
+      });
       return;
     }
 
     setIsSubmitting(true);
     try {
       await staffApi.createStaff(newStaffForm);
-      showToast(`Đã thêm nhân viên [${newStaffForm.fullName}] (${newStaffForm.username}) thành công!`);
+      showToast(`Đã thêm nhân viên [${newStaffForm.fullName}] (${newStaffForm.username}) thành công!`, 'success');
       setShowAddStaffModal(false);
       setNewStaffForm({
         username: '',
@@ -377,7 +389,11 @@ export default function StaffManagementPage() {
       fetchSummary();
     } catch (err) {
       const msg = err.response?.data?.message || 'Lỗi khi tạo nhân viên mới!';
-      alert(msg);
+      showAlert({
+        title: 'Lỗi tạo nhân viên',
+        message: msg,
+        type: 'error'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -403,7 +419,7 @@ export default function StaffManagementPage() {
     setIsSubmitting(true);
     try {
       await staffApi.updateStaff(selectedStaffForEdit.id, editStaffForm);
-      showToast(`Đã cập nhật thông tin nhân viên [${editStaffForm.fullName}] thành công!`);
+      showToast(`Đã cập nhật thông tin nhân viên [${editStaffForm.fullName}] thành công!`, 'success');
       setShowEditStaffModal(false);
       setSelectedStaffForEdit(null);
       fetchStaff();
@@ -411,7 +427,11 @@ export default function StaffManagementPage() {
       fetchDaySchedule(selectedDate);
     } catch (err) {
       const msg = err.response?.data?.message || 'Lỗi khi cập nhật nhân viên!';
-      alert(msg);
+      showAlert({
+        title: 'Lỗi cập nhật hồ sơ',
+        message: msg,
+        type: 'error'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -420,20 +440,28 @@ export default function StaffManagementPage() {
   // Đổi mã PIN
   const handleChangePin = async () => {
     if (!newPinCode || !/^\d{6}$/.test(newPinCode)) {
-      alert('Vui lòng nhập mã PIN mới gồm đúng 6 chữ số!');
+      showAlert({
+        title: 'Mã PIN không hợp lệ',
+        message: 'Vui lòng nhập mã PIN mới gồm đúng 6 chữ số!',
+        type: 'warning'
+      });
       return;
     }
     if (!selectedStaffForPin) return;
 
     try {
       await staffApi.changePin(selectedStaffForPin.id, newPinCode);
-      showToast(`Đã đổi mã PIN cho nhân viên [${selectedStaffForPin.fullName}] thành công!`);
+      showToast(`Đã đổi mã PIN cho nhân viên [${selectedStaffForPin.fullName}] thành công!`, 'success');
       setShowPinModal(false);
       setSelectedStaffForPin(null);
       setNewPinCode('');
     } catch (err) {
       const msg = err.response?.data?.message || 'Lỗi khi đổi mã PIN!';
-      alert(msg);
+      showAlert({
+        title: 'Lỗi đổi mã PIN',
+        message: msg,
+        type: 'error'
+      });
     }
   };
 
@@ -442,40 +470,58 @@ export default function StaffManagementPage() {
     const isLockedDueToPin = (staff.failedPinAttempts != null && staff.failedPinAttempts >= 5) || !staff.isActive;
     const actionName = !staff.isActive ? 'mở khóa kích hoạt' : 'tạm khóa';
     const confirmPrompt = isLockedDueToPin && !staff.isActive
-      ? `Tài khoản của [${staff.fullName}] (${staff.username}) đang bị KHÓA do nhập sai mã PIN ${staff.failedPinAttempts || 5} lần. Bạn có chắc chắn muốn MỞ KHÓA và đặt lại số lần thử?`
+      ? `Tài khoản của [${staff.fullName}] (${staff.username}) đang bị KHÓA do nhập sai mã PIN ${staff.failedPinAttempts || 5} lần.\n\nBạn có chắc chắn muốn MỞ KHÓA và đặt lại số lần thử?`
       : `Bạn có chắc chắn muốn ${actionName} tài khoản của [${staff.fullName}] (${staff.username})?`;
 
-    if (!window.confirm(confirmPrompt)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: isLockedDueToPin && !staff.isActive ? 'Mở khóa tài khoản nhân viên' : 'Xác nhận trạng thái tài khoản',
+      message: confirmPrompt,
+      confirmText: !staff.isActive ? 'Mở khóa' : 'Khóa tài khoản',
+      type: isLockedDueToPin ? 'warning' : 'danger'
+    });
+
+    if (!confirmed) return;
 
     try {
       const res = !staff.isActive ? await staffApi.unlockStaff(staff.id) : await staffApi.toggleStatus(staff.id);
       const msg = res?.data?.message || res?.message || 'Cập nhật trạng thái tài khoản thành công!';
-      showToast(msg);
+      showToast(msg, 'success');
       fetchStaff();
       fetchSummary();
       fetchDaySchedule(selectedDate);
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi cập nhật trạng thái nhân viên!');
+      showAlert({
+        title: 'Lỗi cập nhật trạng thái',
+        message: err.response?.data?.message || 'Lỗi cập nhật trạng thái nhân viên!',
+        type: 'error'
+      });
     }
   };
 
   // Quản lý chuyển đổi thủ công trạng thái ca trực (Trực ca <-> Ngoại tuyến)
   const handleToggleShiftStatus = async (staff) => {
     const nextStatus = !staff.isOnShift ? 'Trực ca (Online)' : 'Ngoại tuyến (Offline)';
-    if (!window.confirm(`Bạn có chắc muốn chuyển trạng thái ca của [${staff.fullName}] (${staff.username}) sang "${nextStatus}"?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Chuyển đổi trạng thái ca trực',
+      message: `Bạn có chắc muốn chuyển trạng thái ca của [${staff.fullName}] (${staff.username}) sang "${nextStatus}"?`,
+      confirmText: 'Chuyển trạng thái',
+      type: 'warning'
+    });
+
+    if (!confirmed) return;
 
     try {
       const res = await staffApi.toggleShiftStatus(staff.id);
       const msg = res?.data?.message || 'Cập nhật trạng thái ca thành công!';
-      showToast(msg);
+      showToast(msg, 'success');
       fetchStaff();
       fetchSummary();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi cập nhật trạng thái ca!');
+      showAlert({
+        title: 'Lỗi cập nhật ca trực',
+        message: err.response?.data?.message || 'Lỗi cập nhật trạng thái ca!',
+        type: 'error'
+      });
     }
   };
 
@@ -488,7 +534,11 @@ export default function StaffManagementPage() {
     if (!staff) return;
 
     if (!staff.isActive) {
-      alert(`Nhân viên [${staff.fullName}] hiện đang bị tạm khóa tài khoản. Vui lòng kích hoạt lại trước khi phân ca!`);
+      showAlert({
+        title: 'Tài khoản đang bị tạm khóa',
+        message: `Nhân viên [${staff.fullName}] hiện đang bị tạm khóa tài khoản. Vui lòng kích hoạt lại trước khi phân ca!`,
+        type: 'warning'
+      });
       return;
     }
 
@@ -499,11 +549,15 @@ export default function StaffManagementPage() {
         shiftType: shiftType
       });
       const shiftName = shiftType === 'MORNING' ? 'Ca Sáng' : 'Ca Chiều / Tối';
-      showToast(`Đã phân công [${staff.fullName}] (${staff.roleLabel || staff.role}) vào ${shiftName}!`);
+      showToast(`Đã phân công [${staff.fullName}] (${staff.roleLabel || staff.role}) vào ${shiftName}!`, 'success');
       setRoleShiftSelection(prev => ({ ...prev, [`${shiftType}_${staff.role}`]: '' }));
       fetchDaySchedule(selectedDate);
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi phân ca làm việc!');
+      showAlert({
+        title: 'Lỗi phân ca làm việc',
+        message: err.response?.data?.message || 'Lỗi phân ca làm việc!',
+        type: 'error'
+      });
     }
   };
 
@@ -512,7 +566,11 @@ export default function StaffManagementPage() {
     const key = `${shiftType}_${role}`;
     const staffId = roleShiftSelection[key];
     if (!staffId) {
-      alert('Vui lòng chọn nhân viên cần phân ca trong danh sách!');
+      showAlert({
+        title: 'Chưa chọn nhân sự',
+        message: 'Vui lòng chọn nhân viên cần phân ca trong danh sách!',
+        type: 'warning'
+      });
       return;
     }
     await handleAssignShift(shiftType, staffId);
@@ -536,7 +594,11 @@ export default function StaffManagementPage() {
   // Thêm nhân viên vào ca từ Pop-up Modal
   const handleSubmitAssignModal = async () => {
     if (!assignSelectedStaffId) {
-      alert('Vui lòng chọn nhân viên trong dropdown để thêm vào ca!');
+      showAlert({
+        title: 'Chưa chọn nhân sự',
+        message: 'Vui lòng chọn nhân viên trong dropdown để thêm vào ca!',
+        type: 'warning'
+      });
       return;
     }
     const staffId = parseInt(assignSelectedStaffId, 10);
@@ -548,33 +610,51 @@ export default function StaffManagementPage() {
 
   // Xóa / Hủy phân ca của nhân viên
   const handleRemoveShift = async (scheduleId, staffName, shiftLabel) => {
-    if (!window.confirm(`Hủy ca trực của [${staffName}] khỏi ${shiftLabel}?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Hủy phân ca làm việc',
+      message: `Hủy ca trực của [${staffName}] khỏi ${shiftLabel}?`,
+      confirmText: 'Hủy ca trực',
+      type: 'danger'
+    });
+
+    if (!confirmed) return;
 
     try {
       await staffApi.removeShift(scheduleId);
-      showToast(`Đã hủy ca trực của [${staffName}]!`);
+      showToast(`Đã hủy ca trực của [${staffName}]!`, 'success');
       fetchDaySchedule(selectedDate);
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi hủy ca trực!');
+      showAlert({
+        title: 'Lỗi hủy ca làm việc',
+        message: err.response?.data?.message || 'Lỗi hủy ca trực!',
+        type: 'error'
+      });
     }
   };
 
   // Sao chép lịch phân ca từ hôm trước
   const handleCopyYesterdaySchedule = async () => {
     const yesterdayStr = getLocalDateString(-1, selectedDate);
-    if (!window.confirm(`Bạn có muốn sao chép toàn bộ phân ca từ ngày hôm trước (${yesterdayStr}) sang ngày ${selectedDate}?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Sao chép phân ca làm việc',
+      message: `Bạn có muốn sao chép toàn bộ phân ca từ ngày hôm trước (${yesterdayStr}) sang ngày ${selectedDate}?`,
+      confirmText: 'Sao chép phân ca',
+      type: 'info'
+    });
+
+    if (!confirmed) return;
 
     try {
       const res = await staffApi.copySchedule(yesterdayStr, selectedDate);
       const msg = res?.data?.message || res?.message || 'Sao chép phân ca thành công!';
-      showToast(msg);
+      showToast(msg, 'success');
       fetchDaySchedule(selectedDate);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể sao chép lịch làm việc!');
+      showAlert({
+        title: 'Lỗi sao chép lịch phân ca',
+        message: err.response?.data?.message || 'Không thể sao chép lịch làm việc!',
+        type: 'error'
+      });
     }
   };
 

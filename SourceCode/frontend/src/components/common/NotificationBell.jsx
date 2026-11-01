@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from './Icon';
 import { notificationApi } from '../../api/notificationApi';
 import { subscribeRealtimeEvents, broadcastRealtimeEvent } from '../../utils/realtimeSync';
+import { useDialog } from '../../context/DialogContext';
 
 /**
  * Âm thanh báo chuông nhẹ nhàng sử dụng Web Audio API chuẩn trình duyệt
@@ -46,6 +47,7 @@ const playNotificationChime = () => {
 
 export default function NotificationBell() {
   const navigate = useNavigate();
+  const { showAlert } = useDialog();
   const dropdownRef = useRef(null);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -161,7 +163,11 @@ export default function NotificationBell() {
       broadcastRealtimeEvent({ type: 'CALL_WAITER', resolvedId: item.sourceId });
       await fetchNotifications();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi xử lý yêu cầu chuông!');
+      showAlert({
+        title: 'Lỗi chuông phục vụ',
+        message: err.response?.data?.message || 'Lỗi xử lý yêu cầu chuông!',
+        type: 'error'
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -210,7 +216,11 @@ export default function NotificationBell() {
       broadcastRealtimeEvent({ type: 'CALL_WAITER' });
       await fetchNotifications(true);
     } catch (err) {
-      alert('Không thể tạo thông báo thử nghiệm: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Lỗi thông báo thử nghiệm',
+        message: 'Không thể tạo thông báo thử nghiệm: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }

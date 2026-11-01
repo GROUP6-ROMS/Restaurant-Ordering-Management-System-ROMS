@@ -4,6 +4,7 @@ import RomsLogo from '../../components/common/RomsLogo';
 import { reservationApi } from '../../api/reservationApi';
 import { customerApi } from '../../api/customerApi';
 import Icon from '../../components/common/Icon';
+import { useDialog } from '../../context/DialogContext';
 import './publicPages.css';
 
 // Helper tính toán ngày theo múi giờ địa phương chuẩn định dạng YYYY-MM-DD (tránh lệch timezone UTC)
@@ -37,6 +38,7 @@ const formatShortDate = (dateStr) => {
 };
 
 export default function ReservationPage() {
+  const { showAlert } = useDialog();
   // Lấy ngày hôm nay, ngày mai, ngày kia theo giờ địa phương (YYYY-MM-DD)
   const todayStr = getLocalDateString(0);
   const tomorrowStr = getLocalDateString(1);
@@ -224,7 +226,11 @@ export default function ReservationPage() {
     if (e) e.preventDefault();
     if (currentStep === 1) {
       if (!selectedDate) {
-        alert('Vui lòng chọn ngày dùng bữa!');
+        showAlert({
+          title: 'Chưa chọn ngày',
+          message: 'Vui lòng chọn ngày dùng bữa trước khi tiếp tục!',
+          type: 'warning'
+        });
         return;
       }
       setCurrentStep(2);
@@ -235,12 +241,20 @@ export default function ReservationPage() {
     } else if (currentStep === 4) {
       // Xác thực form thông tin khách
       if (!customerName.trim()) {
-        alert('Vui lòng nhập Họ và tên của bạn!');
+        showAlert({
+          title: 'Thiếu thông tin liên hệ',
+          message: 'Vui lòng nhập Họ và tên của bạn!',
+          type: 'warning'
+        });
         return;
       }
       const phoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
       if (!customerPhone.trim() || !phoneRegex.test(customerPhone.trim())) {
-        alert('Vui lòng nhập số điện thoại hợp lệ (10 chữ số, ví dụ: 0901234567)!');
+        showAlert({
+          title: 'Số điện thoại không hợp lệ',
+          message: 'Vui lòng nhập số điện thoại hợp lệ (gồm 10 chữ số, ví dụ: 0901234567)!',
+          type: 'warning'
+        });
         return;
       }
 
@@ -280,7 +294,11 @@ export default function ReservationPage() {
       } catch (err) {
         console.error('Lỗi khi gửi yêu cầu đặt bàn:', err);
         const errMsg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu đặt bàn. Vui lòng thử lại!';
-        alert(errMsg);
+        showAlert({
+          title: 'Không thể đặt bàn',
+          message: errMsg,
+          type: 'error'
+        });
       } finally {
         setIsSubmitting(false);
       }

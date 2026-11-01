@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Icon from '../../components/common/Icon';
 import { menuApi } from '../../api/menuApi';
+import { useDialog } from '../../context/DialogContext';
 
 // Hàm loại bỏ dấu tiếng Việt chuẩn quốc tế (VD: "Bò Wagyu" -> "bo wagyu")
 const removeVietnameseTones = (str) => {
@@ -60,9 +61,12 @@ export default function MenuManagementPage() {
     imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500'
   });
 
+  const { showConfirm, showAlert, showToast: globalShowToast } = useDialog();
+
   // Hiển thị thông báo Toast
-  const showToast = (msg) => {
-    setToastMessage(msg);
+  const showToast = (msg, type = 'success') => {
+    globalShowToast(msg, type);
+    setToastMessage(typeof msg === 'string' ? msg : msg?.message);
     setTimeout(() => setToastMessage(null), 3200);
   };
 
@@ -169,7 +173,11 @@ export default function MenuManagementPage() {
   // 4. Tạo món ăn mới
   const handleCreateDish = async () => {
     if (!newDish.name.trim() || !newDish.sku.trim()) {
-      alert('Vui lòng nhập đầy đủ tên món ăn và mã SKU!');
+      showAlert({
+        title: 'Thiếu thông tin món ăn',
+        message: 'Vui lòng nhập đầy đủ tên món ăn và mã SKU!',
+        type: 'warning'
+      });
       return;
     }
     try {
@@ -195,11 +203,15 @@ export default function MenuManagementPage() {
         const [sumRes, catRes] = await Promise.all([menuApi.getSummary(), menuApi.getCategories()]);
         if (sumRes.data?.data) setSummary(sumRes.data.data);
         if (catRes.data?.data) setCategories(catRes.data.data);
-        showToast(`Đã tạo mới món ăn [${created.name}] thành công!`);
+        showToast(`Đã tạo mới món ăn [${created.name}] thành công!`, 'success');
       }
     } catch (err) {
       console.error('Lỗi khi thêm món:', err);
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi tạo món ăn!');
+      showAlert({
+        title: 'Lỗi tạo món ăn',
+        message: err.response?.data?.message || 'Có lỗi xảy ra khi tạo món ăn!',
+        type: 'error'
+      });
     }
   };
 
@@ -207,10 +219,14 @@ export default function MenuManagementPage() {
   const handleDeleteDish = async (dishId, dishName) => {
     const targetName = dishName || selectedDish?.name || 'món ăn này';
 
-    // Hộp thoại xác nhận an toàn tránh bấm nhầm
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa món [${targetName}] khỏi thực đơn không?`)) {
-      return;
-    }
+    // Hộp thoại xác nhận an toàn trực tiếp trên UI
+    const confirmed = await showConfirm({
+      title: 'Xác nhận xóa món ăn',
+      message: `Bạn có chắc chắn muốn xóa món [${targetName}] khỏi thực đơn không?\nMón này sẽ không hiển thị trên Thực đơn gọi món của khách nữa.`,
+      confirmText: 'Xóa món',
+      type: 'danger'
+    });
+    if (!confirmed) return;
 
     try {
       // 1. Gọi API Backend xóa món (Soft Delete)
@@ -233,17 +249,25 @@ export default function MenuManagementPage() {
       if (sumRes.data?.data) setSummary(sumRes.data.data);
       if (catRes.data?.data) setCategories(catRes.data.data);
 
-      showToast(`Đã xóa món [${targetName}] khỏi thực đơn thành công!`);
+      showToast(`Đã xóa món [${targetName}] khỏi thực đơn thành công!`, 'success');
     } catch (err) {
       console.error('Lỗi khi xóa món ăn:', err);
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi xóa món ăn!');
+      showAlert({
+        title: 'Lỗi xóa món ăn',
+        message: err.response?.data?.message || 'Có lỗi xảy ra khi xóa món ăn!',
+        type: 'error'
+      });
     }
   };
 
   // 5. Thêm danh mục mới
   const handleCreateCategory = async () => {
     if (!newCatName.trim()) {
-      alert('Vui lòng nhập tên danh mục!');
+      showAlert({
+        title: 'Thiếu tên danh mục',
+        message: 'Vui lòng nhập tên danh mục!',
+        type: 'warning'
+      });
       return;
     }
     setCatActionLoading(true);
@@ -253,11 +277,15 @@ export default function MenuManagementPage() {
         setCategories(prev => [...prev, res.data.data]);
         setNewCatName('');
         setNewCatDesc('');
-        showToast('Thêm danh mục mới thành công!');
+        showToast('Thêm danh mục mới thành công!', 'success');
       }
     } catch (err) {
       console.error('Lỗi khi tạo danh mục:', err);
-      alert(err.response?.data?.message || 'Không thể tạo danh mục!');
+      showAlert({
+        title: 'Lỗi tạo danh mục',
+        message: err.response?.data?.message || 'Không thể tạo danh mục!',
+        type: 'error'
+      });
     } finally {
       setCatActionLoading(false);
     }
@@ -265,13 +293,24 @@ export default function MenuManagementPage() {
 
   // 6. Xóa danh mục
   const handleDeleteCategory = async (catId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa nhóm danh mục này?')) return;
+    const confirmed = await showConfirm({
+      title: 'Xóa nhóm danh mục',
+      message: 'Bạn có chắc chắn muốn xóa nhóm danh mục này không?',
+      confirmText: 'Xóa danh mục',
+      type: 'danger'
+    });
+    if (!confirmed) return;
+
     try {
       await menuApi.deleteCategory(catId);
       setCategories(prev => prev.filter(c => c.id !== catId));
-      showToast('Đã xóa danh mục thành công!');
+      showToast('Đã xóa danh mục thành công!', 'success');
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể xóa danh mục!');
+      showAlert({
+        title: 'Lỗi xóa danh mục',
+        message: err.response?.data?.message || 'Không thể xóa danh mục!',
+        type: 'error'
+      });
     }
   };
 

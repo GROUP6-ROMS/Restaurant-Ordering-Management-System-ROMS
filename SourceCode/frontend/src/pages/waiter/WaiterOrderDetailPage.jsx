@@ -3,8 +3,11 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/common/Icon';
 import { waiterApi } from '../../api/waiterApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
+import { useDialog } from '../../context/DialogContext';
+
 export default function WaiterOrderDetailPage() {
   const navigate = useNavigate();
+  const { showConfirm, showAlert } = useDialog();
   const [searchParams] = useSearchParams();
   const tableCodeParam = searchParams.get('table');
 
@@ -162,9 +165,13 @@ export default function WaiterOrderDetailPage() {
 
   const handleCloseEmptyTable = async () => {
     if (!tableData.id) return;
-    if (!window.confirm(`Xác nhận đóng phiên ăn 0đ và giải phóng bàn ${tableData.code} (Khách không dùng món / Mở nhầm)?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Đóng phiên bàn trống',
+      message: `Xác nhận đóng phiên ăn 0đ và giải phóng bàn ${tableData.code}?\n(Dành cho trường hợp khách không dùng món hoặc mở nhầm bàn)`,
+      confirmText: 'Đóng bàn',
+      type: 'warning'
+    });
+    if (!confirmed) return;
     try {
       await waiterApi.closeEmptySession(tableData.id, { reason: 'Khách không dùng món / Hủy bàn trống', targetStatus: 'AVAILABLE' });
       showToast(`Đã đóng phiên bàn trống thành công cho bàn ${tableData.code}!`);

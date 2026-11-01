@@ -4,9 +4,11 @@ import { waiterApi } from '../../api/waiterApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 import Icon from '../../components/common/Icon';
+import { useDialog } from '../../context/DialogContext';
 
 export default function WaiterFloorPlanPage() {
   const navigate = useNavigate();
+  const { showConfirm, showAlert } = useDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tables, setTables] = useState([]);
   const [menuCatalog, setMenuCatalog] = useState([]);
@@ -429,9 +431,13 @@ export default function WaiterFloorPlanPage() {
   const handleCloseEmptyTable = async (tableId) => {
     const target = tables.find(t => t.id === tableId) || selectedTable;
     const name = target?.label || target?.tableNumber || `Bàn #${tableId}`;
-    if (!window.confirm(`Xác nhận đóng phiên ăn 0đ và giải phóng ${name} (Khách không dùng món / Mở nhầm)?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Đóng phiên bàn trống',
+      message: `Xác nhận đóng phiên ăn 0đ và giải phóng ${name}?\n(Dành cho trường hợp khách không dùng món hoặc mở nhầm bàn)`,
+      confirmText: 'Đóng bàn',
+      type: 'warning'
+    });
+    if (!confirmed) return;
     try {
       await waiterApi.closeEmptySession(tableId, { reason: 'Khách không dùng món / Hủy bàn trống', targetStatus: 'AVAILABLE' });
       showToast(`Đã đóng phiên bàn trống thành công cho ${name}!`);

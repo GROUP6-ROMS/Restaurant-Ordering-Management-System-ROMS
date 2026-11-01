@@ -9,6 +9,7 @@ import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
 import Icon from '../../components/common/Icon';
 import { QRCodeSVG } from 'qrcode.react';
+import { useDialog } from '../../context/DialogContext';
 
 // Hàm sinh URL ảnh QR động chuẩn NAPAS 247
 const generateVietQrUrl = (amount, billCode, tableCode, profile) => {
@@ -49,6 +50,7 @@ export default function PosCheckoutPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const restaurantProfile = useRestaurantProfile();
+  const { showConfirm, showAlert } = useDialog();
 
   // Navigation tab chính: 'POS' | 'HISTORY' | 'SHIFT'
   const [activePosTab, setActivePosTab] = useState('POS');
@@ -2795,8 +2797,14 @@ export default function PosCheckoutPage() {
             <div>
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`XÁC NHẬN THỦ CÔNG:\nBạn đã kiểm tra App MB Bank và chắc chắn nhận đủ tiền cho bàn ${payOsData?.tableNumber || currentTable?.name}?\n\nHệ thống sẽ chốt đơn và in phiếu ngay lập tức.`)) {
+                onClick={async () => {
+                  const confirmed = await showConfirm({
+                    title: 'Xác nhận thu tiền thủ công',
+                    message: `Bạn đã kiểm tra App MB Bank và chắc chắn nhận đủ tiền cho bàn ${payOsData?.tableNumber || currentTable?.name}?\n\nHệ thống sẽ chốt đơn và xuất hóa đơn ngay lập tức.`,
+                    confirmText: 'Đã nhận đủ tiền',
+                    type: 'success'
+                  });
+                  if (confirmed) {
                     executeCheckoutPayment(true);
                   }
                 }}

@@ -7,8 +7,10 @@ import {
   DEFAULT_PROFILE
 } from '../../utils/restaurantConfig';
 import { restaurantProfileApi } from '../../api/restaurantProfileApi';
+import { useDialog } from '../../context/DialogContext';
 
 export default function RestaurantProfileModal({ isOpen, onClose }) {
+  const { showConfirm } = useDialog();
   const [profile, setProfile] = useState(() => getRestaurantProfile());
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,8 +61,14 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
     }
   };
 
-  const handleReset = () => {
-    if (window.confirm('Khôi phục lại thông tin thương hiệu mặc định của ROMS?')) {
+  const handleReset = async () => {
+    const confirmed = await showConfirm({
+      title: 'Khôi phục thông tin thương hiệu',
+      message: 'Khôi phục lại thông tin thương hiệu mặc định ban đầu của ROMS?',
+      confirmText: 'Khôi phục',
+      type: 'warning'
+    });
+    if (confirmed) {
       setProfile(DEFAULT_PROFILE);
       setActivePresetId(null);
     }
