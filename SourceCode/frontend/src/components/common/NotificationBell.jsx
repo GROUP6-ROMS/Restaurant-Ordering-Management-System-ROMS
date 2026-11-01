@@ -205,26 +205,6 @@ export default function NotificationBell() {
     });
   };
 
-  // 7. Tạo chuông thử nghiệm nhanh
-  const handleTestCall = async (e) => {
-    e.stopPropagation();
-    try {
-      setLoading(true);
-      await notificationApi.createTestAssistance({
-        note: 'Khách tại bàn vừa bấm chuông yêu cầu nhân viên hỗ trợ khăn lạnh & nước đá'
-      });
-      broadcastRealtimeEvent({ type: 'CALL_WAITER' });
-      await fetchNotifications(true);
-    } catch (err) {
-      showAlert({
-        title: 'Lỗi thông báo thử nghiệm',
-        message: 'Không thể tạo thông báo thử nghiệm: ' + (err.response?.data?.message || err.message),
-        type: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Lọc danh sách theo tab được chọn
   const rawItems = activeTab === 'ASSISTANCE'
@@ -367,28 +347,6 @@ export default function NotificationBell() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {/* Nút test chuông */}
-              <button
-                type="button"
-                onClick={handleTestCall}
-                title="Tạo chuông thử nghiệm để kiểm tra tính năng"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '5px 9px',
-                  borderRadius: '8px',
-                  border: '1px solid #EAE0DE',
-                  background: '#FFFFFF',
-                  color: '#9D4124',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <Icon name="bolt" size={14} />
-                <span>Test Chuông</span>
-              </button>
 
               {/* Nút làm mới */}
               <button
