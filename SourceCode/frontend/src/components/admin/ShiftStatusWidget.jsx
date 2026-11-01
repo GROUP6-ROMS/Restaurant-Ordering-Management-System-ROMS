@@ -412,8 +412,8 @@ export default function ShiftStatusWidget({ currentTime = new Date() }) {
                     ref={popoverRef}
                     style={{
                         position: 'fixed',
-                        left: '252px',
-                        bottom: '20px',
+                        left: '266px',
+                        bottom: '14px',
                         width: '360px',
                         maxHeight: '520px',
                         background: '#FFFFFF',

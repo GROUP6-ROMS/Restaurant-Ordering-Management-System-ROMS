@@ -77,14 +77,13 @@ export default function AdminLayout() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FFF8F6', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#FFF8F6', display: 'flex', flexDirection: 'column' }}>
       {/* Top Header */}
       <header style={{
         height: '64px',
         background: '#FFFFFF',
         borderBottom: '1px solid #EAE0DE',
-        position: 'sticky',
-        top: 0,
+        flexShrink: 0,
         zIndex: 50,
         display: 'flex',
         alignItems: 'center',
@@ -199,25 +198,28 @@ export default function AdminLayout() {
         </div>
       </header>
 
-      {/* Body with Sidebar & Content */}
-      <div style={{ display: 'flex', flex: 1 }}>
-        {/* Sidebar */}
+      {/* Body with Fixed Sidebar & Independent Scrollable Content */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        {/* Sidebar Cố định - Luôn hiện trên màn hình 100% thời gian */}
         <aside style={{
           width: '260px',
           background: '#FCF1EF',
           borderRight: '1px solid #EAE0DE',
-          padding: '20px 14px',
+          padding: '16px 12px 14px 12px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          flexShrink: 0
+          flexShrink: 0,
+          height: '100%',
+          boxSizing: 'border-box'
         }}>
-          <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 8px 12px' }}>
+          {/* Vùng Menu Điều Hướng - Tự cuộn độc lập nếu màn hình nhỏ */}
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '2px' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 8px 10px' }}>
               Khu Vực Quản Trị
             </div>
 
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {navItems.map(item => {
                 const isActive = location.pathname.startsWith(item.path);
                 return (
@@ -228,18 +230,18 @@ export default function AdminLayout() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '10px 14px',
+                      padding: '9px 12px',
                       borderRadius: '12px',
                       textDecoration: 'none',
                       background: isActive ? '#9D4124' : 'transparent',
                       color: isActive ? '#FFFFFF' : '#56423D',
                       fontWeight: 700,
-                      fontSize: '0.85rem',
+                      fontSize: '0.84rem',
                       transition: 'all 0.15s ease'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Icon name={item.icon} size={20} fill={isActive ? 1 : 0} />
+                      <Icon name={item.icon} size={19} fill={isActive ? 1 : 0} />
                       <span>{item.label}</span>
                     </div>
                   </Link>
@@ -248,12 +250,14 @@ export default function AdminLayout() {
             </nav>
           </div>
 
-          {/* Bottom Shift Status (Động theo giờ thực & xem nhanh Live Roster) */}
-          <ShiftStatusWidget currentTime={currentTime} />
+          {/* Ô Trạng Thái Ca Trực Ghim Cố Định Ở Đáy Sidebar - Luôn luôn nhìn thấy trên màn hình */}
+          <div style={{ paddingTop: '10px', flexShrink: 0, borderTop: '1px solid #EAE0DE', marginTop: '8px' }}>
+            <ShiftStatusWidget currentTime={currentTime} />
+          </div>
         </aside>
 
-        {/* Content Area */}
-        <main style={{ flex: 1, padding: '24px', overflowX: 'auto', background: '#FFF8F6' }}>
+        {/* Content Area - Cuộn độc lập */}
+        <main style={{ flex: 1, padding: '24px', overflowY: 'auto', overflowX: 'auto', background: '#FFF8F6' }}>
           <Outlet />
         </main>
       </div>

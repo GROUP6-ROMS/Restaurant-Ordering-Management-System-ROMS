@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,10 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final RealtimeService realtimeService;
+
+    // Quản lý thời điểm nhận tín hiệu Heartbeat gần nhất của từng nhân sự
+    private final Map<String, Long> staffLastHeartbeatMap = new ConcurrentHashMap<>();
+    private final long serverStartupTime = System.currentTimeMillis();
 
     @Value("${app.security.master-recovery-key:ROMS-RECOVERY-2026}")
     private String masterRecoveryKey = "ROMS-RECOVERY-2026";
@@ -182,6 +187,7 @@ public class AuthServiceImpl implements AuthService {
             // 7. Cap nhat trang thai dang trong ca truc
             staff.setIsOnShift(true);
             staffRepository.save(staff);
+            staffLastHeartbeatMap.put(staff.getUsername(), System.currentTimeMillis());
 
             // Phát sự kiện WebSocket STOMP báo nhân viên vừa đăng nhập vào ca trực
             if (realtimeService != null) {
@@ -256,6 +262,7 @@ public class AuthServiceImpl implements AuthService {
             // Khi nhân viên đăng xuất, cập nhật isOnShift = false
             staff.setIsOnShift(false);
             staffRepository.save(staff);
+            staffLastHeartbeatMap.remove(staff.getUsername());
 
             // Phát sự kiện WebSocket STOMP báo nhân viên vừa rời ca trực
             if (realtimeService != null) {
@@ -287,6 +294,8 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException("Tài khoản nhân viên đang bị khóa!", HttpStatus.FORBIDDEN);
         }
 
+        staffLastHeartbeatMap.put(staff.getUsername(), System.currentTimeMillis());
+
         boolean wasOffShift = !Boolean.TRUE.equals(staff.getIsOnShift());
         if (wasOffShift) {
             staff.setIsOnShift(true);
@@ -312,6 +321,47 @@ public class AuthServiceImpl implements AuthService {
         response.put("role", staff.getRole().name());
         response.put("isOnShift", true);
         return response;
+    }
+
+    /**
+     * Tự động quét định kỳ mỗi 30s và chuyển nhân viên sang Ngoại tuyến nếu không nhận được Heartbeat (> 90 giây).
+     * Cơ chế phòng thủ dự phòng (Fallback) khi thiết bị mất điện, rớt mạng Wi-Fi hoặc crash trình duyệt.
+     */
+    @Scheduled(initialDelay = 60000, fixedDelay = 30000)
+    @Transactional
+    public void cleanupInactiveStaffShifts() {
+        long now = System.currentTimeMillis();
+        // Bỏ qua trong 90 giây đầu khi máy chủ vừa khởi động để clients kịp gửi tín hiệu đầu tiên
+        if (now - serverStartupTime < 90_000) {
+            return;
+        }
+
+        List<Staff> onShiftStaffs = staffRepository.findAll().stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsOnShift()))
+                .toList();
+
+        for (Staff staff : onShiftStaffs) {
+            Long lastSeen = staffLastHeartbeatMap.get(staff.getUsername());
+            if (lastSeen == null || (now - lastSeen > 90_000)) {
+                staff.setIsOnShift(false);
+                staffRepository.save(staff);
+                staffLastHeartbeatMap.remove(staff.getUsername());
+
+                if (realtimeService != null) {
+                    try {
+                        realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                                .type("STAFF_LOGOUT")
+                                .status("OFFLINE")
+                                .note("Hệ thống tự động chuyển nhân viên " + staff.getFullName() + " sang Ngoại tuyến do không nhận được tín hiệu")
+                                .payload(staff.getUsername())
+                                .build());
+                    } catch (Exception e) {
+                        log.warn("[ShiftMonitor] Lỗi khi broadcast STAFF_LOGOUT tự động cho {}: {}", staff.getUsername(), e.getMessage());
+                    }
+                }
+                log.info("[ShiftMonitor] Nhân viên {} tự động chuyển sang OFFLINE do không có heartbeat > 90s", staff.getUsername());
+            }
+        }
     }
 
     @Override

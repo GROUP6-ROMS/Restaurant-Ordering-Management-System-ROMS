@@ -78,12 +78,46 @@ export function AuthProvider({ children }) {
 
   // ===================================================================
   // TỰ ĐỘNG ĐỒNG BỘ PHIÊN LÀM VIỆC & DUY TRÌ TRẠNG THÁI CA TRỰC (HEARTBEAT)
+  // TỰ ĐỘNG CHUYỂN SANG OFFLINE KHI ĐÓNG TAB TRÌNH DUYỆT (SOLUTION 1C)
   // ===================================================================
   useEffect(() => {
     if (!token || !user?.username) return;
 
+    // 1. Tạo hoặc lấy tab ID duy nhất cho tab này
+    let tabId = sessionStorage.getItem('roms_tab_id');
+    if (!tabId) {
+      tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      sessionStorage.setItem('roms_tab_id', tabId);
+    }
+
+    // Hàm cập nhật sự hiện diện của tab vào localStorage
+    const updateTabPresence = () => {
+      try {
+        const raw = localStorage.getItem('roms_active_staff_tabs');
+        const tabs = raw ? JSON.parse(raw) : {};
+        tabs[tabId] = {
+          username: user.username,
+          lastSeen: Date.now()
+        };
+        // Dọn dẹp các tab cũ không update quá 45 giây
+        const now = Date.now();
+        Object.keys(tabs).forEach(id => {
+          if (now - tabs[id].lastSeen > 45000) {
+            delete tabs[id];
+          }
+        });
+        localStorage.setItem('roms_active_staff_tabs', JSON.stringify(tabs));
+      } catch (e) {
+        // Safe catch
+      }
+    };
+
+    updateTabPresence();
+
+    // 2. Gửi tín hiệu Heartbeat định kỳ mỗi 30 giây (duy trì isOnShift = true)
     const syncHeartbeat = async () => {
       try {
+        updateTabPresence();
         const res = await authApi.heartbeat(user.username);
         if (res?.data?.success && res.data.data?.isOnShift) {
           setUser((prev) => {
@@ -104,16 +138,56 @@ export function AuthProvider({ children }) {
       }
     };
 
-    // Kích hoạt ngay khi mở tab / F5 và lặp lại định kỳ mỗi 60 giây
+    // Kích hoạt ngay khi mở tab / F5 và lặp lại định kỳ mỗi 30 giây
     syncHeartbeat();
-    const heartbeatTimer = setInterval(syncHeartbeat, 60000);
+    const heartbeatTimer = setInterval(syncHeartbeat, 30000);
 
     const handleFocus = () => syncHeartbeat();
     window.addEventListener('focus', handleFocus);
 
+    // 3. Xử lý khi đóng tab / tắt trình duyệt (pagehide / beforeunload)
+    // Tự động gửi tín hiệu chuyển sang OFFLINE nếu không còn tab nào khác của nhân viên này mở
+    const handleTabClose = () => {
+      try {
+        const raw = localStorage.getItem('roms_active_staff_tabs');
+        const tabs = raw ? JSON.parse(raw) : {};
+        delete tabs[tabId];
+        localStorage.setItem('roms_active_staff_tabs', JSON.stringify(tabs));
+
+        // Kiểm tra xem còn tab nào khác của nhân viên này còn sống (< 45 giây)
+        const now = Date.now();
+        const hasOtherActiveTab = Object.values(tabs).some(
+          t => t.username === user.username && (now - t.lastSeen < 45000)
+        );
+
+        // Nếu đây là tab cuối cùng của nhân viên này, gửi tín hiệu đăng xuất ca trực
+        if (!hasOtherActiveTab) {
+          const payload = JSON.stringify({ username: user.username });
+          if (typeof fetch === 'function') {
+            fetch('/api/auth/logout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+              keepalive: true
+            }).catch(() => {});
+          } else if (navigator.sendBeacon) {
+            const blob = new Blob([payload], { type: 'application/json' });
+            navigator.sendBeacon('/api/auth/logout', blob);
+          }
+        }
+      } catch (e) {
+        // Safe catch
+      }
+    };
+
+    window.addEventListener('pagehide', handleTabClose);
+    window.addEventListener('beforeunload', handleTabClose);
+
     return () => {
       clearInterval(heartbeatTimer);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pagehide', handleTabClose);
+      window.removeEventListener('beforeunload', handleTabClose);
     };
   }, [token, user?.username]);
 
