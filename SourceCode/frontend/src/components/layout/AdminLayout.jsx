@@ -5,6 +5,7 @@ import Icon from '../common/Icon';
 import RomsLogo from '../common/RomsLogo';
 import NotificationBell from '../common/NotificationBell';
 import RestaurantProfileModal from '../admin/RestaurantProfileModal';
+import ShiftStatusWidget from '../admin/ShiftStatusWidget';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
 export default function AdminLayout() {
@@ -247,19 +248,8 @@ export default function AdminLayout() {
             </nav>
           </div>
 
-          {/* Bottom Shift Status */}
-          <div style={{ background: '#FFFFFF', padding: '12px 14px', borderRadius: '14px', border: '1px solid #EAE0DE' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <span style={{ fontSize: '0.72rem', color: '#89726B', fontWeight: 700, textTransform: 'uppercase' }}>Trạng thái ca trực</span>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#596232', display: 'inline-block' }} />
-            </div>
-            <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1F1B1A' }}>
-              8 Nhân sự đang online
-            </div>
-            <div style={{ fontSize: '0.72rem', color: '#596232', marginTop: '2px' }}>
-              Ca Tối: 17:00 - 23:00
-            </div>
-          </div>
+          {/* Bottom Shift Status (Động theo giờ thực & xem nhanh Live Roster) */}
+          <ShiftStatusWidget currentTime={currentTime} />
         </aside>
 
         {/* Content Area */}

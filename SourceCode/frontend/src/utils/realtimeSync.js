@@ -160,13 +160,14 @@ const initStompClient = () => {
       console.log('[WebSocket STOMP] Đã kết nối thành công tới máy chủ ROMS!');
       notifyConnectionState(true);
 
-      // 1. Subscribe 5 topic nghiệp vụ cốt lõi
+      // 1. Subscribe 6 topic nghiệp vụ cốt lõi
       const topics = [
         '/topic/tables',
         '/topic/kitchen',
         '/topic/service-requests',
         '/topic/orders',
-        '/topic/pos'
+        '/topic/pos',
+        '/topic/staff' // <-- THÊM DÒNG NÀY ĐỂ NHẬN SỰ KIỆN LOGIN / LOGOUT TỨC THÌ
       ];
 
       topics.forEach((topic) => {
@@ -258,7 +259,7 @@ export const isRealtimeConnected = () => isConnected;
  * @returns {Function} cleanup function
  */
 export const onRealtimeConnectionChange = (callback) => {
-  if (typeof callback !== 'function') return () => {};
+  if (typeof callback !== 'function') return () => { };
   connectionStateSubscribers.add(callback);
   callback(isConnected);
   return () => {
@@ -331,7 +332,7 @@ export const broadcastRealtimeEvent = (eventData, extraData = {}) => {
  */
 export const subscribeRealtimeEvents = (onMessageCallback) => {
   if (typeof onMessageCallback !== 'function') {
-    return () => {};
+    return () => { };
   }
 
   // Đảm bảo STOMP Client đã được khởi tạo
@@ -354,7 +355,7 @@ export const subscribeRealtimeEvents = (onMessageCallback) => {
  */
 export const subscribeDiningTableEvents = (tableId, callback) => {
   if (!tableId || typeof callback !== 'function') {
-    return () => {};
+    return () => { };
   }
 
   initStompClient();
@@ -378,7 +379,7 @@ export const subscribeDiningTableEvents = (tableId, callback) => {
         if (sub) {
           try {
             sub.unsubscribe();
-          } catch (e) {}
+          } catch (e) { }
           activeStompSubscriptions.delete(topic);
         }
       }
