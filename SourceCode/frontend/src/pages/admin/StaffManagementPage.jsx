@@ -806,12 +806,12 @@ export default function StaffManagementPage() {
     </tr>
     <tr>
       <td colspan="13" class="sub-banner">
-        Áp dụng từ Thứ Hai (${weekInfo.startDisplay}) đến Chủ Nhật (${weekInfo.endDisplay}) • Chi nhánh Quận 1 (Chính) • Mã biểu mẫu: BM-NS-04/ROMS
+        Áp dụng từ Thứ Hai (${weekInfo.startDisplay}) đến Chủ Nhật (${weekInfo.endDisplay}) • Toàn Hệ Thống Nhà Hàng • Mã biểu mẫu: BM-NS-04/ROMS
       </td>
     </tr>
     <tr>
       <td colspan="4" class="meta-box"><b>Ngày xuất:</b> ${curDateStr} Lúc ${curTimeStr}</td>
-      <td colspan="4" class="meta-box"><b>Người lập biểu:</b> Quản lý chi nhánh</td>
+      <td colspan="4" class="meta-box"><b>Người lập biểu:</b> Quản lý nhà hàng</td>
       <td colspan="5" class="meta-box"><b>Tổng nhân sự:</b> ${exportStaff.length} người | <b>Tổng ca tuần:</b> ${grandTotalShifts} lượt trực</td>
     </tr>
   </table>
@@ -941,7 +941,7 @@ export default function StaffManagementPage() {
     </tr>`;
     }).join('')}
     <tr style="background-color:#FFECB3; font-weight:bold;">
-      <td colspan="2" class="td-right">TỔNG CỘNG TOÀN CHI NHÁNH:</td>
+      <td colspan="2" class="td-right">TỔNG CỘNG TOÀN NHÀ HÀNG:</td>
       <td class="td-center">${exportStaff.length} người</td>
       <td class="td-center" style="color:#9D4124;">${grandTotalShifts} ca</td>
       <td class="td-center">100%</td>
@@ -959,7 +959,7 @@ export default function StaffManagementPage() {
     <tr>
       <td colspan="3" style="padding:10px 14px; background-color:#FAF7F5; font-size:9.5pt; color:#56423D; border:1px solid #D5C2BD; line-height:1.6;">
         <b>1. Thời gian có mặt:</b> Nhân viên bắt buộc có mặt trước giờ bắt đầu ca trực ít nhất 15 phút để họp giao ban, kiểm tra đồng phục, thẻ tên và nhận bàn giao khu vực.<br/>
-        <b>2. Đổi ca trực:</b> Mọi trường hợp đổi ca trực phải được thực hiện trên hệ thống và có sự phê duyệt của Quản lý chi nhánh trước tối thiểu 24 giờ.<br/>
+        <b>2. Đổi ca trực:</b> Mọi trường hợp đổi ca trực phải được thực hiện trên hệ thống và có sự phê duyệt của Quản lý nhà hàng trước tối thiểu 24 giờ.<br/>
         <b>3. Kỷ luật ca trực:</b> Nghiêm cấm tự ý bỏ ca trực, đi muộn về sớm hoặc tự ý đổi ca không báo trước. Vi phạm sẽ bị xử lý kỷ luật theo nội quy nhà hàng.
       </td>
     </tr>
@@ -973,10 +973,10 @@ export default function StaffManagementPage() {
       <td style="border:none; text-align:center; vertical-align:top; width:33%;">
         <b>ĐIỀU PHỐI BẾP (BOH LEAD)</b><br/>
         <span style="font-size:9pt; color:#89726B;">(Ký và ghi rõ họ tên)</span><br/><br/><br/><br/><br/>
-        <b>Bếp Trưởng Chi Nhánh</b>
+        <b>Bếp Trưởng Nhà Hàng</b>
       </td>
       <td style="border:none; text-align:center; vertical-align:top; width:33%;">
-        <b>GIÁM ĐỐC CHI NHÁNH DUYỆT</b><br/>
+        <b>BAN QUẢN LÝ DUYỆT</b><br/>
         <span style="font-size:9pt; color:#89726B;">(Ký duyệt và đóng dấu)</span><br/><br/><br/><br/><br/>
         <b>Ban Quản Trị ROMS</b>
       </td>
@@ -1153,7 +1153,7 @@ export default function StaffManagementPage() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#89726B', letterSpacing: '0.04em' }}>
-              Tổng Nhân Lực Chi Nhánh
+              Tổng Nhân Lực Nhà Hàng
             </span>
             <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FCF1EF', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="groups" size={20} />
@@ -3595,19 +3595,19 @@ export default function StaffManagementPage() {
                       <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.25rem', color: '#9D4124', letterSpacing: '0.04em' }}>
                         ROMS RESTAURANT & BAR
                       </span>
-                      <span style={{ fontSize: '0.72rem', background: '#F6ECEA', color: '#56423D', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                        Chi nhánh Quận 1 (Chính)
+                      <span style={{ fontSize: '0.72rem', background: '#F2F8ED', color: '#3A5A20', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                        Toàn Nhà Hàng
                       </span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#56423D', marginTop: '3px' }}>
-                      Địa chỉ: 123 Lê Lợi, P. Bến Nghé, Quận 1, TP. Hồ Chí Minh • Hotline: (028) 3822 9999
+                      Hệ thống vận hành ẩm thực thông minh ROMS
                     </div>
                   </div>
 
                   <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#56423D' }}>
                     <div>Mã biểu mẫu: <strong>BM-NS-04/ROMS</strong></div>
                     <div>Ngày lập: <strong>{new Date().toLocaleDateString('vi-VN')}</strong></div>
-                    <div>Người lập: <strong>Quản lý chi nhánh</strong></div>
+                    <div>Người lập: <strong>Quản lý nhà hàng</strong></div>
                   </div>
                 </div>
 
@@ -3845,7 +3845,7 @@ export default function StaffManagementPage() {
                     </div>
 
                     <div>
-                      <div style={{ fontWeight: 800, color: '#1F1B1A' }}>GIÁM ĐỐC CHI NHÁNH</div>
+                      <div style={{ fontWeight: 800, color: '#1F1B1A' }}>BAN QUẢN LÝ NHÀ HÀNG</div>
                       <div style={{ fontSize: '0.72rem', color: '#89726B' }}>(Ký duyệt, đóng dấu)</div>
                       <div style={{ height: '60px' }}></div>
                       <div style={{ fontWeight: 700, color: '#1F1B1A' }}>Ban Quản Trị ROMS</div>

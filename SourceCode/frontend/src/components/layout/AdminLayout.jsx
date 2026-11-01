@@ -106,9 +106,9 @@ export default function AdminLayout() {
             </div>
           </Link>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FCF1EF', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', color: '#56423D' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#596232' }} />
-            <span>Chi nhánh Q.1 (Chính)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F2F8ED', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', color: '#3A5A20', fontWeight: 600 }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4CAF50' }} />
+            <span>Hệ Thống Trực Tuyến</span>
           </div>
 
           {/* Quick Restaurant Profile Switcher / Config Button */}
