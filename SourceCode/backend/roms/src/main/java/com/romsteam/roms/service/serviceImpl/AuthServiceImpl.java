@@ -182,13 +182,19 @@ public class AuthServiceImpl implements AuthService {
             staff.setIsOnShift(true);
             staffRepository.save(staff);
 
-// Phát sự kiện WebSocket STOMP báo nhân viên vừa đăng nhập vào ca trực
-            realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
-                    .type("STAFF_LOGIN")
-                    .status("ONLINE")
-                    .note("Nhân viên " + staff.getFullName() + " đã đăng nhập vào ca trực")
-                    .payload(staff.getUsername())
-                    .build());
+            // Phát sự kiện WebSocket STOMP báo nhân viên vừa đăng nhập vào ca trực
+            if (realtimeService != null) {
+                try {
+                    realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                            .type("STAFF_LOGIN")
+                            .status("ONLINE")
+                            .note("Nhân viên " + staff.getFullName() + " đã đăng nhập vào ca trực")
+                            .payload(staff.getUsername())
+                            .build());
+                } catch (Exception e) {
+                    log.warn("[Realtime] Không thể phát sự kiện STAFF_LOGIN: {}", e.getMessage());
+                }
+            }
 
             // 8. Sinh token JWT
             String token = jwtTokenProvider.generateToken(authentication);
@@ -251,12 +257,18 @@ public class AuthServiceImpl implements AuthService {
             staffRepository.save(staff);
 
             // Phát sự kiện WebSocket STOMP báo nhân viên vừa rời ca trực
-            realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
-                    .type("STAFF_LOGOUT")
-                    .status("OFFLINE")
-                    .note("Nhân viên " + staff.getFullName() + " đã kết thúc ca trực")
-                    .payload(staff.getUsername())
-                    .build());
+            if (realtimeService != null) {
+                try {
+                    realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                            .type("STAFF_LOGOUT")
+                            .status("OFFLINE")
+                            .note("Nhân viên " + staff.getFullName() + " đã kết thúc ca trực")
+                            .payload(staff.getUsername())
+                            .build());
+                } catch (Exception e) {
+                    log.warn("[Realtime] Không thể phát sự kiện STAFF_LOGOUT: {}", e.getMessage());
+                }
+            }
         });
     }
 

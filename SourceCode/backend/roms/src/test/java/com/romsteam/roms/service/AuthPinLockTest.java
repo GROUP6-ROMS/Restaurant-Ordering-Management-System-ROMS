@@ -57,6 +57,9 @@ class AuthPinLockTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private RealtimeService realtimeService;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
