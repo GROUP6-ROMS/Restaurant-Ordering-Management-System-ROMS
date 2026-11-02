@@ -7,6 +7,7 @@ import NotificationBell from '../common/NotificationBell';
 import RestaurantProfileModal from '../admin/RestaurantProfileModal';
 import ShiftStatusWidget from '../admin/ShiftStatusWidget';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
+import './adminLayout.css';
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
@@ -14,6 +15,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const restaurantProfile = useRestaurantProfile();
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -51,17 +53,23 @@ export default function AdminLayout() {
   const [showConfirmLogoutModal, setShowConfirmLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Accessibility: Lắng nghe phím Escape để đóng nhanh các modal
+  // Accessibility: Lắng nghe phím Escape để đóng nhanh các modal và Mobile Drawer
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        if (mobileDrawerOpen) setMobileDrawerOpen(false);
         if (showConfirmLogoutModal) setShowConfirmLogoutModal(false);
         if (showProfileModal) setShowProfileModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showConfirmLogoutModal, showProfileModal]);
+  }, [mobileDrawerOpen, showConfirmLogoutModal, showProfileModal]);
+
+  // Tự động đóng Mobile Drawer khi người dùng đổi trang
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [location.pathname]);
 
   const handleConfirmLogout = async () => {
     try {
@@ -77,36 +85,38 @@ export default function AdminLayout() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FFF8F6', display: 'flex', flexDirection: 'column' }}>
+    <div className="admin-layout-container">
       {/* Top Header */}
-      <header style={{
-        height: '64px',
-        background: '#FFFFFF',
-        borderBottom: '1px solid #EAE0DE',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 24px',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.03)'
-      }}>
-        {/* Left: Brand & Suite */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <Link to="/admin/reports" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-            <RomsLogo size={36} />
+      <header className="admin-header">
+        {/* Left: Hamburger (Mobile) + Brand & Suite */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Hamburger button on Mobile / Tablet */}
+          <button
+            type="button"
+            className="admin-hamburger-btn"
+            onClick={() => setMobileDrawerOpen(prev => !prev)}
+            aria-label="Mở menu quản trị"
+            title="Mở menu thanh điều hướng"
+          >
+            <Icon name={mobileDrawerOpen ? 'close' : 'menu'} size={22} />
+          </button>
+
+          <Link to="/admin/reports" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+            <RomsLogo size={32} />
             <div>
-              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#9D4124', lineHeight: 1 }}>
+              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#9D4124', lineHeight: 1 }}>
                 ROMS Suite
               </div>
-              <div style={{ fontSize: '0.68rem', color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+              <div style={{ fontSize: '0.64rem', color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
                 Quản Trị Nhà Hàng
               </div>
             </div>
           </Link>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F2F8ED', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', color: '#3A5A20', fontWeight: 600 }}>
+          <div
+            className="admin-header-online-badge"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F2F8ED', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.74rem', color: '#3A5A20', fontWeight: 600 }}
+          >
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4CAF50' }} />
             <span>Hệ Thống Trực Tuyến</span>
           </div>
@@ -114,6 +124,7 @@ export default function AdminLayout() {
           {/* Quick Restaurant Profile Switcher / Config Button */}
           <button
             type="button"
+            className="admin-config-btn"
             onClick={() => setShowProfileModal(true)}
             title="Tùy biến thương hiệu & thông tin quán (K80, VietQR, Báo cáo)"
             style={{
@@ -137,16 +148,8 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        {/* Center: Clock */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          background: '#FCF1EF',
-          border: '1px solid #EAE0DE',
-          padding: '6px 14px',
-          borderRadius: '12px'
-        }}>
+        {/* Center: Clock (Ẩn trên mobile) */}
+        <div className="admin-header-center-clock">
           <Icon name="schedule" size={18} style={{ color: '#9D4124' }} />
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: '0.92rem', color: '#1F1B1A' }}>
             {timeStr}
@@ -155,20 +158,23 @@ export default function AdminLayout() {
         </div>
 
         {/* Right: Notification Bell, Profile & Unified Logout button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* Chuông Thông Báo Quản Trị (Bàn gọi hỗ trợ & Đặt bàn mới) */}
           <NotificationBell />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: user ? '#1F1B1A' : '#BA1A1A' }}>
+            <div className="admin-user-details">
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: user ? '#1F1B1A' : '#BA1A1A' }}>
                 {user?.fullName || 'Chưa Đăng Nhập'}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#89726B' }}>
+              <div style={{ fontSize: '0.68rem', color: '#89726B' }}>
                 {user ? `Mã NV: ${user.username} • Quản Lý` : 'Vui lòng đăng nhập lại'}
               </div>
             </div>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+            <div
+              title={`${user?.fullName || ''} (${user?.username || ''})`}
+              style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#FFDBC9', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.82rem' }}
+            >
               {user?.fullName ? user.fullName.split(' ').slice(-1)[0][0] : '?'}
             </div>
           </div>
@@ -176,19 +182,20 @@ export default function AdminLayout() {
           {/* Unified Logout Button */}
           <button
             type="button"
+            className="admin-logout-btn"
             onClick={() => setShowConfirmLogoutModal(true)}
             title="Đăng xuất khỏi tài khoản"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '7px 14px',
+              padding: '6px 12px',
               borderRadius: '10px',
               border: '1px solid #EAE0DE',
               background: '#FFFFFF',
               color: '#BA1A1A',
               fontWeight: 700,
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               cursor: 'pointer',
               transition: 'all 0.15s ease'
             }}
@@ -200,20 +207,45 @@ export default function AdminLayout() {
       </header>
 
       {/* Body with Sidebar & Content */}
-      <div style={{ display: 'flex', flex: 1 }}>
-        {/* Sidebar */}
-        <aside style={{
-          width: '260px',
-          background: '#FCF1EF',
-          borderRight: '1px solid #EAE0DE',
-          padding: '20px 14px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          flexShrink: 0
-        }}>
+      <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
+        {/* Mobile Backdrop Overlay */}
+        <div
+          className={`admin-drawer-overlay ${mobileDrawerOpen ? 'open' : ''}`}
+          onClick={() => setMobileDrawerOpen(false)}
+        />
+
+        {/* Sidebar (Desktop Side Nav / Mobile Drawer) */}
+        <aside className={`admin-sidebar ${mobileDrawerOpen ? 'open' : ''}`}>
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 8px 12px' }}>
+            {/* Header riêng cho Drawer trên Mobile */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px 14px', borderBottom: '1px solid #F0E6E4', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RomsLogo size={28} />
+                <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.95rem', color: '#9D4124' }}>
+                  ROMS Quản Trị
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileDrawerOpen(false)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFF8F6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#56423D',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 8px 10px' }}>
               Khu Vực Quản Trị
             </div>
 
@@ -224,6 +256,7 @@ export default function AdminLayout() {
                   <Link
                     key={item.path}
                     to={item.path}
+                    onClick={() => setMobileDrawerOpen(false)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -242,6 +275,7 @@ export default function AdminLayout() {
                       <Icon name={item.icon} size={20} fill={isActive ? 1 : 0} />
                       <span>{item.label}</span>
                     </div>
+                    {isActive && <Icon name="chevron_right" size={18} />}
                   </Link>
                 );
               })}
@@ -249,11 +283,13 @@ export default function AdminLayout() {
           </div>
 
           {/* Bottom Shift Status (Động theo giờ thực & xem nhanh Live Roster) */}
-          <ShiftStatusWidget currentTime={currentTime} />
+          <div style={{ marginTop: '20px' }}>
+            <ShiftStatusWidget currentTime={currentTime} />
+          </div>
         </aside>
 
         {/* Content Area */}
-        <main style={{ flex: 1, padding: '24px', overflowX: 'auto', background: '#FFF8F6' }}>
+        <main className="admin-main-content">
           <Outlet />
         </main>
       </div>
