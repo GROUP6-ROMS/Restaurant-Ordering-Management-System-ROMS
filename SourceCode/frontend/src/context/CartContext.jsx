@@ -21,17 +21,29 @@ export function CartProvider({ children }) {
     localStorage.setItem('roms_table_info', JSON.stringify(tableInfo));
   }, [tableInfo]);
 
-  // Them mon vao gio hang
+  // Thêm món vào giỏ hàng (Cộng dồn số lượng trên 1 dòng duy nhất)
   const addToCart = (menuItem, quantity = 1, note = "") => {
+    const cleanNote = (note || '').trim();
+    const qtyToAdd = Math.max(1, Number(quantity) || 1);
+
     setCartItems(prev => {
-      const existingIndex = prev.findIndex(item => item.id === menuItem.id && item.note === note);
+      // Tìm món trùng theo ID (hoặc cùng ID và cùng ghi chú)
+      const existingIndex = prev.findIndex(item =>
+        Number(item.id) === Number(menuItem.id) &&
+        (item.note || '').trim() === cleanNote
+      );
+
+      // Nếu đã tồn tại -> cộng dồn số lượng theo chuẩn Immutable
       if (existingIndex > -1) {
-        const updated = [...prev];
-        updated[existingIndex].quantity += quantity;
-        return updated;
-      } else {
-        return [...prev, { ...menuItem, quantity, note }];
+        return prev.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + qtyToAdd }
+            : item
+        );
       }
+
+      // Nếu chưa có -> thêm dòng mới
+      return [...prev, { ...menuItem, quantity: qtyToAdd, note: cleanNote }];
     });
   };
 
