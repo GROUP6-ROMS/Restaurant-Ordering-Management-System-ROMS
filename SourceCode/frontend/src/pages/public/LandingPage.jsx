@@ -174,28 +174,6 @@ export default function LandingPage() {
 
           {/* Action Hub */}
           <div className="public-header-actions">
-            <Link
-              to="/dining/welcome?table=19&token=qr-t01-token-8841"
-              title="Mô phỏng trải nghiệm thực khách quét QR gọi món tại bàn"
-              className="hide-on-mobile"
-              style={{
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '9px 16px',
-                borderRadius: '9999px',
-                background: '#FCF1EF',
-                border: '1px solid #FFDBC9',
-                color: '#9D4124',
-                fontWeight: 700,
-                fontSize: '0.85rem'
-              }}
-            >
-              <Icon name="qr_code_scanner" size={18} style={{ color: '#9D4124' }} />
-              <span>Quét QR</span>
-            </Link>
-
             {/* Nút Đăng nhập Staff - Hiện rõ ở cả Desktop lẫn Mobile Web Dọc (Portrait) */}
             <Link
               to="/login"
@@ -300,15 +278,6 @@ export default function LandingPage() {
                 <Icon name="soup_kitchen" size={20} style={{ color: '#9D4124' }} />
                 <span>Quy Trình Vận Hành</span>
               </a>
-
-              <Link
-                to="/dining/welcome?table=19&token=qr-t01-token-8841"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', textDecoration: 'none', color: '#56423D', fontWeight: 700, fontSize: '0.88rem' }}
-              >
-                <Icon name="qr_code_scanner" size={20} style={{ color: '#9D4124' }} />
-                <span>Trải Nghiệm Quét QR Tại Bàn</span>
-              </Link>
             </div>
           </div>
 
@@ -755,8 +724,8 @@ export default function LandingPage() {
                     {dish.price.toLocaleString('vi-VN')}₫
                   </span>
                   <Link
-                    to="/dining/welcome?table=01"
-                    title="Gọi món này tại bàn"
+                    to="/reservation"
+                    title="Đặt bàn giữ chỗ thưởng thức món"
                     style={{
                       textDecoration: 'none',
                       display: 'inline-flex',
@@ -770,8 +739,8 @@ export default function LandingPage() {
                       fontSize: '0.78rem'
                     }}
                   >
-                    <Icon name="add" size={16} />
-                    <span>Xem món</span>
+                    <Icon name="table_restaurant" size={16} />
+                    <span>Đặt bàn</span>
                   </Link>
                 </div>
               </div>
