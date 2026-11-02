@@ -10,6 +10,12 @@ export const customerApi = {
         return response.data;
     },
 
+    // Alias tiện ích đồng bộ cho Landing Page hoặc các trang công khai
+    getMenu: async () => {
+        const response = await axiosClient.get('/customer/dining/menu');
+        return response.data;
+    },
+
     // 2. Thực khách gửi đơn gọi món tại bàn
     placeCustomerOrder: async (orderData) => {
         const response = await axiosClient.post('/customer/dining/orders', orderData);

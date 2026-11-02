@@ -9,32 +9,53 @@ import './publicPages.css';
 export default function LandingPage() {
   const restaurantProfile = useRestaurantProfile();
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
 
   // Tải danh mục thực đơn thực tế từ CSDL Backend
   useEffect(() => {
     const fetchLiveMenu = async () => {
       try {
-        const res = await customerApi.getMenu();
-        if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-          const mapped = res.data
-            .filter(item => item.isAvailable)
-            .map(item => ({
-              id: item.id,
-              category: (item.station === 'BAR' || item.categoryName?.toUpperCase().includes('NƯỚC') || item.categoryName?.toUpperCase().includes('UỐNG')) 
-                ? 'DRINK' 
-                : (item.categoryName?.toUpperCase().includes('KHAI VỊ') ? 'APPETIZER' : 'MAIN'),
-              categoryName: item.categoryName || 'Món Ngon',
-              name: item.name,
-              desc: item.description || 'Món ăn tinh hoa chế biến nóng sốt, chuẩn vị và đảm bảo vệ sinh an toàn thực phẩm.',
-              price: item.price,
-              rating: '5.0',
-              tag: item.tag || 'Bestseller',
-              tagBg: item.tag?.includes('Bán chạy') ? '#9D4124' : '#596232',
-              image: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80'
+        const res = await customerApi.getCustomerMenu();
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const menuCatalog = res.data;
+
+          // Trích xuất danh sách danh mục có món ăn thực tế
+          const catList = menuCatalog
+            .filter(c => c.items && c.items.length > 0)
+            .map(c => ({
+              id: c.categoryId,
+              label: c.categoryName
             }));
-          if (mapped.length > 0) {
-            setMenuItems(mapped);
+          if (catList.length > 0) {
+            setCategories(catList);
+          }
+
+          // Gom phẳng toàn bộ món ăn đang mở bán (isAvailable !== false)
+          const flatDishes = [];
+          menuCatalog.forEach(c => {
+            if (c.items && Array.isArray(c.items)) {
+              c.items.forEach(item => {
+                if (item.isAvailable !== false) {
+                  flatDishes.push({
+                    id: item.id,
+                    categoryId: c.categoryId,
+                    categoryName: c.categoryName || 'Món Ngon',
+                    name: item.name,
+                    desc: item.description || 'Món ăn tinh hoa chế biến nóng sốt, chuẩn vị và đảm bảo vệ sinh an toàn thực phẩm.',
+                    price: Number(item.price) || 0,
+                    rating: '5.0',
+                    tag: item.tag || 'Bestseller',
+                    tagBg: item.tag?.toLowerCase().includes('bán chạy') || item.tag?.toLowerCase().includes('bestseller') ? '#9D4124' : '#596232',
+                    image: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80'
+                  });
+                }
+              });
+            }
+          });
+
+          if (flatDishes.length > 0) {
+            setMenuItems(flatDishes);
           }
         }
       } catch (err) {
@@ -68,7 +89,7 @@ export default function LandingPage() {
       rating: '4.8',
       tag: 'Thanh Đạm',
       tagBg: '#596232',
-      image: 'https://images.unsplash.com/photo-1548946526-f69e2424cf45?w=600&q=80'
+      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80'
     },
     {
       id: 3,
@@ -124,6 +145,9 @@ export default function LandingPage() {
 
   const filteredDishes = activeDishes.filter(d => {
     if (selectedCategory === 'ALL') return true;
+    if (d.categoryId !== undefined) {
+      return d.categoryId === selectedCategory;
+    }
     return d.category === selectedCategory;
   });
 
@@ -482,12 +506,15 @@ export default function LandingPage() {
 
           {/* Filter Pills */}
           <div className="public-menu-categories-bar" style={{ background: '#F0E6E4', padding: '6px', borderRadius: '9999px' }}>
-            {[
-              { id: 'ALL', label: 'Tất cả món' },
-              { id: 'MAIN', label: 'Món chính & Lẩu' },
-              { id: 'APPETIZER', label: 'Khai vị' },
-              { id: 'DRINK', label: 'Đồ uống & Cà phê' }
-            ].map(tab => (
+            {(categories.length > 0
+              ? [{ id: 'ALL', label: 'Tất cả món' }, ...categories]
+              : [
+                  { id: 'ALL', label: 'Tất cả món' },
+                  { id: 'MAIN', label: 'Món chính & Lẩu' },
+                  { id: 'APPETIZER', label: 'Khai vị' },
+                  { id: 'DRINK', label: 'Đồ uống & Cà phê' }
+                ]
+            ).map(tab => (
               <button
                 key={tab.id}
                 type="button"
@@ -530,7 +557,14 @@ export default function LandingPage() {
               }}
             >
               <div style={{ position: 'relative', height: '210px', width: '100%', overflow: 'hidden' }}>
-                <img src={dish.image} alt={dish.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img
+                  src={dish.image}
+                  alt={dish.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80';
+                  }}
+                />
                 <span style={{
                   position: 'absolute',
                   top: '12px',
@@ -581,7 +615,8 @@ export default function LandingPage() {
                       background: '#FCF1EF',
                       color: '#9D4124',
                       fontWeight: 700,
-                      fontSize: '0.78rem'
+                      fontSize: '0.78rem',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     <Icon name="table_restaurant" size={16} />
