@@ -4,6 +4,7 @@ import Icon from '../../components/common/Icon';
 import { waiterApi } from '../../api/waiterApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 import { useDialog } from '../../context/DialogContext';
+import './waiterMobile.css';
 
 export default function WaiterOrderDetailPage() {
   const navigate = useNavigate();
@@ -251,7 +252,7 @@ export default function WaiterOrderDetailPage() {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', paddingBottom: isMobile ? '80px' : '0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', paddingBottom: isMobile ? '135px' : '24px' }}>
       {/* Toast Notification */}
       {toastMessage && (
         <div style={{
@@ -731,7 +732,7 @@ export default function WaiterOrderDetailPage() {
       {isMobile && (
         <div style={{
           position: 'fixed',
-          bottom: '56px',
+          bottom: '62px',
           left: 0,
           right: 0,
           background: '#FFFFFF',

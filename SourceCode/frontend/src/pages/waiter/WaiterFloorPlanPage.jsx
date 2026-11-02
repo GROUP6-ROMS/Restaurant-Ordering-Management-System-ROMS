@@ -5,6 +5,7 @@ import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/rea
 
 import Icon from '../../components/common/Icon';
 import { useDialog } from '../../context/DialogContext';
+import './waiterMobile.css';
 
 export default function WaiterFloorPlanPage() {
   const navigate = useNavigate();
@@ -152,6 +153,7 @@ export default function WaiterFloorPlanPage() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState('');
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [mobileOrderModalTab, setMobileOrderModalTab] = useState('CATALOG'); // 'CATALOG' | 'CART'
   const [showQrModal, setShowQrModal] = useState(false);
 
   // Giỏ hàng gọi món của Waiter (Waiter Order Pad)
@@ -1424,7 +1426,7 @@ export default function WaiterFloorPlanPage() {
         flexWrap: 'wrap',
         gap: '8px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
+        <div className="waiter-filter-scroll-container">
           {[
             { id: 'ALL', label: 'Tất cả bàn', count: tables.length, color: '#9D4124' },
             { id: 'OCCUPIED', label: 'Đang phục vụ', count: tables.filter(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'AWAITING_PAYMENT').length, color: '#994703' },
@@ -1541,11 +1543,7 @@ export default function WaiterFloorPlanPage() {
             <div style={{ fontSize: '0.85rem', marginTop: '4px' }}>Vui lòng chọn khu vực khác hoặc thay đổi bộ lọc trạng thái.</div>
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(160px, 1fr))' : 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: isMobile ? '12px' : '18px'
-          }}>
+          <div className="waiter-floor-grid">
             {filteredTables.map(t => {
               const isSelected = selectedTable?.id === t.id;
               const topBorderColor = getBorderColor(t);
@@ -1918,6 +1916,28 @@ export default function WaiterFloorPlanPage() {
                 </button>
               </div>
 
+              {/* Mobile Order Pad Tabs */}
+              {isMobile && (
+                <div className="waiter-modal-mobile-tabs">
+                  <button
+                    type="button"
+                    className={`waiter-modal-mobile-tab-btn ${mobileOrderModalTab === 'CATALOG' ? 'active' : ''}`}
+                    onClick={() => setMobileOrderModalTab('CATALOG')}
+                  >
+                    <Icon name="restaurant_menu" size={16} />
+                    <span>Thực Đơn ({filteredOrderMenu.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`waiter-modal-mobile-tab-btn ${mobileOrderModalTab === 'CART' ? 'active' : ''}`}
+                    onClick={() => setMobileOrderModalTab('CART')}
+                  >
+                    <Icon name="shopping_cart" size={16} />
+                    <span>Phiếu Món ({cartTotalCount})</span>
+                  </button>
+                </div>
+              )}
+
               {/* Modal Body: 2 Phân vùng Thực Đơn & Giỏ Hàng (Order Pad) */}
               <div style={{
                 display: isMobile ? 'flex' : 'grid',
@@ -1929,7 +1949,14 @@ export default function WaiterFloorPlanPage() {
                 minHeight: 0
               }}>
                 {/* CỘT TRÁI: Thực đơn món ăn (Menu Catalog) */}
-                <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, gap: '10px', overflow: 'hidden' }}>
+                <div style={{
+                  display: (isMobile && mobileOrderModalTab === 'CART') ? 'none' : 'flex',
+                  flexDirection: 'column',
+                  minHeight: 0,
+                  gap: '10px',
+                  overflow: 'hidden',
+                  width: '100%'
+                }}>
                   {/* Thanh tìm kiếm & lọc category */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -2110,18 +2137,48 @@ export default function WaiterFloorPlanPage() {
                       })
                     )}
                   </div>
+
+                  {/* Nút xem phiếu giỏ hàng nhanh trên mobile nếu có món */}
+                  {isMobile && cartTotalCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMobileOrderModalTab('CART')}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        background: '#9D4124',
+                        color: '#FFF',
+                        border: 'none',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(157, 65, 36, 0.25)',
+                        marginTop: '6px'
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Icon name="shopping_cart" size={18} />
+                        Xem Phiếu Gọi ({cartTotalCount} món)
+                      </span>
+                      <span>{cartTotalAmount.toLocaleString('vi-VN')}₫ →</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* CỘT PHẢI: Phiếu gọi món / Giỏ hàng tạm (Order Pad) */}
                 <div style={{
+                  display: (isMobile && mobileOrderModalTab === 'CATALOG') ? 'none' : 'flex',
                   background: '#FFF8F6',
                   borderRadius: '16px',
                   border: '1px solid #FFDBC9',
                   padding: '14px',
-                  display: 'flex',
                   flexDirection: 'column',
                   minHeight: 0,
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  width: '100%'
                 }}>
                   {/* Header Cart */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', borderBottom: '1px solid #F0E6E4', paddingBottom: '8px' }}>
@@ -2138,15 +2195,26 @@ export default function WaiterFloorPlanPage() {
                         {cartTotalCount} món
                       </span>
                     </div>
-                    {orderCart.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setOrderCart([])}
-                        style={{ background: 'none', border: 'none', color: '#BA1A1A', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Xóa tất cả
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isMobile && (
+                        <button
+                          type="button"
+                          onClick={() => setMobileOrderModalTab('CATALOG')}
+                          style={{ background: '#FFDBC9', border: 'none', color: '#9D4124', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', padding: '4px 8px', borderRadius: '6px' }}
+                        >
+                          + Thêm món
+                        </button>
+                      )}
+                      {orderCart.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setOrderCart([])}
+                          style={{ background: 'none', border: 'none', color: '#BA1A1A', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Xóa tất cả
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Danh sách món trong giỏ */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import { customerApi } from '../../api/customerApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
@@ -362,6 +363,7 @@ export default function CustomerMenuPage() {
 
   const { cartItems, addToCart, tableInfo } = useCart();
   const { showToast, ToastEl } = useToast();
+  const restaurantProfile = useRestaurantProfile();
 
   // Nạp thực đơn trực tiếp từ CSDL qua customerApi
   useEffect(() => {
@@ -504,7 +506,7 @@ export default function CustomerMenuPage() {
                   color: 'var(--on-surface)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  ROMS Bistro
+                  {restaurantProfile.brandName || restaurantProfile.name || 'ROMS Dining'}
                 </span>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,

@@ -2,6 +2,7 @@ import CustomerAiChatModal from '../customer/CustomerAiChatModal';
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import RomsLogo from '../common/RomsLogo';
 import Icon from '../common/Icon';
 import { customerApi } from '../../api/customerApi';
@@ -17,6 +18,7 @@ function formatVND(amount) {
 // ====================================================
 export default function CustomerLayout() {
   const { tableInfo, totalCount, totalPrice } = useCart();
+  const restaurantProfile = useRestaurantProfile();
   const location = useLocation();
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('Đã gửi yêu cầu gọi nhân viên!');
@@ -100,7 +102,7 @@ export default function CustomerLayout() {
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               letterSpacing: '-0.01em',
             }}>
-              ROMS Bistro
+              {restaurantProfile.brandName || restaurantProfile.name || 'ROMS Dining'}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
               <span style={{

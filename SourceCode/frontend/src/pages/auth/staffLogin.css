@@ -1,0 +1,158 @@
+/* staffLogin.css - Tối ưu Responsive Mobile Web cho Trang Đăng Nhập Ca Làm Việc ROMS */
+
+.staff-login-wrapper {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: linear-gradient(135deg, #2D1612 0%, #1A0D0A 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.staff-login-card {
+  background: #FFFFFF;
+  border-radius: 28px;
+  max-width: 960px;
+  width: 100%;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.5);
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.staff-login-left {
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.staff-login-right {
+  background: #FCF1EF;
+  padding: 36px 32px;
+  border-left: 1px solid #F0E6E4;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* Preset buttons container */
+.staff-login-presets-container {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Mobile Tabs Toggle (chỉ hiện khi mobile) */
+.staff-login-mobile-tabs {
+  display: none;
+}
+
+/* Responsive cho Tablet & Mobile */
+@media (max-width: 860px) {
+  .staff-login-wrapper {
+    padding: 12px 10px;
+    align-items: flex-start;
+    padding-top: 16px;
+    padding-bottom: 24px;
+  }
+
+  .staff-login-card {
+    grid-template-columns: 1fr;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  .staff-login-left {
+    padding: 22px 18px;
+  }
+
+  .staff-login-right {
+    border-left: none;
+    border-top: 1px solid #F0E6E4;
+    padding: 24px 18px 28px;
+  }
+
+  /* Preset chip trượt ngang mượt mà trên mobile */
+  .staff-login-presets-container {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    margin: 0 -4px;
+    padding-left: 4px;
+    padding-right: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .staff-login-presets-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .staff-login-presets-container button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Numpad buttons responsive trên mobile */
+  .staff-numpad-grid button {
+    height: 50px !important;
+    font-size: 1.25rem !important;
+  }
+
+  /* Thanh chuyển đổi tab mobile */
+  .staff-login-mobile-tabs {
+    display: flex;
+    background: #F0E6E4;
+    border-radius: 12px;
+    padding: 3px;
+    margin-bottom: 16px;
+    gap: 4px;
+  }
+
+  .staff-login-mobile-tab-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 9px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    background: transparent;
+    color: #56423D;
+  }
+
+  .staff-login-mobile-tab-btn.active {
+    background: #FFFFFF;
+    color: #9D4124;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+}
+
+@media (max-width: 480px) {
+  .staff-login-wrapper {
+    padding: 8px 6px;
+  }
+
+  .staff-login-card {
+    border-radius: 16px;
+  }
+
+  .staff-login-left {
+    padding: 18px 14px;
+  }
+
+  .staff-login-right {
+    padding: 18px 14px 22px;
+  }
+}

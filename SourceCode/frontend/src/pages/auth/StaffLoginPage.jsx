@@ -4,6 +4,7 @@ import { useAuth, getRoleHome } from '../../context/AuthContext';
 import Icon from '../../components/common/Icon';
 import RomsLogo from '../../components/common/RomsLogo';
 import { authApi } from '../../api/authApi';
+import './staffLogin.css';
 
 const PRESET_ACCOUNTS = [
   { role: 'MANAGER', roleLabel: 'Quản Lý', code: 'MGR-001', pin: '123456', name: 'Dương Trong', icon: 'shield_person', color: '#9D4124' },
@@ -22,6 +23,7 @@ export default function StaffLoginPage() {
   const [activeRole, setActiveRole] = useState('MANAGER');
   const [activeField, setActiveField] = useState('pin'); // 'code' or 'pin'
   const [errorMessage, setErrorMessage] = useState(null);
+  const [mobileView, setMobileView] = useState('FORM'); // 'FORM' | 'NUMPAD'
 
   // Modal Khôi phục mã PIN Quản lý
   const [showForgotPinModal, setShowForgotPinModal] = useState(false);
@@ -186,30 +188,18 @@ export default function StaffLoginPage() {
 
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #2D1612 0%, #1A0D0A 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px',
-      boxSizing: 'border-box'
-    }}>
-      <div style={{
-        background: '#FFFFFF',
-        borderRadius: '28px',
-        maxWidth: '960px',
-        width: '100%',
-        boxShadow: '0 25px 60px -15px rgba(0,0,0,0.5)',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        overflow: 'hidden'
-      }}>
+    <div className="staff-login-wrapper">
+      <div className="staff-login-card">
         {/* Left Side: Employee ID, PIN, Preset Chips */}
-        <div style={{ padding: '36px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div
+          className="staff-login-left"
+          style={{
+            display: mobileView === 'NUMPAD' && typeof window !== 'undefined' && window.innerWidth <= 860 ? 'none' : 'flex'
+          }}
+        >
           <div>
             {/* Header with Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
               <RomsLogo size={38} />
               <div>
                 <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.25rem', color: '#1F1B1A', letterSpacing: '0.04em' }}>
@@ -221,10 +211,33 @@ export default function StaffLoginPage() {
               </div>
             </div>
 
-            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#1F1B1A', margin: '0 0 6px' }}>
+            {/* Mobile View Toggle Tabs */}
+            <div className="staff-login-mobile-tabs">
+              <button
+                type="button"
+                className={`staff-login-mobile-tab-btn ${mobileView === 'FORM' ? 'active' : ''}`}
+                onClick={() => setMobileView('FORM')}
+              >
+                <Icon name="badge" size={16} />
+                <span>Nhập Ca & PIN</span>
+              </button>
+              <button
+                type="button"
+                className={`staff-login-mobile-tab-btn ${mobileView === 'NUMPAD' ? 'active' : ''}`}
+                onClick={() => {
+                  setMobileView('NUMPAD');
+                  setActiveField('pin');
+                }}
+              >
+                <Icon name="dialpad" size={16} />
+                <span>Bàn Phím Số ({pin.length}/6)</span>
+              </button>
+            </div>
+
+            <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.5rem', color: '#1F1B1A', margin: '0 0 6px' }}>
               Đăng Nhập Ca Làm Việc
             </h2>
-            <p style={{ margin: '0 0 20px', fontSize: '0.85rem', color: '#89726B' }}>
+            <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: '#89726B' }}>
               Quét thẻ nhân viên hoặc nhập Mã Nhân Viên và Mã PIN để vào vị trí làm việc.
             </p>
 
@@ -287,11 +300,11 @@ export default function StaffLoginPage() {
             )}
 
             {/* Role Preset Quick Selection */}
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#56423D', display: 'block', marginBottom: '8px' }}>
                 Chọn Nhanh Ca / Vị Trí Trực (Demo):
               </span>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div className="staff-login-presets-container">
                 {PRESET_ACCOUNTS.map(p => {
                   const isSelected = employeeCode === p.code;
                   return (
@@ -300,13 +313,13 @@ export default function StaffLoginPage() {
                       type="button"
                       onClick={() => handleSelectPreset(p)}
                       style={{
-                        padding: '6px 12px',
+                        padding: '7px 12px',
                         borderRadius: '10px',
                         border: isSelected ? `2px solid ${p.color}` : '1px solid #EAE0DE',
                         background: isSelected ? '#FFF8F6' : '#FFFFFF',
                         color: isSelected ? p.color : '#56423D',
                         fontWeight: 800,
-                        fontSize: '0.75rem',
+                        fontSize: '0.76rem',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -363,9 +376,32 @@ export default function StaffLoginPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
-                  Mã PIN Ca Trực (6 Số)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#56423D' }}>
+                    Mã PIN Ca Trực (6 Số)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileView('NUMPAD');
+                      setActiveField('pin');
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#9D4124',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Icon name="dialpad" size={15} />
+                    Bàn phím số Numpad
+                  </button>
+                </div>
                 <div
                   onClick={() => setActiveField('pin')}
                   style={{
@@ -454,10 +490,10 @@ export default function StaffLoginPage() {
             </form>
           </div>
 
-          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Link to="/" style={{ fontSize: '0.8rem', color: '#89726B', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
               <Icon name="arrow_back" size={16} />
-              Quay lại Trang Chủ
+              Trang Chủ
             </Link>
             <span style={{ fontSize: '0.75rem', color: '#89726B' }}>
               ROMS v2.4 Enterprise
@@ -466,22 +502,39 @@ export default function StaffLoginPage() {
         </div>
 
         {/* Right Side: Touchscreen Numpad for Fast POS/Tablet Access */}
-        <div style={{
-          background: '#FCF1EF',
-          padding: '36px 32px',
-          borderLeft: '1px solid #F0E6E4',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center'
-        }}>
+        <div
+          className="staff-login-right"
+          style={{
+            display: mobileView === 'FORM' && typeof window !== 'undefined' && window.innerWidth <= 860 ? 'none' : 'flex'
+          }}
+        >
+          {/* Mobile Back to Form button if active */}
+          <div className="staff-login-mobile-tabs" style={{ width: '100%', maxWidth: '300px' }}>
+            <button
+              type="button"
+              className={`staff-login-mobile-tab-btn ${mobileView === 'FORM' ? 'active' : ''}`}
+              onClick={() => setMobileView('FORM')}
+            >
+              <Icon name="arrow_back" size={16} />
+              <span>Quay Lại Biểu Mẫu</span>
+            </button>
+            <button
+              type="button"
+              className={`staff-login-mobile-tab-btn ${mobileView === 'NUMPAD' ? 'active' : ''}`}
+              onClick={() => setMobileView('NUMPAD')}
+            >
+              <Icon name="dialpad" size={16} />
+              <span>Bàn Phím Số</span>
+            </button>
+          </div>
+
           <div style={{ width: '100%', maxWidth: '300px' }}>
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '14px' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9D4124', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Bàn Phím Số Cảm Ứng (Touch Numpad)
               </span>
               <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#56423D' }}>
-                Đang nhập cho: <b>{activeField === 'pin' ? 'MÃ PIN' : 'MÃ NHÂN VIÊN'}</b>
+                Đang nhập cho: <b>{activeField === 'pin' ? 'MÃ PIN (6 Số)' : 'MÃ NHÂN VIÊN'}</b>
               </p>
             </div>
 
@@ -490,7 +543,7 @@ export default function StaffLoginPage() {
               display: 'flex',
               justifyContent: 'center',
               gap: '12px',
-              margin: '0 auto 20px',
+              margin: '0 auto 16px',
               padding: '10px 16px',
               background: '#FFFFFF',
               borderRadius: '12px',
@@ -511,18 +564,21 @@ export default function StaffLoginPage() {
             </div>
 
             {/* Grid 3x4 Numpad */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '12px'
-            }}>
+            <div
+              className="staff-numpad-grid"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '10px'
+              }}
+            >
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
                 <button
                   key={num}
                   type="button"
                   onClick={() => handleNumpadPress(num.toString())}
                   style={{
-                    height: '56px',
+                    height: '54px',
                     borderRadius: '14px',
                     border: '1px solid #EAE0DE',
                     background: '#FFFFFF',
@@ -546,7 +602,7 @@ export default function StaffLoginPage() {
                 type="button"
                 onClick={handleNumpadClear}
                 style={{
-                  height: '56px',
+                  height: '54px',
                   borderRadius: '14px',
                   border: '1px solid #EAE0DE',
                   background: '#F6ECEA',
@@ -564,7 +620,7 @@ export default function StaffLoginPage() {
                 type="button"
                 onClick={() => handleNumpadPress('0')}
                 style={{
-                  height: '56px',
+                  height: '54px',
                   borderRadius: '14px',
                   border: '1px solid #EAE0DE',
                   background: '#FFFFFF',
@@ -583,7 +639,7 @@ export default function StaffLoginPage() {
                 type="button"
                 onClick={handleNumpadBackspace}
                 style={{
-                  height: '56px',
+                  height: '54px',
                   borderRadius: '14px',
                   border: '1px solid #EAE0DE',
                   background: '#F6ECEA',
@@ -597,6 +653,32 @@ export default function StaffLoginPage() {
                 <Icon name="backspace" size={22} />
               </button>
             </div>
+
+            {/* Direct Login Button on Numpad for Mobile */}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              style={{
+                width: '100%',
+                marginTop: '14px',
+                padding: '13px',
+                borderRadius: '12px',
+                background: '#9D4124',
+                color: '#FFFFFF',
+                border: 'none',
+                fontWeight: 900,
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(157, 65, 36, 0.28)'
+              }}
+            >
+              <Icon name="login" size={18} />
+              Vào Ca Làm Việc
+            </button>
           </div>
         </div>
       </div>
