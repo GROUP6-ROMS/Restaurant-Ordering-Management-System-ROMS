@@ -142,13 +142,13 @@ export default function LandingPage() {
       }}>
         <div className="public-header-container">
           {/* Brand Logo with Dynamic Restaurant Name */}
-          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <RomsLogo size={44} />
+          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RomsLogo size={38} />
             <div>
-              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#9D4124', lineHeight: 1.1 }}>
+              <div className="public-header-brand-name">
                 {restaurantProfile.brandName || 'ROMS'}
               </div>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div className="hide-on-mobile" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Hệ Thống Quản Lý Ẩm Thực
               </div>
             </div>
