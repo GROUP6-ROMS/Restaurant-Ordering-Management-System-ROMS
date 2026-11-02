@@ -12,11 +12,14 @@ import com.romsteam.roms.service.MenuService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller cung cấp trọn bộ REST API phục vụ màn hình Quản lý Thực Đơn (/admin/menu)
@@ -137,5 +140,15 @@ public class AdminMenuController {
     public ResponseEntity<ApiResponse<Void>> syncMenu() {
         menuService.syncMenuToKdsAndPos();
         return ResponseEntity.ok(ApiResponse.success(null, "Đã đồng bộ thực đơn xuống tất cả trạm Bếp KDS và Máy Thu Ngân POS!"));
+    }
+
+    // 13. POST /api/admin/menu/upload-image - Tải ảnh món ăn từ thiết bị
+    @PostMapping(value = "/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadDishImage(
+            @RequestParam("file") MultipartFile file
+    ) {
+        String imageUrl = menuService.uploadDishImage(file);
+        return ResponseEntity.ok(ApiResponse.success(Map.of("imageUrl", imageUrl), "Tải ảnh món ăn lên thành công!"));
     }
 }

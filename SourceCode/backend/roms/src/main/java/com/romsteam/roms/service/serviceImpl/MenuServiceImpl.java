@@ -17,14 +17,22 @@ import com.romsteam.roms.service.MenuService;
 import com.romsteam.roms.service.RealtimeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -38,6 +46,9 @@ public class MenuServiceImpl implements MenuService {
     private final MenuItemRepository menuItemRepository;
     private final CategoryRepository categoryRepository;
     private final RealtimeService realtimeService;
+
+    @Value("${app.upload.dir:uploads/menu}")
+    private String uploadDir;
 
     @Override
     @Transactional(readOnly = true)
@@ -342,6 +353,64 @@ public class MenuServiceImpl implements MenuService {
     @Override
     public void syncMenuToKdsAndPos() {
         log.info("Menu catalog synchronization broadcasted to KDS displays and POS registers successfully.");
+    }
+
+    @Override
+    public String uploadDishImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException("Vui lòng chọn file hình ảnh hợp lệ!", HttpStatus.BAD_REQUEST);
+        }
+
+        // 1. Kiểm tra kích thước file (tối đa 5MB)
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new AppException("Dung lượng hình ảnh không được vượt quá 5MB!", HttpStatus.BAD_REQUEST);
+        }
+
+        // 2. Kiểm tra định dạng đuôi file và content type
+        String contentType = file.getContentType();
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
+        }
+
+        boolean isValidExtension = extension.equals(".jpg") || extension.equals(".jpeg") || 
+                                   extension.equals(".png") || extension.equals(".webp") || 
+                                   extension.equals(".gif");
+
+        boolean isValidMime = contentType != null && (
+                contentType.equalsIgnoreCase("image/jpeg") ||
+                contentType.equalsIgnoreCase("image/png") ||
+                contentType.equalsIgnoreCase("image/webp") ||
+                contentType.equalsIgnoreCase("image/gif")
+        );
+
+        if (!isValidExtension || !isValidMime) {
+            throw new AppException("Định dạng file không hợp lệ! Vui lòng chỉ tải lên file hình ảnh (.jpg, .jpeg, .png, .webp, .gif).", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            // 3. Khởi tạo thư mục lưu trữ nếu chưa tồn tại
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            // 4. Sinh tên file duy nhất tránh xung đột và ghi đè
+            String uniqueFilename = "dish-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8) + extension;
+            Path targetLocation = uploadPath.resolve(uniqueFilename);
+
+            // 5. Lưu file vào ổ cứng
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+
+            log.info("Uploaded dish image successfully: {} (size: {} bytes)", uniqueFilename, file.getSize());
+
+            // 6. Trả về đường dẫn URL công khai
+            return "/api/uploads/menu/" + uniqueFilename;
+        } catch (IOException e) {
+            log.error("Lỗi khi lưu trữ file hình ảnh món ăn: {}", e.getMessage(), e);
+            throw new AppException("Có lỗi xảy ra khi lưu trữ file ảnh lên máy chủ. Vui lòng thử lại!", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     // Helper map MenuItem Entity sang AdminMenuItemResponse DTO

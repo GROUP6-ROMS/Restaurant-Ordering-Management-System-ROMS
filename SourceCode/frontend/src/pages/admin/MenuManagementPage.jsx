@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Icon from '../../components/common/Icon';
 import { menuApi } from '../../api/menuApi';
 import { useDialog } from '../../context/DialogContext';
@@ -68,6 +68,102 @@ export default function MenuManagementPage() {
     globalShowToast(msg, type);
     setToastMessage(typeof msg === 'string' ? msg : msg?.message);
     setTimeout(() => setToastMessage(null), 3200);
+  };
+
+  // Quản lý tải lên hình ảnh từ thiết bị
+  const editFileInputRef = useRef(null);
+  const addFileInputRef = useRef(null);
+  const [isUploadingEditImage, setIsUploadingEditImage] = useState(false);
+  const [isUploadingAddImage, setIsUploadingAddImage] = useState(false);
+  const [isCustomUrlMode, setIsCustomUrlMode] = useState(false);
+  const [isCustomAddUrlMode, setIsCustomAddUrlMode] = useState(false);
+
+  // Xử lý upload ảnh cho món đang chọn sửa
+  const handleUploadSelectedDishImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showAlert({
+        title: 'Định dạng không hợp lệ',
+        message: 'Vui lòng chọn file hình ảnh (JPG, PNG, WEBP, GIF)!',
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showAlert({
+        title: 'File quá lớn',
+        message: 'Dung lượng ảnh tối đa là 5MB. Vui lòng chọn ảnh nhỏ hơn!',
+        type: 'warning'
+      });
+      return;
+    }
+
+    try {
+      setIsUploadingEditImage(true);
+      const res = await menuApi.uploadDishImage(file);
+      if (res.data?.data?.imageUrl) {
+        handleUpdateSelectedDishField('imageUrl', res.data.data.imageUrl);
+        showToast('Tải ảnh món ăn lên thành công!');
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải ảnh lên:', err);
+      const errMsg = err.response?.data?.message || 'Không thể tải ảnh lên máy chủ. Vui lòng thử lại!';
+      showAlert({
+        title: 'Lỗi tải ảnh',
+        message: errMsg,
+        type: 'error'
+      });
+    } finally {
+      setIsUploadingEditImage(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  };
+
+  // Xử lý upload ảnh cho món ăn mới trong Modal
+  const handleUploadNewDishImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showAlert({
+        title: 'Định dạng không hợp lệ',
+        message: 'Vui lòng chọn file hình ảnh (JPG, PNG, WEBP, GIF)!',
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showAlert({
+        title: 'File quá lớn',
+        message: 'Dung lượng ảnh tối đa là 5MB. Vui lòng chọn ảnh nhỏ hơn!',
+        type: 'warning'
+      });
+      return;
+    }
+
+    try {
+      setIsUploadingAddImage(true);
+      const res = await menuApi.uploadDishImage(file);
+      if (res.data?.data?.imageUrl) {
+        setNewDish(prev => ({ ...prev, imageUrl: res.data.data.imageUrl }));
+        showToast('Tải ảnh món mới lên thành công!');
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải ảnh lên:', err);
+      const errMsg = err.response?.data?.message || 'Không thể tải ảnh lên máy chủ. Vui lòng thử lại!';
+      showAlert({
+        title: 'Lỗi tải ảnh',
+        message: errMsg,
+        type: 'error'
+      });
+    } finally {
+      setIsUploadingAddImage(false);
+      if (addFileInputRef.current) addFileInputRef.current.value = '';
+    }
   };
 
   // 1. Tải toàn bộ dữ liệu ban đầu từ Backend
@@ -920,26 +1016,130 @@ export default function MenuManagementPage() {
                   </select>
                 </div>
 
-                {/* Đường dẫn hình ảnh */}
+                {/* Ảnh món ăn & Tải lên từ thiết bị */}
                 <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '4px' }}>
-                    Đường dẫn ảnh món (URL):
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedDish.imageUrl || ''}
-                    onChange={(e) => handleUpdateSelectedDishField('imageUrl', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1F1B1A' }}>
+                      Hình ảnh món ăn:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomUrlMode(!isCustomUrlMode)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#9D4124',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0,
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      {isCustomUrlMode ? 'Đóng ô URL' : 'Dán link URL'}
+                    </button>
+                  </div>
+
+                  {/* Khung xem trước và nút tải ảnh từ thiết bị */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    background: '#FFF8F6',
+                    border: '1.5px dashed #FFDBC9'
+                  }}>
+                    <div style={{
+                      position: 'relative',
+                      width: '64px',
+                      height: '64px',
                       borderRadius: '10px',
-                      border: '1px solid #EAE0DE',
-                      background: '#FFFFFF',
-                      fontSize: '0.82rem',
-                      color: '#56423D',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                      overflow: 'hidden',
+                      background: '#F0E6E4',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src={selectedDish.imageUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500'}
+                        alt={selectedDish.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.target.src = 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500';
+                        }}
+                      />
+                      {isUploadingEditImage && (
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'rgba(0,0,0,0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#FFF'
+                        }}>
+                          <Icon name="progress_activity" size={20} className="animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <input
+                        type="file"
+                        ref={editFileInputRef}
+                        accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                        onChange={handleUploadSelectedDishImage}
+                        style={{ display: 'none' }}
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingEditImage}
+                        onClick={() => editFileInputRef.current?.click()}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '7px 12px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: isUploadingEditImage ? '#EAE0DE' : '#9D4124',
+                          color: '#FFFFFF',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: isUploadingEditImage ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Icon name="upload" size={16} />
+                        <span>{isUploadingEditImage ? 'Đang tải lên...' : 'Tải ảnh từ thiết bị'}</span>
+                      </button>
+                      <span style={{ fontSize: '0.68rem', color: '#89726B' }}>
+                        Hỗ trợ JPG, PNG, WEBP tối đa 5MB
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Ô nhập URL dự phòng nếu bật toggle */}
+                  {isCustomUrlMode && (
+                    <div style={{ marginTop: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="Nhập đường dẫn URL ảnh (https://...)"
+                        value={selectedDish.imageUrl || ''}
+                        onChange={(e) => handleUpdateSelectedDishField('imageUrl', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #EAE0DE',
+                          background: '#FFFFFF',
+                          fontSize: '0.78rem',
+                          color: '#56423D',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Mô tả */}
@@ -1167,6 +1367,120 @@ export default function MenuManagementPage() {
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #EAE0DE', outline: 'none', boxSizing: 'border-box' }}
                   />
                 </div>
+              </div>
+
+              {/* Hình ảnh món ăn mới & Tải lên từ thiết bị */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A' }}>
+                    Hình ảnh món ăn:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomAddUrlMode(!isCustomAddUrlMode)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#9D4124',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: 0,
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {isCustomAddUrlMode ? 'Đóng ô URL' : 'Dán link URL'}
+                  </button>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  background: '#FFF8F6',
+                  border: '1.5px dashed #FFDBC9'
+                }}>
+                  <div style={{
+                    position: 'relative',
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    background: '#F0E6E4',
+                    flexShrink: 0
+                  }}>
+                    <img
+                      src={newDish.imageUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500'}
+                      alt="Ảnh món mới"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.target.src = 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500';
+                      }}
+                    />
+                    {isUploadingAddImage && (
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#FFF'
+                      }}>
+                        <Icon name="progress_activity" size={20} className="animate-spin" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input
+                      type="file"
+                      ref={addFileInputRef}
+                      accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                      onChange={handleUploadNewDishImage}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingAddImage}
+                      onClick={() => addFileInputRef.current?.click()}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '7px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: isUploadingAddImage ? '#EAE0DE' : '#9D4124',
+                        color: '#FFFFFF',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: isUploadingAddImage ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <Icon name="upload" size={16} />
+                      <span>{isUploadingAddImage ? 'Đang tải lên...' : 'Tải ảnh từ thiết bị'}</span>
+                    </button>
+                    <span style={{ fontSize: '0.68rem', color: '#89726B' }}>
+                      Hỗ trợ JPG, PNG, WEBP tối đa 5MB
+                    </span>
+                  </div>
+                </div>
+
+                {isCustomAddUrlMode && (
+                  <div style={{ marginTop: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Dán link URL ảnh (https://...)"
+                      value={newDish.imageUrl}
+                      onChange={(e) => setNewDish({ ...newDish, imageUrl: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #EAE0DE', outline: 'none', boxSizing: 'border-box', fontSize: '0.78rem' }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Mô tả */}

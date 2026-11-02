@@ -75,6 +75,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    volumes:
+      - roms-uploads:/app/uploads
     networks:
       - roms-net
 
@@ -98,11 +100,13 @@ services:
       - roms-net
 
 # ===================================================================
-# LƯU TRỮ VĨNH VIỄN CƠ SỞ DỮ LIỆU (DOCKER VOLUME)
+# LƯU TRỮ VĨNH VIỄN CƠ SỞ DỮ LIỆU VÀ TẬP TIN UPLOAD (DOCKER VOLUME)
 # ===================================================================
 volumes:
   mssql-data:
     name: roms-mssql-data
+  roms-uploads:
+    name: roms-uploads
 
 # ===================================================================
 # MẠNG NỘI BỘ DOCKER (ISOLATED NETWORK)

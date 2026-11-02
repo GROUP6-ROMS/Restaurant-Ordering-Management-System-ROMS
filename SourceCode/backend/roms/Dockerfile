@@ -29,6 +29,9 @@ RUN addgroup -S romsgroup && adduser -S romsuser -G romsgroup
 
 WORKDIR /app
 
+# Tạo thư mục uploads để lưu trữ ảnh món ăn và phân quyền
+RUN mkdir -p /app/uploads/menu
+
 # Sao chép file jar từ Stage 1 sang Stage 2
 COPY --from=builder /build/target/roms-*.jar app.jar
 

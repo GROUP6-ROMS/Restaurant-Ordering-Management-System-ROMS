@@ -10,6 +10,8 @@ import com.romsteam.roms.dto.response.MenuSummaryResponse;
 
 import java.util.List;
 
+import org.springframework.web.multipart.MultipartFile;
+
 public interface MenuService {
 
     // 1. Lấy thông tin thống kê 3 thẻ KPI
@@ -47,4 +49,7 @@ public interface MenuService {
 
     // 12. Kích hoạt đồng bộ thực đơn xuống KDS và POS
     void syncMenuToKdsAndPos();
+
+    // 13. Tải lên hình ảnh món ăn từ thiết bị máy tính hoặc điện thoại
+    String uploadDishImage(MultipartFile file);
 }

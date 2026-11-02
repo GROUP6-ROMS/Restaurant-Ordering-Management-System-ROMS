@@ -60,5 +60,14 @@ export const menuApi = {
         return axiosClient.delete(`/admin/menu/categories/${id}`);
     },
 
-
+    // 12. Tải ảnh món ăn trực tiếp từ thiết bị lên server
+    uploadDishImage: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return axiosClient.post('/admin/menu/upload-image', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+    }
 };
