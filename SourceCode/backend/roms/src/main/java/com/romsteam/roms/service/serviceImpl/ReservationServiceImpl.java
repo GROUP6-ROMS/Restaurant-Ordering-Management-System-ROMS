@@ -61,6 +61,11 @@ public class ReservationServiceImpl implements ReservationService {
             throw new AppException("Thời gian đặt bàn không hợp lệ! Vui lòng chọn thời gian từ hiện tại trở đi.");
         }
 
+        // Kiểm tra số lượng khách đặt bàn trực tuyến theo RULE-RESV-01 & RULE-RESV-02: từ 1 đến 20 khách
+        if (request.getGuestCount() == null || request.getGuestCount() < 1 || request.getGuestCount() > 20) {
+            throw new AppException("Số lượng khách đặt trực tuyến phải từ 1 đến 20 người. Với đoàn từ 21 khách trở lên, quý khách vui lòng liên hệ hotline để được phục vụ tiệc riêng!");
+        }
+
         // 2. Sinh mã đặt chỗ duy nhất (Ví dụ: RES-20261009-4821)
         String dateStr = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String bookingCode;

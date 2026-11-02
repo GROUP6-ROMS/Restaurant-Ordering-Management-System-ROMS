@@ -96,6 +96,42 @@ class ReservationServiceTest {
     }
 
     @Test
+    @DisplayName("1b. Chặn đặt bàn trực tuyến khi số khách vượt quá 20 người (RULE-RESV-01, RULE-RESV-02)")
+    void createCustomerReservation_WhenGuestsExceed20_ThrowsException() {
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        CreateReservationRequest request = CreateReservationRequest.builder()
+                .customerName("Trần Khách Hàng")
+                .customerPhone("0987654321")
+                .guestCount(21) // Vượt quá giới hạn 20 người
+                .reservationDate(tomorrow.toString())
+                .reservationTime("18:30")
+                .requestedZone("VIP")
+                .build();
+
+        assertThatThrownBy(() -> reservationService.createCustomerReservation(request))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("từ 1 đến 20 người");
+    }
+
+    @Test
+    @DisplayName("1c. Chặn đặt bàn trực tuyến khi số khách nhỏ hơn 1 (RULE-RESV-02)")
+    void createCustomerReservation_WhenGuestsLessThan1_ThrowsException() {
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        CreateReservationRequest request = CreateReservationRequest.builder()
+                .customerName("Trần Khách Hàng")
+                .customerPhone("0987654321")
+                .guestCount(0) // Nhỏ hơn 1 người
+                .reservationDate(tomorrow.toString())
+                .reservationTime("18:30")
+                .requestedZone("VIP")
+                .build();
+
+        assertThatThrownBy(() -> reservationService.createCustomerReservation(request))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("từ 1 đến 20 người");
+    }
+
+    @Test
     @DisplayName("2. Đặt bàn thành công trong tương lai với trạng thái PENDING và món đặt trước")
     void createCustomerReservation_WhenValid_SavesPendingReservationWithItems() {
         LocalDate tomorrow = LocalDate.now().plusDays(1);

@@ -186,9 +186,16 @@ export default function ReservationPage() {
   };
 
   const handleApplyCustomGuests = (e) => {
-    const val = parseInt(e.target.value, 10) || 1;
-    setCustomGuestInput(val);
-    setSelectedGuests(val);
+    const raw = e.target.value;
+    if (raw === '') {
+      setCustomGuestInput('');
+      setSelectedGuests(0);
+      return;
+    }
+    const val = parseInt(raw, 10);
+    const parsedVal = isNaN(val) ? 0 : val;
+    setCustomGuestInput(parsedVal);
+    setSelectedGuests(parsedVal);
   };
 
   // Pre-order handlers
@@ -233,12 +240,45 @@ export default function ReservationPage() {
         });
         return;
       }
+      if (!selectedTime) {
+        showAlert({
+          title: 'Chưa chọn khung giờ',
+          message: 'Vui lòng chọn khung giờ dùng bữa trước khi tiếp tục!',
+          type: 'warning'
+        });
+        return;
+      }
+      if (!selectedGuests || selectedGuests < 1) {
+        showAlert({
+          title: 'Số lượng khách không hợp lệ',
+          message: 'Số lượng khách đặt bàn trực tuyến tối thiểu là 1 người!',
+          type: 'warning'
+        });
+        return;
+      }
+      if (selectedGuests > 20) {
+        showAlert({
+          title: 'Số lượng khách vượt quá quy định',
+          message: 'Số lượng khách đặt trực tuyến tối đa là 20 người. Quý khách vui lòng liên hệ hotline 1900-xxxx để được hỗ trợ sắp xếp phòng tiệc đoàn riêng!',
+          type: 'warning'
+        });
+        return;
+      }
       setCurrentStep(2);
     } else if (currentStep === 2) {
       setCurrentStep(3);
     } else if (currentStep === 3) {
       setCurrentStep(4);
     } else if (currentStep === 4) {
+      // Xác thực số lượng khách (1-20 khách theo RULE-RESV-01)
+      if (!selectedGuests || selectedGuests < 1 || selectedGuests > 20) {
+        showAlert({
+          title: 'Số lượng khách không hợp lệ',
+          message: 'Số lượng khách đặt bàn trực tuyến phải từ 1 đến 20 người. Quý khách vui lòng kiểm tra lại!',
+          type: 'warning'
+        });
+        return;
+      }
       // Xác thực form thông tin khách
       if (!customerName.trim()) {
         showAlert({
@@ -688,34 +728,104 @@ export default function ReservationPage() {
 
                   {/* Ô nhập số lượng khách tùy ý (nếu chọn Số khác) */}
                   {isCustomGuests && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
-                        Nhập số lượng khách chính xác:
-                      </span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="50"
-                        value={customGuestInput}
-                        onChange={handleApplyCustomGuests}
-                        className="touch-input"
-                        style={{
-                          width: '80px',
-                          padding: '8px 12px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #9D4124',
-                          fontSize: '1rem',
-                          fontWeight: 800,
-                          color: '#9D4124',
-                          background: '#FFFFFF',
-                          outline: 'none',
-                          textAlign: 'center'
-                        }}
-                      />
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A' }}>khách</span>
-                      <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
-                        (Đoàn tiệc trên 20 khách vui lòng ghi chú thêm nhu cầu trang trí hoặc set menu)
-                      </span>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      background: '#FFF8F6',
+                      padding: '14px 16px',
+                      borderRadius: '14px',
+                      border: isCustomGuests && (selectedGuests > 20 || selectedGuests < 1 || customGuestInput === '')
+                        ? '1.5px solid #F87171'
+                        : '1px solid #FFDBC9'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
+                          Nhập số lượng khách chính xác:
+                        </span>
+                        <input
+                          id="reservation-custom-guests"
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={customGuestInput}
+                          onChange={handleApplyCustomGuests}
+                          className="touch-input"
+                          placeholder="1-20"
+                          style={{
+                            width: '80px',
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            border: isCustomGuests && (selectedGuests > 20 || selectedGuests < 1 || customGuestInput === '')
+                              ? '1.5px solid #DC2626'
+                              : '1.5px solid #9D4124',
+                            fontSize: '1rem',
+                            fontWeight: 800,
+                            color: isCustomGuests && (selectedGuests > 20 || selectedGuests < 1 || customGuestInput === '')
+                              ? '#DC2626'
+                              : '#9D4124',
+                            background: '#FFFFFF',
+                            outline: 'none',
+                            textAlign: 'center'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A' }}>khách</span>
+                      </div>
+
+                      {/* Thông báo hướng dẫn quy định số lượng khách trực tuyến in trực tiếp trên giao diện */}
+                      <div style={{ fontSize: '0.78rem', color: '#89726B', lineHeight: '1.4' }}>
+                        * Hệ thống trực tuyến hỗ trợ tối đa <strong>20 khách/đoàn</strong> (theo quy định nhà hàng). Quý khách đặt tiệc đoàn từ 21 khách trở lên vui lòng liên hệ hotline <strong>1900-xxxx</strong> để được sắp xếp phòng tiệc riêng.
+                      </div>
+
+                      {/* Cảnh báo lỗi in trực tiếp trên giao diện khi số khách vượt quá 20 */}
+                      {isCustomGuests && selectedGuests > 20 && (
+                        <div
+                          id="reservation-guest-error-over"
+                          style={{
+                            marginTop: '4px',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            background: '#FEE2E2',
+                            border: '1px solid #FCA5A5',
+                            color: '#991B1B',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <Icon name="error" size={18} style={{ color: '#DC2626', flexShrink: 0 }} />
+                          <span>
+                            Số lượng khách vượt quá quy định đặt bàn trực tuyến (tối đa 20 người). Quý khách vui lòng nhập lại hoặc gọi hotline 1900-xxxx để được hỗ trợ tiệc đoàn!
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Cảnh báo lỗi in trực tiếp trên giao diện khi số khách < 1 hoặc để trống */}
+                      {isCustomGuests && (selectedGuests < 1 || customGuestInput === '') && (
+                        <div
+                          id="reservation-guest-error-under"
+                          style={{
+                            marginTop: '4px',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            background: '#FEF3C7',
+                            border: '1px solid #FCD34D',
+                            color: '#92400E',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <Icon name="warning" size={18} style={{ color: '#D97706', flexShrink: 0 }} />
+                          <span>
+                            Vui lòng nhập số lượng khách hợp lệ từ 1 đến 20 khách.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

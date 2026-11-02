@@ -1,6 +1,7 @@
 package com.romsteam.roms.dto.request;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -33,9 +34,10 @@ public class CreateReservationRequest {
     // Email liên hệ (không bắt buộc)
     private String customerEmail;
 
-    // Số lượng khách trong đoàn (tối thiểu 1 khách)
+    // Số lượng khách trong đoàn (tối thiểu 1 khách, tối đa 20 khách trực tuyến theo RULE-RESV-01)
     @NotNull(message = "Vui lòng chỉ định số lượng khách")
     @Min(value = 1, message = "Số lượng khách tối thiểu là 1 người")
+    @Max(value = 20, message = "Số lượng khách đặt trực tuyến tối đa là 20 người. Quý khách vui lòng liên hệ hotline để đặt tiệc đoàn.")
     private Integer guestCount;
 
     // Ngày dùng bữa (Định dạng YYYY-MM-DD, chọn từ Date Picker)
