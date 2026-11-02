@@ -10,17 +10,6 @@ export default function LandingPage() {
   const restaurantProfile = useRestaurantProfile();
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [menuItems, setMenuItems] = useState([]);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && mobileMenuOpen) {
-        setMobileMenuOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mobileMenuOpen]);
 
   // Tải danh mục thực đơn thực tế từ CSDL Backend
   useEffect(() => {
@@ -206,126 +195,6 @@ export default function LandingPage() {
               <Icon name="calendar_month" size={17} />
               <span>Đặt Bàn</span>
             </Link>
-
-            {/* Nút Hamburger Menu trên Mobile */}
-            <button
-              type="button"
-              className="public-header-hamburger"
-              onClick={() => setMobileMenuOpen(prev => !prev)}
-              aria-label="Mở menu điều hướng"
-              title="Mở menu tiện ích"
-            >
-              <Icon name={mobileMenuOpen ? 'close' : 'menu'} size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation Drawer Overlay */}
-        <div
-          className={`public-mobile-drawer-overlay ${mobileMenuOpen ? 'open' : ''}`}
-          onClick={() => setMobileMenuOpen(false)}
-        />
-
-        {/* Mobile Navigation Drawer Panel */}
-        <div className={`public-mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '14px', borderBottom: '1px solid #F0E6E4', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <RomsLogo size={32} />
-                <div>
-                  <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#9D4124', lineHeight: 1.1 }}>
-                    {restaurantProfile.brandName || 'ROMS'}
-                  </div>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase' }}>
-                    Menu Tiện Ích
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #EAE0DE', background: '#FFF8F6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#56423D', cursor: 'pointer' }}
-              >
-                <Icon name="close" size={18} />
-              </button>
-            </div>
-
-            {/* Navigation links inside drawer */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <a
-                href="#about"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', textDecoration: 'none', color: '#56423D', fontWeight: 700, fontSize: '0.88rem' }}
-              >
-                <Icon name="storefront" size={20} style={{ color: '#9D4124' }} />
-                <span>Về Chúng Tôi</span>
-              </a>
-
-              <a
-                href="#menu"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', textDecoration: 'none', color: '#56423D', fontWeight: 700, fontSize: '0.88rem' }}
-              >
-                <Icon name="restaurant_menu" size={20} style={{ color: '#9D4124' }} />
-                <span>Thực Đơn Món Ngon</span>
-              </a>
-
-              <a
-                href="#workflow"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', textDecoration: 'none', color: '#56423D', fontWeight: 700, fontSize: '0.88rem' }}
-              >
-                <Icon name="soup_kitchen" size={20} style={{ color: '#9D4124' }} />
-                <span>Quy Trình Vận Hành</span>
-              </a>
-            </div>
-          </div>
-
-          {/* Bottom Action in Drawer: Nút Đăng nhập Staff và Đặt Bàn */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '16px', borderTop: '1px solid #F0E6E4' }}>
-            <Link
-              to="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px',
-                borderRadius: '12px',
-                background: '#FFF8F6',
-                border: '1.5px solid #FFDBC9',
-                color: '#9D4124',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                textDecoration: 'none'
-              }}
-            >
-              <Icon name="badge" size={20} />
-              <span>Đăng Nhập Ca Trực (Staff)</span>
-            </Link>
-
-            <Link
-              to="/reservation"
-              onClick={() => setMobileMenuOpen(false)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px',
-                borderRadius: '12px',
-                background: '#9D4124',
-                color: '#FFFFFF',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                textDecoration: 'none',
-                boxShadow: '0 4px 14px rgba(157, 65, 36, 0.3)'
-              }}
-            >
-              <Icon name="calendar_month" size={20} />
-              <span>Đặt Bàn Giữ Chỗ Ngay</span>
-            </Link>
           </div>
         </div>
       </header>
@@ -375,7 +244,7 @@ export default function LandingPage() {
               {restaurantProfile.tagline || 'Phục vụ tận tâm • Món ngon chuẩn vị • Vận hành thông minh'} — Trải nghiệm gọi món không chạm QR tại bàn, điều phối trạm Bếp KDS thời gian thực, quản lý sơ đồ bàn trực quan và thanh toán hóa đơn siêu tốc.
             </p>
 
-            <div className="public-hero-cta-group" style={{ paddingTop: '8px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+            <div className="public-hero-cta-group" style={{ paddingTop: '8px' }}>
               <Link
                 to="/reservation"
                 style={{
@@ -396,30 +265,6 @@ export default function LandingPage() {
               >
                 <Icon name="table_restaurant" size={22} />
                 <span>Đặt Bàn Giữ Chỗ Ngay</span>
-              </Link>
-
-              <Link
-                to="/login"
-                className="public-hero-btn-staff"
-                style={{
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '13px 22px',
-                  borderRadius: '9999px',
-                  background: '#FFFFFF',
-                  color: '#9D4124',
-                  border: '1.5px solid #FFDBC9',
-                  fontFamily: "'Epilogue', sans-serif",
-                  fontWeight: 700,
-                  fontSize: '0.92rem',
-                  boxShadow: '0 2px 8px rgba(157, 65, 36, 0.08)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <Icon name="badge" size={20} />
-                <span>Vào Ca Trực (Staff)</span>
               </Link>
             </div>
 
