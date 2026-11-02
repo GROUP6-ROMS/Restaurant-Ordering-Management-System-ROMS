@@ -44,10 +44,23 @@
   color: #9D4124;
 }
 
+.public-header-brand-name {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: #9D4124;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .public-header-container {
     padding: 0 12px;
     height: 60px;
+  }
+
+  .public-header-brand-name {
+    font-size: 1.05rem;
   }
 
   .hide-on-mobile {
