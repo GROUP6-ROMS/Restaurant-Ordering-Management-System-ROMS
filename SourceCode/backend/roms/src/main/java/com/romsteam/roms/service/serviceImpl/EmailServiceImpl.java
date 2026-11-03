@@ -115,7 +115,7 @@ public class EmailServiceImpl implements EmailService {
                   </div>
                 </div>
                 <div class="footer">
-                  © 2026 ROMS Bistro Management System • SWP391 Capstone Project
+                  © 2026 ROMS Bistro • Hệ Thống Quản Lý & Vận Hành Nhà Hàng Thông Minh
                 </div>
               </div>
             </body>

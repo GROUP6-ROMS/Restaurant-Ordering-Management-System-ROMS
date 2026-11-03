@@ -222,7 +222,12 @@ export default function StaffLoginPage() {
     setForgotLoading(true);
     setForgotError(null);
     try {
-      const res = await authApi.resetPinWithOtp(forgotUsername.trim(), otpOrKey.trim(), newPinCode);
+      const res = await authApi.resetPinWithOtp(
+        forgotUsername.trim(),
+        otpOrKey.trim(),
+        newPinCode,
+        confirmPinCode
+      );
       const data = res.data?.data || res.data || {};
       alert(data.message || 'Đặt lại mã PIN thành công! Vui lòng đăng nhập với mã PIN mới.');
       setShowForgotPinModal(false);
@@ -230,7 +235,8 @@ export default function StaffLoginPage() {
       setPin('');
       setShowPinModal(true);
     } catch (err) {
-      setForgotError(err.response?.data?.message || 'Mã OTP hoặc Master Key không hợp lệ. Vui lòng thử lại!');
+      const errorMsg = err.response?.data?.message || (err.response ? 'Mã OTP xác thực không chính xác hoặc đã hết hạn!' : err.message);
+      setForgotError(errorMsg);
     } finally {
       setForgotLoading(false);
     }
