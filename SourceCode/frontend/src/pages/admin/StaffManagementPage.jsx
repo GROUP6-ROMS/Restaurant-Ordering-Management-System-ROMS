@@ -1111,16 +1111,9 @@ export default function StaffManagementPage() {
         </div>
       )}
 
-      {/* Header Title Area & Breadcrumb */}
+      {/* Header Title Area */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#89726B', marginBottom: '4px' }}>
-            <span>ROMS Suite</span>
-            <Icon name="chevron_right" size={14} />
-            <span>Vận Hành FOH & BOH</span>
-            <Icon name="chevron_right" size={14} />
-            <span style={{ color: '#9D4124', fontWeight: 700 }}>Nhân Sự & Phân Ca</span>
-          </div>
           <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.9rem', color: '#1F1B1A', margin: 0 }}>
             Quản Lý Nhân Sự & Vận Hành Đội Ngũ
           </h1>
