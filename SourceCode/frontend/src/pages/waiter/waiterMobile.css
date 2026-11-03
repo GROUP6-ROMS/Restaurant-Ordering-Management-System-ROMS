@@ -10,6 +10,7 @@
   scrollbar-width: none;
   padding-bottom: 4px;
 }
+
 .waiter-filter-scroll-container::-webkit-scrollbar {
   display: none;
 }
@@ -32,14 +33,23 @@
 
 @media (max-width: 768px) {
   .waiter-floor-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    /* minmax(0, 1fr) đảm bảo 2 cột chia đôi 50/50 chuẩn xác, không bị đẩy tràn mép */
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 10px !important;
+    grid-auto-rows: 1fr !important;
+    /* Khóa các bàn trong cùng 1 hàng có chiều cao bằng nhau */
   }
 
   .waiter-card-table {
-    padding: 10px !important;
-    border-radius: 14px !important;
-    min-height: 140px !important;
+    padding: 10px 12px !important;
+    border-radius: 16px !important;
+    min-height: 165px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
   }
 
   .waiter-card-btn-action {
