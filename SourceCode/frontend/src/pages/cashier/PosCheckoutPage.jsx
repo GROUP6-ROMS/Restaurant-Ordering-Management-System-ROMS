@@ -2881,7 +2881,10 @@ export default function PosCheckoutPage() {
                   {restaurantProfile.name}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#56423D' }}>{restaurantProfile.address}</div>
-                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>Hotline: {restaurantProfile.phone} • MST: {restaurantProfile.taxCode}</div>
+                <div style={{ fontSize: '0.78rem', color: '#56423D' }}>
+                  {restaurantProfile.phone && `Hotline: ${restaurantProfile.phone}`}
+                  {restaurantProfile.taxCode ? ` • MST: ${restaurantProfile.taxCode}` : ''}
+                </div>
                 <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', marginTop: '8px' }}>
                   {receiptData.isDraft ? 'PHIẾU TẠM TÍNH TIỀN' : (receiptData.isReprint ? 'HÓA ĐƠN THANH TOÁN (IN LẠI)' : 'HÓA ĐƠN THANH TOÁN')}
                 </div>

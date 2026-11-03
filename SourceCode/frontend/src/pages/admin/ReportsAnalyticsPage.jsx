@@ -604,7 +604,7 @@ export default function ReportsAnalyticsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #9D4124', paddingBottom: '12px', marginBottom: '20px' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '18pt', fontWeight: 900, color: '#9D4124' }}>{restaurantProfile.name}</h2>
-            <div style={{ fontSize: '10pt', color: '#56423D', marginTop: '4px' }}>{restaurantProfile.address} | MST: {restaurantProfile.taxCode} | Hotline: {restaurantProfile.phone}</div>
+            <div style={{ fontSize: '10pt', color: '#56423D', marginTop: '4px' }}>{restaurantProfile.address}{restaurantProfile.taxCode ? ` | MST: ${restaurantProfile.taxCode}` : ''}{restaurantProfile.phone ? ` | Hotline: ${restaurantProfile.phone}` : ''}</div>
           </div>
           <div style={{ textAlign: 'right', fontSize: '10pt' }}>
             <div><b>BÁO CÁO TÀI CHÍNH & VẬN HÀNH</b></div>

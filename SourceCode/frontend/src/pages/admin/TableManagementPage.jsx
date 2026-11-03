@@ -7495,7 +7495,10 @@ export default function TableManagementPage() {
                       {restaurantProfile.name}
                     </div>
                     <div style={{ fontSize: '0.76rem', color: '#56423D' }}>{restaurantProfile.address}</div>
-                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>Hotline: {restaurantProfile.phone} • MST: {restaurantProfile.taxCode}</div>
+                    <div style={{ fontSize: '0.76rem', color: '#56423D' }}>
+                      {restaurantProfile.phone && `Hotline: ${restaurantProfile.phone}`}
+                      {restaurantProfile.taxCode ? ` • MST: ${restaurantProfile.taxCode}` : ''}
+                    </div>
                     <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.15rem', color: '#1F1B1A', marginTop: '10px' }}>
                       PHIẾU TẠM TÍNH TIỀN
                     </div>

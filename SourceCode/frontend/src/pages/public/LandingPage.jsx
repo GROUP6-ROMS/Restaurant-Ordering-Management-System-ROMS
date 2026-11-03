@@ -743,10 +743,12 @@ export default function LandingPage() {
                 <Icon name="call" size={18} style={{ color: '#9D4124', flexShrink: 0 }} />
                 <span>Hotline: <strong>{restaurantProfile.phone || '0901.234.567'}</strong></span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Icon name="receipt_long" size={18} style={{ color: '#9D4124', flexShrink: 0 }} />
-                <span>Mã số thuế: <strong>{restaurantProfile.taxCode || '0318999999'}</strong></span>
-              </div>
+              {restaurantProfile.taxCode && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icon name="receipt_long" size={18} style={{ color: '#9D4124', flexShrink: 0 }} />
+                  <span>Mã số thuế: <strong>{restaurantProfile.taxCode}</strong></span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -15,6 +15,8 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activePresetId, setActivePresetId] = useState(null);
+  const [hasManualChanges, setHasManualChanges] = useState(false);
+  const [manualBackup, setManualBackup] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -22,17 +24,59 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
       setSavedSuccess(false);
       setIsSubmitting(false);
       setActivePresetId(null);
+      setHasManualChanges(false);
+      setManualBackup(null);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleApplyPreset = (preset) => {
+  const handleFieldChange = (field, value) => {
+    setProfile(prev => ({ ...prev, [field]: value }));
+    setHasManualChanges(true);
+  };
+
+  const handleApplyPreset = async (preset) => {
+    // 1. Nếu người dùng đang có thông tin nhập tay: Hỏi xác nhận tránh mất dữ liệu
+    if (hasManualChanges) {
+      const confirmed = await showConfirm({
+        title: 'Áp dụng mẫu quán gợi ý',
+        message: `Bạn đang có thông tin nhập thủ công. Việc áp dụng mẫu "${preset.title}" sẽ thay thế các thông tin này (ngoại trừ cấu hình WiFi của bạn). Bạn có muốn tiếp tục không?`,
+        confirmText: 'Áp dụng mẫu',
+        cancelText: 'Giữ thông tin cũ',
+        type: 'warning'
+      });
+      if (!confirmed) return;
+    }
+
+    // 2. Tự động lưu bản nháp thủ công để có thể Hoàn tác (Undo) bất cứ lúc nào
+    setManualBackup({ ...profile });
     setActivePresetId(preset.id);
+
+    // 3. Áp dụng template nhưng TUYỆT ĐỐI BẢO LƯU wifiName và wifiPassword thủ công của quán
     setProfile(prev => ({
       ...prev,
-      ...preset.data
+      name: preset.data.name,
+      brandName: preset.data.brandName,
+      tagline: preset.data.tagline,
+      address: preset.data.address,
+      phone: preset.data.phone,
+      footerMessage: preset.data.footerMessage,
+      logoUrl: preset.data.logoUrl || prev.logoUrl || '',
+      // Giữ nguyên 100% cấu hình WiFi thực tế của quán:
+      wifiName: prev.wifiName,
+      wifiPassword: prev.wifiPassword
     }));
+    setHasManualChanges(false);
+  };
+
+  const handleUndoManual = () => {
+    if (manualBackup) {
+      setProfile({ ...manualBackup });
+      setActivePresetId(null);
+      setManualBackup(null);
+      setHasManualChanges(true);
+    }
   };
 
   const handleSave = async (e) => {
@@ -71,6 +115,8 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
     if (confirmed) {
       setProfile(DEFAULT_PROFILE);
       setActivePresetId(null);
+      setHasManualChanges(false);
+      setManualBackup(null);
     }
   };
 
@@ -157,11 +203,37 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
           
           {/* Quick 1-click Presets */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Icon name="auto_awesome" size={18} style={{ color: '#9D4124' }} />
-                Chọn Mẫu Quán Nhanh (1-Click Presets):
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Icon name="auto_awesome" size={18} style={{ color: '#9D4124' }} />
+                  Chọn Mẫu Quán Nhanh (1-Click Presets):
+                </span>
+                {manualBackup && (
+                  <button
+                    type="button"
+                    onClick={handleUndoManual}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: '#FFF3E0',
+                      border: '1px solid #FFE0B2',
+                      color: '#E65100',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Khôi phục lại thông tin bạn đã nhập trước khi chọn mẫu"
+                  >
+                    <Icon name="undo" size={14} />
+                    ↩ Khôi phục thông tin bạn đã nhập
+                  </button>
+                )}
+              </div>
               <span style={{ fontSize: '0.75rem', color: '#89726B' }}>Chọn mẫu để áp dụng thông tin gợi ý tức thì</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
@@ -206,7 +278,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
                 type="text"
                 required
                 value={profile.name || ''}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
                 placeholder="VD: QUÁN ĂN GIA ĐÌNH BÌNH DÂN ROMS"
                 style={{
                   width: '100%',
@@ -229,7 +301,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
               <input
                 type="text"
                 value={profile.brandName || ''}
-                onChange={(e) => setProfile({ ...profile, brandName: e.target.value })}
+                onChange={(e) => handleFieldChange('brandName', e.target.value)}
                 placeholder="VD: ROMS Dining"
                 style={{
                   width: '100%',
@@ -251,7 +323,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
               <input
                 type="text"
                 value={profile.phone || ''}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                onChange={(e) => handleFieldChange('phone', e.target.value)}
                 placeholder="VD: 0901.234.567"
                 style={{
                   width: '100%',
@@ -273,7 +345,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
               <input
                 type="text"
                 value={profile.address || ''}
-                onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                onChange={(e) => handleFieldChange('address', e.target.value)}
                 placeholder="VD: 123 Đường Ẩm Thực, Quận 1, TP. Hồ Chí Minh"
                 style={{
                   width: '100%',
@@ -287,37 +359,15 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
               />
             </div>
 
-            {/* Mã số thuế */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1F1B1A', marginBottom: '6px' }}>
-                Mã số thuế (MST)
-              </label>
-              <input
-                type="text"
-                value={profile.taxCode || ''}
-                onChange={(e) => setProfile({ ...profile, taxCode: e.target.value })}
-                placeholder="VD: 0318999999"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  border: '1.5px solid #EAE0DE',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            {/* Lời chúc chân hóa đơn */}
-            <div>
+            {/* Lời chúc chân hóa đơn (Toàn hàng) */}
+            <div style={{ gridColumn: 'span 2' }}>
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1F1B1A', marginBottom: '6px' }}>
                 Lời chúc chân hóa đơn (Footer message)
               </label>
               <input
                 type="text"
                 value={profile.footerMessage || ''}
-                onChange={(e) => setProfile({ ...profile, footerMessage: e.target.value })}
+                onChange={(e) => handleFieldChange('footerMessage', e.target.value)}
                 placeholder="VD: Cảm ơn Quý khách & Hẹn gặp lại!"
                 style={{
                   width: '100%',
@@ -339,7 +389,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
               <input
                 type="url"
                 value={profile.logoUrl || ''}
-                onChange={(e) => setProfile({ ...profile, logoUrl: e.target.value })}
+                onChange={(e) => handleFieldChange('logoUrl', e.target.value)}
                 placeholder="VD: https://domain.com/logo.png (Để trống sẽ sử dụng Logo ROMS mặc định)"
                 style={{
                   width: '100%',
@@ -354,7 +404,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* Thông Tin Mạng WiFi Quán (Hiển thị tại màn hình gọi món & QR bàn ăn) */}
+          {/* Thông Tin Mạng WiFi Quán (Cố định thủ công - Không thay đổi theo template) */}
           <div style={{
             background: '#F7F9F6',
             border: '1px solid #D8E2D1',
@@ -362,10 +412,25 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
             padding: '16px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <Icon name="wifi" size={20} style={{ color: '#596232' }} />
                 <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1F1B1A' }}>
                   Mạng WiFi Quán Cho Khách Ăn Tại Bàn (Guest WiFi)
+                </span>
+                <span style={{
+                  fontSize: '0.72rem',
+                  color: '#2E7D32',
+                  background: '#E8F5E9',
+                  border: '1px solid #C8E6C9',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <Icon name="lock" size={13} />
+                  Cố định thủ công • Không đổi theo mẫu
                 </span>
               </div>
               <span style={{ fontSize: '0.74rem', color: '#596232', fontWeight: 600 }}>
@@ -380,7 +445,7 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
                 <input
                   type="text"
                   value={profile.wifiName || ''}
-                  onChange={(e) => setProfile({ ...profile, wifiName: e.target.value })}
+                  onChange={(e) => handleFieldChange('wifiName', e.target.value)}
                   placeholder="VD: ROMS-GUEST, PHO-ROMS-FREE"
                   style={{
                     width: '100%',
@@ -399,82 +464,8 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
                 <input
                   type="text"
                   value={profile.wifiPassword || ''}
-                  onChange={(e) => setProfile({ ...profile, wifiPassword: e.target.value })}
+                  onChange={(e) => handleFieldChange('wifiPassword', e.target.value)}
                   placeholder="VD: roms-welcome, anngonmoingay"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid #CCC',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Ngân hàng & VietQR Chuyển khoản */}
-          <div style={{
-            background: '#FAF7F5',
-            border: '1px solid #EAE0DE',
-            borderRadius: '16px',
-            padding: '16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Icon name="qr_code_2" size={20} style={{ color: '#9D4124' }} />
-              <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1F1B1A' }}>
-                Tài Khoản Ngân Hàng Thụ Hưởng (Phục vụ sinh VietQR POS)
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '4px' }}>
-                  Ngân hàng thụ hưởng
-                </label>
-                <input
-                  type="text"
-                  value={profile.bankName || ''}
-                  onChange={(e) => setProfile({ ...profile, bankName: e.target.value })}
-                  placeholder="VD: MB, VCB, ACB"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid #CCC',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '4px' }}>
-                  Số tài khoản nhận tiền
-                </label>
-                <input
-                  type="text"
-                  value={profile.bankAccountNumber || ''}
-                  onChange={(e) => setProfile({ ...profile, bankAccountNumber: e.target.value })}
-                  placeholder="VD: 090123456789"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid #CCC',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '4px' }}>
-                  Tên thụ hưởng VietQR
-                </label>
-                <input
-                  type="text"
-                  value={profile.bankAccountName || ''}
-                  onChange={(e) => setProfile({ ...profile, bankAccountName: e.target.value })}
-                  placeholder="VD: NHA HANG ROMS"
                   style={{
                     width: '100%',
                     padding: '8px 12px',

@@ -15,7 +15,7 @@ export const DEFAULT_PROFILE = {
   tagline: 'Phục vụ tận tâm • Món ngon chuẩn vị • Vận hành thông minh',
   address: 'Số 123 Đường Ẩm Thực, Quận 1, TP. Hồ Chí Minh',
   phone: '0901.234.567',
-  taxCode: '0318999999',
+  taxCode: '',
   wifiName: 'ROMS-GUEST',
   wifiPassword: 'roms-welcome',
   footerMessage: 'Cảm ơn Quý khách & Hẹn gặp lại!',
@@ -38,15 +38,8 @@ export const RESTAURANT_PRESETS = [
       tagline: 'Ngon chuẩn vị truyền thống • Giá cả bình dân • Đậm đà bản sắc',
       address: '45 Đường Nguyễn Tri Phương, Quận 5, TP. Hồ Chí Minh',
       phone: '0903.111.222',
-      taxCode: '0315888999',
-      wifiName: 'PHO-ROMS-FREE',
-      wifiPassword: 'anngonmoingay',
       footerMessage: 'Kính chúc Quý khách ngon miệng và tràn đầy năng lượng!',
       logoUrl: '',
-      bankAccountName: 'NGO VIET BAO HUY',
-      bankName: 'MBBank',
-      bankAccountNumber: '0905982428',
-      bankBin: '970422',
     }
   },
   {
@@ -60,15 +53,8 @@ export const RESTAURANT_PRESETS = [
       tagline: 'Lẩu đậm đà • Nướng thơm lừng • Bàn tiệc rôm rả',
       address: '88 Đường Phan Xích Long, Phú Nhuận, TP. Hồ Chí Minh',
       phone: '0908.333.444',
-      taxCode: '0316777888',
-      wifiName: 'ROMS-BBQ-5G',
-      wifiPassword: 'launuongthomngon',
       footerMessage: 'Cảm ơn Quý khách đã quây quần cùng ROMS BBQ!',
       logoUrl: '',
-      bankAccountName: 'NGO VIET BAO HUY',
-      bankName: 'MBBank',
-      bankAccountNumber: '0905982428',
-      bankBin: '970422',
     }
   },
   {
@@ -82,15 +68,8 @@ export const RESTAURANT_PRESETS = [
       tagline: 'Cà phê nguyên chất • Trà trái cây tươi mát • Không gian thư giãn',
       address: '12 Đường Lê Lợi, Bến Nghé, Quận 1, TP. Hồ Chí Minh',
       phone: '0909.555.666',
-      taxCode: '0317666555',
-      wifiName: 'ROMS-Coffee-FreeWifi',
-      wifiPassword: 'coffeeandtea',
       footerMessage: 'Chúc Quý khách một ngày tuyệt vời & Hẹn gặp lại!',
       logoUrl: '',
-      bankAccountName: 'NGO VIET BAO HUY',
-      bankName: 'MBBank',
-      bankAccountNumber: '0905982428',
-      bankBin: '970422',
     }
   },
   {
@@ -104,15 +83,8 @@ export const RESTAURANT_PRESETS = [
       tagline: 'Tinh hoa ẩm thực phong phú • Không gian ấm cúng & chuyên nghiệp',
       address: 'Số 123 Đường Ẩm Thực, Quận 1, TP. Hồ Chí Minh',
       phone: '0901.234.567',
-      taxCode: '0318999999',
-      wifiName: 'ROMS-GUEST',
-      wifiPassword: 'roms-welcome',
       footerMessage: 'Cảm ơn Quý khách & Hẹn gặp lại!',
       logoUrl: '',
-      bankAccountName: 'NGO VIET BAO HUY',
-      bankName: 'MBBank',
-      bankAccountNumber: '0905982428',
-      bankBin: '970422',
     }
   }
 ];
