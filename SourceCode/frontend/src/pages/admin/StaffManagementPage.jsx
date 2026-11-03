@@ -1125,21 +1125,6 @@ export default function StaffManagementPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: '#FFFFFF',
-            border: '1px solid #EAE0DE',
-            padding: '8px 14px',
-            borderRadius: '10px',
-            fontSize: '0.8rem',
-            color: '#56423D'
-          }}>
-            <Icon name="cloud_done" size={18} style={{ color: '#596232' }} />
-            <span>Đồng bộ POS/KDS: <strong>Tức thì</strong></span>
-          </div>
-
           <button
             type="button"
             onClick={() => setShowAddStaffModal(true)}
