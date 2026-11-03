@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.CacheManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -41,6 +42,8 @@ public class CashierServiceImpl implements CashierService {
     private final StaffRepository staffRepository;
     private final ZoneRepository zoneRepository;
     private final PasswordEncoder passwordEncoder;
+    private final MenuItemRepository menuItemRepository;
+    private final CacheManager cacheManager;
     private final com.romsteam.roms.service.RealtimeService realtimeService;
 
     @Override
@@ -271,6 +274,11 @@ public class CashierServiceImpl implements CashierService {
 
         PaymentMethod pm = PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
 
+        // Nếu thanh toán bằng tiền mặt (CASH), làm tròn đến hàng 1.000đ theo chuẩn tiền mặt VNĐ
+        if (PaymentMethod.CASH.equals(pm)) {
+            finalAmount = finalAmount.divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(1000));
+        }
+
         // Nghiệp vụ QA 4: Kiểm tra tiền khách đưa khi thanh toán tiền mặt (CASH)
         if (PaymentMethod.CASH.equals(pm)) {
             if (request.getCashGiven() == null || request.getCashGiven().compareTo(finalAmount) < 0) {
@@ -312,13 +320,11 @@ public class CashierServiceImpl implements CashierService {
         table.setStatus(TableStatus.DIRTY);
         tableRepository.save(table);
 
-        // 4. Đóng tất cả ServiceRequest loại BILL của bàn này
-        List<ServiceRequest> billRequests = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(table.getId(), "PENDING");
-        for (ServiceRequest req : billRequests) {
-            if ("BILL".equalsIgnoreCase(req.getRequestType())) {
-                req.setStatus("RESOLVED");
-                requestRepository.save(req);
-            }
+        // 4. Đóng dứt điểm tất cả ServiceRequest còn PENDING của bàn này khi khách đã thanh toán
+        List<ServiceRequest> pendingRequests = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(table.getId(), "PENDING");
+        for (ServiceRequest req : pendingRequests) {
+            req.setStatus("RESOLVED");
+            requestRepository.save(req);
         }
 
         try {
@@ -482,6 +488,9 @@ public class CashierServiceImpl implements CashierService {
         item.setStatus(OrderItemStatus.CANCELLED);
         item.setNote(request.getReason() != null ? auditNote + " " + request.getReason() : auditNote);
         orderItemRepository.save(item);
+
+        // Hoàn lại số lượng tồn kho cho món ăn bị hủy (Stock Restitution)
+        restoreItemStock(item);
 
         Order order = item.getOrder();
         if (order != null && order.getItems() != null) {
@@ -816,5 +825,19 @@ private Staff validateManagerPin(String pin) {
                     case "VIP" -> "Phòng VIP";
                     default -> zoneCode;
                 });
+    }
+
+    private void restoreItemStock(OrderItem item) {
+        if (item != null && item.getMenuItem() != null && item.getQuantity() != null && item.getQuantity() > 0) {
+            MenuItem menuItem = item.getMenuItem();
+            menuItem.increaseStock(item.getQuantity());
+            menuItemRepository.save(menuItem);
+            try {
+                realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), menuItem.getIsAvailable(), menuItem.getRemainingStock());
+            } catch (Exception ignored) {}
+            if (cacheManager != null && cacheManager.getCache("customerMenu") != null) {
+                cacheManager.getCache("customerMenu").clear();
+            }
+        }
     }
 }

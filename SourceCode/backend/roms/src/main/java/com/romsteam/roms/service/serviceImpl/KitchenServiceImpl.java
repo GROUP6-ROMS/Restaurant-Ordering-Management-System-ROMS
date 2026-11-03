@@ -11,6 +11,9 @@ import com.romsteam.roms.entity.enums.SessionStatus;
 import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.exception.ResourceNotFoundException;
 import com.romsteam.roms.repository.OrderItemRepository;
+import com.romsteam.roms.repository.MenuItemRepository;
+import com.romsteam.roms.entity.MenuItem;
+import org.springframework.cache.CacheManager;
 import com.romsteam.roms.repository.OrderRepository;
 import com.romsteam.roms.repository.ZoneRepository;
 import com.romsteam.roms.service.KitchenService;
@@ -35,6 +38,8 @@ public class KitchenServiceImpl implements KitchenService {
     private final OrderItemRepository orderItemRepository;
     private final ZoneRepository zoneRepository;
     private final RealtimeService realtimeService;
+    private final MenuItemRepository menuItemRepository;
+    private final CacheManager cacheManager;
 
     @Override
     @Transactional(readOnly = true)
@@ -72,8 +77,12 @@ public class KitchenServiceImpl implements KitchenService {
 
         try {
             OrderItemStatus newStatus = OrderItemStatus.valueOf(request.getStatus().toUpperCase());
+            OrderItemStatus oldStatus = item.getStatus();
             item.setStatus(newStatus);
             orderItemRepository.save(item);
+            if (newStatus == OrderItemStatus.CANCELLED && oldStatus != OrderItemStatus.CANCELLED) {
+                restoreItemStock(item);
+            }
 
             Order order = item.getOrder();
             if (order != null && order.getItems() != null) {
@@ -143,6 +152,7 @@ public class KitchenServiceImpl implements KitchenService {
                             item.setStatus(OrderItemStatus.SERVED);
                         } else if (newStatus == OrderStatus.CANCELLED) {
                             item.setStatus(OrderItemStatus.CANCELLED);
+                            restoreItemStock(item);
                         }
                     }
                 }
@@ -315,5 +325,19 @@ public class KitchenServiceImpl implements KitchenService {
                     case "VIP" -> "Phòng VIP";
                     default -> zoneCode;
                 });
+    }
+
+    private void restoreItemStock(OrderItem item) {
+        if (item != null && item.getMenuItem() != null && item.getQuantity() != null && item.getQuantity() > 0) {
+            MenuItem menuItem = item.getMenuItem();
+            menuItem.increaseStock(item.getQuantity());
+            menuItemRepository.save(menuItem);
+            try {
+                realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), menuItem.getIsAvailable(), menuItem.getRemainingStock());
+            } catch (Exception ignored) {}
+            if (cacheManager != null && cacheManager.getCache("customerMenu") != null) {
+                cacheManager.getCache("customerMenu").clear();
+            }
+        }
     }
 }

@@ -207,6 +207,15 @@ public class WaiterServiceImpl implements WaiterService {
             sessionRepository.save(session);
         }
 
+        // Đóng dứt điểm tất cả yêu cầu chuông PENDING của bàn để khách mới vào có bàn sạch hoàn toàn
+        List<ServiceRequest> pendingCleaningRequests = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(tableId, "PENDING");
+        if (pendingCleaningRequests != null) {
+            for (ServiceRequest req : pendingCleaningRequests) {
+                req.setStatus("RESOLVED");
+                requestRepository.save(req);
+            }
+        }
+
         try {
             realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), TableStatus.AVAILABLE.name(), "Đã dọn sạch bàn");
         } catch (Exception e) {
