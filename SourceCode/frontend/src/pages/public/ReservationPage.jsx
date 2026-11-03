@@ -37,6 +37,24 @@ const formatShortDate = (dateStr) => {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
+// Helper kiểm tra một khung giờ có thuộc về quá khứ theo thời gian thực hay không
+const isTimeSlotInPast = (timeStr, dateStr) => {
+  if (!timeStr || !dateStr) return false;
+  const today = getLocalDateString(0);
+  if (dateStr < today) return true;
+  if (dateStr > today) return false;
+
+  // Trường hợp ngày là hôm nay: so sánh giờ và phút theo thời gian thực
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return false;
+  const slotMinutes = Number(parts[0]) * 60 + Number(parts[1]);
+
+  return slotMinutes <= currentMinutes;
+};
+
 export default function ReservationPage() {
   const { showAlert } = useDialog();
   // Lấy ngày hôm nay, ngày mai, ngày kia theo giờ địa phương (YYYY-MM-DD)
@@ -53,9 +71,28 @@ export default function ReservationPage() {
 
   // 3. Khung giờ: Giờ đại diện + chế độ nhập giờ khác
   const representativeTimes = ['11:30', '12:00', '18:00', '19:00', '20:00'];
-  const [selectedTime, setSelectedTime] = useState('19:00');
-  const [isCustomTime, setIsCustomTime] = useState(false);
-  const [customTimeInput, setCustomTimeInput] = useState('19:30');
+  const [selectedTime, setSelectedTime] = useState(() => {
+    const today = getLocalDateString(0);
+    for (const t of representativeTimes) {
+      if (!isTimeSlotInPast(t, today)) return t;
+    }
+    const now = new Date();
+    const nextH = Math.min(22, now.getHours() + 1);
+    return `${String(nextH).padStart(2, '0')}:00`;
+  });
+  const [isCustomTime, setIsCustomTime] = useState(() => {
+    const today = getLocalDateString(0);
+    return representativeTimes.every(t => isTimeSlotInPast(t, today));
+  });
+  const [customTimeInput, setCustomTimeInput] = useState(() => {
+    const today = getLocalDateString(0);
+    for (const t of representativeTimes) {
+      if (!isTimeSlotInPast(t, today)) return t;
+    }
+    const now = new Date();
+    const nextH = Math.min(22, now.getHours() + 1);
+    return `${String(nextH).padStart(2, '0')}:00`;
+  });
 
   // 4. Số lượng khách: Số đại diện + chế độ nhập số khác
   const representativeGuests = [2, 4, 6, 8, 10];
@@ -156,6 +193,24 @@ export default function ReservationPage() {
     fetchMenu();
   }, []);
 
+  // Tự động điều chỉnh khung giờ hợp lệ khi ngày dùng bữa thay đổi
+  useEffect(() => {
+    if (isTimeSlotInPast(selectedTime, selectedDate)) {
+      const validPreset = representativeTimes.find(t => !isTimeSlotInPast(t, selectedDate));
+      if (validPreset) {
+        setSelectedTime(validPreset);
+        setIsCustomTime(false);
+      } else {
+        setIsCustomTime(true);
+        const now = new Date();
+        const nextH = Math.min(22, now.getHours() + 1);
+        const fallbackTime = `${String(nextH).padStart(2, '0')}:00`;
+        setCustomTimeInput(fallbackTime);
+        setSelectedTime(fallbackTime);
+      }
+    }
+  }, [selectedDate]);
+
   // Xử lý chọn ngày đặt bàn (Preset hoặc Custom)
   const handleSelectPresetDate = (date) => {
     setIsCustomDate(false);
@@ -169,6 +224,14 @@ export default function ReservationPage() {
 
   // Xử lý chọn khung giờ
   const handleSelectPresetTime = (time) => {
+    if (isTimeSlotInPast(time, selectedDate)) {
+      showAlert({
+        title: 'Khung giờ không khả dụng',
+        message: 'Khung giờ này đã trôi qua trong ngày hôm nay. Quý khách vui lòng chọn khung giờ trong tương lai!',
+        type: 'warning'
+      });
+      return;
+    }
     setIsCustomTime(false);
     setSelectedTime(time);
   };
@@ -248,6 +311,14 @@ export default function ReservationPage() {
         });
         return;
       }
+      if (isTimeSlotInPast(selectedTime, selectedDate)) {
+        showAlert({
+          title: 'Khung giờ không hợp lệ',
+          message: 'Khung giờ dùng bữa đã chọn đã trôi qua so với thời gian thực. Quý khách vui lòng chọn một khung giờ trong tương lai!',
+          type: 'warning'
+        });
+        return;
+      }
       if (!selectedGuests || selectedGuests < 1) {
         showAlert({
           title: 'Số lượng khách không hợp lệ',
@@ -270,6 +341,14 @@ export default function ReservationPage() {
     } else if (currentStep === 3) {
       setCurrentStep(4);
     } else if (currentStep === 4) {
+      if (isTimeSlotInPast(selectedTime, selectedDate)) {
+        showAlert({
+          title: 'Khung giờ không hợp lệ',
+          message: 'Khung giờ dùng bữa đã chọn đã trôi qua so với thời gian thực. Quý khách vui lòng chọn lại ngày hoặc giờ dùng bữa!',
+          type: 'warning'
+        });
+        return;
+      }
       // Xác thực số lượng khách (1-20 khách theo RULE-RESV-01)
       if (!selectedGuests || selectedGuests < 1 || selectedGuests > 20) {
         showAlert({
@@ -586,22 +665,27 @@ export default function ReservationPage() {
                   {/* Danh sách nút giờ đại diện (tự động wrap theo cột responsive) */}
                   <div className="mobile-time-grid" style={{ marginBottom: '12px' }}>
                     {representativeTimes.map(t => {
+                      const isPast = isTimeSlotInPast(t, selectedDate);
                       const isSel = !isCustomTime && selectedTime === t;
                       return (
                         <button
                           key={t}
                           type="button"
+                          disabled={isPast}
                           onClick={() => handleSelectPresetTime(t)}
+                          title={isPast ? 'Khung giờ này đã trôi qua trong ngày hôm nay' : ''}
                           style={{
                             padding: '12px 6px',
                             borderRadius: '12px',
-                            border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
-                            background: isSel ? '#9D4124' : '#FFF8F6',
-                            color: isSel ? '#FFFFFF' : '#1F1B1A',
+                            border: isSel ? '2px solid #9D4124' : (isPast ? '1px solid #E5E0DF' : '1px solid #EAE0DE'),
+                            background: isSel ? '#9D4124' : (isPast ? '#F5EFEB' : '#FFF8F6'),
+                            color: isSel ? '#FFFFFF' : (isPast ? '#A39996' : '#1F1B1A'),
                             fontFamily: "'Epilogue', sans-serif",
                             fontWeight: 800,
                             fontSize: '0.92rem',
-                            cursor: 'pointer',
+                            cursor: isPast ? 'not-allowed' : 'pointer',
+                            opacity: isPast ? 0.38 : 1,
+                            textDecoration: isPast ? 'line-through' : 'none',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -633,31 +717,48 @@ export default function ReservationPage() {
                     </button>
                   </div>
 
+                  {/* Thông báo nếu tất cả khung giờ đại diện hôm nay đều đã trôi qua */}
+                  {selectedDate === todayStr && representativeTimes.every(t => isTimeSlotInPast(t, selectedDate)) && (
+                    <div style={{ fontSize: '0.78rem', color: '#B3261E', background: '#FCEEEE', padding: '8px 12px', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Icon name="info" size={16} style={{ color: '#B3261E', flexShrink: 0 }} />
+                      <span>Các khung giờ đặt bàn đại diện trong ngày hôm nay đều đã qua. Quý khách vui lòng chọn <strong>"Giờ khác"</strong> hoặc chọn ngày tiếp theo!</span>
+                    </div>
+                  )}
+
                   {/* Ô nhập giờ tùy ý (nếu chọn Giờ khác) */}
                   {isCustomTime && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
-                        Nhập giờ mong muốn của bạn:
-                      </span>
-                      <input
-                        type="time"
-                        value={customTimeInput}
-                        onChange={handleApplyCustomTime}
-                        className="touch-input"
-                        style={{
-                          padding: '8px 14px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #9D4124',
-                          fontSize: '1rem',
-                          fontWeight: 800,
-                          color: '#9D4124',
-                          background: '#FFFFFF',
-                          outline: 'none'
-                        }}
-                      />
-                      <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
-                        (Nhà hàng mở cửa phục vụ từ 10:00 đến 22:30 mỗi ngày)
-                      </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#FFF8F6', padding: '12px 16px', borderRadius: '14px', border: '1px solid #FFDBC9' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#56423D' }}>
+                          Nhập giờ mong muốn của bạn:
+                        </span>
+                        <input
+                          type="time"
+                          value={customTimeInput}
+                          min={selectedDate === todayStr ? `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}` : undefined}
+                          onChange={handleApplyCustomTime}
+                          className="touch-input"
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            border: isTimeSlotInPast(customTimeInput, selectedDate) ? '1.5px solid #B3261E' : '1.5px solid #9D4124',
+                            fontSize: '1rem',
+                            fontWeight: 800,
+                            color: isTimeSlotInPast(customTimeInput, selectedDate) ? '#B3261E' : '#9D4124',
+                            background: '#FFFFFF',
+                            outline: 'none'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                          (Nhà hàng mở cửa phục vụ từ 10:00 đến 22:30 mỗi ngày)
+                        </span>
+                      </div>
+                      {isTimeSlotInPast(customTimeInput, selectedDate) && (
+                        <div style={{ fontSize: '0.76rem', color: '#B3261E', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Icon name="warning" size={14} style={{ color: '#B3261E' }} />
+                          <span>Giờ đã chọn đã trôi qua so với thời gian thực. Quý khách vui lòng chọn khung giờ trong tương lai!</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
