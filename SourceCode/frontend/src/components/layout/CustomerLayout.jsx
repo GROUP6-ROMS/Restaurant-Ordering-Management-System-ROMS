@@ -113,7 +113,7 @@ export default function CustomerLayout() {
                 fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
                 letterSpacing: '0.03em',
               }}>
-                {tableInfo?.tableNumber || 'BÀN T05'} • {tableInfo?.guestCount || 4} Khách
+                {tableInfo?.tableNumber ? `${tableInfo.tableNumber} • ${tableInfo.guestCount || 4} Khách` : 'ROMS Dining'}
               </span>
             </div>
           </div>
