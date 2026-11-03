@@ -21,11 +21,8 @@ export default function ReportsAnalyticsPage() {
   const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // State chuyển đổi giữa 4 góc nhìn báo cáo: REVENUE, DISHES, OPERATIONS, AUDIT
+  // State chuyển đổi giữa 3 góc nhìn báo cáo: REVENUE, OPERATIONS, AUDIT
   const [reportType, setReportType] = useState('REVENUE');
-
-  // Filter cho Ma trận BCG Menu Engineering (ALL, STAR, PLOWHORSE, PUZZLE, DOG)
-  const [bcgFilter, setBcgFilter] = useState('ALL');
 
   // State lưu dữ liệu báo cáo trả về từ Backend API
   const [reportData, setReportData] = useState(null);
@@ -166,20 +163,7 @@ export default function ReportsAnalyticsPage() {
     </tr>`).join('')}
   </table>
 
-  <table>
-    <tr><th colspan="7" class="sec-title">3. MA TRẬN MENU ENGINEERING (BCG MATRIX)</th></tr>
-    <tr><th class="th-accent">Tên Món Ăn</th><th class="th-accent">Phân Loại BCG</th><th class="th-accent">Giá Bán</th><th class="th-accent">Giá Vốn</th><th class="th-accent">Biên Lợi Nhuận (%)</th><th class="th-accent">Đã Bán</th><th class="th-accent">Tổng Lợi Nhuận Gộp (VNĐ)</th></tr>
-    ${menuEngineering.map(m => `
-    <tr>
-      <td class="td-left"><b>${m.name}</b></td>
-      <td class="td-center"><b>${m.classificationLabel || m.classification}</b></td>
-      <td class="td-right">${formatNum(m.sellingPrice)} ₫</td>
-      <td class="td-right">${formatNum(m.costPrice)} ₫</td>
-      <td class="td-center">${m.marginPercent}%</td>
-      <td class="td-center">${m.totalQuantitySold}</td>
-      <td class="td-money">${formatNum(m.totalGrossProfit)} ₫</td>
-    </tr>`).join('')}
-  </table>
+
 
   <br/>
   <table>
@@ -253,68 +237,7 @@ export default function ReportsAnalyticsPage() {
     }
   ];
 
-  const menuEngineering = reportData?.menuEngineering || [
-    {
-      id: 1,
-      sku: 'BO-WAGYU-01',
-      name: 'Bò Wagyu Nướng Đá Muối',
-      category: 'Món Chính',
-      sellingPrice: 385000,
-      costPrice: 135000,
-      unitMargin: 250000,
-      marginPercent: 64.9,
-      totalQuantitySold: 42,
-      totalGrossProfit: 10500000,
-      classification: 'STAR',
-      classificationLabel: '🌟 Ngôi Sao (Star)',
-      recommendation: 'Món chủ lực doanh thu và lợi nhuận cao; duy trì chất lượng và định lượng nghiêm ngặt.'
-    },
-    {
-      id: 2,
-      sku: 'LOBSTER-PHOMAI',
-      name: 'Tôm Hùm Sốt Phô Mai Đút Lò',
-      category: 'Hải Sản',
-      sellingPrice: 420000,
-      costPrice: 180000,
-      unitMargin: 240000,
-      marginPercent: 57.1,
-      totalQuantitySold: 12,
-      totalGrossProfit: 2880000,
-      classification: 'PUZZLE',
-      classificationLabel: '🧩 Câu Đố (Puzzle)',
-      recommendation: 'Biên lợi nhuận tốt nhưng lượng bán thấp; đưa vào combo hoặc huấn luyện nhân viên upsell.'
-    },
-    {
-      id: 3,
-      sku: 'COM-CHIEN-HAISAN',
-      name: 'Cơm Chiên Hải Sản Hoàng Kim',
-      category: 'Cơm & Mì',
-      sellingPrice: 125000,
-      costPrice: 65000,
-      unitMargin: 60000,
-      marginPercent: 48.0,
-      totalQuantitySold: 65,
-      totalGrossProfit: 3900000,
-      classification: 'PLOWHORSE',
-      classificationLabel: '🐴 Ngựa Cày (Plowhorse)',
-      recommendation: 'Lượng gọi rất cao nhưng biên lãi thấp; cân nhắc tăng nhẹ giá 5-10k hoặc tối ưu chi phí nguyên liệu.'
-    },
-    {
-      id: 4,
-      sku: 'SALAD-CAHOI',
-      name: 'Salad Cá Hồi Sốt Chanh Dây',
-      category: 'Khai Vị',
-      sellingPrice: 110000,
-      costPrice: 68000,
-      unitMargin: 42000,
-      marginPercent: 38.2,
-      totalQuantitySold: 8,
-      totalGrossProfit: 336000,
-      classification: 'DOG',
-      classificationLabel: '🐕 Kém Hiệu Quả (Dog)',
-      recommendation: 'Lượng bán và tỷ suất lợi nhuận đều thấp; cân nhắc thay thế công thức hoặc loại bỏ khỏi thực đơn.'
-    }
-  ];
+
 
   const invoiceAudit = reportData?.invoiceAudit || [
     {
@@ -347,11 +270,7 @@ export default function ReportsAnalyticsPage() {
     }
   ];
 
-  // Lọc danh sách BCG theo chip
-  const filteredBcgItems = menuEngineering.filter(item => {
-    if (bcgFilter === 'ALL') return true;
-    return item.classification === bcgFilter;
-  });
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -479,7 +398,7 @@ export default function ReportsAnalyticsPage() {
             Báo Cáo Doanh Thu, Lợi Nhuận & Vận Hành
           </h1>
           <p style={{ margin: '4px 0 0', color: '#56423D', fontSize: '0.88rem' }}>
-            Phân tích tỷ suất sinh lời (COGS & Gross Margin), cơ cấu ca làm việc và ma trận thực đơn BCG.
+            Phân tích doanh thu, cơ cấu ca làm việc, hiệu suất bàn và đối soát sổ hóa đơn kiểm toán.
           </p>
         </div>
 
@@ -756,7 +675,6 @@ export default function ReportsAnalyticsPage() {
       <div className="no-print" style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #EAE0DE', paddingBottom: '8px', flexWrap: 'wrap' }}>
         {[
           { id: 'REVENUE', label: 'Doanh Thu & Lợi Nhuận Gộp', icon: 'payments' },
-          { id: 'DISHES', label: 'Ma Trận Thực Đơn (BCG Matrix)', icon: 'restaurant_menu' },
           { id: 'OPERATIONS', label: 'Vận Hành Bàn & Hiệu Suất', icon: 'table_restaurant' },
           { id: 'AUDIT', label: 'Sổ Hóa Đơn & Kiểm Toán', icon: 'receipt_long' }
         ].map(tab => (
@@ -1125,144 +1043,6 @@ export default function ReportsAnalyticsPage() {
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: DISHES & BCG MENU ENGINEERING MATRIX */}
-      {reportType === 'DISHES' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Card giới thiệu Ma trận BCG Menu Engineering */}
-          <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', border: '1px solid #F0E6E4' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
-              <div>
-                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: 0 }}>
-                  Ma Trận Phân Tích Thực Đơn BCG (Menu Engineering Matrix)
-                </h3>
-                <p style={{ margin: '6px 0 0', color: '#56423D', fontSize: '0.85rem' }}>
-                  Đánh giá từng món ăn dựa trên hai trục: <b>Biên Lợi Nhuận (Profit Margin)</b> và <b>Mức Độ Phổ Biến (Popularity / Sales Volume)</b>.
-                </p>
-              </div>
-
-              {/* Bộ lọc 4 nhóm BCG */}
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {[
-                  { id: 'ALL', label: 'Tất Cả Món' },
-                  { id: 'STAR', label: '🌟 Ngôi Sao' },
-                  { id: 'PLOWHORSE', label: '🐴 Ngựa Cày' },
-                  { id: 'PUZZLE', label: '🧩 Câu Đố' },
-                  { id: 'DOG', label: '🐕 Kém Hiệu Quả' }
-                ].map(f => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setBcgFilter(f.id)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #EAE0DE',
-                      background: bcgFilter === f.id ? '#9D4124' : '#FFFFFF',
-                      color: bcgFilter === f.id ? '#FFFFFF' : '#56423D',
-                      fontWeight: 700,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Thống kê nhanh 4 góc phần tư */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ background: '#FFFDF0', padding: '14px', borderRadius: '12px', border: '1px solid #FDE68A' }}>
-                <div style={{ fontWeight: 800, color: '#B45309', fontSize: '0.85rem' }}>🌟 Ngôi Sao (Stars)</div>
-                <div style={{ fontSize: '0.76rem', color: '#92400E', marginTop: '4px' }}>Bán chạy & Lãi cao. Giữ vững chất lượng, đặt ở vị trí mắt nhìn trên menu.</div>
-              </div>
-              <div style={{ background: '#F0FDF4', padding: '14px', borderRadius: '12px', border: '1px solid #BBF7D0' }}>
-                <div style={{ fontWeight: 800, color: '#15803D', fontSize: '0.85rem' }}>🐴 Ngựa Cày (Plowhorses)</div>
-                <div style={{ fontSize: '0.76rem', color: '#166534', marginTop: '4px' }}>Bán rất chạy nhưng Lãi thấp. Tăng nhẹ giá bán 5-10% hoặc tối ưu định lượng.</div>
-              </div>
-              <div style={{ background: '#EFF6FF', padding: '14px', borderRadius: '12px', border: '1px solid #BFDBFE' }}>
-                <div style={{ fontWeight: 800, color: '#1D4ED8', fontSize: '0.85rem' }}>🧩 Câu Đố (Puzzles)</div>
-                <div style={{ fontSize: '0.76rem', color: '#1E40AF', marginTop: '4px' }}>Lãi rất cao nhưng Bán chậm. Đưa vào combo hoặc huấn luyện nhân viên upsell.</div>
-              </div>
-              <div style={{ background: '#FEF2F2', padding: '14px', borderRadius: '12px', border: '1px solid #FECACA' }}>
-                <div style={{ fontWeight: 800, color: '#B91C1C', fontSize: '0.85rem' }}>🐕 Kém Hiệu Quả (Dogs)</div>
-                <div style={{ fontSize: '0.76rem', color: '#991B1B', marginTop: '4px' }}>Bán chậm và Lãi thấp. Cân nhắc đổi công thức món hoặc loại bỏ khỏi thực đơn.</div>
-              </div>
-            </div>
-
-            {/* Bảng chi tiết ma trận Menu Engineering */}
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
-                <thead>
-                  <tr style={{ background: '#FCF1EF', borderBottom: '2px solid #EAE0DE' }}>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D' }}>Tên Món & Mã SKU</th>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D' }}>Phân Loại BCG</th>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D', textAlign: 'right' }}>Giá Bán</th>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D', textAlign: 'right' }}>Giá Vốn (Cost)</th>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D', textAlign: 'center' }}>Biên Lãi %</th>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D', textAlign: 'center' }}>Đã Bán</th>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D', textAlign: 'right' }}>Tổng LN Gộp</th>
-                    <th style={{ padding: '12px', fontWeight: 800, color: '#56423D' }}>Khuyến Nghị Vận Hành</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBcgItems.map(item => {
-                    const badgeBg =
-                      item.classification === 'STAR' ? '#FEF3C7' :
-                        item.classification === 'PLOWHORSE' ? '#DCFCE7' :
-                          item.classification === 'PUZZLE' ? '#DBEAFE' : '#FEE2E2';
-                    const badgeColor =
-                      item.classification === 'STAR' ? '#92400E' :
-                        item.classification === 'PLOWHORSE' ? '#166534' :
-                          item.classification === 'PUZZLE' ? '#1E40AF' : '#991B1B';
-
-                    return (
-                      <tr key={item.id} style={{ borderBottom: '1px solid #F0E6E4' }}>
-                        <td style={{ padding: '12px' }}>
-                          <div style={{ fontWeight: 800, color: '#1F1B1A' }}>{item.name}</div>
-                          <span style={{ fontSize: '0.72rem', color: '#89726B' }}>{item.sku} • {item.category}</span>
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{
-                            background: badgeBg,
-                            color: badgeColor,
-                            padding: '3px 8px',
-                            borderRadius: '8px',
-                            fontWeight: 800,
-                            fontSize: '0.75rem',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {item.classificationLabel || item.classification}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700 }}>
-                          {Number(item.sellingPrice).toLocaleString('vi-VN')}₫
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', color: '#C5221F', fontWeight: 600 }}>
-                          {Number(item.costPrice).toLocaleString('vi-VN')}₫
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center', fontWeight: 800, color: item.marginPercent >= 60 ? '#059669' : '#B45309' }}>
-                          {item.marginPercent}%
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center', fontWeight: 800 }}>
-                          {item.totalQuantitySold}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: 800, color: '#9D4124' }}>
-                          {Number(item.totalGrossProfit).toLocaleString('vi-VN')}₫
-                        </td>
-                        <td style={{ padding: '12px', fontSize: '0.76rem', color: '#56423D', maxWidth: '280px' }}>
-                          {item.recommendation}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>
