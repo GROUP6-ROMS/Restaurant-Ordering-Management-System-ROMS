@@ -29,6 +29,15 @@ export const authApi = {
     // Đặt lại mã PIN bằng OTP hoặc Khóa Master Recovery Key
     resetPinWithOtpOrRecoveryKey: (data) => {
         return axiosClient.post('/auth/forgot-pin/reset', data);
+    },
+
+    // Đặt lại mã PIN bằng OTP
+    resetPinWithOtp: (username, otpOrRecoveryKey, newPinCode, confirmPinCode) => {
+        return axiosClient.post('/auth/forgot-pin/reset', {
+            username,
+            otpOrRecoveryKey,
+            newPinCode,
+            confirmPinCode: confirmPinCode || newPinCode
+        });
     }
 };
-
