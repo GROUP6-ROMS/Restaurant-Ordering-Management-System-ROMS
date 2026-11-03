@@ -40,6 +40,18 @@ export default function CustomerCartPage() {
   const handleSubmitOrder = async () => {
     if (cartItems.length === 0 || isSubmitting) return;
 
+    const diningToken = sessionStorage.getItem('roms_dining_token');
+    const staffToken = sessionStorage.getItem('roms_token');
+    if (!diningToken && !staffToken) {
+      showToast('Vui lòng quét mã QR tại bàn để xác thực và gửi đơn gọi món!');
+      return;
+    }
+
+    if (!tableInfo?.tableId && !tableInfo?.tableNumber) {
+      showToast('Chưa xác định được thông tin bàn ăn. Vui lòng quét lại mã QR tại bàn!');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const payload = {

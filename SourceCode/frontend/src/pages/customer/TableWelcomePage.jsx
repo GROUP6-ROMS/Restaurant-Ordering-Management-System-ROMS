@@ -12,8 +12,7 @@ export default function TableWelcomePage() {
   const { tableInfo, setTableInfo, cartItems, totalCount, totalPrice } = useCart();
   const restaurantProfile = useRestaurantProfile();
 
-  const rawTable = searchParams.get('table') || '5';
-  const tableNumberFormatted = rawTable.padStart(2, '0');
+  const rawTable = searchParams.get('table');
   const tokenParam = searchParams.get('token');
 
   const [guestCount, setGuestCount] = useState(tableInfo?.guestCount || 4);
@@ -22,15 +21,17 @@ export default function TableWelcomePage() {
   const [currentTime, setCurrentTime] = useState('');
 
   // State xác thực mã QR thời gian thực từ Backend
-  const [isVerifying, setIsVerifying] = useState(!!tokenParam);
+  const [isVerifying, setIsVerifying] = useState(true);
   const [verifiedTable, setVerifiedTable] = useState(null);
   const [verifyError, setVerifyError] = useState(null);
 
   // Xác định mã bàn chuẩn kỹ thuật (T-01, B-02, VIP-01)
-  const tableCode = verifiedTable?.code || (
-    rawTable.toUpperCase().startsWith('T-') || rawTable.toUpperCase().startsWith('B-') || rawTable.toUpperCase().startsWith('VIP')
-      ? rawTable.toUpperCase()
-      : `Bàn ${tableNumberFormatted}`
+  const tableCode = verifiedTable?.code || verifiedTable?.tableNumber || (
+    rawTable
+      ? (rawTable.toUpperCase().startsWith('T-') || rawTable.toUpperCase().startsWith('B-') || rawTable.toUpperCase().startsWith('VIP')
+          ? rawTable.toUpperCase()
+          : `Bàn ${rawTable}`)
+      : 'Bàn ăn'
   );
 
   // Xác định xem có phải bàn VIP hay không
@@ -38,7 +39,7 @@ export default function TableWelcomePage() {
     verifiedTable?.code?.toUpperCase().includes('VIP') ||
     verifiedTable?.zone?.toUpperCase().includes('VIP') ||
     verifiedTable?.zoneName?.toUpperCase().includes('VIP') ||
-    rawTable.toUpperCase().includes('VIP')
+    (rawTable && rawTable.toUpperCase().includes('VIP'))
   );
 
   // Clock
@@ -55,40 +56,44 @@ export default function TableWelcomePage() {
   // Xác thực mã QR Token với CSDL qua Backend API
   useEffect(() => {
     const verifyToken = async () => {
-      let activeToken = tokenParam;
-      // Hỗ trợ demo quét bàn T-01 nếu không có tokenParam
-      if (!activeToken && (rawTable === '01' || rawTable === '1' || rawTable === '19' || rawTable.toUpperCase() === 'T-01')) {
-        activeToken = 'qr-t01-token-8841';
+      const activeToken = tokenParam ? tokenParam.trim() : null;
+
+      // Không có token QR: Từ chối truy cập ngay lập tức, triệt tiêu mọi backdoor/mock token
+      if (!activeToken) {
+        sessionStorage.removeItem('roms_dining_token');
+        setVerifyError('Vui lòng quét mã QR vật lý được dán tại bàn ăn để bắt đầu gọi món!');
+        setIsVerifying(false);
+        return;
       }
 
-      if (activeToken) {
-        try {
-          setIsVerifying(true);
-          setVerifyError(null);
-          const res = await tableApi.verifyQr(activeToken);
-          if (res.data && res.data.success) {
-            const tData = res.data.data;
-            // Lưu Dining Token có ký số bảo mật của Backend vào sessionStorage
-            if (tData.diningToken) {
-              sessionStorage.setItem('roms_dining_token', tData.diningToken);
-            }
-            setVerifiedTable(tData);
-            if (tData.capacity) setGuestCount(tData.capacity);
+      try {
+        setIsVerifying(true);
+        setVerifyError(null);
+        const res = await tableApi.verifyQr(activeToken);
+        if (res.data && res.data.success) {
+          const tData = res.data.data;
+          // Lưu Dining Token có ký số bảo mật của Backend vào sessionStorage
+          if (tData.diningToken) {
+            sessionStorage.setItem('roms_dining_token', tData.diningToken);
           }
-        } catch (err) {
-          console.error('Lỗi xác thực mã QR:', err);
-          const msg = err.response?.data?.message || 'Mã QR này không hợp lệ hoặc đã bị thay đổi!';
-          setVerifyError(msg);
-        } finally {
-          setIsVerifying(false);
+          setVerifiedTable(tData);
+          if (tData.capacity) setGuestCount(tData.capacity);
+        } else {
+          sessionStorage.removeItem('roms_dining_token');
+          setVerifyError(res.data?.message || 'Mã QR này không hợp lệ hoặc đã bị thay đổi!');
         }
-      } else {
+      } catch (err) {
+        console.error('Lỗi xác thực mã QR:', err);
+        sessionStorage.removeItem('roms_dining_token');
+        const msg = err.response?.data?.message || 'Mã QR này không hợp lệ hoặc đã bị thay đổi!';
+        setVerifyError(msg);
+      } finally {
         setIsVerifying(false);
       }
     };
 
     verifyToken();
-  }, [tokenParam, rawTable]);
+  }, [tokenParam]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -109,19 +114,22 @@ export default function TableWelcomePage() {
   };
 
   const handleStartDining = () => {
+    if (!verifiedTable || !verifiedTable.diningToken) {
+      setVerifyError('Phiên gọi món chưa được xác thực. Vui lòng quét lại mã QR tại bàn!');
+      return;
+    }
+
     const info = {
       tableNumber: tableCode,
-      tableId: verifiedTable?.id || (parseInt(rawTable, 10) >= 19 ? parseInt(rawTable, 10) : null),
-      tableName: verifiedTable?.name || '',
-      zoneName: verifiedTable?.zoneName || '',
+      tableId: verifiedTable.id,
+      tableName: verifiedTable.name || '',
+      zoneName: verifiedTable.zoneName || '',
       isVip,
       guestCount,
-      token: tokenParam || verifiedTable?.qrToken || `table-${tableNumberFormatted}-token`,
-      diningToken: verifiedTable?.diningToken || sessionStorage.getItem('roms_dining_token')
+      token: verifiedTable.qrToken,
+      diningToken: verifiedTable.diningToken
     };
-    if (verifiedTable?.diningToken) {
-      sessionStorage.setItem('roms_dining_token', verifiedTable.diningToken);
-    }
+    sessionStorage.setItem('roms_dining_token', verifiedTable.diningToken);
     setTableInfo(info);
     navigate('/dining/menu');
   };
@@ -186,7 +194,7 @@ export default function TableWelcomePage() {
           <Icon name="qr_code_scanner" size={38} />
         </div>
         <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, color: '#1F1B1A', margin: '0 0 8px', fontSize: '1.35rem' }}>
-          Mã QR Không Còn Hiệu Lực
+          {tokenParam ? 'Mã QR Không Còn Hiệu Lực' : 'Yêu Cầu Quét Mã QR'}
         </h2>
         <p style={{ margin: '0 0 24px', fontSize: '0.88rem', color: '#89726B', maxWidth: '340px', lineHeight: 1.5 }}>
           {verifyError}
