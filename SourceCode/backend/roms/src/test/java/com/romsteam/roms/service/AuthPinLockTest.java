@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,6 +62,9 @@ class AuthPinLockTest {
 
     @Mock
     private RealtimeService realtimeService;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -234,9 +239,12 @@ class AuthPinLockTest {
         assertThat(result).isNotNull();
         assertThat(result.get("success")).isEqualTo(true);
         assertThat(result.get("username")).isEqualTo("MGR-001");
-        assertThat(result.get("otpHint")).isNotNull();
-        assertThat(result.get("otpHint").toString()).matches("^\\d{6}$");
+        assertThat(result.get("otpHint")).isNull();
         assertThat(result.get("maskedEmail").toString()).contains("***");
+
+        ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendOtpEmail(eq("manager@roms.vn"), eq("Trần Quản Lý"), otpCaptor.capture());
+        assertThat(otpCaptor.getValue()).matches("^\\d{6}$");
     }
 
     @Test
@@ -313,7 +321,12 @@ class AuthPinLockTest {
         RequestOtpRequest otpReq = new RequestOtpRequest();
         otpReq.setUsername("MGR-001");
         Map<String, Object> otpRes = authService.requestPinResetOtp(otpReq);
-        String generatedOtp = (String) otpRes.get("otpHint");
+        
+        // Xác minh emailService đã được gọi và bóc tách mã OTP gửi qua email
+        ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService, times(1)).sendOtpEmail(eq("manager@roms.vn"), anyString(), otpCaptor.capture());
+        String generatedOtp = otpCaptor.getValue();
+        assertThat(generatedOtp).matches("^\\d{6}$");
 
         // Bước 2: Dùng mã OTP để đặt lại mã PIN
         ResetPinRequest resetReq = new ResetPinRequest();
@@ -367,7 +380,7 @@ class AuthPinLockTest {
                 .satisfies(ex -> {
                     AppException appEx = (AppException) ex;
                     assertThat(appEx.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-                    assertThat(appEx.getMessage()).contains("Mã OTP xác thực hoặc Khóa khôi phục Master Key không chính xác");
+                    assertThat(appEx.getMessage()).contains("Mã OTP xác thực không chính xác");
                 });
     }
 

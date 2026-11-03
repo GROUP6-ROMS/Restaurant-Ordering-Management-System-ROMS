@@ -69,6 +69,7 @@ public class StaffServiceImpl implements StaffService {
                 .pinCode(passwordEncoder.encode(request.getPinCode().trim()))
                 .fullName(request.getFullName().trim())
                 .phone(request.getPhone() != null ? request.getPhone().trim() : null)
+                .email(request.getEmail() != null && !request.getEmail().trim().isEmpty() ? request.getEmail().trim() : null)
                 .role(request.getRole())
                 .isActive(true)
                 .isOnShift(false)
@@ -87,6 +88,7 @@ public class StaffServiceImpl implements StaffService {
 
         staff.setFullName(request.getFullName().trim());
         staff.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
+        staff.setEmail(request.getEmail() != null && !request.getEmail().trim().isEmpty() ? request.getEmail().trim() : null);
         staff.setRole(request.getRole());
         if (request.getIsActive() != null) {
             staff.setIsActive(request.getIsActive());

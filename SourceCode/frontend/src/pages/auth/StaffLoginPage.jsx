@@ -41,6 +41,18 @@ export default function StaffLoginPage() {
   const [forgotSuccess, setForgotSuccess] = useState(null);
   const [otpHint, setOtpHint] = useState(null);
   const [maskedEmail, setMaskedEmail] = useState(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Đếm ngược thời gian chờ gửi lại mã OTP (cooldown 60s)
+  useEffect(() => {
+    let timer;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   // Tìm thông tin preset tương ứng với mã nhân viên hiện tại (nếu có)
   const matchedPreset = PRESET_ACCOUNTS.find(
@@ -161,6 +173,7 @@ export default function StaffLoginPage() {
     setNewPinCode('');
     setConfirmPinCode('');
     setOtpHint(null);
+    setResendCooldown(0);
     setShowPinModal(false);
     setShowForgotPinModal(true);
   };
@@ -178,12 +191,11 @@ export default function StaffLoginPage() {
       const res = await authApi.requestPinResetOtp(forgotUsername.trim());
       const data = res.data?.data || res.data || {};
       setOtpHint(data.otpHint || null);
-      setMaskedEmail(data.maskedEmail || 'email');
-      setForgotSuccess(data.message || 'Đã tạo mã OTP khôi phục thành công!');
+      setMaskedEmail(data.maskedEmail || 'quản lý');
+      setForgotSuccess(data.message || 'Đã gửi mã OTP khôi phục thành công!');
       setForgotStep(2);
-      if (data.otpHint) {
-        setOtpOrKey(data.otpHint);
-      }
+      setResendCooldown(60);
+      setOtpOrKey('');
     } catch (err) {
       setForgotError(err.response?.data?.message || 'Không thể yêu cầu mã OTP. Vui lòng kiểm tra lại!');
     } finally {
@@ -747,23 +759,45 @@ export default function StaffLoginPage() {
             {/* STEP 2: Reset PIN */}
             {forgotStep === 2 && (
               <form onSubmit={handleResetPin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ background: '#FFF8F6', border: '1px dashed #9D4124', borderRadius: '12px', padding: '10px 12px', fontSize: '0.78rem', color: '#56423D' }}>
-                  <div style={{ fontWeight: 800, color: '#9D4124', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Icon name="key" size={16} />
-                    Mã Xác Thực Dự Phòng (Demo/Hội đồng chấm thi):
+                <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '12px', padding: '12px', fontSize: '0.8rem', color: '#0369A1' }}>
+                  <div style={{ fontWeight: 800, color: '#0284C7', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon name="mail" size={18} />
+                    Mã xác thực OTP đã được gửi thành công!
                   </div>
-                  <div>Mã OTP vừa sinh: <b style={{ letterSpacing: '2px', color: '#9D4124', fontSize: '0.9rem' }}>{otpHint || 'Chờ gửi'}</b></div>
-                  <div style={{ marginTop: '2px', fontSize: '0.74rem', color: '#89726B' }}>Hoặc dùng Master Recovery Key: <code style={{ fontWeight: 700, color: '#1F1B1A' }}>ROMS-RECOVERY-2026</code></div>
+                  <div style={{ color: '#0C4A6E', lineHeight: '1.4' }}>
+                    Hệ thống đã gửi mã OTP 6 chữ số tới hộp thư <strong>{maskedEmail || 'quản lý'}</strong>. Vui lòng kiểm tra hộp thư đến (hoặc hòm thư Spam).
+                  </div>
+                  <div style={{ marginTop: '8px', fontSize: '0.74rem', color: '#64748B', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E0F2FE', paddingTop: '6px' }}>
+                    <span>Hiệu lực trong 5 phút</span>
+                    <button
+                      type="button"
+                      disabled={resendCooldown > 0 || forgotLoading}
+                      onClick={handleRequestOtp}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: resendCooldown > 0 ? '#94A3B8' : '#9D4124',
+                        fontWeight: 700,
+                        cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer',
+                        padding: 0,
+                        textDecoration: 'underline',
+                        fontSize: '0.76rem'
+                      }}
+                    >
+                      {resendCooldown > 0 ? `Gửi lại sau (${resendCooldown}s)` : 'Gửi lại mã OTP'}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '4px' }}>
-                    Mã Xác Thực OTP (6 Số) Hoặc Master Key
+                    Mã Xác Thực OTP (6 Số)
                   </label>
                   <input
                     type="text"
+                    maxLength={6}
                     required
-                    placeholder="Nhập 6 số OTP hoặc Khóa Master"
+                    placeholder="Nhập 6 chữ số từ email"
                     value={otpOrKey}
                     onChange={(e) => setOtpOrKey(e.target.value)}
                     style={{
@@ -771,8 +805,9 @@ export default function StaffLoginPage() {
                       padding: '10px 12px',
                       borderRadius: '10px',
                       border: '1px solid #EAE0DE',
-                      fontSize: '0.9rem',
+                      fontSize: '1rem',
                       fontWeight: 700,
+                      letterSpacing: '2px',
                       boxSizing: 'border-box'
                     }}
                   />

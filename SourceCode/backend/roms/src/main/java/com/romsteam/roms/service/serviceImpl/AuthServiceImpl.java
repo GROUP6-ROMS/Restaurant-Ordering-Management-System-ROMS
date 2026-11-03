@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.romsteam.roms.dto.response.RomsRealtimeEvent;
 import com.romsteam.roms.service.RealtimeService;
+import com.romsteam.roms.service.EmailService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -50,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final RealtimeService realtimeService;
+    private final EmailService emailService;
 
     // Quản lý thời điểm nhận tín hiệu Heartbeat gần nhất của từng nhân sự
     private final Map<String, Long> staffLastHeartbeatMap = new ConcurrentHashMap<>();
@@ -75,19 +77,20 @@ public class AuthServiceImpl implements AuthService {
 
     private final Map<String, OtpEntry> otpStorage = new ConcurrentHashMap<>();
 
-    // CODE MỚI SAU KHI SỬA:
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            StaffRepository staffRepository,
                            StaffScheduleRepository staffScheduleRepository,
                            JwtTokenProvider jwtTokenProvider,
                            PasswordEncoder passwordEncoder,
-                           RealtimeService realtimeService) { // <-- THÊM THAM SỐ NÀY
+                           RealtimeService realtimeService,
+                           EmailService emailService) {
         this.authenticationManager = authenticationManager;
         this.staffRepository = staffRepository;
         this.staffScheduleRepository = staffScheduleRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.passwordEncoder = passwordEncoder;
-        this.realtimeService = realtimeService;           // <-- THÊM DÒNG NÀY
+        this.realtimeService = realtimeService;
+        this.emailService = emailService;
     }
 
     @Override
@@ -378,19 +381,21 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException("Chức năng tự khôi phục mã PIN chỉ áp dụng cho tài khoản Quản lý (MANAGER)! Vui lòng liên hệ Quản lý cơ sở để cấp lại mã PIN.", HttpStatus.FORBIDDEN);
         }
 
+        String recipientEmail = staff.getEmail();
+        if (recipientEmail == null || recipientEmail.trim().isEmpty() || !recipientEmail.contains("@")) {
+            throw new AppException("Tài khoản Quản lý " + staff.getFullName() + " (" + username + ") chưa được cập nhật địa chỉ email nhận OTP! Vui lòng liên hệ bộ phận kỹ thuật để bổ sung email.", HttpStatus.BAD_REQUEST);
+        }
+
         // Sinh mã OTP ngẫu nhiên 6 chữ số
         String otp = String.format("%06d", new java.util.Random().nextInt(900000) + 100000);
         otpStorage.put(username.toUpperCase(), new OtpEntry(otp, LocalDateTime.now().plusMinutes(5)));
 
-        log.warn("=========================================================================================");
-        log.warn("[SECURITY RECOVERY OTP] Mã OTP đặt lại mã PIN cho Quản lý {} ({}) là: {}", staff.getFullName(), username, otp);
-        log.warn("[SECURITY RECOVERY OTP] Mã OTP có hiệu lực trong 5 phút. Khóa Master Recovery Key dự phòng: {}", masterRecoveryKey);
-        log.warn("=========================================================================================");
-
-        String maskedEmail = "email quản lý";
-        if (staff.getEmail() != null && staff.getEmail().contains("@")) {
-            maskedEmail = staff.getEmail().replaceAll("(^.{2})(.*)(@.*$)", "$1***$3");
+        // Gửi email HTML chứa mã OTP qua Gmail SMTP
+        if (emailService != null) {
+            emailService.sendOtpEmail(recipientEmail, staff.getFullName(), otp);
         }
+
+        String maskedEmail = recipientEmail.replaceAll("(^.{2})(.*)(@.*$)", "$1***$3");
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -398,9 +403,8 @@ public class AuthServiceImpl implements AuthService {
         response.put("fullName", staff.getFullName());
         response.put("role", staff.getRole().name());
         response.put("maskedEmail", maskedEmail);
-        response.put("message", "Đã khởi tạo mã xác thực OTP khôi phục cho Quản lý " + staff.getFullName() + "! Bạn có thể dùng mã OTP (hiệu lực 5 phút) hoặc Khóa khôi phục Master Key dự phòng.");
-        // Gợi ý mã OTP phục vụ kiểm thử / demo trực tiếp thuận tiện
-        response.put("otpHint", otp);
+        response.put("message", "Đã gửi mã xác thực OTP (hiệu lực 5 phút) đến hộp thư: " + maskedEmail + ". Vui lòng kiểm tra hộp thư đến hoặc mục Thư rác (Spam).");
+        // BẢO MẬT: TUYỆT ĐỐI KHÔNG TRẢ otpHint VỀ HTTP RESPONSE!
         return response;
     }
 
@@ -439,7 +443,7 @@ public class AuthServiceImpl implements AuthService {
                 otpStorage.remove(username.toUpperCase());
                 throw new AppException("Mã OTP đã hết thời hạn hiệu lực (5 phút)! Vui lòng bấm gửi lại mã OTP mới.", HttpStatus.BAD_REQUEST);
             }
-            throw new AppException("Mã OTP xác thực hoặc Khóa khôi phục Master Key không chính xác!", HttpStatus.BAD_REQUEST);
+            throw new AppException("Mã OTP xác thực không chính xác hoặc đã hết hạn!", HttpStatus.BAD_REQUEST);
         }
 
         // Đặt lại mã PIN băm BCrypt và mở khóa tài khoản

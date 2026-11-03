@@ -217,6 +217,7 @@ export default function StaffManagementPage() {
     username: '',
     fullName: '',
     phone: '',
+    email: '',
     role: 'WAITER',
     pinCode: '123456'
   });
@@ -225,6 +226,7 @@ export default function StaffManagementPage() {
   const [editStaffForm, setEditStaffForm] = useState({
     fullName: '',
     phone: '',
+    email: '',
     role: 'WAITER',
     isActive: true
   });
@@ -382,6 +384,7 @@ export default function StaffManagementPage() {
         username: '',
         fullName: '',
         phone: '',
+        email: '',
         role: 'WAITER',
         pinCode: '123456'
       });
@@ -405,6 +408,7 @@ export default function StaffManagementPage() {
     setEditStaffForm({
       fullName: staff.fullName || '',
       phone: staff.phone || '',
+      email: staff.email || '',
       role: staff.role || 'WAITER',
       isActive: staff.isActive !== false
     });
@@ -742,6 +746,7 @@ export default function StaffManagementPage() {
     const matchSearch =
       (s.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (s.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (s.phone || '').includes(searchQuery);
     if (!matchSearch) return false;
 
@@ -2130,6 +2135,7 @@ export default function StaffManagementPage() {
                   <tr style={{ background: '#FCF1EF', color: '#89726B', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #EAE0DE' }}>
                     <th style={{ padding: '12px 16px', textAlign: 'center', width: '50px' }}>STT</th>
                     <th style={{ padding: '12px 16px' }}>Nhân Viên & Thông Tin</th>
+                    <th style={{ padding: '12px 16px' }}>Email Nhận OTP</th>
                     <th style={{ padding: '12px 16px' }}>Vai Trò Hệ Thống</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>Trạng Thái Trực Ca</th>
                     <th style={{ padding: '12px 16px' }}>Ca Làm Việc Hôm Nay</th>
@@ -2140,14 +2146,14 @@ export default function StaffManagementPage() {
                 <tbody>
                   {loadingStaff ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: '#89726B' }}>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: '#89726B' }}>
                         <Icon name="progress_activity" size={24} style={{ animation: 'spin 1s linear infinite', color: '#9D4124' }} />
                         <div style={{ marginTop: '8px' }}>Đang tải danh sách nhân viên...</div>
                       </td>
                     </tr>
                   ) : filteredStaff.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: '#89726B' }}>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: '#89726B' }}>
                         Không tìm thấy nhân viên nào phù hợp với bộ lọc!
                       </td>
                     </tr>
@@ -2187,6 +2193,30 @@ export default function StaffManagementPage() {
                                 </div>
                               </div>
                             </div>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            {staff.email ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#1F1B1A', fontWeight: 600 }}>
+                                <Icon name="mail" size={16} style={{ color: '#9D4124', flexShrink: 0 }} />
+                                <span style={{ wordBreak: 'break-all' }}>{staff.email}</span>
+                              </div>
+                            ) : (
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontStyle: 'italic',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#FFDAD6',
+                                color: '#93000A',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontWeight: 600
+                              }}>
+                                <Icon name="warning" size={14} style={{ color: '#93000A' }} />
+                                Chưa có email
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: '14px 16px' }}>
                             <span style={{
@@ -2518,6 +2548,19 @@ export default function StaffManagementPage() {
 
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '4px' }}>
+                  Địa chỉ Email (Nhận mã OTP khôi phục PIN Quản lý)
+                </label>
+                <input
+                  type="email"
+                  placeholder="quanly@roms.vn"
+                  value={newStaffForm.email}
+                  onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #EAE0DE', fontSize: '0.88rem', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '4px' }}>
                   Vai trò phân quyền hệ thống <span style={{ color: '#9D4124' }}>*</span>
                 </label>
                 <select
@@ -2624,6 +2667,19 @@ export default function StaffManagementPage() {
                   type="text"
                   value={editStaffForm.phone}
                   onChange={(e) => setEditStaffForm({ ...editStaffForm, phone: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #EAE0DE', fontSize: '0.88rem', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '4px' }}>
+                  Địa chỉ Email (Nhận mã OTP khôi phục PIN Quản lý)
+                </label>
+                <input
+                  type="email"
+                  placeholder="quanly@roms.vn"
+                  value={editStaffForm.email}
+                  onChange={(e) => setEditStaffForm({ ...editStaffForm, email: e.target.value })}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #EAE0DE', fontSize: '0.88rem', boxSizing: 'border-box', outline: 'none' }}
                 />
               </div>
