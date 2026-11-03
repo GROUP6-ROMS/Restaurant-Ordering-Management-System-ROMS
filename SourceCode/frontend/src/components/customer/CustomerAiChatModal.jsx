@@ -120,6 +120,17 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
 
     // Thêm món vào giỏ hàng kèm thông báo mượt mà trên giao diện
     const handleAddToCart = (dish) => {
+        const diningToken = sessionStorage.getItem('roms_dining_token');
+        const staffToken = sessionStorage.getItem('roms_token');
+        const isTableOccupied = (tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
+        if (!isTableOccupied) {
+            setToastMessage('Chờ nhân viên mở bàn! Vui lòng đợi nhân viên mở bàn.');
+            setTimeout(() => {
+                setToastMessage(null);
+            }, 2500);
+            return;
+        }
+
         addToCart(dish, 1, '');
 
         // 1. Hiển thị thông báo Toast tự tắt sau 2 giây
