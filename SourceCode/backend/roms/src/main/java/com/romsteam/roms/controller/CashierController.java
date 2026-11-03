@@ -108,12 +108,14 @@ public class CashierController {
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 
-    // 10. POST /api/cashier/tables/{id}/close-empty - Đóng phiên ăn bàn trống (0đ)
+    // 10. POST /api/cashier/tables/{id}/close-empty - Đóng phiên ăn bàn trống (0đ) kèm audit thu ngân
     @PostMapping("/tables/{id}/close-empty")
     public ResponseEntity<ApiResponse<CashierTableResponse>> closeEmptySession(
             @PathVariable Long id,
-            @RequestBody(required = false) CloseEmptySessionRequest request) {
-        CashierTableResponse response = cashierService.closeEmptySession(id, request);
+            @RequestBody(required = false) CloseEmptySessionRequest request,
+            Authentication authentication) {
+        String cashierUsername = authentication != null ? authentication.getName() : null;
+        CashierTableResponse response = cashierService.closeEmptySession(id, request, cashierUsername);
         return ResponseEntity.ok(ApiResponse.success(response, "Đã đóng phiên bàn trống và giải phóng bàn thành công!"));
     }
 }

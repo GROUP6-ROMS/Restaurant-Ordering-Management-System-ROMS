@@ -593,8 +593,9 @@ export default function PosCheckoutPage() {
   }
 
   const vatRate = 8.0;
-  const computedVat = Math.round((rawSubtotal * vatRate) / 100);
-  const finalCalculatedAmount = Math.max(0, rawSubtotal + computedVat - computedDiscount);
+  const computedTaxable = Math.max(0, rawSubtotal - computedDiscount);
+  const computedVat = Math.round((computedTaxable * vatRate) / 100);
+  const finalCalculatedAmount = computedTaxable + computedVat;
   const roundedFinalAmount = Math.round(finalCalculatedAmount / 1000) * 1000;
 
   // Thêm nhanh món ăn vào bàn
