@@ -92,7 +92,12 @@ export default function PosCheckoutPage() {
 
   // Đối soát két tiền & Chốt ca (Tab SHIFT)
   const [shiftSummary, setShiftSummary] = useState(null);
-  const [shiftType, setShiftType] = useState('MORNING');
+  const [shiftType, setShiftType] = useState(() => {
+    const hour = new Date().getHours();
+    return (hour >= 6 && hour < 14) ? 'MORNING' : 'EVENING';
+  });
+  const [shiftDate, setShiftDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isLoadingShift, setIsLoadingShift] = useState(false);
   const [openingCash, setOpeningCash] = useState(() => {
     const saved = localStorage.getItem('roms_cashier_opening_cash');
     return saved !== null ? Number(saved) : 500000; // Mặc định 500.000đ tiền lẻ đầu ca
@@ -456,12 +461,15 @@ export default function PosCheckoutPage() {
   // 5. Tải tổng hợp doanh thu ca khi mở Tab SHIFT
   const fetchShiftSummary = useCallback(async () => {
     try {
-      const res = await cashierApi.getShiftSummary(shiftType, historyDate, openingCash);
+      setIsLoadingShift(true);
+      const res = await cashierApi.getShiftSummary(shiftType, shiftDate, openingCash);
       setShiftSummary(res.data?.data || null);
     } catch (err) {
       console.error('Lỗi tải tổng hợp ca:', err);
+    } finally {
+      setIsLoadingShift(false);
     }
-  }, [shiftType, historyDate, openingCash]);
+  }, [shiftType, shiftDate, openingCash]);
 
   useEffect(() => {
     if (activePosTab === 'SHIFT') {
@@ -2262,6 +2270,93 @@ export default function PosCheckoutPage() {
       {/* VIEW 3: KÉT TIỀN & BÀN GIAO CA */}
       {activePosTab === 'SHIFT' && (
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Thanh điều khiển chọn Ca & Ngày đối soát */}
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            border: '1px solid #F0E6E4',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginRight: '4px' }}>
+                Ca làm việc:
+              </span>
+              {[
+                { key: 'MORNING', label: '🌅 Ca Sáng (06:00 - 14:00)' },
+                { key: 'EVENING', label: '🌙 Ca Tối (14:00 - 24:00)' },
+                { key: 'ALL', label: '📊 Cả Ngày' }
+              ].map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setShiftType(item.key)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: shiftType === item.key ? '1.5px solid #9D4124' : '1px solid #EAE0DE',
+                    background: shiftType === item.key ? '#FFF6F3' : '#FFFFFF',
+                    color: shiftType === item.key ? '#9D4124' : '#56423D',
+                    fontWeight: shiftType === item.key ? 800 : 600,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#56423D' }}>Ngày:</span>
+                <input
+                  type="date"
+                  value={shiftDate}
+                  onChange={(e) => setShiftDate(e.target.value)}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: '10px',
+                    border: '1px solid #EAE0DE',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#1F1B1A',
+                    outline: 'none',
+                    background: '#FCF1EF'
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchShiftSummary}
+                disabled={isLoadingShift}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#9D4124',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  cursor: isLoadingShift ? 'not-allowed' : 'pointer'
+                }}
+                title="Tải lại số liệu mới nhất"
+              >
+                <Icon name={isLoadingShift ? "sync" : "refresh"} size={16} />
+                <span>{isLoadingShift ? 'Đang tải...' : 'Làm mới'}</span>
+              </button>
+            </div>
+          </div>
+
           {/* Top Shift Metrics */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
             <div style={{ background: '#FFFFFF', padding: '16px 18px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
@@ -2456,7 +2551,7 @@ export default function PosCheckoutPage() {
                   </div>
 
                   <div style={{ padding: '8px 0', borderBottom: '1px dashed #CCC', fontSize: '0.74rem' }}>
-                    <div>Ngày: {new Date().toLocaleDateString('vi-VN')} • Giờ: {new Date().toLocaleTimeString('vi-VN')}</div>
+                    <div>Ngày: {shiftDate || new Date().toLocaleDateString('vi-VN')} • Giờ: {new Date().toLocaleTimeString('vi-VN')}</div>
                     <div>Ca: <strong>{shiftSummary?.shiftName || 'Ca Sáng (06:00 - 14:00)'}</strong></div>
                     <div>Thu ngân: <strong>{user?.fullName || 'Thu Ngân POS'}</strong></div>
                   </div>
