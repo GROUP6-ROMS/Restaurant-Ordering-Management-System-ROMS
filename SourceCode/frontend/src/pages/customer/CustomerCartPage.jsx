@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { customerApi } from '../../api/customerApi';
@@ -36,7 +36,7 @@ export default function CustomerCartPage() {
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
       if (
-        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
+        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type)) &&
         (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
       ) {
         if (event.status === 'OCCUPIED') {

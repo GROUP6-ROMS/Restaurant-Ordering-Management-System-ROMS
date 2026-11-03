@@ -373,7 +373,7 @@ export default function CustomerMenuPage() {
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
       if (
-        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
+        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type)) &&
         (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
       ) {
         if (event.status === 'OCCUPIED') {

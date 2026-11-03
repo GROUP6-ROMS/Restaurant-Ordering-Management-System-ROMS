@@ -23,37 +23,6 @@ export default function CustomerTrackingPage() {
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  const [tableStatus, setTableStatus] = useState(tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE'));
-
-  useEffect(() => {
-    if (tableInfo?.status) setTableStatus(tableInfo.status);
-  }, [tableInfo?.status]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeRealtimeEvents((event) => {
-      if (
-        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
-        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
-      ) {
-        if (event.status === 'OCCUPIED') {
-          setTableStatus('OCCUPIED');
-          if (tableInfo?.token) {
-            tableApi.verifyQr(tableInfo.token).then(res => {
-              if (res.data?.success && res.data.data?.diningToken) {
-                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
-              }
-            }).catch(console.error);
-          }
-          fetchTracking(false);
-        } else if (event.status === 'AVAILABLE') {
-          setTableStatus('AVAILABLE');
-          sessionStorage.removeItem('roms_dining_token');
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token, fetchTracking]);
-
   // Live Tracking state từ Backend CSDL
   const [trackingData, setTrackingData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +49,37 @@ export default function CustomerTrackingPage() {
       if (!isSilent) setIsLoading(false);
     }
   }, [tableInfo?.tableId, tableInfo?.tableNumber]);
+
+  const [tableStatus, setTableStatus] = useState(tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE'));
+
+  useEffect(() => {
+    if (tableInfo?.status) setTableStatus(tableInfo.status);
+  }, [tableInfo?.status]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type)) &&
+        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
+      ) {
+        if (event.status === 'OCCUPIED') {
+          setTableStatus('OCCUPIED');
+          if (tableInfo?.token) {
+            tableApi.verifyQr(tableInfo.token).then(res => {
+              if (res.data?.success && res.data.data?.diningToken) {
+                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+              }
+            }).catch(console.error);
+          }
+          fetchTracking(false);
+        } else if (event.status === 'AVAILABLE') {
+          setTableStatus('AVAILABLE');
+          sessionStorage.removeItem('roms_dining_token');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token, fetchTracking]);
 
   useEffect(() => {
     fetchTracking(false);
