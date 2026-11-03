@@ -20,7 +20,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Kích hoạt Simple In-Memory Message Broker với các tiền tố đích đến (/topic cho broadcast, /queue cho unicast)
         config.enableSimpleBroker("/topic", "/queue");
         // Tiền tố cho các message từ client gửi lên backend xử lý
-        config.setApplicationDestinationPrefixes("/app");
+        // config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
