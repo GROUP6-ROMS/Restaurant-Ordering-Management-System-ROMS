@@ -373,7 +373,7 @@ export default function CustomerMenuPage() {
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
       if (
-        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type)) &&
+        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED', 'BILL_PAID', 'SESSION_CLOSED'].includes(event.type)) &&
         (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
       ) {
         if (event.status === 'OCCUPIED') {
@@ -386,9 +386,18 @@ export default function CustomerMenuPage() {
             }).catch(console.error);
           }
           showToast('Bàn đã được nhân viên mở! Quý khách có thể xem thực đơn và đặt món.');
-        } else if (event.status === 'AVAILABLE') {
+        } else if (
+          event.type === 'BILL_PAID' ||
+          event.type === 'SESSION_CLOSED' ||
+          ['AVAILABLE', 'DIRTY', 'COMPLETED', 'CLOSED'].includes(event.status)
+        ) {
           setTableStatus('AVAILABLE');
           sessionStorage.removeItem('roms_dining_token');
+          const qrToken = tableInfo?.token || sessionStorage.getItem('roms_qr_token') || '';
+          showToast('Bữa ăn đã hoàn tất thanh toán. Cảm ơn quý khách!');
+          setTimeout(() => {
+            window.location.href = `/dining/welcome?table=${tableInfo?.tableId || ''}&token=${qrToken}`;
+          }, 1200);
         }
       }
     });

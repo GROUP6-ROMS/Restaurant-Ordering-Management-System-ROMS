@@ -18,7 +18,7 @@ function formatVND(amount) {
 // Khop voi Stitch SCR-10 (glassmorphism header + bottom nav)
 // ====================================================
 export default function CustomerLayout() {
-  const { tableInfo, setTableInfo, totalCount, totalPrice } = useCart();
+  const { tableInfo, setTableInfo, clearCart, totalCount, totalPrice } = useCart();
   const restaurantProfile = useRestaurantProfile();
   const location = useLocation();
   const [toastVisible, setToastVisible] = useState(false);
@@ -73,52 +73,81 @@ export default function CustomerLayout() {
           `Bàn ${event.tableNumber}`.toUpperCase() === String(tableInfo?.tableNumber).toUpperCase()
         ));
 
+      if (!isCurrentTable) return;
+
+      // 1. Trường hợp nhân viên/quản lý MỞ BÀN (status: OCCUPIED)
       if (
         ['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type) &&
-        isCurrentTable
+        event.status === 'OCCUPIED'
       ) {
-        if (event.status === 'OCCUPIED') {
-          setTableStatus('OCCUPIED');
-          const qrToken = tableInfo?.token || sessionStorage.getItem('roms_qr_token');
-          if (qrToken) {
-            tableApi.verifyQr(qrToken).then(res => {
-              if (res.data?.success && res.data.data?.diningToken) {
-                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
-                const updated = {
-                  ...tableInfo,
-                  status: 'OCCUPIED',
-                  diningToken: res.data.data.diningToken,
-                  token: qrToken
-                };
-                setTableInfo(updated);
-                localStorage.setItem('roms_table_info', JSON.stringify(updated));
-              }
-              showToast('Bàn đã được nhân viên mở! Đang tải lại trang...');
-              setTimeout(() => {
-                window.location.reload();
-              }, 500);
-            }).catch(err => {
-              console.error('Lỗi khi verify QR khi mở bàn:', err);
+        setTableStatus('OCCUPIED');
+        const qrToken = tableInfo?.token || sessionStorage.getItem('roms_qr_token');
+        if (qrToken) {
+          tableApi.verifyQr(qrToken).then(res => {
+            if (res.data?.success && res.data.data?.diningToken) {
+              sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+              const updated = {
+                ...tableInfo,
+                status: 'OCCUPIED',
+                diningToken: res.data.data.diningToken,
+                token: qrToken
+              };
+              setTableInfo(updated);
+              localStorage.setItem('roms_table_info', JSON.stringify(updated));
+            }
+            showToast('Bàn đã được nhân viên mở! Đang tải lại trang...');
+            setTimeout(() => {
               window.location.reload();
-            });
-          } else {
-            const updated = { ...tableInfo, status: 'OCCUPIED' };
-            setTableInfo(updated);
-            localStorage.setItem('roms_table_info', JSON.stringify(updated));
+            }, 500);
+          }).catch(err => {
+            console.error('Lỗi khi verify QR khi mở bàn:', err);
             window.location.reload();
-          }
-        } else if (event.status === 'AVAILABLE') {
-          setTableStatus('AVAILABLE');
-          sessionStorage.removeItem('roms_dining_token');
-          const updated = { ...tableInfo, status: 'AVAILABLE', diningToken: null };
+          });
+        } else {
+          const updated = { ...tableInfo, status: 'OCCUPIED' };
           setTableInfo(updated);
           localStorage.setItem('roms_table_info', JSON.stringify(updated));
           window.location.reload();
         }
+        return;
+      }
+
+      // 2. Trường hợp quản lý/thu ngân ĐÃ TÍNH TIỀN / ĐÓNG BÀN (BILL_PAID, SESSION_CLOSED, DIRTY, AVAILABLE, COMPLETED)
+      const isSessionClosedOrPaid =
+        event.type === 'BILL_PAID' ||
+        event.type === 'SESSION_CLOSED' ||
+        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE'].includes(event.type) &&
+          ['DIRTY', 'AVAILABLE', 'COMPLETED', 'CLOSED'].includes(event.status));
+
+      if (isSessionClosedOrPaid) {
+        setTableStatus('AVAILABLE');
+        sessionStorage.removeItem('roms_dining_token');
+        if (typeof clearCart === 'function') clearCart();
+
+        const qrToken = tableInfo?.token || sessionStorage.getItem('roms_qr_token') || '';
+        const updated = {
+          ...tableInfo,
+          status: 'AVAILABLE',
+          diningToken: null
+        };
+        setTableInfo(updated);
+        localStorage.setItem('roms_table_info', JSON.stringify(updated));
+
+        showToast('Bàn đã hoàn tất thanh toán. Cảm ơn quý khách!');
+
+        setTimeout(() => {
+          const targetWelcomeUrl = `/dining/welcome?table=${tableInfo?.tableId || ''}&token=${qrToken}`;
+          if (location.pathname.includes('/welcome')) {
+            window.location.reload();
+          } else {
+            window.location.href = targetWelcomeUrl;
+          }
+        }, 1200);
+        return;
       }
     });
     return () => unsubscribe();
-  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token, setTableInfo]);
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token, setTableInfo, clearCart, location.pathname]);
 
   const diningToken = sessionStorage.getItem('roms_dining_token');
   const staffToken = sessionStorage.getItem('roms_token');

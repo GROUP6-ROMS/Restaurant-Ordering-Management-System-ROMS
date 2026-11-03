@@ -59,7 +59,7 @@ export default function CustomerTrackingPage() {
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
       if (
-        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type)) &&
+        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED', 'BILL_PAID', 'SESSION_CLOSED'].includes(event.type)) &&
         (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
       ) {
         if (event.status === 'OCCUPIED') {
@@ -72,9 +72,18 @@ export default function CustomerTrackingPage() {
             }).catch(console.error);
           }
           fetchTracking(false);
-        } else if (event.status === 'AVAILABLE') {
+        } else if (
+          event.type === 'BILL_PAID' ||
+          event.type === 'SESSION_CLOSED' ||
+          ['AVAILABLE', 'DIRTY', 'COMPLETED', 'CLOSED'].includes(event.status)
+        ) {
           setTableStatus('AVAILABLE');
           sessionStorage.removeItem('roms_dining_token');
+          const qrToken = tableInfo?.token || sessionStorage.getItem('roms_qr_token') || '';
+          showToast('Hóa đơn đã được thanh toán hoàn tất!');
+          setTimeout(() => {
+            window.location.href = `/dining/welcome?table=${tableInfo?.tableId || ''}&token=${qrToken}`;
+          }, 1200);
         }
       }
     });
