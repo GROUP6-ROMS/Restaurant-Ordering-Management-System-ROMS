@@ -404,12 +404,21 @@ public class CashierServiceImpl implements CashierService {
         String shift = (shiftType != null && !shiftType.trim().isEmpty()) ? shiftType.toUpperCase() : "MORNING";
 
         LocalDateTime start, end;
+        String shiftName;
         if ("MORNING".equalsIgnoreCase(shift)) {
             start = queryDate.atTime(6, 0, 0);
-            end = queryDate.atTime(14, 0, 0);
-        } else {
+            end = queryDate.atTime(13, 59, 59);
+            shiftName = "Ca Sáng (06:00 - 14:00)";
+        } else if ("EVENING".equalsIgnoreCase(shift)) {
             start = queryDate.atTime(14, 0, 0);
+            // Nới rộng đến 05:59:59 sáng hôm sau để bao quát các đơn thanh toán ăn khuya
+            end = queryDate.plusDays(1).atTime(5, 59, 59);
+            shiftName = "Ca Tối (14:00 - 24:00)";
+        } else {
+            // FULL_DAY / ALL
+            start = queryDate.atTime(0, 0, 0);
             end = queryDate.atTime(23, 59, 59);
+            shiftName = "Cả Ngày (00:00 - 24:00)";
         }
 
         List<Bill> bills = billRepository.findByStatusAndPaymentTimeBetween(BillStatus.PAID, start, end);
@@ -437,7 +446,7 @@ public class CashierServiceImpl implements CashierService {
 
         return CashierShiftSummaryResponse.builder()
                 .shiftType(shift)
-                .shiftName("MORNING".equalsIgnoreCase(shift) ? "Ca Sáng (06:00 - 14:00)" : "Ca Tối (14:00 - 24:00)")
+                .shiftName(shiftName)
                 .workDate(queryDate)
                 .cashierUsername(cashierUsername)
                 .cashierFullName(cashier != null ? cashier.getFullName() : "Thu Ngân POS")
