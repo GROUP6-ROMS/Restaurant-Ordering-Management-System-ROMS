@@ -514,15 +514,15 @@ export default function TableWelcomePage() {
                 {verifiedTable.name}
               </span>
             )}
-            <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: isTableOccupied ? '#9D4124' : '#56423D' }}>
-              {isTableOccupied ? 'của bạn đã sẵn sàng!' : 'sẵn sàng đón khách!'}
+            <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: isTableOccupied ? '#9D4124' : '#E65100' }}>
+              {isTableOccupied ? 'của bạn đã sẵn sàng!' : 'Chờ nhân viên mở bàn'}
             </span>
           </div>
 
           <p style={{ fontSize: '0.82rem', color: '#56423D', margin: '0 auto 16px', maxWidth: '340px', lineHeight: 1.5 }}>
             {isTableOccupied
-              ? 'Quý khách có thể bắt đầu chọn món ngay trên thiết bị này hoặc duyệt toàn bộ danh mục thực đơn đặc sắc bên dưới.'
-              : 'Bàn ăn đang chờ nhân viên phục vụ mở bàn (Check-in). Quý khách có thể xem trước thực đơn hoặc nhấn "Gọi mở bàn" để nhân viên đến phục vụ ngay!'}
+              ? 'Quý khách có thể bắt đầu chọn món ngay trên thiết bị này hoặc duyệt toàn bộ danh mục thực đơn đặc sắc.'
+              : 'Bàn ăn đang chờ nhân viên phục vụ mở bàn (Check-in). Vui lòng nhấn "Gọi nhân viên mở bàn" để nhân viên đến phục vụ bạn!'}
           </p>
 
           {/* Guest Count Selector */}
@@ -650,61 +650,33 @@ export default function TableWelcomePage() {
               </button>
             </>
           ) : (
-            <>
-              {/* Call Waiter to Open Table */}
-              <button
-                id="btnCallOpenTable"
-                type="button"
-                onClick={handleCallOpenTable}
-                style={{
-                  padding: '14px 10px',
-                  borderRadius: '16px',
-                  border: '2px solid #E65100',
-                  background: '#FFF3E0',
-                  color: '#BF360C',
-                  fontFamily: "'Epilogue', sans-serif",
-                  fontWeight: 800,
-                  fontSize: '0.92rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <Icon name="notifications_active" size={20} fill={1} />
-                <span>Gọi mở bàn</span>
-              </button>
-
-              {/* Browse Menu Preview */}
-              <button
-                id="btnBrowseMenu"
-                type="button"
-                onClick={handleBrowseMenu}
-                style={{
-                  padding: '14px 10px',
-                  borderRadius: '16px',
-                  border: 'none',
-                  background: '#9D4124',
-                  color: '#FFFFFF',
-                  fontFamily: "'Epilogue', sans-serif",
-                  fontWeight: 800,
-                  fontSize: '0.92rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 8px 24px -4px rgba(157, 65, 36, 0.4)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span>Xem thực đơn</span>
-                <Icon name="restaurant_menu" size={20} />
-              </button>
-            </>
+            <button
+              id="btnCallOpenTable"
+              type="button"
+              onClick={handleCallOpenTable}
+              style={{
+                gridColumn: '1 / -1',
+                width: '100%',
+                padding: '16px 14px',
+                borderRadius: '16px',
+                border: '2px solid #E65100',
+                background: '#FFF3E0',
+                color: '#BF360C',
+                fontFamily: "'Epilogue', sans-serif",
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 16px rgba(230, 81, 0, 0.15)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Icon name="notifications_active" size={22} fill={1} />
+              <span>Gọi nhân viên mở bàn</span>
+            </button>
           )}
         </div>
       </section>

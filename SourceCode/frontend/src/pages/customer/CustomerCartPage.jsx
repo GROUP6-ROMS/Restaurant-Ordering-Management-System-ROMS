@@ -143,6 +143,50 @@ export default function CustomerCartPage() {
     }
   };
 
+  const diningToken = sessionStorage.getItem('roms_dining_token');
+  const staffToken = sessionStorage.getItem('roms_token');
+  const isTableOccupied = (tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
+
+  // Chờ nhân viên mở bàn - Chặn truy cập giỏ hàng nếu bàn chưa mở
+  if (!isTableOccupied) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        minHeight: 'calc(100dvh - 120px)', padding: '40px 20px',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%',
+          background: 'rgba(239, 68, 68, 0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 20,
+        }}>
+          <Icon name="lock" size={40} style={{ color: '#ef4444' }} />
+        </div>
+        <h2 style={{ fontFamily: 'Epilogue', fontWeight: 700, fontSize: 20, color: 'var(--on-surface)', marginBottom: 8 }}>
+          Chờ nhân viên mở bàn
+        </h2>
+        <p style={{ color: 'var(--on-surface-variant)', fontSize: 14, maxWidth: 320, marginBottom: 24, lineHeight: 1.5, fontFamily: 'Plus Jakarta Sans' }}>
+          Bàn của bạn hiện chưa được mở phiên phục vụ. Vui lòng liên hệ nhân viên hoặc bấm chuông gọi nhân viên để được hỗ trợ mở bàn trước khi xem và đặt món!
+        </p>
+        <button
+          onClick={handleCallStaff}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '14px 28px', borderRadius: '9999px',
+            background: 'var(--primary-container)', color: 'var(--on-primary)',
+            fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 14,
+            border: 'none', cursor: 'pointer', boxShadow: 'var(--shadow-primary)',
+          }}
+        >
+          <Icon name="notifications" size={18} />
+          Gọi nhân viên mở bàn
+        </button>
+      </div>
+    );
+  }
+
   // Trang gio hang trong
   if (cartItems.length === 0) {
     return (

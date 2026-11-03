@@ -6,7 +6,8 @@ import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import RomsLogo from '../common/RomsLogo';
 import Icon from '../common/Icon';
 import { customerApi } from '../../api/customerApi';
-import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
+import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
+import { tableApi } from '../../api/tableApi';
 
 function formatVND(amount) {
   return amount.toLocaleString('vi-VN') + 'đ';
@@ -57,6 +58,46 @@ export default function CustomerLayout() {
   const isMenu = location.pathname.includes('/menu');
   const isCart = location.pathname.includes('/cart');
   const isTracking = location.pathname.includes('/tracking');
+
+  const [tableStatus, setTableStatus] = useState(
+    tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE')
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
+        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
+      ) {
+        if (event.status === 'OCCUPIED') {
+          setTableStatus('OCCUPIED');
+          if (tableInfo?.token) {
+            tableApi.verifyQr(tableInfo.token).then(res => {
+              if (res.data?.success && res.data.data?.diningToken) {
+                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+              }
+            }).catch(console.error);
+          }
+          showToast('Bàn đã được nhân viên mở! Quý khách có thể xem thực đơn và gọi món.');
+        } else if (event.status === 'AVAILABLE') {
+          setTableStatus('AVAILABLE');
+          sessionStorage.removeItem('roms_dining_token');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token]);
+
+  const diningToken = sessionStorage.getItem('roms_dining_token');
+  const staffToken = sessionStorage.getItem('roms_token');
+  const isTableOccupied = (tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
+
+  const handleProtectedNav = (e) => {
+    if (!isTableOccupied) {
+      e.preventDefault();
+      showToast('Chờ nhân viên mở bàn! Vui lòng đợi nhân viên mở bàn.');
+    }
+  };
 
   // Accessibility: Lắng nghe phím Escape để đóng Modal hỗ trợ
   useEffect(() => {
@@ -143,7 +184,7 @@ export default function CustomerLayout() {
       </main>
 
       {/* --- Floating Cart Bar (chi hien khi co mon trong gio + khong o trang cart) --- */}
-      {totalCount > 0 && !isCart && (
+      {totalCount > 0 && !isCart && isTableOccupied && (
         <div style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           width: '100%', maxWidth: 430,
@@ -227,6 +268,7 @@ export default function CustomerLayout() {
         {/* Thuc don tab */}
         <Link
           to="/dining/menu"
+          onClick={handleProtectedNav}
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
@@ -245,6 +287,7 @@ export default function CustomerLayout() {
         {/* Gio hang tab (Cung cap voi Thuc Don va Ban An) */}
         <Link
           to="/dining/cart"
+          onClick={handleProtectedNav}
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
@@ -280,6 +323,7 @@ export default function CustomerLayout() {
         {/* Ban an tab */}
         <Link
           to="/dining/orders/tracking"
+          onClick={handleProtectedNav}
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
