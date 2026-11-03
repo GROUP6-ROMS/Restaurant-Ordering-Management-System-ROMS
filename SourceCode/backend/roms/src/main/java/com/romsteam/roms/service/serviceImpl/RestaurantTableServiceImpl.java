@@ -359,9 +359,13 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         }
 
         TableResponse response = mapToTableResponse(table);
-        // Sinh Dining JWT Token bảo vệ phiên gọi món của khách
-        String diningToken = jwtTokenProvider.generateDiningToken(table.getId(), table.getTableNumber());
-        response.setDiningToken(diningToken);
+        // Chỉ cấp Dining JWT Token nếu bàn đang được nhân viên mở phiên phục vụ (OCCUPIED)
+        if (table.getStatus() == TableStatus.OCCUPIED && response.getActiveSessionId() != null) {
+            String diningToken = jwtTokenProvider.generateDiningToken(table.getId(), table.getTableNumber());
+            response.setDiningToken(diningToken);
+        } else {
+            response.setDiningToken(null);
+        }
 
         return response;
     }

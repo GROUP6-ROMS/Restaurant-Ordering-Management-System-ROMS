@@ -5,6 +5,7 @@ import { tableApi } from '../../api/tableApi';
 import Icon from '../../components/common/Icon';
 import RomsLogo from '../../components/common/RomsLogo';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
+import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 export default function TableWelcomePage() {
   const [searchParams] = useSearchParams();
@@ -95,6 +96,35 @@ export default function TableWelcomePage() {
     verifyToken();
   }, [tokenParam]);
 
+  const isTableOccupied = verifiedTable?.status === 'OCCUPIED' && Boolean(verifiedTable?.diningToken);
+
+  // Lắng nghe sự kiện mở bàn thời gian thực từ Phục vụ qua WebSocket
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
+        (Number(event.tableId) === Number(verifiedTable?.id) || event.tableNumber === verifiedTable?.tableNumber)
+      ) {
+        if (event.status === 'OCCUPIED' && tokenParam) {
+          tableApi.verifyQr(tokenParam.trim()).then(res => {
+            if (res.data?.success && res.data.data) {
+              const tData = res.data.data;
+              if (tData.diningToken) {
+                sessionStorage.setItem('roms_dining_token', tData.diningToken);
+              }
+              setVerifiedTable(tData);
+              showToast('Bàn đã được nhân viên mở phục vụ! Quý khách có thể bắt đầu đặt món.');
+            }
+          }).catch(console.error);
+        } else if (event.status === 'AVAILABLE') {
+          sessionStorage.removeItem('roms_dining_token');
+          setVerifiedTable(prev => prev ? { ...prev, status: 'AVAILABLE', diningToken: null } : null);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [verifiedTable?.id, verifiedTable?.tableNumber, tokenParam]);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -108,14 +138,59 @@ export default function TableWelcomePage() {
     setTimeout(() => setCopiedWifi(false), 2000);
   };
 
-  const handleCallStaff = () => {
-    const tableLabel = isVip && verifiedTable?.name ? `${tableCode} (${verifiedTable.name})` : tableCode;
-    showToast(`Đã rung chuông! Nhân viên đang đến hỗ trợ ${tableLabel}.`);
+  const handleCallStaff = async () => {
+    try {
+      const tId = verifiedTable?.id;
+      const tNum = verifiedTable?.code || verifiedTable?.tableNumber || tableCode;
+      if (tId) {
+        await tableApi.callWaiter(tId, {
+          requestType: 'ASSISTANCE',
+          note: `Khách tại bàn ${tNum} yêu cầu nhân viên hỗ trợ`
+        });
+      }
+      const tableLabel = isVip && verifiedTable?.name ? `${tableCode} (${verifiedTable.name})` : tableCode;
+      showToast(`Đã rung chuông! Nhân viên đang đến hỗ trợ ${tableLabel}.`);
+    } catch (err) {
+      const tableLabel = isVip && verifiedTable?.name ? `${tableCode} (${verifiedTable.name})` : tableCode;
+      showToast(`Đã rung chuông! Nhân viên đang đến hỗ trợ ${tableLabel}.`);
+    }
+  };
+
+  const handleCallOpenTable = async () => {
+    try {
+      const tId = verifiedTable?.id;
+      const tNum = verifiedTable?.code || verifiedTable?.tableNumber || tableCode;
+      if (tId) {
+        await tableApi.callWaiter(tId, {
+          requestType: 'OPEN_TABLE',
+          note: `Khách tại ${tNum} yêu cầu nhân viên mở bàn đón khách`
+        });
+      }
+      showToast(`Đã gửi yêu cầu! Nhân viên đang đến mở ${tNum}.`);
+    } catch (err) {
+      showToast('Đã gửi yêu cầu mở bàn tới nhân viên phục vụ!');
+    }
+  };
+
+  const handleBrowseMenu = () => {
+    const info = {
+      tableNumber: tableCode,
+      tableId: verifiedTable?.id,
+      tableName: verifiedTable?.name || '',
+      zoneName: verifiedTable?.zoneName || '',
+      isVip,
+      guestCount,
+      status: verifiedTable?.status || 'AVAILABLE',
+      token: verifiedTable?.qrToken,
+      diningToken: verifiedTable?.diningToken || null
+    };
+    setTableInfo(info);
+    navigate('/dining/menu');
   };
 
   const handleStartDining = () => {
-    if (!verifiedTable || !verifiedTable.diningToken) {
-      setVerifyError('Phiên gọi món chưa được xác thực. Vui lòng quét lại mã QR tại bàn!');
+    if (!verifiedTable || !verifiedTable.diningToken || verifiedTable.status !== 'OCCUPIED') {
+      showToast('Bàn ăn đang chờ nhân viên mở phục vụ. Vui lòng bấm "Gọi mở bàn"!');
       return;
     }
 
@@ -126,6 +201,7 @@ export default function TableWelcomePage() {
       zoneName: verifiedTable.zoneName || '',
       isVip,
       guestCount,
+      status: 'OCCUPIED',
       token: verifiedTable.qrToken,
       diningToken: verifiedTable.diningToken
     };
@@ -387,17 +463,25 @@ export default function TableWelcomePage() {
             gap: '6px',
             padding: '4px 14px',
             borderRadius: '9999px',
-            background: '#E8F5E9',
-            border: '1px solid #C8E6C9',
-            color: '#2E7D32',
+            background: isTableOccupied ? '#E8F5E9' : '#FFF3E0',
+            border: isTableOccupied ? '1px solid #C8E6C9' : '1px solid #FFE0B2',
+            color: isTableOccupied ? '#2E7D32' : '#E65100',
             fontSize: '0.75rem',
             fontWeight: 700,
             marginBottom: '14px'
           }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2E7D32', animation: 'subtlePulse 1.5s infinite' }} />
-            <Icon name="check_circle" size={15} fill={1} />
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isTableOccupied ? '#2E7D32' : '#E65100',
+              animation: 'subtlePulse 1.5s infinite'
+            }} />
+            <Icon name={isTableOccupied ? "check_circle" : "hourglass_top"} size={15} fill={1} />
             <span>
-              Đã kết nối {tableCode}{isVip && verifiedTable?.name ? ` (${verifiedTable.name})` : ''} • Sẵn sàng phục vụ
+              {isTableOccupied
+                ? `Đã kết nối ${tableCode}${isVip && verifiedTable?.name ? ` (${verifiedTable.name})` : ''} • Sẵn sàng phục vụ`
+                : `${tableCode} • Chờ nhân viên mở bàn`}
             </span>
           </div>
 
@@ -418,7 +502,7 @@ export default function TableWelcomePage() {
           </div>
 
           <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.45rem', color: '#1F1B1A', margin: '0 0 6px', letterSpacing: '-0.01em' }}>
-            Xin chào quý khách!
+            {isTableOccupied ? 'Xin chào quý khách!' : 'Chào mừng quý khách!'}
           </h2>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
@@ -430,13 +514,15 @@ export default function TableWelcomePage() {
                 {verifiedTable.name}
               </span>
             )}
-            <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#9D4124' }}>
-              của bạn đã sẵn sàng!
+            <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: isTableOccupied ? '#9D4124' : '#56423D' }}>
+              {isTableOccupied ? 'của bạn đã sẵn sàng!' : 'sẵn sàng đón khách!'}
             </span>
           </div>
 
           <p style={{ fontSize: '0.82rem', color: '#56423D', margin: '0 auto 16px', maxWidth: '340px', lineHeight: 1.5 }}>
-            Quý khách có thể bắt đầu chọn món ngay trên thiết bị này hoặc duyệt toàn bộ danh mục thực đơn đặc sắc bên dưới.
+            {isTableOccupied
+              ? 'Quý khách có thể bắt đầu chọn món ngay trên thiết bị này hoặc duyệt toàn bộ danh mục thực đơn đặc sắc bên dưới.'
+              : 'Bàn ăn đang chờ nhân viên phục vụ mở bàn (Check-in). Quý khách có thể xem trước thực đơn hoặc nhấn "Gọi mở bàn" để nhân viên đến phục vụ ngay!'}
           </p>
 
           {/* Guest Count Selector */}
@@ -507,59 +593,119 @@ export default function TableWelcomePage() {
       {/* PRIMARY ACTION BUTTONS (SCR-09) */}
       <section style={{ marginBottom: '14px', width: '100%' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {/* Call Staff */}
-          <button
-            id="btnCallStaff"
-            type="button"
-            onClick={handleCallStaff}
-            style={{
-              padding: '14px 10px',
-              borderRadius: '16px',
-              border: '2px solid #9D4124',
-              background: '#FFFFFF',
-              color: '#9D4124',
-              fontFamily: "'Epilogue', sans-serif",
-              fontWeight: 800,
-              fontSize: '0.92rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Icon name="room_service" size={20} fill={1} />
-            <span>Gọi nhân viên</span>
-          </button>
+          {isTableOccupied ? (
+            <>
+              {/* Call Staff */}
+              <button
+                id="btnCallStaff"
+                type="button"
+                onClick={handleCallStaff}
+                style={{
+                  padding: '14px 10px',
+                  borderRadius: '16px',
+                  border: '2px solid #9D4124',
+                  background: '#FFFFFF',
+                  color: '#9D4124',
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Icon name="room_service" size={20} fill={1} />
+                <span>Gọi nhân viên</span>
+              </button>
 
-          {/* Start Order */}
-          <button
-            id="btnStartOrder"
-            type="button"
-            onClick={handleStartDining}
-            style={{
-              padding: '14px 10px',
-              borderRadius: '16px',
-              border: 'none',
-              background: '#9D4124',
-              color: '#FFFFFF',
-              fontFamily: "'Epilogue', sans-serif",
-              fontWeight: 800,
-              fontSize: '0.92rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: '0 8px 24px -4px rgba(157, 65, 36, 0.4)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <span>Bắt đầu gọi món</span>
-            <Icon name="arrow_forward" size={20} />
-          </button>
+              {/* Start Order */}
+              <button
+                id="btnStartOrder"
+                type="button"
+                onClick={handleStartDining}
+                style={{
+                  padding: '14px 10px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: '#9D4124',
+                  color: '#FFFFFF',
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 8px 24px -4px rgba(157, 65, 36, 0.4)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>Bắt đầu gọi món</span>
+                <Icon name="arrow_forward" size={20} />
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Call Waiter to Open Table */}
+              <button
+                id="btnCallOpenTable"
+                type="button"
+                onClick={handleCallOpenTable}
+                style={{
+                  padding: '14px 10px',
+                  borderRadius: '16px',
+                  border: '2px solid #E65100',
+                  background: '#FFF3E0',
+                  color: '#BF360C',
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Icon name="notifications_active" size={20} fill={1} />
+                <span>Gọi mở bàn</span>
+              </button>
+
+              {/* Browse Menu Preview */}
+              <button
+                id="btnBrowseMenu"
+                type="button"
+                onClick={handleBrowseMenu}
+                style={{
+                  padding: '14px 10px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: '#9D4124',
+                  color: '#FFFFFF',
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 8px 24px -4px rgba(157, 65, 36, 0.4)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>Xem thực đơn</span>
+                <Icon name="restaurant_menu" size={20} />
+              </button>
+            </>
+          )}
         </div>
       </section>
 

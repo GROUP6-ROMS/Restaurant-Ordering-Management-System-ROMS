@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { customerApi } from '../../api/customerApi';
+import { tableApi } from '../../api/tableApi';
+import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
 
 import Icon from '../../components/common/Icon';
@@ -25,6 +27,37 @@ export default function CustomerCartPage() {
   const [orderNote, setOrderNote] = useState('');
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [tableStatus, setTableStatus] = useState(tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE'));
+
+  useEffect(() => {
+    if (tableInfo?.status) setTableStatus(tableInfo.status);
+  }, [tableInfo?.status]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
+        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
+      ) {
+        if (event.status === 'OCCUPIED') {
+          setTableStatus('OCCUPIED');
+          if (tableInfo?.token) {
+            tableApi.verifyQr(tableInfo.token).then(res => {
+              if (res.data?.success && res.data.data?.diningToken) {
+                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+              }
+            }).catch(console.error);
+          }
+          showToast('Bàn đã được nhân viên mở! Quý khách có thể gửi đơn đặt món.');
+        } else if (event.status === 'AVAILABLE') {
+          setTableStatus('AVAILABLE');
+          sessionStorage.removeItem('roms_dining_token');
+          showToast('Bữa ăn đã hoàn tất thanh toán.');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -40,8 +73,15 @@ export default function CustomerCartPage() {
   const handleSubmitOrder = async () => {
     if (cartItems.length === 0 || isSubmitting) return;
 
-    const diningToken = sessionStorage.getItem('roms_dining_token');
     const staffToken = sessionStorage.getItem('roms_token');
+    const isOccupied = tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED';
+
+    if (!isOccupied && !staffToken) {
+      showToast('Bàn ăn chưa được nhân viên phục vụ mở phiên (Check-in). Vui lòng nhấn "Gọi mở bàn" trước!');
+      return;
+    }
+
+    const diningToken = sessionStorage.getItem('roms_dining_token');
     if (!diningToken && !staffToken) {
       showToast('Vui lòng quét mã QR tại bàn để xác thực và gửi đơn gọi món!');
       return;
@@ -144,6 +184,51 @@ export default function CustomerCartPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 24 }}>
+
+      {/* --- Cảnh báo bàn chưa mở phiên --- */}
+      {!(tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED' || sessionStorage.getItem('roms_token')) && (
+        <div style={{ padding: '12px 16px 0' }}>
+          <div style={{
+            background: '#FFF3E0',
+            borderRadius: 16,
+            padding: '12px 14px',
+            border: '1px solid #FFE0B2',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Icon name="hourglass_top" size={24} style={{ color: '#E65100' }} />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, color: '#BF360C', fontFamily: 'Plus Jakarta Sans' }}>
+                  Chờ nhân viên mở bàn
+                </div>
+                <div style={{ fontSize: 11, color: '#E65100', fontFamily: 'Plus Jakarta Sans' }}>
+                  Nhân viên cần mở bàn trước khi bạn gửi đơn
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleCallStaff}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                background: '#E65100',
+                color: '#FFFFFF',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Gọi mở bàn
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* --- Card thong tin ban an --- */}
       <div style={{ padding: '12px 16px 0' }}>

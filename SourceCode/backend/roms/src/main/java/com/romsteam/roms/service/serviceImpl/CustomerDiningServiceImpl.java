@@ -111,34 +111,18 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
 
         RestaurantTable table = resolveTable(request.getTableId(), request.getTableNumber());
 
-        // 1. Kiểm tra hoặc khởi tạo phiên ăn DiningSession
+        // 1. Kiểm tra phiên ăn DiningSession đang hoạt động (Bắt buộc bàn phải được nhân viên mở trước)
         Optional<DiningSession> activeSessionOpt = sessionRepository.findByTableIdAndStatus(table.getId(), SessionStatus.ACTIVE);
-        DiningSession activeSession;
+        if (activeSessionOpt.isEmpty() || table.getStatus() != TableStatus.OCCUPIED) {
+            throw new AppException("Bàn ăn hiện chưa được nhân viên phục vụ mở phiên (Check-in). Vui lòng liên hệ nhân viên hoặc bấm 'Gọi nhân viên' để mở bàn!", HttpStatus.FORBIDDEN);
+        }
 
-        if (activeSessionOpt.isPresent()) {
-            activeSession = activeSessionOpt.get();
-            // Nếu trước đó bàn từng gửi in tạm tính, xóa cờ tạm tính để Thu ngân biết có món mới
-            if (activeSession.getNote() != null && activeSession.getNote().contains("[DRAFT_PRINTED]")) {
-                String cleaned = activeSession.getNote().replace("[DRAFT_PRINTED]", "").trim();
-                activeSession.setNote(cleaned.isEmpty() ? null : cleaned);
-                sessionRepository.save(activeSession);
-            }
-        } else {
-            // Tự động mở phiên ăn cho bàn
-            String sessionToken = "sess-" + table.getTableNumber().toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
-            activeSession = new DiningSession();
-            activeSession.setTable(table);
-            activeSession.setSessionToken(sessionToken);
-            activeSession.setStatus(SessionStatus.ACTIVE);
-            activeSession.setGuestCount(request.getGuestCount() != null && request.getGuestCount() > 0 
-                    ? request.getGuestCount() 
-                    : (table.getCapacity() != null ? table.getCapacity() : 2));
-            activeSession.setStartTime(LocalDateTime.now());
-            activeSession.setNote(request.getOrderNote());
-            activeSession = sessionRepository.save(activeSession);
-
-            table.setStatus(TableStatus.OCCUPIED);
-            tableRepository.save(table);
+        DiningSession activeSession = activeSessionOpt.get();
+        // Nếu trước đó bàn từng gửi in tạm tính, xóa cờ tạm tính để Thu ngân biết có món mới
+        if (activeSession.getNote() != null && activeSession.getNote().contains("[DRAFT_PRINTED]")) {
+            String cleaned = activeSession.getNote().replace("[DRAFT_PRINTED]", "").trim();
+            activeSession.setNote(cleaned.isEmpty() ? null : cleaned);
+            sessionRepository.save(activeSession);
         }
 
         // 2. Tạo phiếu gọi món Order

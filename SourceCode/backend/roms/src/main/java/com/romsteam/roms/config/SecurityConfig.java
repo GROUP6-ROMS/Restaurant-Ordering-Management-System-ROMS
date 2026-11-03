@@ -91,7 +91,7 @@ public class SecurityConfig {
                         // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket, Actuator, Webhook payOS
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/customer/tables/verify-qr",
+                                "/api/customer/tables/**",
                                 "/api/customer/reservations/**",
                                 "/api/customer/dining/menu",
                                 "/api/customer/ai/**",

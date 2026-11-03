@@ -5,7 +5,7 @@ const CartContext = createContext();
 export function CartProvider({ children }) {
   const [tableInfo, setTableInfo] = useState(() => {
     const saved = localStorage.getItem('roms_table_info');
-    return saved ? JSON.parse(saved) : { tableNumber: "Bàn 05", tableId: 5, sessionId: 103 };
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [cartItems, setCartItems] = useState(() => {
