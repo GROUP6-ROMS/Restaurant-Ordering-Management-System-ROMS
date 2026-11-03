@@ -69,7 +69,7 @@ public class EmailServiceImpl implements EmailService {
      * Tạo template Email HTML chuyên nghiệp với màu sắc thương hiệu ROMS Bistro
      */
     private String buildOtpHtmlContent(String recipientName, String otp) {
-        return """
+        String template = """
             <!DOCTYPE html>
             <html lang="vi">
             <head>
@@ -98,7 +98,7 @@ public class EmailServiceImpl implements EmailService {
                   <p>Hệ Thống Quản Lý & Vận Hành Nhà Hàng Thông Minh</p>
                 </div>
                 <div class="body">
-                  <div class="greeting">Xin chào %s,</div>
+                  <div class="greeting">Xin chào {recipientName},</div>
                   <div class="desc">
                     Hệ thống nhận được yêu cầu đặt lại mã PIN đăng nhập cho tài khoản Quản lý cơ sở của bạn.
                     Dưới đây là mã xác thực OTP dùng một lần để hoàn tất quy trình:
@@ -106,7 +106,7 @@ public class EmailServiceImpl implements EmailService {
                   
                   <div class="otp-box">
                     <div class="otp-label">MÃ XÁC THỰC OTP CỦA BẠN</div>
-                    <div class="otp-code">%s</div>
+                    <div class="otp-code">{otp}</div>
                     <div class="otp-note">⏱ Mã có hiệu lực trong vòng 5 phút</div>
                   </div>
                   
@@ -120,7 +120,8 @@ public class EmailServiceImpl implements EmailService {
               </div>
             </body>
             </html>
-            """.formatted(recipientName, otp);
+            """;
+        return template.replace("{recipientName}", recipientName).replace("{otp}", otp);
     }
 }
 
