@@ -248,7 +248,14 @@ export default function TableManagementPage() {
   const handleOpenAssignModal = async (resItem) => {
     setSelectedResForAssign(resItem);
     setSelectedAssignTableId('');
-    setAssignZoneFilter('ALL');
+
+    // Tự động đặt bộ lọc khu vực xuất hiện đầu tiên là khu vực chứa bàn mà khách muốn đặt
+    const matchedZone = zonesList.find(
+      z => z.zoneCode === resItem.requestedZone || z.name === resItem.requestedZone
+    );
+    const initialZone = matchedZone ? matchedZone.zoneCode : (resItem.requestedZone || 'ALL');
+    setAssignZoneFilter(initialZone);
+
     setAssignAdminNote('');
     setShowAssignModal(true);
     setAssignLoading(true);
@@ -258,7 +265,7 @@ export default function TableManagementPage() {
       setAvailableTablesForAssign(availableList);
       if (availableList.length > 0) {
         // Tự động gợi ý bàn cùng khu vực khách mong muốn nếu có
-        const matched = availableList.find(t => t.zone === resItem.requestedZone);
+        const matched = availableList.find(t => t.zone === (matchedZone?.zoneCode || resItem.requestedZone));
         setSelectedAssignTableId(matched ? String(matched.id) : String(availableList[0].id));
       }
     } catch (err) {
