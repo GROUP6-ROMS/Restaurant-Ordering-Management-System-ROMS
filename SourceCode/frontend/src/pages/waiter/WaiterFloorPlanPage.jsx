@@ -46,9 +46,9 @@ export default function WaiterFloorPlanPage() {
             qty: item.quantity || 1,
             note: item.note || (
               item.status === 'READY' ? 'Quầy Pass sẵn sàng' :
-              item.status === 'COOKING' ? 'Bếp đang nấu KDS' :
-              item.status === 'PENDING' ? 'Chờ bếp nhận món' :
-              item.status === 'SERVED' ? 'Đã lên bàn' : 'Chờ xử lý'
+                item.status === 'COOKING' ? 'Bếp đang nấu KDS' :
+                  item.status === 'PENDING' ? 'Chờ bếp nhận món' :
+                    item.status === 'SERVED' ? 'Đã lên bàn' : 'Chờ xử lý'
             )
           }))
         }));
@@ -474,7 +474,9 @@ export default function WaiterFloorPlanPage() {
             borderRadius: '12px',
             background: '#FEE2E2',
             color: '#B91C1C',
-            border: '1px solid #FCA5A5'
+            border: '1px solid #FCA5A5',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
           }}
         >
           <Icon name="warning" size={13} style={{ color: '#B91C1C' }} />
@@ -496,7 +498,9 @@ export default function WaiterFloorPlanPage() {
             borderRadius: '12px',
             background: '#FEF3C7',
             color: '#B45309',
-            border: '1px solid #FCD34D'
+            border: '1px solid #FCD34D',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
           }}
         >
           <Icon name="timer" size={13} style={{ color: '#B45309' }} />
@@ -518,7 +522,9 @@ export default function WaiterFloorPlanPage() {
             borderRadius: '12px',
             background: '#ECFDF5',
             color: '#047857',
-            border: '1px solid #A7F3D0'
+            border: '1px solid #A7F3D0',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
           }}
         >
           <Icon name="schedule" size={13} style={{ color: '#047857' }} />
@@ -541,7 +547,9 @@ export default function WaiterFloorPlanPage() {
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
-          animation: 'pulse 1.5s infinite'
+          animation: 'pulse 1.5s infinite',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <Icon name="campaign" size={14} /> CẦN PHỤC VỤ
         </span>
@@ -558,7 +566,9 @@ export default function WaiterFloorPlanPage() {
           fontSize: '0.72rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px'
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <Icon name="soup_kitchen" size={14} /> BẾP XONG MÓN
         </span>
@@ -576,7 +586,9 @@ export default function WaiterFloorPlanPage() {
           fontSize: '0.72rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px'
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <Icon name="receipt" size={14} /> CHỜ TÍNH TIỀN
         </span>
@@ -594,7 +606,9 @@ export default function WaiterFloorPlanPage() {
           fontSize: '0.72rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px'
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669' }} />
           SẴN SÀNG
@@ -612,7 +626,9 @@ export default function WaiterFloorPlanPage() {
           fontSize: '0.72rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px'
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <Icon name="cleaning_services" size={14} /> CHỜ DỌN BÀN
         </span>
@@ -630,7 +646,9 @@ export default function WaiterFloorPlanPage() {
           fontSize: '0.72rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px'
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <Icon name="bookmark" size={14} /> ĐÃ ĐẶT
         </span>
@@ -648,7 +666,9 @@ export default function WaiterFloorPlanPage() {
           fontSize: '0.72rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px'
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <Icon name="restaurant" size={13} style={{ color: '#C62828' }} />
           ĐANG PHỤC VỤ
@@ -667,7 +687,9 @@ export default function WaiterFloorPlanPage() {
           fontSize: '0.72rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px'
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <Icon name="lock" size={13} style={{ color: '#57534E' }} />
           ĐÃ KHÓA
@@ -683,6 +705,8 @@ export default function WaiterFloorPlanPage() {
         borderRadius: '9999px',
         fontWeight: 700,
         fontSize: '0.72rem',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
         display: 'inline-flex',
         alignItems: 'center',
         gap: '4px'
@@ -1551,11 +1575,12 @@ export default function WaiterFloorPlanPage() {
               return (
                 <div
                   key={t.id}
+                  className="waiter-card-table"
                   onClick={() => handleSelectTable(t)}
                   style={{
                     background: '#FFFFFF',
                     borderRadius: '16px',
-                    padding: isMobile ? '12px' : '14px',
+                    padding: isMobile ? '10px 12px' : '14px',
                     boxShadow: isSelected ? '0 8px 24px rgba(157, 65, 36, 0.18)' : '0 2px 10px rgba(0,0,0,0.04)',
                     borderTop: `4px solid ${topBorderColor}`,
                     border: isSelected ? '2px solid #9D4124' : '1px solid #F0E6E4',
@@ -1563,38 +1588,55 @@ export default function WaiterFloorPlanPage() {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    minHeight: isMobile ? '145px' : '170px',
+                    minHeight: isMobile ? '165px' : '170px',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    position: 'relative'
+                    position: 'relative',
+                    minWidth: 0
                   }}
                 >
-                  <div>
-                    {/* Card Top */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{
-                          fontFamily: "'Epilogue', sans-serif",
-                          fontWeight: 800,
-                          fontSize: '1.05rem',
-                          color: isSelected ? '#9D4124' : '#1F1B1A'
-                        }}>
-                          {t.label}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', background: '#F6ECEA', color: '#56423D', padding: '2px 6px', borderRadius: '9999px', fontWeight: 600 }}>
-                          {t.seats} chỗ
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {getDwellTimeBadge(t)}
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {/* Card Top: Tầng 1 - Số chỗ bên trái & Duy nhất 1 Huy hiệu trạng thái bên phải */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', minWidth: 0 }}>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        background: '#F6ECEA',
+                        color: '#56423D',
+                        padding: '2px 7px',
+                        borderRadius: '9999px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}>
+                        {t.seats} chỗ
+                      </span>
+
+                      {/* Chỉ giữ duy nhất getStatusBadge ở góc phải -> Không bao giờ bị tràn */}
+                      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                         {getStatusBadge(t)}
                       </div>
                     </div>
 
-                    {/* Status note */}
-                    <p style={{ margin: '4px 0 8px', fontSize: '0.78rem', color: '#56423D', lineHeight: 1.35 }}>
-                      {t.statusNote}
-                    </p>
+                    {/* Card Top: Tầng 2 - Tên bàn nổi bật */}
+                    <h4 style={{
+                      fontFamily: "'Epilogue', sans-serif",
+                      fontWeight: 800,
+                      fontSize: isMobile ? '0.96rem' : '1.05rem',
+                      color: isSelected ? '#9D4124' : '#1F1B1A',
+                      margin: '2px 0 4px',
+                      lineHeight: 1.3,
+                      wordBreak: 'break-word'
+                    }}>
+                      {t.label}
+                    </h4>
+
+                    {/* Status note & Cảnh báo thời gian ngồi (nếu có) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '2px 0 8px', flexWrap: 'wrap' }}>
+                      {getDwellTimeBadge(t)}
+                      <span style={{ fontSize: '0.75rem', color: '#56423D', lineHeight: 1.35 }}>
+                        {t.statusNote}
+                      </span>
+                    </div>
 
                     {/* Thông tin đặt bàn nếu có */}
                     {t.status === 'RESERVED' && (t.reservationInfo || t.reservedTime) && (
