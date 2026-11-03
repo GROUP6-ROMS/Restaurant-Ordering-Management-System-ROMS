@@ -235,10 +235,7 @@ public class CashierServiceImpl implements CashierService {
             throw new AppException("Bàn còn " + unservedCount + " phần món đang chế biến / chờ bếp phục vụ! Vui lòng kiểm tra với Bếp hoặc xác nhận đồng ý thanh toán trước.", HttpStatus.BAD_REQUEST);
         }
 
-        // 4. Áp dụng thuế & giảm giá
-        BigDecimal taxRate = request.getTaxRate() != null ? request.getTaxRate() : BigDecimal.valueOf(8.0);
-        BigDecimal taxAmount = subtotal.multiply(taxRate).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-
+        // 4. Áp dụng giảm giá trước, sau đó tính thuế VAT trên số tiền thực tế (theo chuẩn Nghị định 123/2020/NĐ-CP)
         BigDecimal discountAmount = BigDecimal.ZERO;
         if ("PERCENT".equalsIgnoreCase(request.getDiscountType()) && request.getDiscountValue() != null) {
             if (request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
@@ -264,8 +261,13 @@ public class CashierServiceImpl implements CashierService {
             validateManagerPin(request.getManagerPin());
         }
 
-        BigDecimal finalAmount = subtotal.add(taxAmount).subtract(discountAmount);
-        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) finalAmount = BigDecimal.ZERO;
+        BigDecimal taxableAmount = subtotal.subtract(discountAmount);
+        if (taxableAmount.compareTo(BigDecimal.ZERO) < 0) taxableAmount = BigDecimal.ZERO;
+
+        BigDecimal taxRate = request.getTaxRate() != null ? request.getTaxRate() : BigDecimal.valueOf(8.0);
+        BigDecimal taxAmount = taxableAmount.multiply(taxRate).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+
+        BigDecimal finalAmount = taxableAmount.add(taxAmount);
 
         PaymentMethod pm = PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
 
@@ -277,7 +279,7 @@ public class CashierServiceImpl implements CashierService {
             }
         }
 
-        String billCode = "BILL-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + (System.currentTimeMillis() % 10000);
+        String billCode = generateUniqueBillCode();
 
         // 1. Tái sử dụng bản ghi Bill tạm tính (UNPAID) nếu có hoặc tạo mới bản ghi Bill
         Bill bill = existingBillOpt.orElseGet(Bill::new);
@@ -463,7 +465,7 @@ public class CashierServiceImpl implements CashierService {
     @Override
     @Transactional
     public void voidOrderItem(Long itemId, ManagerApprovalRequest request) {
-        validateManagerPin(request.getManagerPin());
+        Staff manager = validateManagerPin(request.getManagerPin());
 
         OrderItem item = orderItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại: " + itemId));
@@ -476,8 +478,9 @@ public class CashierServiceImpl implements CashierService {
             throw new AppException("Món ăn này đã được hủy trước đó!", HttpStatus.BAD_REQUEST);
         }
 
+        String auditNote = "[HỦY BỞI QUẢN LÝ: " + manager.getFullName() + " (@" + manager.getUsername() + ")]";
         item.setStatus(OrderItemStatus.CANCELLED);
-        item.setNote(request.getReason() != null ? "[HỦY BỞI QUẢN LÝ] " + request.getReason() : "[HỦY BỞI QUẢN LÝ]");
+        item.setNote(request.getReason() != null ? auditNote + " " + request.getReason() : auditNote);
         orderItemRepository.save(item);
 
         Order order = item.getOrder();
@@ -570,7 +573,11 @@ public class CashierServiceImpl implements CashierService {
     // HELPER METHODS
     // ===================================================================
 
-    private Staff validateManagerPin(String pin) {
+        private String generateUniqueBillCode() {
+        return "BILL-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "-" + String.format("%03d", (int)(Math.random() * 900) + 100);
+    }
+
+private Staff validateManagerPin(String pin) {
         if (pin == null || pin.trim().length() != 6) {
             throw new AppException("Mã PIN Quản lý phải gồm đúng 6 chữ số!", HttpStatus.BAD_REQUEST);
         }
@@ -727,7 +734,7 @@ public class CashierServiceImpl implements CashierService {
 
     @Override
     @Transactional
-    public CashierTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request) {
+    public CashierTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request, String cashierUsername) {
         RestaurantTable table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
 
@@ -759,11 +766,12 @@ public class CashierServiceImpl implements CashierService {
 
             session.setStatus(SessionStatus.COMPLETED);
             session.setEndTime(LocalDateTime.now());
+            String author = (cashierUsername != null) ? " bởi @" + cashierUsername : "";
             String reason = (request != null && request.getReason() != null && !request.getReason().trim().isEmpty())
                     ? request.getReason().trim()
                     : "Khách không dùng món / Hủy bàn trống";
             String existingNote = session.getNote() != null ? session.getNote() : "";
-            session.setNote((existingNote + " [EMPTY_SESSION_CLOSED: " + reason + "]").trim());
+            session.setNote((existingNote + " [EMPTY_SESSION_CLOSED" + author + ": " + reason + "]").trim());
             sessionRepository.save(session);
 
             for (Order order : orders) {

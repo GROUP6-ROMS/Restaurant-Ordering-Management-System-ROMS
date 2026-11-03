@@ -119,10 +119,7 @@ public class PayOsServiceImpl implements PayOsService {
             throw new AppException("Bàn còn " + unservedCount + " phần món đang chế biến / chờ bếp phục vụ! Vui lòng kiểm tra với Bếp hoặc xác nhận đồng ý thanh toán trước.", HttpStatus.BAD_REQUEST);
         }
 
-        // 3. Tính thuế & giảm giá
-        BigDecimal taxRate = request.getTaxRate() != null ? request.getTaxRate() : BigDecimal.valueOf(8.0);
-        BigDecimal taxAmount = subtotal.multiply(taxRate).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-
+        // 3. Tính giảm giá trước, sau đó tính thuế VAT trên số tiền chịu thuế (theo chuẩn Nghị định 123/2020/NĐ-CP)
         BigDecimal discountAmount = BigDecimal.ZERO;
         if ("PERCENT".equalsIgnoreCase(request.getDiscountType()) && request.getDiscountValue() != null) {
             if (request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
@@ -146,7 +143,13 @@ public class PayOsServiceImpl implements PayOsService {
             validateManagerPin(request.getManagerPin());
         }
 
-        BigDecimal finalAmount = subtotal.add(taxAmount).subtract(discountAmount);
+        BigDecimal taxableAmount = subtotal.subtract(discountAmount);
+        if (taxableAmount.compareTo(BigDecimal.ZERO) < 0) taxableAmount = BigDecimal.ZERO;
+
+        BigDecimal taxRate = request.getTaxRate() != null ? request.getTaxRate() : BigDecimal.valueOf(8.0);
+        BigDecimal taxAmount = taxableAmount.multiply(taxRate).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+
+        BigDecimal finalAmount = taxableAmount.add(taxAmount);
         if (finalAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException("Số tiền thanh toán phải lớn hơn 0đ để sinh mã VietQR!", HttpStatus.BAD_REQUEST);
         }
@@ -192,7 +195,7 @@ public class PayOsServiceImpl implements PayOsService {
         long orderCode = (System.currentTimeMillis() % 9000000000L) + 1000000000L;
         String description = String.valueOf(orderCode);
 
-        String billCode = "BILL-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + (System.currentTimeMillis() % 10000);
+        String billCode = generateUniqueBillCode();
 
         // 6. Lưu thông tin hóa đơn tạm tính (UNPAID)
         bill.setSession(session);
@@ -508,7 +511,11 @@ public class PayOsServiceImpl implements PayOsService {
         }
     }
 
-    private Staff validateManagerPin(String pin) {
+        private String generateUniqueBillCode() {
+        return "BILL-" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "-" + String.format("%03d", (int)(Math.random() * 900) + 100);
+    }
+
+private Staff validateManagerPin(String pin) {
         if (pin == null || pin.trim().length() != 6) {
             throw new AppException("Mã PIN Quản lý phải gồm đúng 6 chữ số!", HttpStatus.BAD_REQUEST);
         }

@@ -41,6 +41,6 @@ public interface CashierService {
     // 9. Xác nhận chốt ca két tiền có Quản lý duyệt mã PIN và duyệt chênh lệch két
     CloseShiftResponse closeShift(CloseShiftRequest request, String cashierUsername);
 
-    // 10. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món hoặc mở nhầm bàn
-    CashierTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request);
+    // 10. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món hoặc mở nhầm bàn (có audit username)
+    CashierTableResponse closeEmptySession(Long tableId, CloseEmptySessionRequest request, String cashierUsername);
 }
