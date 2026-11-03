@@ -1338,6 +1338,7 @@ export default function StaffManagementPage() {
 
                 <button
                   type="button"
+                  className="staff-print-btn-desktop-only"
                   onClick={handleOpenWeeklyPrintModal}
                   style={{
                     padding: '8px 16px',
@@ -1354,39 +1355,10 @@ export default function StaffManagementPage() {
                     boxShadow: '0 2px 8px rgba(157, 65, 36, 0.25)',
                     transition: 'all 0.15s ease'
                   }}
-                  title="Mở xem trước và in bảng phân công lịch trực theo tuần chuẩn A4"
+                  title="Mở xem trước và in bảng phân công lịch trực theo tuần chuẩn A4 (Hỗ trợ xuất Excel bên trong)"
                 >
                   <Icon name="local_printshop" size={16} />
                   <span>In Lịch Tuần (A4)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleExportExcel(selectedDate)}
-                  disabled={isExportingExcel}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #2E7D32',
-                    background: '#E8F5E9',
-                    color: '#1B5E20',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: isExportingExcel ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 8px rgba(46, 125, 50, 0.12)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title="Xuất bảng phân công ca trực cả tuần ra file Excel (.xls) đẹp mắt và chi tiết"
-                >
-                  <Icon
-                    name={isExportingExcel ? 'progress_activity' : 'description'}
-                    size={16}
-                    style={{ animation: isExportingExcel ? 'spin 1s linear infinite' : 'none', color: '#1B5E20' }}
-                  />
-                  <span>{isExportingExcel ? 'Đang xuất Excel...' : 'Xuất Excel Tuần'}</span>
                 </button>
               </div>
             </div>

@@ -191,3 +191,14 @@
     padding: 12px 8px;
   }
 }
+
+/* Nút In ấn A4 lịch phân ca chỉ hiển thị trên Desktop, tự động ẩn trên màn hình điện thoại */
+.staff-print-btn-desktop-only {
+  display: flex !important;
+}
+
+@media (max-width: 768px) {
+  .staff-print-btn-desktop-only {
+    display: none !important;
+  }
+}
