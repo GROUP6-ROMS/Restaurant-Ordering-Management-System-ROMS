@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import { customerApi } from '../../api/customerApi';
+import { tableApi } from '../../api/tableApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 import Icon from '../../components/common/Icon';
@@ -365,6 +366,39 @@ export default function CustomerMenuPage() {
   const { showToast, ToastEl } = useToast();
   const restaurantProfile = useRestaurantProfile();
 
+  const [tableStatus, setTableStatus] = useState(
+    tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE')
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
+        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
+      ) {
+        if (event.status === 'OCCUPIED') {
+          setTableStatus('OCCUPIED');
+          if (tableInfo?.token) {
+            tableApi.verifyQr(tableInfo.token).then(res => {
+              if (res.data?.success && res.data.data?.diningToken) {
+                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+              }
+            }).catch(console.error);
+          }
+          showToast('Bàn đã được nhân viên mở! Quý khách có thể xem thực đơn và đặt món.');
+        } else if (event.status === 'AVAILABLE') {
+          setTableStatus('AVAILABLE');
+          sessionStorage.removeItem('roms_dining_token');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token]);
+
+  const diningToken = sessionStorage.getItem('roms_dining_token');
+  const staffToken = sessionStorage.getItem('roms_token');
+  const isTableOccupied = (tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
+
   // Nạp thực đơn trực tiếp từ CSDL qua customerApi
   useEffect(() => {
     const fetchMenu = async () => {
@@ -474,6 +508,67 @@ export default function CustomerMenuPage() {
   };
 
   const selectedCatObj = categories.find(c => c.id === selectedCategory);
+
+  // Kiểm tra nếu bàn chưa mở phiên phục vụ -> Hiện thông báo Chờ nhân viên mở bàn
+  if (!isTableOccupied) {
+    return (
+      <div style={{
+        padding: '60px 20px',
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '65vh'
+      }}>
+        <div style={{
+          width: '76px',
+          height: '76px',
+          borderRadius: '50%',
+          background: '#FFF3E0',
+          border: '2px solid #FFE0B2',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#E65100',
+          marginBottom: '16px',
+          boxShadow: '0 4px 16px rgba(230, 81, 0, 0.12)'
+        }}>
+          <Icon name="hourglass_top" size={40} fill={1} />
+        </div>
+        <h2 style={{ fontFamily: 'Epilogue', fontWeight: 900, fontSize: '1.4rem', color: '#1F1B1A', margin: '0 0 8px' }}>
+          Chờ nhân viên mở bàn
+        </h2>
+        <p style={{ fontSize: '0.88rem', color: '#56423D', maxWidth: '320px', margin: '0 auto 24px', lineHeight: 1.5 }}>
+          Bàn ăn hiện chưa được nhân viên phục vụ mở bàn (Check-in). Quý khách vui lòng đợi nhân viên mở bàn để xem thực đơn và đặt món!
+        </p>
+        <button
+          type="button"
+          onClick={() => handleRequestAssistance('ASSISTANCE', 'Yêu cầu nhân viên mở bàn (Check-in)')}
+          style={{
+            padding: '13px 26px',
+            borderRadius: '9999px',
+            background: '#E65100',
+            color: '#FFFFFF',
+            border: 'none',
+            fontFamily: 'Plus Jakarta Sans',
+            fontWeight: 800,
+            fontSize: '0.92rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(230,81,0,0.25)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Icon name="notifications_active" size={20} fill={1} />
+          Gọi nhân viên mở bàn
+        </button>
+        {ToastEl}
+      </div>
+    );
+  }
 
   return (
     <div style={{

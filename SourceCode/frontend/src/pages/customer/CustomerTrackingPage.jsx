@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { customerApi } from '../../api/customerApi';
+import { tableApi } from '../../api/tableApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 import Icon from '../../components/common/Icon';
@@ -21,6 +22,37 @@ export default function CustomerTrackingPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  const [tableStatus, setTableStatus] = useState(tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE'));
+
+  useEffect(() => {
+    if (tableInfo?.status) setTableStatus(tableInfo.status);
+  }, [tableInfo?.status]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
+        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
+      ) {
+        if (event.status === 'OCCUPIED') {
+          setTableStatus('OCCUPIED');
+          if (tableInfo?.token) {
+            tableApi.verifyQr(tableInfo.token).then(res => {
+              if (res.data?.success && res.data.data?.diningToken) {
+                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+              }
+            }).catch(console.error);
+          }
+          fetchTracking(false);
+        } else if (event.status === 'AVAILABLE') {
+          setTableStatus('AVAILABLE');
+          sessionStorage.removeItem('roms_dining_token');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token, fetchTracking]);
 
   // Live Tracking state từ Backend CSDL
   const [trackingData, setTrackingData] = useState(null);
@@ -110,6 +142,50 @@ export default function CustomerTrackingPage() {
   const totalFoodPrice = trackingData?.totalAmount || 0;
   const vat = trackingData?.vatAmount || 0;
   const finalTotal = trackingData?.grandTotal || 0;
+
+  const diningToken = sessionStorage.getItem('roms_dining_token');
+  const staffToken = sessionStorage.getItem('roms_token');
+  const isTableOccupied = (tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
+
+  // Chờ nhân viên mở bàn - Chặn truy cập theo dõi bàn ăn nếu bàn chưa mở
+  if (!isTableOccupied) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        minHeight: 'calc(100dvh - 120px)', padding: '40px 20px',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%',
+          background: 'rgba(239, 68, 68, 0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 20,
+        }}>
+          <Icon name="lock" size={40} style={{ color: '#ef4444' }} />
+        </div>
+        <h2 style={{ fontFamily: 'Epilogue', fontWeight: 700, fontSize: 20, color: 'var(--on-surface)', marginBottom: 8 }}>
+          Chờ nhân viên mở bàn
+        </h2>
+        <p style={{ color: 'var(--on-surface-variant)', fontSize: 14, maxWidth: 320, marginBottom: 24, lineHeight: 1.5, fontFamily: 'Plus Jakarta Sans' }}>
+          Bàn của bạn hiện chưa được mở phiên phục vụ. Vui lòng liên hệ nhân viên hoặc bấm chuông gọi nhân viên để được hỗ trợ mở bàn trước khi theo dõi bàn ăn!
+        </p>
+        <button
+          onClick={() => handleRequestAssistance('CALL_WAITER', 'Khách yêu cầu hỗ trợ mở bàn')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '14px 28px', borderRadius: '9999px',
+            background: 'var(--primary-container)', color: 'var(--on-primary)',
+            fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 14,
+            border: 'none', cursor: 'pointer', boxShadow: 'var(--shadow-primary)',
+          }}
+        >
+          <Icon name="notifications" size={18} />
+          Gọi nhân viên mở bàn
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '16px 16px 100px', maxWidth: '600px', margin: '0 auto' }}>
