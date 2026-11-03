@@ -93,6 +93,15 @@ export default function PosCheckoutPage() {
   // Đối soát két tiền & Chốt ca (Tab SHIFT)
   const [shiftSummary, setShiftSummary] = useState(null);
   const [shiftType, setShiftType] = useState('MORNING');
+  const [openingCash, setOpeningCash] = useState(() => {
+    const saved = localStorage.getItem('roms_cashier_opening_cash');
+    return saved !== null ? Number(saved) : 500000; // Mặc định 500.000đ tiền lẻ đầu ca
+  });
+  const handleOpeningCashChange = (val) => {
+    const num = Math.max(0, parseInt(val, 10) || 0);
+    setOpeningCash(num);
+    localStorage.setItem('roms_cashier_opening_cash', String(num));
+  };
   const [denominations, setDenominations] = useState({
     500000: 15,
     200000: 10,
@@ -447,12 +456,12 @@ export default function PosCheckoutPage() {
   // 5. Tải tổng hợp doanh thu ca khi mở Tab SHIFT
   const fetchShiftSummary = useCallback(async () => {
     try {
-      const res = await cashierApi.getShiftSummary(shiftType, historyDate);
+      const res = await cashierApi.getShiftSummary(shiftType, historyDate, openingCash);
       setShiftSummary(res.data?.data || null);
     } catch (err) {
       console.error('Lỗi tải tổng hợp ca:', err);
     }
-  }, [shiftType, historyDate]);
+  }, [shiftType, historyDate, openingCash]);
 
   useEffect(() => {
     if (activePosTab === 'SHIFT') {
@@ -2254,39 +2263,72 @@ export default function PosCheckoutPage() {
       {activePosTab === 'SHIFT' && (
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Top Shift Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-            <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+            <div style={{ background: '#FFFFFF', padding: '16px 18px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
               <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 600 }}>Tổng số hóa đơn ca</span>
-              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#1F1B1A', marginTop: '6px' }}>
+              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.4rem', color: '#1F1B1A', marginTop: '6px' }}>
                 {shiftSummary?.totalBillsCount || 0}
               </div>
             </div>
 
-            <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
+            <div style={{ background: '#FFF6F3', padding: '14px 18px', borderRadius: '16px', border: '1.5px dashed #FFB59F' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 700 }}>Tiền lẻ đầu ca</span>
+                <span style={{ fontSize: '0.7rem', color: '#9D4124', fontWeight: 800, background: '#FFE8DF', padding: '2px 6px', borderRadius: '6px' }}>Mở ca</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                <input
+                  type="number"
+                  min="0"
+                  step="10000"
+                  value={openingCash}
+                  onChange={(e) => handleOpeningCashChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    fontFamily: "'Epilogue', sans-serif",
+                    fontWeight: 800,
+                    fontSize: '1.25rem',
+                    color: '#753400',
+                    background: '#FFFFFF',
+                    border: '1px solid #FFB59F',
+                    borderRadius: '8px',
+                    padding: '4px 8px',
+                    outline: 'none'
+                  }}
+                  title="Nhập số tiền lẻ có sẵn trong két khi bắt đầu ca"
+                />
+                <span style={{ fontWeight: 800, color: '#753400' }}>₫</span>
+              </div>
+            </div>
+
+            <div style={{ background: '#FFFFFF', padding: '16px 18px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
               <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 600 }}>Doanh thu tiền mặt</span>
-              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#753400', marginTop: '6px' }}>
+              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.4rem', color: '#753400', marginTop: '6px' }}>
                 {Number(shiftSummary?.cashRevenue || 0).toLocaleString('vi-VN')}₫
               </div>
             </div>
 
-            <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
+            <div style={{ background: '#FFFFFF', padding: '16px 18px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
               <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 600 }}>Chuyển khoản VietQR</span>
-              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#9D4124', marginTop: '6px' }}>
+              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.4rem', color: '#9D4124', marginTop: '6px' }}>
                 {Number(shiftSummary?.bankRevenue || 0).toLocaleString('vi-VN')}₫
               </div>
             </div>
 
-            <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
+            <div style={{ background: '#FFFFFF', padding: '16px 18px', borderRadius: '16px', border: '1px solid #F0E6E4' }}>
               <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 600 }}>Quẹt thẻ POS</span>
-              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.5rem', color: '#596232', marginTop: '6px' }}>
+              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.4rem', color: '#596232', marginTop: '6px' }}>
                 {Number(shiftSummary?.cardRevenue || 0).toLocaleString('vi-VN')}₫
               </div>
             </div>
 
-            <div style={{ background: '#FFDBC9', padding: '16px 20px', borderRadius: '16px', border: '1.5px solid #FFB59F' }}>
+            <div style={{ background: '#FFDBC9', padding: '16px 18px', borderRadius: '16px', border: '1.5px solid #FFB59F' }}>
               <span style={{ fontSize: '0.78rem', color: '#753400', fontWeight: 800, textTransform: 'uppercase' }}>Két tiền lý thuyết</span>
-              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#753400', marginTop: '6px' }}>
+              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.5rem', color: '#753400', marginTop: '6px' }}>
                 {theoreticalDrawerCash.toLocaleString('vi-VN')}₫
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#8F4A32', marginTop: '4px', fontWeight: 600 }}>
+                = {Number(openingCash).toLocaleString('vi-VN')}₫ + {Number(shiftSummary?.cashRevenue || 0).toLocaleString('vi-VN')}₫
               </div>
             </div>
           </div>
@@ -2441,7 +2483,15 @@ export default function PosCheckoutPage() {
 
                   <div style={{ padding: '8px 0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>= Tiền mặt trong két:</span>
+                      <span>+ Tiền lẻ đầu ca:</span>
+                      <strong>{Number(shiftSummary?.openingCash ?? openingCash).toLocaleString('vi-VN')}₫</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>+ Thu tiền mặt trong ca:</span>
+                      <strong>{Number(shiftSummary?.cashRevenue || 0).toLocaleString('vi-VN')}₫</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dotted #AAA', paddingTop: '4px', marginTop: '4px' }}>
+                      <span>= Tiền mặt lý thuyết két:</span>
                       <strong>{theoreticalDrawerCash.toLocaleString('vi-VN')}₫</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#596232', fontWeight: 800 }}>
@@ -2450,7 +2500,7 @@ export default function PosCheckoutPage() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: cashDifference === 0 ? '#596232' : '#BA1A1A' }}>
                       <span>CHÊNH LỆCH:</span>
-                      <span>{cashDifference === 0 ? '0₫ (Khớp)' : `${cashDifference.toLocaleString('vi-VN')}₫`}</span>
+                      <span>{cashDifference === 0 ? '0₫ (Khớp)' : `${cashDifference > 0 ? '+' : ''}${cashDifference.toLocaleString('vi-VN')}₫`}</span>
                     </div>
                   </div>
 
@@ -3130,8 +3180,16 @@ export default function PosCheckoutPage() {
                 <strong>{user?.fullName || 'Thu Ngân POS'}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#89726B' }}>Tổng doanh thu ca:</span>
-                <strong style={{ color: '#9D4124' }}>{Number(shiftSummary?.totalRevenue || 0).toLocaleString('vi-VN')}₫</strong>
+                <span style={{ color: '#89726B' }}>Tiền lẻ đầu ca:</span>
+                <strong>{Number(openingCash).toLocaleString('vi-VN')}₫</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#89726B' }}>Doanh thu tiền mặt trong ca:</span>
+                <strong style={{ color: '#753400' }}>{Number(shiftSummary?.cashRevenue || 0).toLocaleString('vi-VN')}₫</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#89726B' }}>Tiền mặt lý thuyết két:</span>
+                <strong>{theoreticalDrawerCash.toLocaleString('vi-VN')}₫</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#89726B' }}>Tiền mặt thực đếm:</span>
@@ -3144,7 +3202,7 @@ export default function PosCheckoutPage() {
                   background: cashDifference === 0 ? '#DDE8AB' : '#FFDAD6',
                   color: cashDifference === 0 ? '#181E00' : '#BA1A1A'
                 }}>
-                  {cashDifference === 0 ? '✓ Khớp 100% (0₫)' : `Lệch: ${cashDifference.toLocaleString('vi-VN')}₫`}
+                  {cashDifference === 0 ? '✓ Khớp 100% (0₫)' : `Lệch: ${cashDifference > 0 ? '+' : ''}${cashDifference.toLocaleString('vi-VN')}₫`}
                 </span>
               </div>
             </div>

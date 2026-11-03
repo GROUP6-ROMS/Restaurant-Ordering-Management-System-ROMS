@@ -32,8 +32,9 @@ export const cashierApi = {
   },
 
   // 7. Lấy tổng hợp doanh thu theo ca đối soát két tiền
-  getShiftSummary: (shiftType, date) => {
-    return axiosClient.get('/cashier/shift/summary', { params: { shiftType, date } });
+  // openingCash: tiền đầu ca (số nguyên VND, mặc định 0)
+  getShiftSummary: (shiftType, date, openingCash = 0) => {
+    return axiosClient.get('/cashier/shift/summary', { params: { shiftType, date, openingCash } });
   },
 
   // 8. Hủy món có mã PIN quản lý
@@ -49,5 +50,5 @@ export const cashierApi = {
   // 10. Đóng phiên ăn bàn trống (0đ) khi khách không dùng món
   closeEmptySession: (tableId, data) => {
     return axiosClient.post(`/cashier/tables/${tableId}/close-empty`, data);
-  }
+  },
 };

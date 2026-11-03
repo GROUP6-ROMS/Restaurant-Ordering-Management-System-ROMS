@@ -5,6 +5,7 @@ import com.romsteam.roms.dto.request.ManagerApprovalRequest;
 import com.romsteam.roms.dto.request.CloseShiftRequest;
 import com.romsteam.roms.dto.response.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -31,7 +32,8 @@ public interface CashierService {
     CashierInvoiceResponse getInvoiceDetail(Long invoiceId);
 
     // 7. Lấy tổng hợp doanh thu theo ca của thu ngân để đối soát két tiền
-    CashierShiftSummaryResponse getShiftSummary(String shiftType, LocalDate date, String cashierUsername);
+    // openingCash: tiền đầu ca (thu ngân nhập khi bắt đầu ca), được cộng vào theoreticalDrawerCash
+    CashierShiftSummaryResponse getShiftSummary(String shiftType, LocalDate date, BigDecimal openingCash, String cashierUsername);
 
     // 8. Hủy món trên hóa đơn tạm tính có Quản lý duyệt mã PIN
     void voidOrderItem(Long itemId, ManagerApprovalRequest request);

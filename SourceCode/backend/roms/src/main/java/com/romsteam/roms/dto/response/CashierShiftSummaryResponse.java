@@ -26,6 +26,8 @@ public class CashierShiftSummaryResponse {
     private BigDecimal bankRevenue;     // Doanh thu chuyển khoản (BANK_TRANSFER)
     private BigDecimal cardRevenue;     // Doanh thu quẹt thẻ (CARD)
 
-    // Tiền mặt lý thuyết phải có trong két = Tiền đầu ca (nếu có) + cashRevenue
+    private BigDecimal openingCash;             // Tiền đầu ca (thu ngân nhập khi mở ca)
+
+    // Tiền mặt lý thuyết phải có trong két = Tiền đầu ca + cashRevenue
     private BigDecimal theoreticalDrawerCash;
 }

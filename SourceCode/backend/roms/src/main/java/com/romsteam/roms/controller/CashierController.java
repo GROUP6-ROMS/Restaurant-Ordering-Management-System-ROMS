@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -76,13 +77,15 @@ public class CashierController {
     }
 
     // 7. GET /api/cashier/shift/summary - Doanh thu theo ca để kiểm đếm két tiền
+    // openingCash: tiền đầu ca (thu ngân nhập, mặc định 0 nếu không truyền)
     @GetMapping("/shift/summary")
     public ResponseEntity<ApiResponse<CashierShiftSummaryResponse>> getShiftSummary(
             @RequestParam(required = false, defaultValue = "MORNING") String shiftType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false, defaultValue = "0") BigDecimal openingCash,
             Authentication authentication) {
         String cashierUsername = authentication != null ? authentication.getName() : null;
-        CashierShiftSummaryResponse summary = cashierService.getShiftSummary(shiftType, date, cashierUsername);
+        CashierShiftSummaryResponse summary = cashierService.getShiftSummary(shiftType, date, openingCash, cashierUsername);
         return ResponseEntity.ok(ApiResponse.success(summary, "Lấy doanh thu ca thành công"));
     }
 
