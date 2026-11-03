@@ -135,6 +135,20 @@
   .admin-main-content {
     padding: 14px 10px;
   }
+
+  /* Popover danh sách nhân sự ca trực: bung ngược lên trên widget, vừa vặn lọt lòng menu mobile */
+  .shift-status-popover {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: calc(100% + 8px) !important;
+    width: auto !important;
+    max-width: 100% !important;
+    max-height: 420px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+    border-radius: 16px !important;
+    z-index: 1050 !important;
+  }
 }
 
 @media (max-width: 600px) {
