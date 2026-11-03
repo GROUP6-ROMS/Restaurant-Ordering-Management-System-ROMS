@@ -43,6 +43,10 @@ export const tableApi = {
     verifyQr: (qrToken) => {
         return axiosClient.post('/customer/tables/verify-qr', { qrToken });
     },
+    // Khách hàng bấm chuông gọi nhân viên hỗ trợ / mở bàn tại bàn
+    callWaiter: (tableId, data) => {
+        return axiosClient.post(`/customer/tables/${tableId}/call`, data || {});
+    },
     // Xem nhanh danh sách món đang gọi tại bàn
     getTableOrders: (tableId) => {
         return axiosClient.get(`/admin/tables/${tableId}/orders`);
