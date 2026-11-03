@@ -410,6 +410,7 @@ export default function ShiftStatusWidget({ currentTime = new Date() }) {
             {isOpen && (
                 <div
                     ref={popoverRef}
+                    className="shift-status-popover"
                     style={{
                         position: 'fixed',
                         left: '266px',
