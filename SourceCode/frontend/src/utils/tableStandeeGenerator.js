@@ -122,27 +122,7 @@ export function generateStandeeCanvas({ table, restaurantProfile, qrCanvas }) {
     const qrInnerSize = qrBoxSize - 70;
     ctx.drawImage(qrCanvas, qrInnerX, qrInnerY, qrInnerSize, qrInnerSize);
 
-    // Vẽ logo ROMS nhỏ ở tâm mã QR
-    const centerSize = 84;
-    const centerX = qrBoxX + (qrBoxSize - centerSize) / 2;
-    const centerY = qrBoxY + (qrBoxSize - centerSize) / 2;
 
-    ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(0,0,0,0.18)';
-    ctx.shadowBlur = 8;
-    drawRoundedRect(ctx, centerX, centerY, centerSize, centerSize, 16);
-    ctx.fill();
-
-    ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 3;
-    drawRoundedRect(ctx, centerX, centerY, centerSize, centerSize, 16);
-    ctx.stroke();
-
-    ctx.fillStyle = primaryColor;
-    ctx.font = '900 40px "Epilogue", sans-serif';
-    ctx.fillText('R', 500, centerY + 56);
-    ctx.restore();
   }
 
   // 9. Hộp hướng dẫn 3 bước thao tác (Đã xóa dòng DÙNG CAMERA ĐIỆN THOẠI ĐỂ QUÉT MÃ theo yêu cầu)
