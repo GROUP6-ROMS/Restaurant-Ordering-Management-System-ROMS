@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Icon from '../common/Icon';
 import {
   getRestaurantProfile,
@@ -10,13 +10,18 @@ import { restaurantProfileApi } from '../../api/restaurantProfileApi';
 import { useDialog } from '../../context/DialogContext';
 
 export default function RestaurantProfileModal({ isOpen, onClose }) {
-  const { showConfirm } = useDialog();
+  const { showConfirm, showAlert } = useDialog();
   const [profile, setProfile] = useState(() => getRestaurantProfile());
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activePresetId, setActivePresetId] = useState(null);
   const [hasManualChanges, setHasManualChanges] = useState(false);
   const [manualBackup, setManualBackup] = useState(null);
+
+  // Quản lý upload ảnh Logo quán từ thiết bị
+  const logoFileInputRef = useRef(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [showCustomUrlInput, setShowCustomUrlInput] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -26,6 +31,9 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
       setActivePresetId(null);
       setHasManualChanges(false);
       setManualBackup(null);
+      setIsUploadingLogo(false);
+      setShowCustomUrlInput(false);
+      if (logoFileInputRef.current) logoFileInputRef.current.value = '';
     }
   }, [isOpen]);
 
@@ -77,6 +85,58 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
       setManualBackup(null);
       setHasManualChanges(true);
     }
+  };
+
+  const handleLogoFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 1. Kiểm tra kích thước file tối đa 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      showAlert({
+        title: 'Ảnh quá dung lượng',
+        message: 'Dung lượng ảnh logo tối đa cho phép là 5MB. Vui lòng chọn ảnh nhỏ hơn!',
+        type: 'warning'
+      });
+      if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+      return;
+    }
+
+    // 2. Kiểm tra định dạng hợp lệ
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      showAlert({
+        title: 'Định dạng không hỗ trợ',
+        message: 'Vui lòng chỉ tải lên file hình ảnh (.jpg, .jpeg, .png, .webp, .gif)!',
+        type: 'warning'
+      });
+      if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+      return;
+    }
+
+    try {
+      setIsUploadingLogo(true);
+      const res = await restaurantProfileApi.uploadLogo(file);
+      if (res?.data?.imageUrl) {
+        handleFieldChange('logoUrl', res.data.imageUrl);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải ảnh logo lên server:', err);
+      const errMsg = err.response?.data?.message || 'Không thể tải ảnh logo lên máy chủ. Vui lòng thử lại!';
+      showAlert({
+        title: 'Lỗi tải ảnh',
+        message: errMsg,
+        type: 'error'
+      });
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    handleFieldChange('logoUrl', '');
+    if (logoFileInputRef.current) logoFileInputRef.current.value = '';
   };
 
   const handleSave = async (e) => {
@@ -381,30 +441,185 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
               />
             </div>
 
-            {/* Logo Thương Hiệu Quán (URL hình ảnh) */}
+            {/* Logo Thương Hiệu Quán (Tải lên từ thiết bị & Live Preview) */}
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1F1B1A', marginBottom: '6px' }}>
-                Đường dẫn ảnh Logo quán (Logo URL tùy chỉnh)
-              </label>
-              <input
-                type="url"
-                value={profile.logoUrl || ''}
-                onChange={(e) => handleFieldChange('logoUrl', e.target.value)}
-                placeholder="VD: https://domain.com/logo.png (Để trống sẽ sử dụng Logo ROMS mặc định)"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  border: '1.5px solid #EAE0DE',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Icon name="image" size={18} style={{ color: '#9D4124' }} />
+                  Ảnh Logo Quán (Hiển thị Header, Thẻ bàn, In nhiệt K80 & Trang chủ)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomUrlInput(!showCustomUrlInput)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#9D4124',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {showCustomUrlInput ? 'Ẩn ô dán link URL' : 'Dán link URL ảnh'}
+                </button>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '12px 16px',
+                borderRadius: '16px',
+                background: '#FFF8F6',
+                border: '1.5px dashed #FFDBC9',
+                flexWrap: 'wrap'
+              }}>
+                {/* Preview Logo */}
+                <div style={{
+                  position: 'relative',
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '14px',
+                  overflow: 'hidden',
+                  background: '#FFFFFF',
+                  border: '1px solid #EAE0DE',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  flexShrink: 0
+                }}>
+                  {profile.logoUrl ? (
+                    <img
+                      src={profile.logoUrl}
+                      alt="Logo Quán"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#9D4124',
+                      textAlign: 'center',
+                      padding: '4px'
+                    }}>
+                      <Icon name="storefront" size={26} />
+                      <span style={{ fontSize: '0.58rem', fontWeight: 800, marginTop: '2px' }}>ROMS LOGO</span>
+                    </div>
+                  )}
+
+                  {isUploadingLogo && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.55)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FFFFFF'
+                    }}>
+                      <Icon name="progress_activity" size={22} className="animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Các nút hành động Upload */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <input
+                      type="file"
+                      ref={logoFileInputRef}
+                      onChange={handleLogoFileChange}
+                      accept="image/png, image/jpeg, image/webp, image/gif"
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingLogo}
+                      onClick={() => logoFileInputRef.current?.click()}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        background: '#9D4124',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: isUploadingLogo ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 6px rgba(157, 65, 36, 0.25)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Icon name="cloud_upload" size={17} />
+                      {isUploadingLogo ? 'Đang tải lên...' : 'Tải ảnh từ thiết bị'}
+                    </button>
+
+                    {profile.logoUrl && (
+                      <button
+                        type="button"
+                        disabled={isUploadingLogo}
+                        onClick={handleRemoveLogo}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          background: '#FFFFFF',
+                          color: '#BA1A1A',
+                          border: '1px solid #FFDAD6',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                        title="Xóa ảnh tùy chỉnh và quay về Logo mặc định"
+                      >
+                        <Icon name="delete" size={15} />
+                        Xóa ảnh
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '0.72rem', color: '#89726B', lineHeight: 1.35 }}>
+                    Khuyên dùng ảnh vuông (tỷ lệ 1:1), định dạng JPG, PNG, WEBP. Tối đa 5MB.
+                  </div>
+                </div>
+              </div>
+
+              {/* Ô nhập URL tùy chỉnh khi chọn dán link */}
+              {showCustomUrlInput && (
+                <div style={{ marginTop: '8px' }}>
+                  <input
+                    type="url"
+                    value={profile.logoUrl || ''}
+                    onChange={(e) => handleFieldChange('logoUrl', e.target.value)}
+                    placeholder="Hoặc dán URL: https://domain.com/logo.png"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #EAE0DE',
+                      fontSize: '0.82rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Thông Tin Mạng WiFi Quán (Cố định thủ công - Không thay đổi theo template) */}
+          {/* Thông Tin Mạng WiFi Quán (Chỉnh thủ công - Không thay đổi theo template) */}
           <div style={{
             background: '#F7F9F6',
             border: '1px solid #D8E2D1',
@@ -416,21 +631,6 @@ export default function RestaurantProfileModal({ isOpen, onClose }) {
                 <Icon name="wifi" size={20} style={{ color: '#596232' }} />
                 <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1F1B1A' }}>
                   Mạng WiFi Quán Cho Khách Ăn Tại Bàn (Guest WiFi)
-                </span>
-                <span style={{
-                  fontSize: '0.72rem',
-                  color: '#2E7D32',
-                  background: '#E8F5E9',
-                  border: '1px solid #C8E6C9',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  fontWeight: 700,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Icon name="lock" size={13} />
-                  Cố định thủ công • Không đổi theo mẫu
                 </span>
               </div>
               <span style={{ fontSize: '0.74rem', color: '#596232', fontWeight: 600 }}>
