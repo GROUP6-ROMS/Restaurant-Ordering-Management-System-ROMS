@@ -389,6 +389,62 @@ export default function ReportsAnalyticsPage() {
             display: none !important;
           }
         }
+                  /* ================= RESPONSIVE CHO MOBILE & TABLET ================= */
+        @media screen and (max-width: 1023px) {
+          /* Chuyển grid 2 cột 8:4 sang xếp chồng dọc 1 cột 100% */
+          .reports-hourly-bestseller-grid {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 16px !important;
+          }
+          .reports-hourly-col,
+          .reports-bestseller-col {
+            grid-column: span 12 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .reports-hourly-card,
+          .reports-bestseller-card {
+            padding: 16px !important;
+          }
+          /* Header giờ hoạt động & badge Giờ đỉnh */
+          .reports-hourly-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
+          .reports-hourly-peak-badge {
+            align-self: flex-start !important;
+            white-space: normal !important;
+            font-size: 0.75rem !important;
+            line-height: 1.4 !important;
+          }
+          /* Tab Vận hành (Operations) cũng tự chuyển 1 cột */
+          .reports-operations-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        /* Tối ưu màn hình điện thoại hẹp (< 480px) */
+        @media screen and (max-width: 480px) {
+          .reports-hourly-row {
+            font-size: 0.76rem !important;
+            gap: 8px !important;
+          }
+          .reports-hourly-time {
+            width: 82px !important;
+            font-size: 0.75rem !important;
+          }
+          .reports-hourly-val {
+            width: 115px !important;
+            font-size: 0.75rem !important;
+          }
+          /* Cơ cấu thanh toán 3 ô chuyển sang co giãn tự động */
+          .reports-payment-grid {
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+            gap: 8px !important;
+          }
+        }
       `}</style>
 
       {/* Toast Notification */}
@@ -418,12 +474,7 @@ export default function ReportsAnalyticsPage() {
       {/* Header & Export Actions (Màn hình thường) */}
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9D4124', background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px' }}>
-              Tài Chính & Lợi Nhuận Gộp
-            </span>
-            <span style={{ fontSize: '0.85rem', color: '#89726B', fontWeight: 600 }}>Quản Trị Nhà Hàng ROMS</span>
-          </div>
+
           <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.75rem', color: '#1F1B1A', margin: 0 }}>
             Báo Cáo Doanh Thu, Lợi Nhuận & Vận Hành
           </h1>
@@ -924,9 +975,9 @@ export default function ReportsAnalyticsPage() {
           </div>
 
           {/* Grid: Biểu đồ khung giờ + Top Bán Chạy */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '20px' }}>
+          <div className="reports-hourly-bestseller-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '20px' }}>
             {/* Cột Trái: Biểu đồ Doanh thu theo Khung Giờ (8 cols) */}
-            <div style={{
+            <div className="reports-hourly-col reports-hourly-card" style={{
               gridColumn: 'span 8',
               background: '#FFFFFF',
               borderRadius: '20px',
@@ -934,7 +985,7 @@ export default function ReportsAnalyticsPage() {
               border: '1px solid #F0E6E4',
               boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div className="reports-hourly-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
                   <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', margin: 0 }}>
                     Doanh Thu Theo Khung Giờ Hoạt Động
@@ -944,7 +995,7 @@ export default function ReportsAnalyticsPage() {
                   </p>
                 </div>
 
-                <span style={{ fontSize: '0.78rem', background: '#FCF1EF', color: '#9D4124', fontWeight: 700, padding: '4px 10px', borderRadius: '8px' }}>
+                <span className="reports-hourly-peak-badge" style={{ fontSize: '0.78rem', background: '#FCF1EF', color: '#9D4124', fontWeight: 700, padding: '4px 10px', borderRadius: '8px' }}>
                   Giờ Đỉnh: {reportData?.peakHourLabel || '18:00 - 19:30'} ({((reportData?.peakHourRevenue || 14800000) / 1000000).toFixed(1)}M)
                 </span>
               </div>
@@ -952,8 +1003,8 @@ export default function ReportsAnalyticsPage() {
               {/* Danh sách thanh biểu đồ */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {hourlyList.map((h, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.82rem' }}>
-                    <span style={{ width: '95px', color: '#56423D', fontWeight: 600, flexShrink: 0 }}>
+                  <div key={idx} className="reports-hourly-row" style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.82rem' }}>
+                    <span className="reports-hourly-time" style={{ width: '95px', color: '#56423D', fontWeight: 600, flexShrink: 0 }}>
                       {h.hour}
                     </span>
 
@@ -967,7 +1018,7 @@ export default function ReportsAnalyticsPage() {
                       }} />
                     </div>
 
-                    <div style={{ width: '130px', textAlign: 'right', flexShrink: 0 }}>
+                    <div className="reports-hourly-val" style={{ width: '130px', textAlign: 'right', flexShrink: 0 }}>
                       <span style={{ fontWeight: 800, color: '#1F1B1A' }}>
                         {Number(h.revenue).toLocaleString('vi-VN')}₫
                       </span>
@@ -984,7 +1035,7 @@ export default function ReportsAnalyticsPage() {
                 <h4 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.95rem', color: '#1F1B1A', margin: '0 0 12px' }}>
                   Cơ Cấu Phương Thức Thanh Toán
                 </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div className="reports-payment-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                   {paymentMethods.map((pm, idx) => (
                     <div key={idx} style={{ background: '#FFF8F6', padding: '12px', borderRadius: '12px', border: '1px solid #F6ECEA' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#89726B', fontSize: '0.75rem', fontWeight: 600 }}>
@@ -1003,8 +1054,8 @@ export default function ReportsAnalyticsPage() {
             </div>
 
             {/* Cột Phải: Top 5 Món Bán Chạy (4 cols) */}
-            <div style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{
+            <div className="reports-bestseller-col" style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="reports-bestseller-card" style={{
                 background: '#FFFFFF',
                 borderRadius: '20px',
                 padding: '24px',
@@ -1022,6 +1073,7 @@ export default function ReportsAnalyticsPage() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
                   {bestsellers.map(item => (
                     <div
                       key={item.id}
@@ -1162,12 +1214,12 @@ export default function ReportsAnalyticsPage() {
                   {filteredBcgItems.map(item => {
                     const badgeBg =
                       item.classification === 'STAR' ? '#FEF3C7' :
-                      item.classification === 'PLOWHORSE' ? '#DCFCE7' :
-                      item.classification === 'PUZZLE' ? '#DBEAFE' : '#FEE2E2';
+                        item.classification === 'PLOWHORSE' ? '#DCFCE7' :
+                          item.classification === 'PUZZLE' ? '#DBEAFE' : '#FEE2E2';
                     const badgeColor =
                       item.classification === 'STAR' ? '#92400E' :
-                      item.classification === 'PLOWHORSE' ? '#166534' :
-                      item.classification === 'PUZZLE' ? '#1E40AF' : '#991B1B';
+                        item.classification === 'PLOWHORSE' ? '#166534' :
+                          item.classification === 'PUZZLE' ? '#1E40AF' : '#991B1B';
 
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid #F0E6E4' }}>
@@ -1218,7 +1270,7 @@ export default function ReportsAnalyticsPage() {
 
       {/* TAB 3: OPERATIONS & TABLE PERFORMANCE */}
       {reportType === 'OPERATIONS' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+        <div className="reports-operations-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', border: '1px solid #F0E6E4' }}>
             <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', margin: '0 0 16px' }}>
               Hiệu Suất Phục Vụ & Lấp Đầy Bàn
