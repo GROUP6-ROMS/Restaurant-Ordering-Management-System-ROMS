@@ -100,8 +100,27 @@ public class MenuItem {
         this.remainingStock = newStock;
         if (newStock != null && newStock > 0) {
             this.isAvailable = true;
-            if ("Tạm Hết (86d)".equals(this.tag)) {
+            if (this.tag != null && this.tag.contains("86d")) {
                 this.tag = "Đang Bán";
+            }
+        }
+    }
+
+    /**
+     * Hoàn lại số lượng tồn kho khi món bị hủy (Stock Restitution)
+     * @param quantity số lượng cần hoàn trả
+     */
+    public void increaseStock(int quantity) {
+        if (this.remainingStock != null) {
+            this.remainingStock += quantity;
+            if (this.dailyStock != null && this.remainingStock > this.dailyStock) {
+                this.remainingStock = this.dailyStock;
+            }
+            if (this.remainingStock > 0) {
+                this.isAvailable = true;
+                if (this.tag != null && this.tag.contains("86d")) {
+                    this.tag = "Đang Bán";
+                }
             }
         }
     }

@@ -437,10 +437,8 @@ public class PayOsServiceImpl implements PayOsService {
             // Đóng tất cả yêu cầu tính tiền loại BILL của bàn
             List<ServiceRequest> billRequests = requestRepository.findByTableIdAndStatusOrderByCreatedAtDesc(table.getId(), "PENDING");
             for (ServiceRequest req : billRequests) {
-                if ("BILL".equalsIgnoreCase(req.getRequestType())) {
-                    req.setStatus("RESOLVED");
-                    requestRepository.save(req);
-                }
+                req.setStatus("RESOLVED");
+                requestRepository.save(req);
             }
 
             try {

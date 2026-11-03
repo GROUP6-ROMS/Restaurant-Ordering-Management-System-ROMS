@@ -87,6 +87,39 @@ function getAudioContext() {
 }
 
 // Bộ tổng hợp âm thanh Web Audio API (Synthesizer Chime)
+// Âm báo cảnh báo hủy món dành cho Bếp (Warning buzzer for cancelled/voided dishes)
+function playCancelAlert() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(340, now);
+    gain1.gain.setValueAtTime(0.28, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.22);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(260, now + 0.24);
+    gain2.gain.setValueAtTime(0.28, now + 0.24);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.24);
+    osc2.stop(now + 0.48);
+  } catch (e) {
+    console.warn('Audio Context không thể phát âm cảnh báo:', e);
+  }
+}
+
 function playKitchenChime() {
   try {
     const ctx = getAudioContext();
@@ -510,6 +543,7 @@ export default function KitchenKdsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+  const [cancelledAlert, setCancelledAlert] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
   // State Quản lý món hết (86'd)
@@ -619,6 +653,12 @@ export default function KitchenKdsPage() {
     document.addEventListener('visibilitychange', handleFocus);
 
     const unsubscribeRealtime = subscribeRealtimeEvents((event) => {
+        if (event?.status === 'CANCELLED' || event?.payload?.status === 'CANCELLED' || event?.type === 'ORDER_CANCELLED') {
+          if (soundEnabled) playCancelAlert();
+          const tbl = event?.tableNumber || event?.tableName || 'Bàn';
+          setCancelledAlert(`⚠️ Bàn ${tbl}: Có món vừa bị HỦY bởi Quản lý! Dừng chế biến!`);
+          setTimeout(() => setCancelledAlert(null), 8000);
+        }
       if (event?.type === 'NEW_ORDER_CREATED' || event?.type === 'ORDER_UPDATE' || event?.type === 'TABLE_UPDATE') {
         loadOrders(true);
       }
@@ -938,6 +978,31 @@ export default function KitchenKdsPage() {
       </div>
 
       {/* --- Grid Ticket Cards --- */}
+        {/* Banner cảnh báo Hủy Món (Void Alert) */}
+        {cancelledAlert && (
+          <div style={{
+            background: '#BA1A1A', color: '#FFFFFF',
+            padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 14,
+            boxShadow: '0 4px 12px rgba(186, 26, 26, 0.35)',
+            zIndex: 10
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Icon name="warning" size={24} style={{ color: '#FFDAD6' }} />
+              <span>{cancelledAlert}</span>
+            </div>
+            <button
+              onClick={() => setCancelledAlert(null)}
+              style={{
+                background: 'rgba(255,255,255,0.25)', border: 'none', color: '#fff',
+                padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12
+              }}
+            >
+              Đã rõ
+            </button>
+          </div>
+        )}
+
       <main style={{
         flex: 1, overflowY: 'auto',
         padding: '16px 20px',
