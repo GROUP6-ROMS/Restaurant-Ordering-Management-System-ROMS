@@ -158,7 +158,11 @@ export default function TableWelcomePage() {
               }, 600);
             }
           }).catch(console.error);
-        } else if (event.status === 'AVAILABLE') {
+        } else if (
+          event.type === 'BILL_PAID' ||
+          event.type === 'SESSION_CLOSED' ||
+          ['AVAILABLE', 'DIRTY', 'COMPLETED', 'CLOSED'].includes(event.status)
+        ) {
           sessionStorage.removeItem('roms_dining_token');
           setVerifiedTable(prev => prev ? { ...prev, status: 'AVAILABLE', diningToken: null } : null);
         }

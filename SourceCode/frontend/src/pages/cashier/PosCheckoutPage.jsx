@@ -745,7 +745,9 @@ export default function PosCheckoutPage() {
       setPayOsData(null);
       await fetchPosTables(true);
       if (completedTableId) {
-        broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: completedTableId, status: 'DIRTY' });
+        broadcastRealtimeEvent({ type: 'BILL_PAID', tableId: completedTableId, status: 'COMPLETED' });
+        broadcastRealtimeEvent({ type: 'BILL_PAID', tableId: completedTableId, status: 'COMPLETED' });
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: completedTableId, status: 'DIRTY' });
       }
     }, 1500);
   }, [currentTable, fetchPosTables]);
