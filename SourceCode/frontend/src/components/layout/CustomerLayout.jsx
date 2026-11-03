@@ -65,28 +65,60 @@ export default function CustomerLayout() {
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
+      const isCurrentTable =
+        (event.tableId && Number(event.tableId) === Number(tableInfo?.tableId)) ||
+        (event.tableNumber && (
+          event.tableNumber === tableInfo?.tableNumber ||
+          String(event.tableNumber).toUpperCase() === String(tableInfo?.tableNumber).toUpperCase() ||
+          `Bàn ${event.tableNumber}`.toUpperCase() === String(tableInfo?.tableNumber).toUpperCase()
+        ));
+
       if (
-        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
-        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
+        ['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type) &&
+        isCurrentTable
       ) {
         if (event.status === 'OCCUPIED') {
           setTableStatus('OCCUPIED');
-          if (tableInfo?.token) {
-            tableApi.verifyQr(tableInfo.token).then(res => {
+          const qrToken = tableInfo?.token || sessionStorage.getItem('roms_qr_token');
+          if (qrToken) {
+            tableApi.verifyQr(qrToken).then(res => {
               if (res.data?.success && res.data.data?.diningToken) {
                 sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+                const updated = {
+                  ...tableInfo,
+                  status: 'OCCUPIED',
+                  diningToken: res.data.data.diningToken,
+                  token: qrToken
+                };
+                setTableInfo(updated);
+                localStorage.setItem('roms_table_info', JSON.stringify(updated));
               }
-            }).catch(console.error);
+              showToast('Bàn đã được nhân viên mở! Đang tải lại trang...');
+              setTimeout(() => {
+                window.location.reload();
+              }, 500);
+            }).catch(err => {
+              console.error('Lỗi khi verify QR khi mở bàn:', err);
+              window.location.reload();
+            });
+          } else {
+            const updated = { ...tableInfo, status: 'OCCUPIED' };
+            setTableInfo(updated);
+            localStorage.setItem('roms_table_info', JSON.stringify(updated));
+            window.location.reload();
           }
-          showToast('Bàn đã được nhân viên mở! Quý khách có thể xem thực đơn và gọi món.');
         } else if (event.status === 'AVAILABLE') {
           setTableStatus('AVAILABLE');
           sessionStorage.removeItem('roms_dining_token');
+          const updated = { ...tableInfo, status: 'AVAILABLE', diningToken: null };
+          setTableInfo(updated);
+          localStorage.setItem('roms_table_info', JSON.stringify(updated));
+          window.location.reload();
         }
       }
     });
     return () => unsubscribe();
-  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token]);
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token, setTableInfo]);
 
   const diningToken = sessionStorage.getItem('roms_dining_token');
   const staffToken = sessionStorage.getItem('roms_token');

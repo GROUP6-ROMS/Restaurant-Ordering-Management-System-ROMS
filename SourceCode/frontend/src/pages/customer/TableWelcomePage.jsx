@@ -77,6 +77,23 @@ export default function TableWelcomePage() {
           if (tData.diningToken) {
             sessionStorage.setItem('roms_dining_token', tData.diningToken);
           }
+          // Lưu QR token để phục vụ verify khi bàn được mở
+          sessionStorage.setItem('roms_qr_token', activeToken);
+
+          const initialInfo = {
+            tableNumber: tData.code || tData.tableNumber || tableCode,
+            tableId: tData.id,
+            tableName: tData.name || '',
+            zoneName: tData.zoneName || '',
+            isVip,
+            guestCount: tData.capacity || guestCount,
+            status: tData.status || 'AVAILABLE',
+            token: activeToken,
+            diningToken: tData.diningToken || null
+          };
+          setTableInfo(initialInfo);
+          localStorage.setItem('roms_table_info', JSON.stringify(initialInfo));
+
           setVerifiedTable(tData);
           if (tData.capacity) setGuestCount(tData.capacity);
         } else {
@@ -101,19 +118,44 @@ export default function TableWelcomePage() {
   // Lắng nghe sự kiện mở bàn thời gian thực từ Phục vụ qua WebSocket
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
+      const activeQrToken = tokenParam ? tokenParam.trim() : sessionStorage.getItem('roms_qr_token');
+      const isTarget =
+        (event.tableId && Number(event.tableId) === Number(verifiedTable?.id)) ||
+        (event.tableNumber && (
+          event.tableNumber === verifiedTable?.tableNumber ||
+          event.tableNumber === verifiedTable?.code
+        ));
+
       if (
-        (event.type === 'TABLE_STATUS_CHANGED' || event.type === 'TABLE_UPDATED' || event.type === 'DINING_SESSION_OPENED') &&
-        (Number(event.tableId) === Number(verifiedTable?.id) || event.tableNumber === verifiedTable?.tableNumber)
+        ['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED'].includes(event.type) &&
+        (isTarget || !verifiedTable)
       ) {
-        if (event.status === 'OCCUPIED' && tokenParam) {
-          tableApi.verifyQr(tokenParam.trim()).then(res => {
+        if (event.status === 'OCCUPIED' && activeQrToken) {
+          tableApi.verifyQr(activeQrToken).then(res => {
             if (res.data?.success && res.data.data) {
               const tData = res.data.data;
               if (tData.diningToken) {
                 sessionStorage.setItem('roms_dining_token', tData.diningToken);
               }
+              const info = {
+                tableNumber: tData.code || tData.tableNumber || tableCode,
+                tableId: tData.id,
+                tableName: tData.name || '',
+                zoneName: tData.zoneName || '',
+                isVip,
+                guestCount: tData.capacity || guestCount,
+                status: 'OCCUPIED',
+                token: activeQrToken,
+                diningToken: tData.diningToken || null
+              };
+              setTableInfo(info);
+              localStorage.setItem('roms_table_info', JSON.stringify(info));
               setVerifiedTable(tData);
-              showToast('Bàn đã được nhân viên mở phục vụ! Quý khách có thể bắt đầu đặt món.');
+              showToast('Bàn đã được nhân viên mở! Đang mở thực đơn...');
+              // Tự động chuyển thẳng vào trang dining/menu để mở tất cả tính năng của bàn
+              setTimeout(() => {
+                window.location.href = '/dining/menu';
+              }, 600);
             }
           }).catch(console.error);
         } else if (event.status === 'AVAILABLE') {
@@ -123,7 +165,7 @@ export default function TableWelcomePage() {
       }
     });
     return () => unsubscribe();
-  }, [verifiedTable?.id, verifiedTable?.tableNumber, tokenParam]);
+  }, [verifiedTable?.id, verifiedTable?.tableNumber, verifiedTable?.code, tokenParam, tableCode, isVip, guestCount, setTableInfo]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
