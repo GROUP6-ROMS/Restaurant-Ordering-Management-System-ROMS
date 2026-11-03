@@ -85,15 +85,13 @@ export function generateStandeeCanvas({ table, restaurantProfile, qrCanvas }) {
   ctx.fillStyle = '#1F1B1A';
   ctx.font = '900 80px "Epilogue", sans-serif';
   ctx.letterSpacing = '-1px';
-  const tableCodeText = table.code?.toUpperCase().startsWith('T-') || table.code?.toUpperCase().startsWith('B-') || table.code?.toUpperCase().startsWith('VIP')
-    ? table.code.toUpperCase()
-    : (table.code ? `BÀN ${table.code}` : 'BÀN ĂN');
+  const tableCodeText = (table.code || table.name || 'BÀN ĂN').toUpperCase();
   ctx.fillText(tableCodeText, 500, 330);
 
   // Thông tin phân khu & sức chứa
   ctx.fillStyle = '#56423D';
   ctx.font = '700 24px "Plus Jakarta Sans", sans-serif';
-  const subInfo = `${table.name || ''}  •  ${table.zoneName || 'Khu vực phục vụ'}  •  ${table.capacity || 4} Chỗ ngồi`;
+  const subInfo = `${table.name || ''}  •  ${table.zoneName || 'Khu vực phục vụ'}  •  ${table.capacity || 4} chỗ`;
   ctx.fillText(subInfo, 500, 375);
 
   // 8. Khung chứa mã QR Code trung tâm
@@ -147,17 +145,11 @@ export function generateStandeeCanvas({ table, restaurantProfile, qrCanvas }) {
     ctx.restore();
   }
 
-  // 9. Dòng kêu gọi hành động (Call To Action)
-  ctx.fillStyle = primaryColor;
-  ctx.font = '900 32px "Epilogue", sans-serif';
-  ctx.letterSpacing = '1px';
-  ctx.fillText('📱 DÙNG CAMERA ĐIỆN THOẠI ĐỂ QUÉT MÃ', 500, 1025);
-
-  // 10. Hộp hướng dẫn 3 bước thao tác
+  // 9. Hộp hướng dẫn 3 bước thao tác (Đã xóa dòng DÙNG CAMERA ĐIỆN THOẠI ĐỂ QUÉT MÃ theo yêu cầu)
   const guideX = 110;
-  const guideY = 1060;
+  const guideY = 1010;
   const guideW = 780;
-  const guideH = 175;
+  const guideH = 190;
 
   ctx.fillStyle = '#FAF6F5';
   drawRoundedRect(ctx, guideX, guideY, guideW, guideH, 20);
@@ -169,38 +161,38 @@ export function generateStandeeCanvas({ table, restaurantProfile, qrCanvas }) {
 
   ctx.textAlign = 'left';
   ctx.fillStyle = '#2C221E';
-  ctx.font = '700 22px "Plus Jakarta Sans", sans-serif';
+  ctx.font = '700 23px "Plus Jakarta Sans", sans-serif';
 
   const steps = [
-    '①  Mở ứng dụng Camera hoặc Zalo quét mã QR tại bàn',
-    '②  Khám phá thực đơn đặc sắc & chọn món ăn yêu thích',
-    '③  Bấm gửi đơn, Bếp KDS sẽ chế biến và phục vụ tận bàn'
+    '①  Mở Camera điện thoại hoặc Zalo quét mã QR',
+    '②  Khám phá thực đơn & chọn món ăn yêu thích',
+    '③  Bấm gửi đơn để Bếp chế biến và phục vụ tận bàn'
   ];
 
   steps.forEach((st, idx) => {
-    ctx.fillText(st, guideX + 36, guideY + 48 + idx * 46);
+    ctx.fillText(st, guideX + 40, guideY + 52 + idx * 50);
   });
 
-  // 11. Hộp thông tin tiện ích WiFi
+  // 10. Hộp thông tin tiện ích WiFi
   ctx.textAlign = 'center';
-  const wifiY = 1290;
+  const wifiY = 1245;
   ctx.save();
   ctx.fillStyle = '#FFFFFF';
   ctx.strokeStyle = '#EAE0DE';
   ctx.lineWidth = 2;
-  drawRoundedRect(ctx, 160, wifiY, 680, 72, 18);
+  drawRoundedRect(ctx, 160, wifiY, 680, 80, 18);
   ctx.fill();
   ctx.stroke();
 
   ctx.fillStyle = '#1F1B1A';
-  ctx.font = '800 23px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText(`📶 WiFi: ${wifiName}   |   Mật khẩu: ${wifiPass}`, 500, wifiY + 44);
+  ctx.font = '800 24px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(`📶 WiFi: ${wifiName}   |   Pass: ${wifiPass}`, 500, wifiY + 49);
   ctx.restore();
 
-  // 12. Chân trang (Footer)
+  // 11. Chân trang (Footer)
   ctx.fillStyle = '#89726B';
   ctx.font = '600 18px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('Hotline hỗ trợ: 1900 8924  •  ROMS Smart Table Terminal  •  Cần hỗ trợ vui lòng gọi nhân viên', 500, 1420);
+  ctx.fillText('Hotline hỗ trợ: 1900 8924  •  ROMS Smart Table Terminal  •  Cần hỗ trợ vui lòng gọi nhân viên', 500, 1395);
 
   return canvas;
 }

@@ -9,7 +9,8 @@ import { cashierApi } from '../../api/cashierApi';
 import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import { QRCodeCanvas } from 'qrcode.react';
-import { downloadTableStandeePng } from '../../utils/tableStandeeGenerator';
+import JSZip from 'jszip';
+import { generateStandeeCanvas, downloadTableStandeePng } from '../../utils/tableStandeeGenerator';
 
 export default function TableManagementPage() {
   const location = useLocation();
@@ -151,7 +152,7 @@ export default function TableManagementPage() {
     showToast(`Đã lưu ảnh tem ${selectedQrTable.code} (PNG HD 300DPI) về máy!`);
   };
 
-  const handleBatchDownloadAll = async () => {
+  const handleBatchDownloadZip = async () => {
     if (!batchFilteredTables || batchFilteredTables.length === 0) {
       showToast('Không có bàn nào để xuất ảnh!');
       return;
@@ -159,22 +160,52 @@ export default function TableManagementPage() {
 
     setIsDownloadingBatch(true);
     setBatchProgress({ current: 0, total: batchFilteredTables.length });
-    showToast(`Bắt đầu kết xuất ${batchFilteredTables.length} ảnh tem bàn HD...`);
+    showToast(`Đang nén ${batchFilteredTables.length} tem bàn vào file ZIP...`);
 
-    for (let i = 0; i < batchFilteredTables.length; i++) {
-      const t = batchFilteredTables[i];
-      setBatchProgress({ current: i + 1, total: batchFilteredTables.length });
-      const qrCanvas = document.getElementById(`batch-qr-canvas-${t.id}`);
-      downloadTableStandeePng({
-        table: t,
-        restaurantProfile,
-        qrCanvas
-      });
-      await new Promise((r) => setTimeout(r, 220));
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder("Tem_Ban_QR_ROMS");
+
+      for (let i = 0; i < batchFilteredTables.length; i++) {
+        const t = batchFilteredTables[i];
+        setBatchProgress({ current: i + 1, total: batchFilteredTables.length });
+        const qrCanvas = document.getElementById(`batch-qr-canvas-${t.id}`);
+        const standeeCanvas = generateStandeeCanvas({
+          table: t,
+          restaurantProfile,
+          qrCanvas
+        });
+
+        // Lấy dữ liệu base64 PNG đưa vào zip
+        const dataUrl = standeeCanvas.toDataURL('image/png');
+        const base64Data = dataUrl.split(',')[1];
+        const safeCode = (t.code || `Ban_${t.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+        folder.file(`Tem_Ban_${safeCode}_ROMS.png`, base64Data, { base64: true });
+
+        // Tạm dừng 25ms để cập nhật tiến độ mượt mà trên UI
+        await new Promise((r) => setTimeout(r, 25));
+      }
+
+      showToast('Đang tạo và tải file ZIP về máy...');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      const zoneLabel = batchFilterZone === 'ALL' ? 'Toan_Bo' : batchFilterZone.replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `Bo_Tem_Ban_QR_ROMS_${zoneLabel}.zip`;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+      showToast(`Đã tải về thành công file ZIP (${batchFilteredTables.length} tem bàn)!`);
+    } catch (err) {
+      console.error('Lỗi khi nén file zip:', err);
+      showToast('Có lỗi xảy ra khi nén file ZIP. Vui lòng thử lại!');
+    } finally {
+      setIsDownloadingBatch(false);
     }
-
-    setIsDownloadingBatch(false);
-    showToast(`Đã tải về thành công ${batchFilteredTables.length} file ảnh tem bàn HD!`);
   };
 
   // State Quản Lý & Set Bàn Cho Đơn Đặt Bàn (Reservation Assignment)
@@ -2879,12 +2910,7 @@ export default function TableManagementPage() {
                     </span>
                   </div>
 
-                  {/* Dòng hướng dẫn Camera */}
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: badgeBg, margin: '10px 0 6px' }}>
-                    📱 DÙNG CAMERA ĐIỆN THOẠI ĐỂ QUÉT MÃ
-                  </div>
-
-                  {/* 3 Bước thao tác */}
+                  {/* 3 Bước thao tác (Đã xóa dòng DÙNG CAMERA ĐIỆN THOẠI ĐỂ QUÉT MÃ theo yêu cầu) */}
                   <div style={{
                     background: '#FAF6F5',
                     borderRadius: '10px',
@@ -2893,7 +2919,8 @@ export default function TableManagementPage() {
                     color: '#352F2E',
                     textAlign: 'left',
                     lineHeight: 1.45,
-                    border: '1px solid #F0E6E4'
+                    border: '1px solid #F0E6E4',
+                    margin: '12px 0 8px'
                   }}>
                     <div><strong>1.</strong> Mở Camera điện thoại hoặc Zalo quét mã QR</div>
                     <div><strong>2.</strong> Xem thực đơn & chọn món ăn yêu thích</div>
@@ -2902,16 +2929,21 @@ export default function TableManagementPage() {
 
                   {/* WiFi Info */}
                   <div style={{
-                    marginTop: '8px',
                     padding: '6px 10px',
                     background: '#FFFFFF',
                     borderRadius: '8px',
                     border: '1px solid #EAE0DE',
                     fontSize: '0.68rem',
                     fontWeight: 700,
-                    color: '#1F1B1A'
+                    color: '#1F1B1A',
+                    marginBottom: '8px'
                   }}>
                     📶 WiFi: <strong>{restaurantProfile.wifiName || 'ROMS-GUEST'}</strong> | Pass: <strong>{restaurantProfile.wifiPassword || 'roms-welcome'}</strong>
+                  </div>
+
+                  {/* Footer Hotline */}
+                  <div style={{ fontSize: '0.62rem', color: '#89726B', fontWeight: 600 }}>
+                    Hotline hỗ trợ: 1900 8924 • ROMS Smart Table Terminal
                   </div>
                 </div>
               );
@@ -4326,11 +4358,11 @@ export default function TableManagementPage() {
                 })}
               </select>
 
-              {/* Nút Tải Toàn Bộ Ảnh Tem Bàn HD */}
+              {/* Nút Tải Toàn Bộ Ảnh Tem Bàn Dạng File ZIP */}
               <button
                 type="button"
                 disabled={isDownloadingBatch}
-                onClick={handleBatchDownloadAll}
+                onClick={handleBatchDownloadZip}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -4347,8 +4379,8 @@ export default function TableManagementPage() {
                   opacity: isDownloadingBatch ? 0.8 : 1
                 }}
               >
-                <Icon name={isDownloadingBatch ? "autorenew" : "download"} size={18} />
-                {isDownloadingBatch ? `Đang tải (${batchProgress.current}/${batchProgress.total})...` : 'Lưu Toàn Bộ Ảnh (PNG HD)'}
+                <Icon name={isDownloadingBatch ? "autorenew" : "folder_zip"} size={18} />
+                {isDownloadingBatch ? `Đang nén ZIP (${batchProgress.current}/${batchProgress.total})...` : 'Lưu File ZIP (Tất Cả Ảnh PNG HD)'}
               </button>
 
               {/* Nút Kích hoạt In Ấn / Lưu PDF */}
@@ -4437,109 +4469,174 @@ export default function TableManagementPage() {
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '20px'
+              gap: '24px'
             }}>
-              {batchFilteredTables.map((t) => (
-                <div
-                  key={t.id}
-                  className="qr-card-item"
-                  style={{
-                    border: '2px dashed #9D4124',
-                    borderRadius: '18px',
-                    padding: '18px 16px',
-                    textAlign: 'center',
-                    background: '#FFFFFF',
-                    position: 'relative'
-                  }}
-                >
-                  {/* Top Badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9D4124', background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px' }}>
-                      ROMS RESTAURANT
-                    </span>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#89726B' }}>
-                      {t.zoneName}
-                    </span>
-                  </div>
+              {batchFilteredTables.map((t) => {
+                const isVip = Boolean(
+                  t.code?.toUpperCase().includes('VIP') ||
+                  t.name?.toUpperCase().includes('VIP') ||
+                  t.zone?.toUpperCase().includes('VIP') ||
+                  t.zoneName?.toUpperCase().includes('VIP')
+                );
+                const cardBorder = isVip ? '2.5px solid #78350F' : '2.5px solid #9D4124';
+                const badgeBg = isVip ? '#78350F' : '#9D4124';
+                const targetUrl = (() => {
+                  const baseDomain = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost'))
+                    ? window.location.origin
+                    : 'http://roms-restaurant.duckdns.org';
+                  return `${baseDomain}/dining/welcome?table=${t.id}&token=${t.qrToken || ''}`;
+                })();
 
-                  {/* Mã bàn to nổi bật */}
-                  <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: '1.8rem', fontWeight: 900, color: '#1F1B1A', margin: '4px 0 2px' }}>
-                    {t.code}
-                  </h2>
-                  <div style={{ fontSize: '0.8rem', color: '#56423D', fontWeight: 600, marginBottom: '12px' }}>
-                    {t.name} • {t.capacity} Chỗ ngồi
-                  </div>
+                return (
+                  <div
+                    key={t.id}
+                    className="qr-card-item"
+                    style={{
+                      background: isVip ? '#FFFDF8' : '#FFFDFB',
+                      border: cardBorder,
+                      borderRadius: '20px',
+                      padding: '20px 18px',
+                      textAlign: 'center',
+                      boxShadow: '0 8px 24px rgba(157,65,36,0.1)',
+                      position: 'relative'
+                    }}
+                  >
+                    {/* Đường chỉ mảnh trang trí bên trong */}
+                    <div style={{
+                      position: 'absolute',
+                      inset: '6px',
+                      border: isVip ? '1px solid #F59E0B' : '1px solid #E8C3BA',
+                      borderRadius: '14px',
+                      pointerEvents: 'none'
+                    }} />
 
-                  {/* Khung Mã QR Trung Tâm (Canvas Sắc Nét) */}
-                  <div style={{
-                    background: '#FFFFFF',
-                    padding: '10px',
-                    borderRadius: '14px',
-                    display: 'inline-flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    border: '1.5px solid #EAE0DE',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                    marginBottom: '6px'
-                  }}>
-                    <QRCodeCanvas
-                      id={`batch-qr-canvas-${t.id}`}
-                      value={(() => {
-                        const baseDomain = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost'))
-                          ? window.location.origin
-                          : 'http://roms-restaurant.duckdns.org';
-                        return `${baseDomain}/dining/welcome?table=${t.id}&token=${t.qrToken || ''}`;
-                      })()}
-                      size={180}
-                      level="H"
-                      marginSize={2}
-                    />
-                    <span style={{ display: 'block', fontSize: '0.62rem', color: '#89726B', marginTop: '3px', fontWeight: 600 }}>
-                      Mã: {t.qrToken}
-                    </span>
-                  </div>
+                    {/* Top Brand Name */}
+                    <div style={{ fontSize: '0.72rem', fontWeight: 900, color: badgeBg, letterSpacing: '2px', textTransform: 'uppercase' }}>
+                      ★ {restaurantProfile.brandName || restaurantProfile.name || 'ROMS RESTAURANT'} ★
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 600, color: '#89726B', letterSpacing: '1px', marginTop: '2px' }}>
+                      HỆ THỐNG GỌI MÓN THÔNG MINH TẠI BÀN
+                    </div>
 
-                  {/* Nút tải lẻ từng bàn trong danh sách */}
-                  <div className="no-print" style={{ marginTop: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const qrCanvas = document.getElementById(`batch-qr-canvas-${t.id}`);
-                        downloadTableStandeePng({ table: t, restaurantProfile, qrCanvas });
-                        showToast(`Đã lưu ảnh tem ${t.code} thành công!`);
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        background: '#FFF3E0',
-                        color: '#BF360C',
-                        border: '1px solid #FFE0B2',
-                        fontWeight: 700,
-                        fontSize: '0.72rem',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Icon name="download" size={14} />
-                      Lưu Tem Bàn Này (PNG HD)
-                    </button>
-                  </div>
+                    {/* Table Badge */}
+                    <div style={{
+                      display: 'inline-block',
+                      background: badgeBg,
+                      color: '#FFFFFF',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      padding: '2px 14px',
+                      borderRadius: '12px',
+                      margin: '10px 0 4px',
+                      letterSpacing: '0.5px'
+                    }}>
+                      {isVip ? 'PHÒNG VIP' : 'BÀN ĂN'}
+                    </div>
 
-                  {/* 3 Bước Hướng dẫn */}
-                  <div style={{ fontSize: '0.72rem', color: '#56423D', lineHeight: 1.35, margin: '6px 0', textAlign: 'left', background: '#FAF6F5', padding: '8px 12px', borderRadius: '8px' }}>
-                    <div><strong>1.</strong> Mở camera điện thoại quét mã QR</div>
-                    <div><strong>2.</strong> Chọn món ăn & đồ uống yêu thích</div>
-                    <div><strong>3.</strong> Bấm gửi đơn & nhân viên phục vụ tận bàn</div>
-                  </div>
+                    {/* Large Table Code */}
+                    <h2 style={{
+                      fontFamily: "'Epilogue', sans-serif",
+                      fontWeight: 900,
+                      fontSize: '2rem',
+                      color: '#1F1B1A',
+                      margin: '2px 0 0',
+                      letterSpacing: '-0.5px'
+                    }}>
+                      {t.code}
+                    </h2>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#56423D', marginBottom: '12px' }}>
+                      {t.name} • {t.zoneName} • {t.capacity || 4} chỗ
+                    </div>
 
-                  {/* Footer WiFi */}
-                  <div style={{ fontSize: '0.68rem', color: '#89726B', fontWeight: 600, borderTop: '1px solid #F0E6E4', paddingTop: '6px', marginTop: '6px' }}>
-                    📶 WiFi: <strong>{restaurantProfile.wifiName || 'ROMS-GUEST'}</strong> | Mật khẩu: <strong>{restaurantProfile.wifiPassword || 'roms-welcome'}</strong>
+                    {/* Khung Mã QR Trung Tâm (Canvas Sắc Nét) */}
+                    <div style={{
+                      background: '#FFFFFF',
+                      padding: '12px',
+                      borderRadius: '16px',
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      border: '1.5px solid #EAE0DE',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+                    }}>
+                      <QRCodeCanvas
+                        id={`batch-qr-canvas-${t.id}`}
+                        value={targetUrl}
+                        size={180}
+                        level="H"
+                        marginSize={2}
+                      />
+                      <span style={{ fontSize: '0.62rem', color: '#89726B', marginTop: '4px', fontWeight: 600 }}>
+                        Mã: {t.qrToken || 'qr-active-token'}
+                      </span>
+                    </div>
+
+                    {/* Nút tải lẻ từng bàn trong danh sách (Ẩn khi in ấn / xuất PDF) */}
+                    <div className="no-print" style={{ marginTop: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const qrCanvas = document.getElementById(`batch-qr-canvas-${t.id}`);
+                          downloadTableStandeePng({ table: t, restaurantProfile, qrCanvas });
+                          showToast(`Đã lưu ảnh tem ${t.code} thành công!`);
+                        }}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          background: '#FFF3E0',
+                          color: '#BF360C',
+                          border: '1px solid #FFE0B2',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Icon name="download" size={14} />
+                        Lưu Tem Bàn Này (PNG HD)
+                      </button>
+                    </div>
+
+                    {/* 3 Bước thao tác */}
+                    <div style={{
+                      background: '#FAF6F5',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.68rem',
+                      color: '#352F2E',
+                      textAlign: 'left',
+                      lineHeight: 1.45,
+                      border: '1px solid #F0E6E4',
+                      margin: '10px 0 8px'
+                    }}>
+                      <div><strong>1.</strong> Mở Camera điện thoại hoặc Zalo quét mã QR</div>
+                      <div><strong>2.</strong> Xem thực đơn & chọn món ăn yêu thích</div>
+                      <div><strong>3.</strong> Bấm gửi đơn để Bếp chế biến và phục vụ tận bàn</div>
+                    </div>
+
+                    {/* WiFi Info */}
+                    <div style={{
+                      padding: '6px 10px',
+                      background: '#FFFFFF',
+                      borderRadius: '8px',
+                      border: '1px solid #EAE0DE',
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      color: '#1F1B1A',
+                      marginBottom: '8px'
+                    }}>
+                      📶 WiFi: <strong>{restaurantProfile.wifiName || 'ROMS-GUEST'}</strong> | Pass: <strong>{restaurantProfile.wifiPassword || 'roms-welcome'}</strong>
+                    </div>
+
+                    {/* Footer Hotline */}
+                    <div style={{ fontSize: '0.62rem', color: '#89726B', fontWeight: 600 }}>
+                      Hotline hỗ trợ: 1900 8924 • ROMS Smart Table Terminal
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
