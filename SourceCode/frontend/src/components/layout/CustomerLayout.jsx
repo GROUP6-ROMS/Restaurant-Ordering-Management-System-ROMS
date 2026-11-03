@@ -99,6 +99,14 @@ export default function CustomerLayout() {
     }
   };
 
+  const handleOpenAiChat = () => {
+    if (!isTableOccupied) {
+      showToast('Chờ nhân viên mở bàn! Vui lòng đợi nhân viên mở bàn.');
+      return;
+    }
+    setIsAiModalOpen(true);
+  };
+
   // Accessibility: Lắng nghe phím Escape để đóng Modal hỗ trợ
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -490,7 +498,7 @@ export default function CustomerLayout() {
       {/* ============================================================== */}
       {/* --- Nút Nổi AI Trợ Lý Ẩm Thực (Floating Action Button) --- */}
       <button
-        onClick={() => setIsAiModalOpen(true)}
+        onClick={handleOpenAiChat}
         aria-label="Mở Trợ lý Ẩm thực AI"
         style={{
           position: 'fixed',
