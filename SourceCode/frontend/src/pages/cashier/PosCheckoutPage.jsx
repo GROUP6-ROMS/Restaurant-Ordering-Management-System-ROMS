@@ -107,14 +107,73 @@ export default function PosCheckoutPage() {
     setOpeningCash(num);
     localStorage.setItem('roms_cashier_opening_cash', String(num));
   };
-  const [denominations, setDenominations] = useState({
-    500000: 15,
-    200000: 10,
-    100000: 8,
-    50000: 5,
-    20000: 4,
-    10000: 2
+
+  // Cơ chế tải & lưu bảng kiểm đếm tiền mặt theo từng Ca & Ngày (localStorage)
+  const getSavedDenominations = (type, date) => {
+    try {
+      const key = `roms_cashier_denom_${type}_${date}`;
+      const saved = localStorage.getItem(key);
+      if (saved) return JSON.parse(saved);
+      const fallback = localStorage.getItem('roms_cashier_denominations');
+      if (fallback) return JSON.parse(fallback);
+    } catch (e) {}
+    return {
+      500000: 0,
+      200000: 0,
+      100000: 0,
+      50000: 0,
+      20000: 0,
+      10000: 0
+    };
+  };
+
+  const [denominations, setDenominations] = useState(() => {
+    const initShift = (new Date().getHours() >= 6 && new Date().getHours() < 14) ? 'MORNING' : 'EVENING';
+    const initDate = new Date().toISOString().split('T')[0];
+    return getSavedDenominations(initShift, initDate);
   });
+  const [isDenomSaved, setIsDenomSaved] = useState(true);
+
+  // Tự động lưu bảng kiểm đếm tiền mặt mỗi khi số lượng thay đổi
+  useEffect(() => {
+    try {
+      const key = `roms_cashier_denom_${shiftType}_${shiftDate}`;
+      localStorage.setItem(key, JSON.stringify(denominations));
+      localStorage.setItem('roms_cashier_denominations', JSON.stringify(denominations));
+      setIsDenomSaved(true);
+    } catch (e) {}
+  }, [denominations, shiftType, shiftDate]);
+
+  // Tải lại bảng kiểm đếm tương ứng khi thu ngân đổi Ca hoặc Ngày
+  useEffect(() => {
+    const loaded = getSavedDenominations(shiftType, shiftDate);
+    setDenominations(loaded);
+  }, [shiftType, shiftDate]);
+
+  const handleResetDenominations = () => {
+    const emptyDenom = {
+      500000: 0,
+      200000: 0,
+      100000: 0,
+      50000: 0,
+      20000: 0,
+      10000: 0
+    };
+    setDenominations(emptyDenom);
+    showToast('Đã đặt lại toàn bộ bảng kiểm đếm tiền về 0 tờ!');
+  };
+
+  const handleManualSaveDenominations = () => {
+    try {
+      const key = `roms_cashier_denom_${shiftType}_${shiftDate}`;
+      localStorage.setItem(key, JSON.stringify(denominations));
+      localStorage.setItem('roms_cashier_denominations', JSON.stringify(denominations));
+      setIsDenomSaved(true);
+      showToast('💾 Đã lưu bảng kiểm đếm két tiền thành công!');
+    } catch (e) {
+      showToast('Lỗi khi lưu bảng kiểm đếm!');
+    }
+  };
   const [handoverNote, setHandoverNote] = useState('Ca trực hoàn tất tốt, không phát sinh sai sót lớn.');
   const [isShiftClosed, setIsShiftClosed] = useState(() => {
     return sessionStorage.getItem('roms_cashier_shift_closed') === 'true';
@@ -918,6 +977,15 @@ export default function PosCheckoutPage() {
       return;
     }
     try {
+      // Tổng hợp chi tiết bảng kiểm đếm tiền mặt vào ghi chú bàn giao ca
+      const denomBreakdown = Object.entries(denominations)
+        .filter(([_, count]) => Number(count) > 0)
+        .sort((a, b) => Number(b[0]) - Number(a[0]))
+        .map(([d, c]) => `${Number(d).toLocaleString('vi-VN')}₫ x ${c}`)
+        .join(', ');
+
+      const fullHandoverWithDenom = `[Đếm két: ${denomBreakdown || '0đ'}] ${handoverNote || ''}`.trim();
+
       const res = await cashierApi.closeShift({
         managerPin: shiftManagerPin.trim(),
         reason: shiftManagerNote.trim(),
@@ -925,7 +993,7 @@ export default function PosCheckoutPage() {
         countedCash: totalCountedCash,
         theoreticalCash: theoreticalDrawerCash,
         cashDifference: cashDifference,
-        handoverNote: handoverNote
+        handoverNote: fullHandoverWithDenom
       });
       const approvedTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
       setIsShiftClosed(true);
@@ -2433,9 +2501,67 @@ export default function PosCheckoutPage() {
             <div style={{ gridColumn: 'span 7', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {/* Bảng kiểm đếm mệnh giá */}
               <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '20px', border: '1px solid #F0E6E4' }}>
-                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.1rem', color: '#1F1B1A', marginBottom: '14px' }}>
-                  Bảng Kiểm Đếm Tiền Mặt Theo Mệnh Giá
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.1rem', color: '#1F1B1A', margin: 0 }}>
+                      Bảng Kiểm Đếm Tiền Mặt Theo Mệnh Giá
+                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#89726B' }}>
+                        Tổng số tờ: <strong>{Object.values(denominations).reduce((sum, v) => sum + (Number(v) || 0), 0)} tờ</strong>
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#276722', background: '#EBF5E9', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                        ✓ Đã tự động lưu
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={handleResetDenominations}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #EAE0DE',
+                        background: '#FFFFFF',
+                        color: '#BA1A1A',
+                        fontWeight: 700,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Đặt lại tất cả mệnh giá về 0 để đếm ca mới"
+                    >
+                      <Icon name="restart_alt" size={14} />
+                      <span>Đặt lại 0</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleManualSaveDenominations}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #9D4124',
+                        background: '#FFF6F3',
+                        color: '#9D4124',
+                        fontWeight: 800,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Lưu thủ công số liệu kiểm đếm"
+                    >
+                      <Icon name="save" size={14} />
+                      <span>Lưu kiểm đếm</span>
+                    </button>
+                  </div>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {[
@@ -2576,7 +2702,7 @@ export default function PosCheckoutPage() {
                     </div>
                   </div>
 
-                  <div style={{ padding: '8px 0' }}>
+                  <div style={{ padding: '8px 0', borderBottom: '1px dashed #CCC' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>+ Tiền lẻ đầu ca:</span>
                       <strong>{Number(shiftSummary?.openingCash ?? openingCash).toLocaleString('vi-VN')}₫</strong>
@@ -2597,6 +2723,24 @@ export default function PosCheckoutPage() {
                       <span>CHÊNH LỆCH:</span>
                       <span>{cashDifference === 0 ? '0₫ (Khớp)' : `${cashDifference > 0 ? '+' : ''}${cashDifference.toLocaleString('vi-VN')}₫`}</span>
                     </div>
+                  </div>
+
+                  {/* Bảng kê chi tiết mệnh giá tiền thực đếm trên biên bản K80 */}
+                  <div style={{ padding: '6px 0', fontSize: '0.72rem' }}>
+                    <div style={{ fontWeight: 800, marginBottom: '4px' }}>CHI TIẾT MỆNH GIÁ KIỂM ĐẾM:</div>
+                    {Object.entries(denominations).filter(([_, count]) => Number(count) > 0).length === 0 ? (
+                      <div style={{ fontStyle: 'italic', color: '#888' }}>- Chưa kiểm đếm tờ tiền nào</div>
+                    ) : (
+                      Object.entries(denominations)
+                        .sort((a, b) => Number(b[0]) - Number(a[0]))
+                        .filter(([_, count]) => Number(count) > 0)
+                        .map(([denom, count]) => (
+                          <div key={denom} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
+                            <span>• {Number(denom).toLocaleString('vi-VN')}₫ × {count} tờ:</span>
+                            <strong>{(Number(denom) * Number(count)).toLocaleString('vi-VN')}₫</strong>
+                          </div>
+                        ))
+                    )}
                   </div>
 
                   {isShiftClosed ? (
