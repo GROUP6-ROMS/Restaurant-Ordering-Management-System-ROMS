@@ -18,7 +18,7 @@ function formatVND(amount) {
 // Khop voi Stitch SCR-10 (glassmorphism header + bottom nav)
 // ====================================================
 export default function CustomerLayout() {
-  const { tableInfo, totalCount, totalPrice } = useCart();
+  const { tableInfo, setTableInfo, totalCount, totalPrice } = useCart();
   const restaurantProfile = useRestaurantProfile();
   const location = useLocation();
   const [toastVisible, setToastVisible] = useState(false);
