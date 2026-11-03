@@ -71,13 +71,22 @@
   width: 100%;
 }
 
-/* Drawer Backdrop for Mobile */
+/* Drawer Backdrop & Mobile Header */
 .admin-drawer-overlay {
   display: none;
 }
 
+/* Header riêng cho Drawer trên Mobile, ẩn hoàn toàn trên Desktop */
+.admin-drawer-mobile-header {
+  display: none !important;
+}
+
 /* Responsive Media Queries */
 @media (max-width: 1024px) {
+  .admin-drawer-mobile-header {
+    display: flex !important;
+  }
+
   .admin-hamburger-btn {
     display: flex;
   }

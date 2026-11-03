@@ -218,7 +218,7 @@ export default function AdminLayout() {
         <aside className={`admin-sidebar ${mobileDrawerOpen ? 'open' : ''}`}>
           <div>
             {/* Header riêng cho Drawer trên Mobile */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px 14px', borderBottom: '1px solid #F0E6E4', marginBottom: '14px' }}>
+            <div className="admin-drawer-mobile-header" style={{ alignItems: 'center', justifyContent: 'space-between', padding: '0 8px 14px', borderBottom: '1px solid #F0E6E4', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <RomsLogo size={28} />
                 <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.95rem', color: '#9D4124' }}>
