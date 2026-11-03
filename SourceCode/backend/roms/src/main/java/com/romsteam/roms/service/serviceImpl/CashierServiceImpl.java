@@ -399,7 +399,7 @@ public class CashierServiceImpl implements CashierService {
 
     @Override
     @Transactional(readOnly = true)
-    public CashierShiftSummaryResponse getShiftSummary(String shiftType, LocalDate date, String cashierUsername) {
+    public CashierShiftSummaryResponse getShiftSummary(String shiftType, LocalDate date, BigDecimal openingCash, String cashierUsername) {
         LocalDate queryDate = (date != null) ? date : LocalDate.now();
         String shift = (shiftType != null && !shiftType.trim().isEmpty()) ? shiftType.toUpperCase() : "MORNING";
 
@@ -427,6 +427,12 @@ public class CashierServiceImpl implements CashierService {
 
         BigDecimal total = cash.add(bank).add(card);
 
+        // Tiền đầu ca (opening float) do thu ngân nhập khi mở ca
+        BigDecimal opening = (openingCash != null && openingCash.compareTo(BigDecimal.ZERO) > 0) ? openingCash : BigDecimal.ZERO;
+
+        // Tiền mặt lý thuyết phải có trong két = Tiền đầu ca + Doanh thu tiền mặt trong ca
+        BigDecimal theoretical = opening.add(cash);
+
         Staff cashier = (cashierUsername != null) ? staffRepository.findByUsername(cashierUsername).orElse(null) : null;
 
         return CashierShiftSummaryResponse.builder()
@@ -440,7 +446,8 @@ public class CashierServiceImpl implements CashierService {
                 .cashRevenue(cash)
                 .bankRevenue(bank)
                 .cardRevenue(card)
-                .theoreticalDrawerCash(cash)
+                .openingCash(opening)
+                .theoreticalDrawerCash(theoretical)
                 .build();
     }
 
