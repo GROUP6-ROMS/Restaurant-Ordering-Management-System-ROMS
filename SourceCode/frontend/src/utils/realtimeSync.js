@@ -295,17 +295,17 @@ export const broadcastRealtimeEvent = (eventData, extraData = {}) => {
   isDuplicateEvent(payload);
 
   // 1. Gửi qua WebSocket STOMP tới máy chủ (để phân tán tới các thiết bị di động, tablet, KDS khác)
-  try {
-    const client = initStompClient();
-    if (client && client.connected) {
-      client.publish({
-        destination: '/app/broadcast',
-        body: JSON.stringify(payload)
-      });
-    }
-  } catch (wsErr) {
-    console.warn('[RealtimeSync] STOMP publish error:', wsErr);
-  }
+  // try {
+  //   const client = initStompClient();
+  //   if (client && client.connected) {
+  //     client.publish({
+  //       destination: '/app/broadcast',
+  //       body: JSON.stringify(payload)
+  //     });
+  //   }
+  // } catch (wsErr) {
+  //   console.warn('[RealtimeSync] STOMP publish error:', wsErr);
+  // }
 
   // 2. Gửi qua BroadcastChannel nội bộ (đồng bộ siêu tốc <3ms giữa các tab cùng trình duyệt)
   try {
