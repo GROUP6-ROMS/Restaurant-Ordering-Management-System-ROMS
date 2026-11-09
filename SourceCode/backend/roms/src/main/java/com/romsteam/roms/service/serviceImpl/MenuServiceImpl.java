@@ -202,6 +202,11 @@ public class MenuServiceImpl implements MenuService {
 
         MenuItem updated = menuItemRepository.save(item);
         log.info("Manager updated menu item [ID: {}, Name: {}]", updated.getId(), updated.getName());
+        try {
+            realtimeService.notifyMenuItemAvailability(updated.getId(), updated.getName(), updated.getIsAvailable(), updated.getRemainingStock());
+        } catch (Exception e) {
+            log.warn("Loi phat realtime khi cap nhat mon {}: {}", updated.getName(), e.getMessage());
+        }
         return mapToAdminResponse(updated);
     }
 
