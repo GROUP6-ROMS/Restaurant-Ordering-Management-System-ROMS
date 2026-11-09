@@ -3,7 +3,9 @@ package com.romsteam.roms.service.serviceImpl;
 import com.romsteam.roms.dto.request.CreateZoneRequest;
 import com.romsteam.roms.dto.request.UpdateZoneRequest;
 import com.romsteam.roms.dto.response.ZoneResponse;
+import com.romsteam.roms.entity.RestaurantTable;
 import com.romsteam.roms.entity.Zone;
+import com.romsteam.roms.entity.enums.TableStatus;
 import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.exception.ResourceNotFoundException;
 import com.romsteam.roms.repository.RestaurantTableRepository;
@@ -91,14 +93,23 @@ public class ZoneServiceImpl implements ZoneService {
         Zone zone = zoneRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Khu vực không tồn tại với ID: " + id));
 
-        // Ràng buộc toàn vẹn dữ liệu: Không cho xóa nếu đang có bàn ăn trực thuộc khu vực này
-        long existingTables = tableRepository.countByZone(zone.getZoneCode());
-        if (existingTables > 0) {
+        // Ràng buộc toàn vẹn dữ liệu: Không cho xóa nếu đang có bàn ăn đang hoạt động trực thuộc khu vực này
+        long activeTables = tableRepository.countByZoneAndIsActiveTrue(zone.getZoneCode());
+        if (activeTables > 0) {
             throw new AppException(
-                    String.format("Không thể xóa khu vực '%s' vì đang có %d bàn ăn trực thuộc. Vui lòng chuyển các bàn sang khu vực khác trước khi xóa!",
-                            zone.getName(), existingTables),
+                    String.format("Không thể xóa khu vực '%s' vì đang có %d bàn ăn đang hoạt động. Vui lòng chuyển các bàn sang khu vực khác hoặc xóa bàn trước khi xóa khu vực!",
+                            zone.getName(), activeTables),
                     HttpStatus.BAD_REQUEST
             );
+        }
+
+        // Với các bàn đã bị xóa mềm trước đó (isActive = false), dọn sạch zone để dữ liệu sạch sẽ
+        List<RestaurantTable> tablesInZone = tableRepository.findByZone(zone.getZoneCode());
+        if (tablesInZone != null && !tablesInZone.isEmpty()) {
+            for (RestaurantTable t : tablesInZone) {
+                t.setZone("DELETED_ZONE");
+            }
+            tableRepository.saveAll(tablesInZone);
         }
 
         zoneRepository.delete(zone);
@@ -106,13 +117,17 @@ public class ZoneServiceImpl implements ZoneService {
 
     private ZoneResponse mapToZoneResponse(Zone zone) {
         long tableCount = tableRepository.countByZoneAndIsActiveTrue(zone.getZoneCode());
+        long available = tableRepository.findByZoneAndStatusAndIsActiveTrue(zone.getZoneCode(), TableStatus.AVAILABLE).size();
         return ZoneResponse.builder()
                 .id(zone.getId())
                 .zoneCode(zone.getZoneCode())
                 .name(zone.getName())
+                .zoneName(zone.getName())
                 .description(zone.getDescription())
                 .displayOrder(zone.getDisplayOrder())
                 .tableCount(tableCount)
+                .totalTables(tableCount)
+                .availableTables(available)
                 .isActive(zone.getIsActive())
                 .createdAt(zone.getCreatedAt())
                 .updatedAt(zone.getUpdatedAt())

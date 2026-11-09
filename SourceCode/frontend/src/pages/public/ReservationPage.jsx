@@ -134,7 +134,7 @@ export default function ReservationPage() {
         if (res.data && res.data.length > 0) {
           setZones(res.data);
           setSelectedZone(res.data[0].zoneCode);
-          setSelectedZoneName(res.data[0].zoneName);
+          setSelectedZoneName(res.data[0].zoneName || res.data[0].name);
         }
       } catch (err) {
         console.error('Không thể tải khu vực từ CSDL, sử dụng danh sách mặc định:', err);
@@ -989,7 +989,7 @@ export default function ReservationPage() {
                           key={z.zoneCode}
                           onClick={() => {
                             setSelectedZone(z.zoneCode);
-                            setSelectedZoneName(z.zoneName);
+                            setSelectedZoneName(z.zoneName || z.name);
                           }}
                           style={{
                             padding: '16px 18px',
@@ -1018,7 +1018,7 @@ export default function ReservationPage() {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                                 <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.98rem', color: '#1F1B1A' }}>
-                                  {z.zoneName}
+                                  {z.zoneName || z.name}
                                 </span>
                                 {z.badge && (
                                   <span style={{

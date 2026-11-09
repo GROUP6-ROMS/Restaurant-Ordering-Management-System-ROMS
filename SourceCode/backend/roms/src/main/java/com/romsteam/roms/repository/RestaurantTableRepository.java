@@ -31,6 +31,9 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     // Lọc danh sách bàn theo phân khu (ZONE_1, ZONE_2, VIP)
     List<RestaurantTable> findByZoneAndIsActiveTrue(String zone);
 
+    // Lấy toàn bộ bàn thuộc phân khu (bao gồm cả bàn đã xóa mềm)
+    List<RestaurantTable> findByZone(String zone);
+
     // Lọc danh sách bàn theo cả phân khu và trạng thái
     List<RestaurantTable> findByZoneAndStatusAndIsActiveTrue(String zone, TableStatus status);
 

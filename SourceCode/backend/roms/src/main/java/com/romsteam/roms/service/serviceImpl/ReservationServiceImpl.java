@@ -13,12 +13,14 @@ import com.romsteam.roms.entity.MenuItem;
 import com.romsteam.roms.entity.Reservation;
 import com.romsteam.roms.entity.ReservationItem;
 import com.romsteam.roms.entity.RestaurantTable;
+import com.romsteam.roms.entity.Zone;
 import com.romsteam.roms.entity.enums.ReservationStatus;
 import com.romsteam.roms.entity.enums.TableStatus;
 import com.romsteam.roms.exception.AppException;
 import com.romsteam.roms.repository.MenuItemRepository;
 import com.romsteam.roms.repository.ReservationRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
+import com.romsteam.roms.repository.ZoneRepository;
 import com.romsteam.roms.service.ReservationService;
 import com.romsteam.roms.service.RestaurantTableService;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final RestaurantTableRepository tableRepository;
     private final MenuItemRepository menuItemRepository;
     private final RestaurantTableService tableService;
+    private final ZoneRepository zoneRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -126,48 +129,79 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional(readOnly = true)
     public List<ZoneResponse> getActiveZones() {
-        // Lấy danh sách các zone có bàn đang hoạt động
-        List<String> distinctZones = tableRepository.findDistinctActiveZones();
-        if (distinctZones.isEmpty()) {
-            distinctZones = Arrays.asList("ZONE_1", "ZONE_2", "VIP");
+        // Lấy danh sách các khu vực đang hoạt động từ bảng zones theo thứ tự hiển thị
+        List<Zone> activeZones = zoneRepository.findByIsActiveTrueOrderByDisplayOrderAsc();
+
+        // Fallback an toàn nếu database chưa có bản ghi nào trong bảng zones
+        if (activeZones.isEmpty()) {
+            List<String> distinctZones = tableRepository.findDistinctActiveZones();
+            if (distinctZones.isEmpty()) {
+                distinctZones = Arrays.asList("ZONE_1", "ZONE_2", "VIP");
+            }
+
+            List<ZoneResponse> fallbackResults = new ArrayList<>();
+            for (String zoneCode : distinctZones) {
+                long total = tableRepository.countByZoneAndIsActiveTrue(zoneCode);
+                long available = tableRepository.findByZoneAndStatusAndIsActiveTrue(zoneCode, TableStatus.AVAILABLE).size();
+
+                String zName = "ZONE_2".equals(zoneCode) ? "Ban Công & Sân Vườn - Tầng 2" :
+                               "VIP".equals(zoneCode) ? "Phòng Riêng VIP Sang Trọng" : "Sảnh Chính - Tầng 1";
+                String desc = "ZONE_2".equals(zoneCode) ? "Tầm nhìn thoáng đãng nhìn ra phố cổ, gió trời tự nhiên lãng mạn cho cặp đôi và nhóm bạn." :
+                              "VIP".equals(zoneCode) ? "Cách âm tốt, không gian riêng tư ấm cúng, thích hợp họp mặt đối tác, liên hoan và tiệc gia đình thân mật." :
+                              "Không gian ấm cúng, thiết kế hiện đại với dàn đèn nghệ thuật và âm nhạc du dương.";
+                String badge = "ZONE_2".equals(zoneCode) ? "View đẹp" : "VIP".equals(zoneCode) ? "Riêng tư" : "Phổ biến";
+
+                fallbackResults.add(ZoneResponse.builder()
+                        .zoneCode(zoneCode)
+                        .name(zName)
+                        .zoneName(zName)
+                        .description(desc)
+                        .badge(badge)
+                        .totalTables(total)
+                        .tableCount(total)
+                        .availableTables(available)
+                        .isActive(true)
+                        .build());
+            }
+            return fallbackResults;
         }
 
+        // Tải danh sách khu vực động thực tế từ CSDL
         List<ZoneResponse> results = new ArrayList<>();
-        for (String zoneCode : distinctZones) {
-            long total = tableRepository.countByZoneAndIsActiveTrue(zoneCode);
-            long available = tableRepository.findByZoneAndStatusAndIsActiveTrue(zoneCode, TableStatus.AVAILABLE).size();
+        for (Zone zone : activeZones) {
+            long total = tableRepository.countByZoneAndIsActiveTrue(zone.getZoneCode());
+            long available = tableRepository.findByZoneAndStatusAndIsActiveTrue(zone.getZoneCode(), TableStatus.AVAILABLE).size();
 
-            // Định nghĩa tên hiển thị và mô tả theo từng phân khu
-            String zoneName;
-            String desc;
-            String badge;
+            // Xác định huy hiệu (badge) phù hợp
+            String badge = null;
+            String lowerName = zone.getName() != null ? zone.getName().toLowerCase() : "";
+            if ("ZONE_1".equalsIgnoreCase(zone.getZoneCode()) || lowerName.contains("sảnh")) {
+                badge = "Phổ biến";
+            } else if ("ZONE_2".equalsIgnoreCase(zone.getZoneCode()) || lowerName.contains("ban công") || lowerName.contains("sân vườn")) {
+                badge = "View đẹp";
+            } else if ("VIP".equalsIgnoreCase(zone.getZoneCode()) || lowerName.contains("vip")) {
+                badge = "Riêng tư";
+            }
 
-            switch (zoneCode) {
-                case "ZONE_2":
-                    zoneName = "Ban Công & Sân Vườn - Tầng 2";
-                    desc = "Tầm nhìn thoáng đãng nhìn ra phố cổ, gió trời tự nhiên lãng mạn cho cặp đôi và nhóm bạn.";
-                    badge = "View đẹp";
-                    break;
-                case "VIP":
-                    zoneName = "Phòng Riêng VIP Sang Trọng";
-                    desc = "Cách âm tốt, không gian riêng tư ấm cúng, thích hợp họp mặt đối tác, liên hoan và tiệc gia đình thân mật.";
-                    badge = "Riêng tư";
-                    break;
-                case "ZONE_1":
-                default:
-                    zoneName = "Sảnh Chính - Tầng 1";
-                    desc = "Không gian ấm cúng, thiết kế hiện đại với dàn đèn nghệ thuật và âm nhạc du dương.";
-                    badge = "Phổ biến";
-                    break;
+            String desc = zone.getDescription();
+            if (desc == null || desc.trim().isEmpty()) {
+                desc = "Không gian phục vụ hiện đại, tiện nghi, ẩm thực tinh hoa của nhà hàng ROMS.";
             }
 
             results.add(ZoneResponse.builder()
-                    .zoneCode(zoneCode)
-                    .zoneName(zoneName)
+                    .id(zone.getId())
+                    .zoneCode(zone.getZoneCode())
+                    .name(zone.getName())
+                    .zoneName(zone.getName())
                     .description(desc)
                     .badge(badge)
+                    .displayOrder(zone.getDisplayOrder())
                     .totalTables(total)
+                    .tableCount(total)
                     .availableTables(available)
+                    .isActive(zone.getIsActive())
+                    .createdAt(zone.getCreatedAt())
+                    .updatedAt(zone.getUpdatedAt())
                     .build());
         }
 
@@ -430,13 +464,22 @@ public class ReservationServiceImpl implements ReservationService {
                 statusLabel = r.getStatus().name();
         }
 
-        String zoneName;
-        if ("ZONE_2".equals(r.getRequestedZone())) {
-            zoneName = "Ban Công & Sân Vườn";
-        } else if ("VIP".equals(r.getRequestedZone())) {
-            zoneName = "Phòng VIP";
-        } else {
-            zoneName = "Sảnh Chính";
+        String zoneName = null;
+        if (r.getRequestedZone() != null) {
+            zoneName = zoneRepository.findByZoneCode(r.getRequestedZone())
+                    .map(Zone::getName)
+                    .orElse(null);
+        }
+        if (zoneName == null) {
+            if ("ZONE_2".equals(r.getRequestedZone())) {
+                zoneName = "Ban Công & Sân Vườn";
+            } else if ("VIP".equals(r.getRequestedZone())) {
+                zoneName = "Phòng VIP";
+            } else if ("ZONE_1".equals(r.getRequestedZone())) {
+                zoneName = "Sảnh Chính";
+            } else {
+                zoneName = r.getRequestedZone() != null ? r.getRequestedZone() : "Sảnh Chính";
+            }
         }
 
         List<ReservationItemResponse> preOrderResponses = new ArrayList<>();
