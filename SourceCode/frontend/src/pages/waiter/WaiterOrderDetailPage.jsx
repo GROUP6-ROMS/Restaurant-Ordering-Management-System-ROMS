@@ -184,8 +184,8 @@ export default function WaiterOrderDetailPage() {
   };
 
   const subtotal = tableData.items.reduce((s, i) => s + (i.price * i.qty), 0);
-  const vat = subtotal * 0.08;
-  const total = subtotal + vat;
+  const vat = 0;
+  const total = subtotal;
 
   // Add dish to temporary order cart
   const handleSelectDish = (dish) => {
@@ -651,9 +651,9 @@ export default function WaiterOrderDetailPage() {
                 <span>Tổng tiền món:</span>
                 <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{subtotal.toLocaleString('vi-VN')}₫</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
-                <span>Thuế VAT (8%):</span>
-                <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{vat.toLocaleString('vi-VN')}₫</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#89726B', fontStyle: 'italic', fontSize: '0.8rem' }}>
+                <span>Thuế GTGT:</span>
+                <span>Đã gồm trong giá món</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
                 <span>Phí dịch vụ:</span>

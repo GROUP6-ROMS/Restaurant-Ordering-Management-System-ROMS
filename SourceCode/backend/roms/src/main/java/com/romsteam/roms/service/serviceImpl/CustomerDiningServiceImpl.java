@@ -312,8 +312,8 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
                     .build());
         }
 
-        BigDecimal vatAmount = totalAmount.multiply(BigDecimal.valueOf(8)).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-        BigDecimal grandTotal = totalAmount.add(vatAmount);
+        BigDecimal vatAmount = BigDecimal.ZERO;
+        BigDecimal grandTotal = totalAmount;
 
         return CustomerOrderTrackingResponse.builder()
                 .tableId(table.getId())

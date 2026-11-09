@@ -7882,16 +7882,10 @@ export default function TableManagementPage() {
                       <span>Cộng tiền món:</span>
                       <span>{Number(preCheckBillData.subtotal || 0).toLocaleString('vi-VN')}₫</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Thuế VAT ({preCheckBillData.taxRate || 8}%):</span>
-                      <span>{Number(preCheckBillData.taxAmount || 0).toLocaleString('vi-VN')}₫</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#89726B', fontStyle: 'italic', fontSize: '0.8rem' }}>
+                      <span>Thuế GTGT:</span>
+                      <span>Đã gồm trong giá món</span>
                     </div>
-                    {Number(preCheckBillData.discountAmount || 0) > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#DC2626' }}>
-                        <span>Giảm giá:</span>
-                        <span>-{Number(preCheckBillData.discountAmount).toLocaleString('vi-VN')}₫</span>
-                      </div>
-                    )}
                     <div style={{
                       display: 'flex',
                       justifyContent: 'space-between',

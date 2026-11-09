@@ -74,10 +74,8 @@ export default function CustomerCartPage() {
     setTimeout(() => setToastVisible(false), 2500);
   };
 
-  // VAT 8%
-  const VAT_RATE = 0.08;
-  const vatAmount = Math.round(totalPrice * VAT_RATE);
-  const grandTotal = totalPrice + vatAmount;
+  // Giá niêm yết đã bao gồm thuế GTGT
+  const grandTotal = totalPrice;
 
   const handleSubmitOrder = async () => {
     if (cartItems.length === 0 || isSubmitting) return;
@@ -551,12 +549,11 @@ export default function CustomerCartPage() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Plus Jakarta Sans', fontSize: 14, color: 'var(--on-surface-variant)' }}>
-              Thuế VAT (8%)
-              <Icon name="help_outline" size={14} style={{ color: 'var(--outline)' }} />
+            <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 13, color: 'var(--on-surface-variant)', fontStyle: 'italic' }}>
+              Thuế GTGT
             </span>
-            <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 14, fontWeight: 500, color: 'var(--on-surface)' }}>
-              {formatVND(vatAmount)}
+            <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 13, color: 'var(--on-surface-variant)', fontStyle: 'italic' }}>
+              Đã gồm trong giá món
             </span>
           </div>
 

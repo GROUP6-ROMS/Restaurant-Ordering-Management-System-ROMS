@@ -545,8 +545,8 @@ export default function PosCheckoutPage() {
     }
     const orderItems = Array.isArray(currentTable.items) ? currentTable.items : [];
     const tableSubtotal = Number(currentTable.orderTotal || 0);
-    const taxRate = 8.0;
-    const taxAmt = Math.round(tableSubtotal * 0.08);
+    const taxRate = 0.0;
+    const taxAmt = 0;
 
     const mappedItems = orderItems.map(it => ({
       orderItemId: it.orderItemId || it.id,
@@ -572,10 +572,10 @@ export default function PosCheckoutPage() {
       sessionId: currentTable.sessionId,
       billCode: currentTable.orderCode || `BILL-${currentTable.code}`,
       subtotal: tableSubtotal,
-      taxRate: taxRate,
-      taxAmount: taxAmt,
+      taxRate: 0,
+      taxAmount: 0,
       discountAmount: 0,
-      finalAmount: tableSubtotal + taxAmt,
+      finalAmount: tableSubtotal,
       unservedCount: unserved,
       hasPaymentRequest: Boolean(currentTable.isCallingBill || currentTable.status === 'PAYMENT_REQUEST'),
       isDraftPrinted: Boolean(currentTable.isDraftPrinted || currentTable.status === 'DRAFT_PRINTED'),
@@ -583,20 +583,13 @@ export default function PosCheckoutPage() {
     };
   }, [billPreview, currentTable]);
 
-  // Tính toán số liệu tài chính hóa đơn trực tiếp từ activeBill (hoặc fallback currentTable)
+  // Tính toán số liệu tài chính hóa đơn trực tiếp: finalAmount = rawSubtotal (Đã gồm VAT, không giảm giá)
   const rawSubtotal = activeBill ? Number(activeBill.subtotal || 0) : 0;
-  let computedDiscount = 0;
-  if (discountType === 'PERCENT' && discountValue > 0) {
-    computedDiscount = Math.round((rawSubtotal * discountValue) / 100);
-  } else if (discountType === 'AMOUNT' && discountValue > 0) {
-    computedDiscount = Math.min(rawSubtotal, Number(discountValue));
-  }
-
-  const vatRate = 8.0;
-  const computedTaxable = Math.max(0, rawSubtotal - computedDiscount);
-  const computedVat = Math.round((computedTaxable * vatRate) / 100);
-  const finalCalculatedAmount = computedTaxable + computedVat;
-  const roundedFinalAmount = Math.round(finalCalculatedAmount / 1000) * 1000;
+  const computedDiscount = 0;
+  const vatRate = 0;
+  const computedVat = 0;
+  const finalCalculatedAmount = rawSubtotal;
+  const roundedFinalAmount = rawSubtotal;
 
   // Thêm nhanh món ăn vào bàn
   const handleQuickAddDish = async (dish) => {
@@ -1852,86 +1845,16 @@ export default function PosCheckoutPage() {
                   </div>
                 )}
 
-                {/* Chiết khấu & Giảm giá */}
-                <div style={{ background: '#FCF1EF', padding: '10px 14px', borderRadius: '12px', marginBottom: '12px', fontSize: '0.8rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontWeight: 700, color: '#56423D' }}>Chiết khấu / Giảm giá:</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {[
-                        { type: 'NONE', label: '0%', val: 0 },
-                        { type: 'PERCENT', label: '5%', val: 5 },
-                        { type: 'PERCENT', label: '10%', val: 10 },
-                        { type: 'PERCENT', label: '20%', val: 20 }
-                      ].map(d => (
-                        <button
-                          key={d.label}
-                          type="button"
-                          onClick={() => {
-                            setDiscountType(d.type);
-                            setDiscountValue(d.val);
-                          }}
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            border: discountType === d.type && discountValue === d.val ? '1px solid #9D4124' : '1px solid #EAE0DE',
-                            background: discountType === d.type && discountValue === d.val ? '#9D4124' : '#FFFFFF',
-                            color: discountType === d.type && discountValue === d.val ? '#FFFFFF' : '#56423D',
-                            fontWeight: 700,
-                            fontSize: '0.72rem',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {d.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Nhập mã PIN Quản lý khi Giảm giá lớn */}
-                  {((discountType === 'PERCENT' && Number(discountValue) > 30) || computedDiscount > 200000) && (
-                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #EAE0DE' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#BA1A1A', fontSize: '0.74rem', fontWeight: 700, marginBottom: '4px' }}>
-                        <Icon name="lock" size={14} />
-                        <span>Giảm giá &gt; 30% hoặc &gt; 200.000₫ yêu cầu mã PIN Quản lý:</span>
-                      </div>
-                      <input
-                        type="password"
-                        maxLength={6}
-                        placeholder="Nhập PIN Quản lý 6 số (vd: 999999)..."
-                        value={discountManagerPin}
-                        onChange={(e) => setDiscountManagerPin(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          border: '1px solid #BA1A1A',
-                          background: '#FFF',
-                          fontSize: '0.82rem',
-                          fontFamily: "'JetBrains Mono', monospace",
-                          color: '#1F1B1A',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-
                 {/* Bảng phân tích chi phí */}
                 <div style={{ background: '#FCF1EF', padding: '12px 14px', borderRadius: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
                     <span>Cộng tiền món:</span>
                     <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{rawSubtotal.toLocaleString('vi-VN')}₫</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
-                    <span>Thuế VAT (8%):</span>
-                    <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{computedVat.toLocaleString('vi-VN')}₫</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#89726B', fontStyle: 'italic', fontSize: '0.78rem' }}>
+                    <span>Thuế GTGT:</span>
+                    <span>Đã gồm trong giá món</span>
                   </div>
-                  {computedDiscount > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#BA1A1A' }}>
-                      <span>Giảm giá ({discountType === 'PERCENT' ? `${discountValue}%` : 'VNĐ'}):</span>
-                      <span style={{ fontWeight: 700 }}>-{computedDiscount.toLocaleString('vi-VN')}₫</span>
-                    </div>
-                  )}
 
                   <div style={{
                     display: 'flex',
@@ -1945,10 +1868,10 @@ export default function PosCheckoutPage() {
                       <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.92rem', color: '#1F1B1A', display: 'block' }}>
                         TỔNG CẦN THU
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#89726B' }}>Làm tròn: {roundedFinalAmount.toLocaleString('vi-VN')}₫</span>
+                      <span style={{ fontSize: '0.72rem', color: '#89726B' }}>Khách thanh toán đúng tiền món</span>
                     </div>
                     <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.45rem', color: '#9D4124' }}>
-                      {finalCalculatedAmount.toLocaleString('vi-VN')}₫
+                      {rawSubtotal.toLocaleString('vi-VN')}₫
                     </span>
                   </div>
                 </div>
@@ -3213,16 +3136,10 @@ export default function PosCheckoutPage() {
                   <span>Cộng tiền món:</span>
                   <span>{Number(receiptData.subtotal).toLocaleString('vi-VN')}₫</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Thuế VAT (8%):</span>
-                  <span>{Number(receiptData.taxAmount || 0).toLocaleString('vi-VN')}₫</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#89726B', fontStyle: 'italic' }}>
+                  <span>Thuế GTGT:</span>
+                  <span>Đã gồm trong giá món</span>
                 </div>
-                {Number(receiptData.discountAmount || 0) > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#BA1A1A' }}>
-                    <span>Giảm giá:</span>
-                    <span>-{Number(receiptData.discountAmount).toLocaleString('vi-VN')}₫</span>
-                  </div>
-                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.15rem', color: '#9D4124', marginTop: '6px', paddingTop: '6px', borderTop: '1.5px solid #1F1B1A' }}>
                   <span>TỔNG CỘNG:</span>
                   <span>{Number(receiptData.finalAmount).toLocaleString('vi-VN')}₫</span>

@@ -114,10 +114,10 @@ public class CashierServiceImpl implements CashierService {
             }
         }
 
-        BigDecimal taxRate = BigDecimal.valueOf(8.0);
-        BigDecimal taxAmount = subtotal.multiply(taxRate).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+        BigDecimal taxRate = BigDecimal.ZERO;
+        BigDecimal taxAmount = BigDecimal.ZERO;
         BigDecimal discountAmount = BigDecimal.ZERO;
-        BigDecimal finalAmount = subtotal.add(taxAmount).subtract(discountAmount);
+        BigDecimal finalAmount = subtotal;
 
         long duration = 0;
         String timeIn = "--:--";
@@ -238,39 +238,10 @@ public class CashierServiceImpl implements CashierService {
             throw new AppException("Bàn còn " + unservedCount + " phần món đang chế biến / chờ bếp phục vụ! Vui lòng kiểm tra với Bếp hoặc xác nhận đồng ý thanh toán trước.", HttpStatus.BAD_REQUEST);
         }
 
-        // 4. Áp dụng giảm giá trước, sau đó tính thuế VAT trên số tiền thực tế (theo chuẩn Nghị định 123/2020/NĐ-CP)
+        // 4. Công thức thanh toán ROMS: finalAmount = subtotal (Giá niêm yết đã bao gồm thuế GTGT, không áp dụng chiết khấu)
         BigDecimal discountAmount = BigDecimal.ZERO;
-        if ("PERCENT".equalsIgnoreCase(request.getDiscountType()) && request.getDiscountValue() != null) {
-            if (request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
-                throw new AppException("Tỷ lệ giảm giá không được vượt quá 100%!", HttpStatus.BAD_REQUEST);
-            }
-            discountAmount = subtotal.multiply(request.getDiscountValue()).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-        } else if ("AMOUNT".equalsIgnoreCase(request.getDiscountType()) && request.getDiscountValue() != null) {
-            discountAmount = request.getDiscountValue();
-        }
-
-        // Nghiệp vụ QA 5: Giảm giá không được vượt quá tổng tiền món trước thuế
-        if (discountAmount.compareTo(subtotal) > 0) {
-            throw new AppException("Số tiền giảm giá (" + discountAmount.toPlainString() + "đ) không được vượt quá tổng tiền món ăn (" + subtotal.toPlainString() + "đ)!", HttpStatus.BAD_REQUEST);
-        }
-
-        // Nghiệp vụ QA 5: Giảm giá lớn (> 30% hoặc > 200.000đ) yêu cầu mã PIN của Quản lý duyệt
-        boolean isHighDiscount = ("PERCENT".equalsIgnoreCase(request.getDiscountType()) && request.getDiscountValue() != null && request.getDiscountValue().compareTo(BigDecimal.valueOf(30)) > 0)
-                || discountAmount.compareTo(BigDecimal.valueOf(200000)) > 0;
-        if (isHighDiscount) {
-            if (request.getManagerPin() == null || request.getManagerPin().trim().isEmpty()) {
-                throw new AppException("Mức giảm giá lớn (> 30% hoặc > 200.000đ) bắt buộc phải có mã PIN Quản lý duyệt!", HttpStatus.BAD_REQUEST);
-            }
-            validateManagerPin(request.getManagerPin());
-        }
-
-        BigDecimal taxableAmount = subtotal.subtract(discountAmount);
-        if (taxableAmount.compareTo(BigDecimal.ZERO) < 0) taxableAmount = BigDecimal.ZERO;
-
-        BigDecimal taxRate = request.getTaxRate() != null ? request.getTaxRate() : BigDecimal.valueOf(8.0);
-        BigDecimal taxAmount = taxableAmount.multiply(taxRate).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-
-        BigDecimal finalAmount = taxableAmount.add(taxAmount);
+        BigDecimal taxAmount = BigDecimal.ZERO;
+        BigDecimal finalAmount = subtotal;
 
         PaymentMethod pm = PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
 

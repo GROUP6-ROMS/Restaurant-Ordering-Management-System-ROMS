@@ -157,11 +157,11 @@ class CashierServiceTest {
         // Act
         CashierBillPreviewResponse preview = cashierService.getBillPreview(1L);
 
-        // Assert
+        // Assert: Giá niêm yết đã bao gồm thuế, không chiết khấu: finalAmount = subtotal = 320.000đ
         assertThat(preview).isNotNull();
         assertThat(preview.getSubtotal()).isEqualByComparingTo(BigDecimal.valueOf(320000));
-        assertThat(preview.getTaxAmount()).isEqualByComparingTo(BigDecimal.valueOf(25600));
-        assertThat(preview.getFinalAmount()).isEqualByComparingTo(BigDecimal.valueOf(345600));
+        assertThat(preview.getTaxAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(preview.getFinalAmount()).isEqualByComparingTo(BigDecimal.valueOf(320000));
         assertThat(preview.getUnservedCount()).isEqualTo(0);
     }
 
@@ -247,49 +247,47 @@ class CashierServiceTest {
     }
 
     @Test
-    @DisplayName("6. Giảm giá lớn (> 200.000đ) không có mã PIN Quản lý -> Ném ngoại lệ BAD_REQUEST")
-    void checkout_WhenHighDiscountWithoutManagerPin_ThrowsException() {
+    @DisplayName("6. Thanh toán tiền mặt chính xác bằng tổng tiền món (Subtotal) -> Thành công")
+    void checkout_WhenPaymentMethodCash_CalculatesExactSubtotalAndSucceeds() {
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
         when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
         when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
         when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
-
-        CashierCheckoutRequest request = new CashierCheckoutRequest();
-        request.setPaymentMethod("CASH");
-        request.setDiscountType("AMOUNT");
-        request.setDiscountValue(BigDecimal.valueOf(250000)); // Giảm 250k > 200k
-        request.setManagerPin(null); // Không truyền PIN
-
-        // Act & Assert
-        assertThatThrownBy(() -> cashierService.checkoutBill(1L, request, "cashier01"))
-                .isInstanceOf(AppException.class)
-                .hasMessageContaining("mã PIN Quản lý duyệt");
-    }
-
-    @Test
-    @DisplayName("7. Giảm giá lớn (> 200.000đ) có mã PIN Quản lý đúng -> Thanh toán thành công")
-    void checkout_WhenHighDiscountWithValidManagerPin_Succeeds() {
-        when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
-        when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
-        when(staffRepository.findByRole(UserRole.MANAGER)).thenReturn(List.of(managerStaff));
-        when(passwordEncoder.matches("123456", managerStaff.getPinCode())).thenReturn(true);
         when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CashierCheckoutRequest request = new CashierCheckoutRequest();
         request.setPaymentMethod("CASH");
-        request.setDiscountType("AMOUNT");
-        request.setDiscountValue(BigDecimal.valueOf(250000));
-        request.setManagerPin("123456");
-        request.setCashGiven(BigDecimal.valueOf(200000));
+        request.setCashGiven(BigDecimal.valueOf(320000)); // Đưa đúng 320.000đ
+
+        // Act
+        CashierInvoiceResponse response = cashierService.checkoutBill(1L, request, "cashier01");
+
+        // Assert: finalAmount bằng đúng subtotal
+        assertThat(response).isNotNull();
+        assertThat(response.getFinalAmount()).isEqualByComparingTo(BigDecimal.valueOf(320000));
+        assertThat(response.getTaxAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(response.getDiscountAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(billRepository).save(any(Bill.class));
+    }
+
+    @Test
+    @DisplayName("7. Thanh toán chuyển khoản (BANK_TRANSFER) -> Thành công với đúng tổng tiền món")
+    void checkout_WhenPaymentMethodBankTransfer_Succeeds() {
+        when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
+        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
+        when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
+        when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CashierCheckoutRequest request = new CashierCheckoutRequest();
+        request.setPaymentMethod("BANK_TRANSFER");
 
         // Act
         CashierInvoiceResponse response = cashierService.checkoutBill(1L, request, "cashier01");
 
         // Assert
         assertThat(response).isNotNull();
-        assertThat(response.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(250000));
+        assertThat(response.getFinalAmount()).isEqualByComparingTo(BigDecimal.valueOf(320000));
         verify(billRepository).save(any(Bill.class));
     }
 

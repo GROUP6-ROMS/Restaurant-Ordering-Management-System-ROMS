@@ -149,8 +149,8 @@ export default function CustomerTrackingPage() {
   const batches = trackingData?.batches || [];
   const totalItemCount = trackingData?.totalItems || 0;
   const totalFoodPrice = trackingData?.totalAmount || 0;
-  const vat = trackingData?.vatAmount || 0;
-  const finalTotal = trackingData?.grandTotal || 0;
+  const vat = 0;
+  const finalTotal = totalFoodPrice;
 
   const diningToken = sessionStorage.getItem('roms_dining_token');
   const staffToken = sessionStorage.getItem('roms_token');
@@ -636,8 +636,8 @@ export default function CustomerTrackingPage() {
               Tạm tính hóa đơn
             </h3>
           </div>
-          <span style={{ fontSize: '0.78rem', color: '#C85A32', fontWeight: 700 }}>
-            Thuế VAT (8%)
+          <span style={{ fontSize: '0.78rem', color: '#596232', fontWeight: 700 }}>
+            Đã gồm thuế GTGT
           </span>
         </div>
 
@@ -646,9 +646,9 @@ export default function CustomerTrackingPage() {
             <span>Tiền món ({totalItemCount} món)</span>
             <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{formatVND(totalFoodPrice)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
-            <span>Thuế GTGT (VAT 8%)</span>
-            <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{formatVND(vat)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#89726B', fontStyle: 'italic' }}>
+            <span>Thuế GTGT</span>
+            <span>Đã gồm trong giá món</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
             <span>Phí dịch vụ</span>
