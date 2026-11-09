@@ -1,0 +1,188 @@
+name: ROMS CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===================================================================
+  # 1. CI JOB: BACKEND (SPRING BOOT 3 + JAVA 21 + MAVEN)
+  # ===================================================================
+  backend-ci:
+    name: Backend CI (Build & Test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Eclipse Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Backend Automated Tests (H2 In-Memory)
+        run: |
+          cd SourceCode/backend/roms
+          mvn -B clean test
+
+      - name: Package Spring Boot Application (Verify Artifact Build)
+        run: |
+          cd SourceCode/backend/roms
+          mvn -B package -DskipTests
+
+      - name: Upload Test Report Artifacts (On Failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: SourceCode/backend/roms/target/surefire-reports/
+          retention-days: 7
+
+  # ===================================================================
+  # 2. CI JOB: FRONTEND (REACT 19 + VITE 8 + NODE 20)
+  # ===================================================================
+  frontend-ci:
+    name: Frontend CI (Lint & Build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'SourceCode/frontend/package-lock.json'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd SourceCode/frontend
+          npm ci
+
+      - name: Run Frontend Code Linter (Oxlint)
+        run: |
+          cd SourceCode/frontend
+          npm run lint
+
+      - name: Build Frontend Production Bundle (Vite)
+        run: |
+          cd SourceCode/frontend
+          npm run build
+
+  # ===================================================================
+  # 3. CD JOB: CONTINUOUS DEPLOYMENT (DOCKER COMPOSE ON VPS)
+  # ===================================================================
+  deploy:
+    name: VPS Continuous Deployment
+    needs: [backend-ci, frontend-ci]
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Execute Deployment Commands on VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          timeout: 180s
+          command_timeout: 30m
+          script_stop: true
+          script: |
+            set -e
+
+            echo "=========================================================="
+            echo "🚀 [ROMS CI/CD] Starting Deployment to VPS"
+            echo "=========================================================="
+
+            # 1. Xác định thư mục làm việc của dự án trên VPS
+            TARGET_DIR="${{ secrets.VPS_WORK_DIR || '/root/Restaurant-Ordering-Management-System-ROMS-' }}"
+            if [ ! -d "$TARGET_DIR" ]; then
+              if [ -d "$HOME/Restaurant-Ordering-Management-System-ROMS-" ]; then
+                TARGET_DIR="$HOME/Restaurant-Ordering-Management-System-ROMS-"
+              else
+                echo "⚠️ Target directory not found at $TARGET_DIR, using current directory..."
+                TARGET_DIR="$(pwd)"
+              fi
+            fi
+
+            echo "📂 Working directory: $TARGET_DIR"
+            cd "$TARGET_DIR"
+
+            # 2. Đồng bộ mã nguồn mới nhất từ GitHub
+            BRANCH="${{ github.ref_name }}"
+            if [ -z "$BRANCH" ]; then
+              BRANCH="develop"
+            fi
+
+            echo "📥 Fetching and syncing branch: origin/$BRANCH..."
+            git fetch origin "$BRANCH"
+            git checkout "$BRANCH"
+            git pull origin "$BRANCH"
+
+            # 3. Nhận diện phiên bản Docker Compose
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE_CMD="docker compose"
+            elif which docker-compose >/dev/null 2>&1; then
+              COMPOSE_CMD="docker-compose"
+            else
+              echo "❌ Error: Neither 'docker compose' nor 'docker-compose' found on VPS!"
+              exit 1
+            fi
+            echo "🐳 Docker Compose engine: $COMPOSE_CMD"
+
+            # 4. Tái biên dịch và khởi chạy lại các container Backend & Frontend
+            echo "🔨 Building and launching updated services..."
+            $COMPOSE_CMD up -d --build backend frontend
+
+            # 5. Dọn dẹp images cũ/rác để tiết kiệm dung lượng ổ cứng VPS
+            echo "🧹 Cleaning up dangling Docker images..."
+            docker image prune -f
+
+            # 6. Kiểm tra trạng thái vận hành qua Spring Boot Actuator Healthcheck
+            echo "🩺 Verifying Backend Health..."
+            MAX_ATTEMPTS=15
+            ATTEMPT=0
+            SUCCESS=false
+
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+              HEALTH_STATUS=$(curl -s -f http://localhost:8080/actuator/health || true)
+              if echo "$HEALTH_STATUS" | grep -q "UP"; then
+                echo "✅ Backend Actuator is UP and Healthy! (Verified at attempt $ATTEMPT)"
+                SUCCESS=true
+                break
+              fi
+              echo "⏳ Waiting for backend readiness... ($ATTEMPT/$MAX_ATTEMPTS)"
+              sleep 4
+            done
+
+            if [ "$SUCCESS" != "true" ]; then
+              echo "⚠️ Warning: Backend healthcheck timed out after 60s. Displaying recent logs:"
+              $COMPOSE_CMD logs --tail=40 backend
+            fi
+
+            echo "=========================================================="
+            echo "🎉 ROMS Deployment Completed Successfully!"
+            echo "=========================================================="
+            $COMPOSE_CMD ps

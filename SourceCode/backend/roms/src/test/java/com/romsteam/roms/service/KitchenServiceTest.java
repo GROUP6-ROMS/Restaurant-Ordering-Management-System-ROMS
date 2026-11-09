@@ -7,6 +7,7 @@ import com.romsteam.roms.entity.enums.OrderItemStatus;
 import com.romsteam.roms.entity.enums.OrderStatus;
 import com.romsteam.roms.entity.enums.SessionStatus;
 import com.romsteam.roms.exception.ResourceNotFoundException;
+import com.romsteam.roms.repository.MenuItemRepository;
 import com.romsteam.roms.repository.OrderItemRepository;
 import com.romsteam.roms.repository.OrderRepository;
 import com.romsteam.roms.repository.ZoneRepository;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.CacheManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -43,6 +45,12 @@ class KitchenServiceTest {
 
     @Mock
     private RealtimeService realtimeService;
+
+    @Mock
+    private MenuItemRepository menuItemRepository;
+
+    @Mock
+    private CacheManager cacheManager;
 
     @InjectMocks
     private KitchenServiceImpl kitchenService;
