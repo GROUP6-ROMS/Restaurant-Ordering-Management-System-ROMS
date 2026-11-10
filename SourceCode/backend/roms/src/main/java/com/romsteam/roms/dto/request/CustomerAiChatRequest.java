@@ -33,6 +33,9 @@ public class CustomerAiChatRequest {
     // Số lượng khách đang ngồi tại bàn (dùng để gợi ý khẩu phần phù hợp)
     private Integer guestCount;
 
+    // Danh sách món hiện có trong giỏ hàng của khách (để AI gợi ý món ăn kèm, tránh trùng lặp)
+    private List<String> cartItems;
+
     // Lịch sử vài câu trò chuyện gần nhất để duy trì ngữ cảnh liên tục
     private List<ChatMessageHistoryDto> history;
 
