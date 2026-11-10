@@ -496,7 +496,7 @@ private Staff validateManagerPin(String pin) {
                 return m;
             }
         }
-        throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.UNAUTHORIZED);
+        throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.BAD_REQUEST);
     }
 
     private String extractAccountNumberFromQr(String qrCode, String fallback) {

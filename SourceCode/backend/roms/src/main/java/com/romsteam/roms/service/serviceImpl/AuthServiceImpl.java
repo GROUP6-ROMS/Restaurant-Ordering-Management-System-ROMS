@@ -246,7 +246,7 @@ public class AuthServiceImpl implements AuthService {
                 throw new AppException("Tài khoản Quản lý đã bị KHÓA do nhập sai mã PIN quá 5 lần!", HttpStatus.FORBIDDEN);
             }
             int remaining = 5 - (manager.getFailedPinAttempts() != null ? manager.getFailedPinAttempts() : 0);
-            throw new AppException("Mã PIN Quản lý không chính xác! Còn " + remaining + " lần thử.", HttpStatus.UNAUTHORIZED);
+            throw new AppException("Mã PIN Quản lý không chính xác! Còn " + remaining + " lần thử.", HttpStatus.BAD_REQUEST);
         }
 
         if (manager.getFailedPinAttempts() != null && manager.getFailedPinAttempts() > 0) {

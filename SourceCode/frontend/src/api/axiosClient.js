@@ -37,17 +37,26 @@ axiosClient.interceptors.response.use(
         }
 
         if (error.response && error.response.status === 401) {
-            const isDining = window.location.pathname.startsWith('/dining');
-            if (isDining) {
-                // Phiên ăn của khách hết hạn: Xóa dining token để yêu cầu quét lại QR
-                sessionStorage.removeItem('roms_dining_token');
-            } else {
-                sessionStorage.removeItem('roms_token');
-                sessionStorage.removeItem('roms_user');
-                localStorage.removeItem('roms_token');
-                localStorage.removeItem('roms_user');
-                if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
+            const requestUrl = error.config?.url || '';
+            // Bỏ qua đăng xuất tự động nếu lỗi đến từ các thao tác xác thực thứ cấp (nhập mã PIN quản lý hủy món, chốt ca...)
+            const isSecondaryAuth = error.config?.skipAuthRedirect ||
+                                    requestUrl.includes('/verify-manager-pin') ||
+                                    requestUrl.includes('/void') ||
+                                    requestUrl.includes('/shift/close');
+
+            if (!isSecondaryAuth) {
+                const isDining = window.location.pathname.startsWith('/dining');
+                if (isDining) {
+                    // Phiên ăn của khách hết hạn: Xóa dining token để yêu cầu quét lại QR
+                    sessionStorage.removeItem('roms_dining_token');
+                } else {
+                    sessionStorage.removeItem('roms_token');
+                    sessionStorage.removeItem('roms_user');
+                    localStorage.removeItem('roms_token');
+                    localStorage.removeItem('roms_user');
+                    if (window.location.pathname !== '/login') {
+                        window.location.href = '/login';
+                    }
                 }
             }
         }

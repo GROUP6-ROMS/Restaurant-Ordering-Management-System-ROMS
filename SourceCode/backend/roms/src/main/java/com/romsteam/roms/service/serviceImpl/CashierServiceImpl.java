@@ -571,7 +571,7 @@ private Staff validateManagerPin(String pin) {
             }
         }
 
-        throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.UNAUTHORIZED);
+        throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.BAD_REQUEST);
     }
 
     private CashierTableResponse mapToCashierTableResponse(RestaurantTable table) {
