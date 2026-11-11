@@ -1,0 +1,149 @@
+<mxfile host="Electron" agent="ROMS SWP391 Team" pages="1">
+  <diagram id="sq_f1" name="WF1 - Auth &amp; JWT Issuance">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1550" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="sq_200" value="&lt;div style=&quot;text-align:center;font-family:Helvetica,Arial,sans-serif;&quot;&gt;
+            &lt;div style=&quot;font-size:17px;font-weight:bold;color:#000000;&quot;&gt;Sequence Diagram: Staff Authentication &amp;amp; Access Control (RBAC)&lt;/div&gt;&lt;/div&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="100" y="15" width="1350" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_201" value="Staff Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontFamily=Helvetica;fontSize=12;fontStyle=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontColor=#000000;" vertex="1" parent="1">
+            <mxGeometry x="60" y="70" width="40" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_202" edge="1" parent="1" source="sq_201" style="endArrow=none;dashed=1;html=1;strokeColor=#000000;strokeWidth=1.2;" value="">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="80" y="920" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_203" value="&lt;b&gt;LoginForm&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;React View&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="170" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_204" value="&lt;b&gt;AuthController&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;REST Controller&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="370" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_205" value="&lt;b&gt;AuthServiceImpl&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Business Service&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="580" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_206" value="&lt;b&gt;StaffRepository&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;JPA Repository&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="800" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_207" value="&lt;b&gt;BCryptEncoder&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Security Bean&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1010" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_208" value="&lt;b&gt;JwtTokenProvider&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Crypto Helper&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1210" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_209" value="&lt;b&gt;Database&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;MySQL 8.0&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1400" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_210" value="1. Inputs username &amp; password; taps &quot;Sign In&quot;" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="80" y="140" as="sourcePoint"/>
+                <mxPoint x="245" y="140" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_211" value="2. POST /api/auth/login { username, password }" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="245" y="190" as="sourcePoint"/>
+                <mxPoint x="445" y="190" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_212" value="3. authenticate(loginRequest)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="445" y="240" as="sourcePoint"/>
+                <mxPoint x="655" y="240" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_213" value="4. findByUsername(username)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="655" y="290" as="sourcePoint"/>
+                <mxPoint x="875" y="290" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_214" value="5. SELECT * FROM staff WHERE username=?" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="875" y="340" as="sourcePoint"/>
+                <mxPoint x="1475" y="340" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_215" value="6. Returns Staff entity (with passwordHash)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1475" y="380" as="sourcePoint"/>
+                <mxPoint x="875" y="380" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_216" value="7. Optional&lt;Staff&gt;" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="875" y="420" as="sourcePoint"/>
+                <mxPoint x="655" y="420" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_217" value="8. matches(rawPassword, passwordHash)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="655" y="470" as="sourcePoint"/>
+                <mxPoint x="1085" y="470" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_218" value="9. true (credentials verified)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1085" y="510" as="sourcePoint"/>
+                <mxPoint x="655" y="510" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_219" value="10. validateAccountStatus(staff) [ACTIVE]" style="html=1;rounded=0;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=1.2;fontSize=10.5;fontFamily=Helvetica;fontColor=#000000;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="655" y="560" as="sourcePoint"/>
+                <mxPoint x="715" y="575" as="targetPoint"/>
+                <Array as="points">
+                    <mxPoint x="700" y="560"/>
+                    <mxPoint x="700" y="590"/>
+                </Array>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_220" value="11. generateToken(auth) [with Role claim]" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="655" y="615" as="sourcePoint"/>
+                <mxPoint x="1285" y="615" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_221" value="12. Signed JWT token (HMAC-SHA256)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1285" y="655" as="sourcePoint"/>
+                <mxPoint x="655" y="655" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_222" value="13. updateLastLogin(staff.getId())" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="655" y="705" as="sourcePoint"/>
+                <mxPoint x="875" y="705" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_223" value="14. UPDATE staff SET last_login=NOW()" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="875" y="745" as="sourcePoint"/>
+                <mxPoint x="1475" y="745" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_224" value="15. AuthResponse { token, role, username }" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="655" y="795" as="sourcePoint"/>
+                <mxPoint x="445" y="795" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_225" value="16. HTTP 200 OK with AuthResponse" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="445" y="845" as="sourcePoint"/>
+                <mxPoint x="245" y="845" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_226" value="17. Saves JWT to LocalStorage; navigates to Dashboard" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="245" y="890" as="sourcePoint"/>
+                <mxPoint x="80" y="890" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

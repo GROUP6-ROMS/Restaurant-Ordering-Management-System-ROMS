@@ -1,0 +1,178 @@
+<mxfile host="Electron" agent="ROMS SWP391 Team" pages="1">
+  <diagram id="sq_f3" name="WF3 - Batch Order &amp; Kitchen Push">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1650" pageHeight="950" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="sq_200" value="&lt;div style=&quot;text-align:center;font-family:Helvetica,Arial,sans-serif;&quot;&gt;
+            &lt;div style=&quot;font-size:17px;font-weight:bold;color:#000000;&quot;&gt;Sequence Diagram: Customer Batch Ordering &amp;amp; Kitchen Dispatch&lt;/div&gt;&lt;/div&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="100" y="15" width="1450" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_201" value="Customer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontFamily=Helvetica;fontSize=12;fontStyle=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontColor=#000000;" vertex="1" parent="1">
+            <mxGeometry x="60" y="70" width="40" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_202" edge="1" parent="1" source="sq_201" style="endArrow=none;dashed=1;html=1;strokeColor=#000000;strokeWidth=1.2;" value="">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="80" y="920" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_203" value="&lt;b&gt;CartDrawer&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;React Client&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="170" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_204" value="&lt;b&gt;CustomerDiningCtrl&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;REST Controller&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="360" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_205" value="&lt;b&gt;CustomerDiningSrv&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;@Transactional&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="570" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_206" value="&lt;b&gt;MenuItemRepo&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Locking JPA&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="790" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_207" value="&lt;b&gt;OrderRepository&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;JPA Repo&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="990" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_208" value="&lt;b&gt;OrderItemRepo&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;JPA Repo&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1190" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_209" value="&lt;b&gt;Database&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;MySQL 8.0&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1370" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_210" value="&lt;b&gt;KitchenKDS&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;WebSocket Sub&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1530" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_211" value="1. Selects dishes &amp; notes; taps &quot;Place Batch Order&quot;" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="80" y="140" as="sourcePoint"/>
+                <mxPoint x="245" y="140" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_212" value="2. POST /api/customer/orders { sessionId, items[] }" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="245" y="190" as="sourcePoint"/>
+                <mxPoint x="435" y="190" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_213" value="3. placeBatchOrder(batchOrderRequest)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="435" y="240" as="sourcePoint"/>
+                <mxPoint x="645" y="240" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_214" value="4. Assert DiningSession is ACTIVE in database" style="html=1;rounded=0;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=1.2;fontSize=10.5;fontFamily=Helvetica;fontColor=#000000;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="290" as="sourcePoint"/>
+                <mxPoint x="705" y="305" as="targetPoint"/>
+                <Array as="points">
+                    <mxPoint x="690" y="290"/>
+                    <mxPoint x="690" y="320"/>
+                </Array>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_215" value="5. findStockByIdForUpdate(dishId) [FOR UPDATE]" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="345" as="sourcePoint"/>
+                <mxPoint x="865" y="345" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_216" value="6. SELECT stock_quantity FROM menu_items WHERE id=? FOR UPDATE" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="865" y="395" as="sourcePoint"/>
+                <mxPoint x="1445" y="395" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_217" value="7. Returns current stock with exclusive row lock" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1445" y="435" as="sourcePoint"/>
+                <mxPoint x="865" y="435" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_218" value="8. MenuItem entity with lock" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="865" y="475" as="sourcePoint"/>
+                <mxPoint x="645" y="475" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_219" value="9. Assert stock_quantity &gt;= requested_quantity" style="html=1;rounded=0;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=1.2;fontSize=10.5;fontFamily=Helvetica;fontColor=#000000;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="525" as="sourcePoint"/>
+                <mxPoint x="705" y="540" as="targetPoint"/>
+                <Array as="points">
+                    <mxPoint x="690" y="525"/>
+                    <mxPoint x="690" y="555"/>
+                </Array>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_220" value="10. save(new Order(sessionId, PENDING))" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="580" as="sourcePoint"/>
+                <mxPoint x="1065" y="580" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_221" value="11. INSERT INTO orders VALUES (...)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1065" y="620" as="sourcePoint"/>
+                <mxPoint x="1445" y="620" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_222" value="12. saveAll(orderItems) [with unit_price snapshot]" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="665" as="sourcePoint"/>
+                <mxPoint x="1265" y="665" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_223" value="13. INSERT INTO order_items VALUES (...)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1265" y="705" as="sourcePoint"/>
+                <mxPoint x="1445" y="705" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_224" value="14. deductStock(dishId, qty)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="750" as="sourcePoint"/>
+                <mxPoint x="865" y="750" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_225" value="15. UPDATE menu_items SET stock_quantity = stock_quantity - ?" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="865" y="790" as="sourcePoint"/>
+                <mxPoint x="1445" y="790" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_226" value="16. STOMP /topic/kitchen { orderId, tableNum, items[] }" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="840" as="sourcePoint"/>
+                <mxPoint x="1605" y="840" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_227" value="17. Renders new ticket on KDS &amp; plays audible alert" style="html=1;rounded=0;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=1.2;fontSize=10.5;fontFamily=Helvetica;fontColor=#000000;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1605" y="880" as="sourcePoint"/>
+                <mxPoint x="1665" y="895" as="targetPoint"/>
+                <Array as="points">
+                    <mxPoint x="1650" y="880"/>
+                    <mxPoint x="1650" y="910"/>
+                </Array>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_228" value="18. OrderResponse { orderId, totalAmount, status }" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="645" y="930" as="sourcePoint"/>
+                <mxPoint x="435" y="930" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_229" value="19. HTTP 201 Created with Order summary" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="435" y="980" as="sourcePoint"/>
+                <mxPoint x="245" y="980" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_230" value="20. Clears cart; displays order live tracking screen" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="245" y="1025" as="sourcePoint"/>
+                <mxPoint x="80" y="1025" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
