@@ -294,9 +294,6 @@ export default function CustomerTrackingPage() {
             </div>
             <p style={{ margin: 0, fontSize: '0.85rem', color: '#56423D', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Icon name="location_on" size={16} style={{ color: '#89726B' }} />
-              {(trackingData?.tableNumber?.toUpperCase().includes('VIP') || tableInfo?.tableNumber?.toUpperCase().includes('VIP')) && (trackingData?.tableName || tableInfo?.tableName)
-                ? `${trackingData?.tableName || tableInfo?.tableName} • `
-                : ''}
               {trackingData?.zoneName || trackingData?.zone || tableInfo?.zoneName || 'Khu vực phục vụ'} ({trackingData?.guestCount || tableInfo?.guestCount || 2} khách)
             </p>
           </div>
@@ -321,58 +318,35 @@ export default function CustomerTrackingPage() {
           </div>
         </div>
 
-        {/* Quick Assistance Buttons */}
+        {/* Quick Assistance Button (Kích hoạt Popup Hỗ trợ giống hệt chuông trên Header) */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '10px',
           marginTop: '18px',
           paddingTop: '14px',
           borderTop: '1px solid #F6ECEA'
         }}>
           <button
             type="button"
-            onClick={() => handleRequestAssistance('CALL_WAITER', 'Khách gọi nhân viên hỗ trợ tại bàn')}
+            onClick={() => window.dispatchEvent(new CustomEvent('roms:open-assist-modal'))}
             style={{
+              width: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '1px solid #F0E6E4',
+              padding: '12px 14px',
+              borderRadius: '14px',
+              border: '1.5px solid #F0E6E4',
               background: '#FFF8F6',
               color: '#C85A32',
-              fontWeight: 700,
-              fontSize: '0.85rem',
+              fontWeight: 800,
+              fontSize: '0.92rem',
               cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(200, 90, 50, 0.08)',
               transition: 'all 0.15s ease'
             }}
           >
-            <Icon name="notifications" size={18} fill={1} />
+            <Icon name="notifications" size={20} fill={1} />
             <span>Gọi phục vụ</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRequestAssistance('REQUEST_ICE', 'Khách xin thêm đá lạnh')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '1px solid #BFDBFE',
-              background: '#EFF6FF',
-              color: '#1D4ED8',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Icon name="ac_unit" size={18} style={{ color: '#2563EB' }} />
-            <span>Xin thêm đá</span>
           </button>
         </div>
       </section>

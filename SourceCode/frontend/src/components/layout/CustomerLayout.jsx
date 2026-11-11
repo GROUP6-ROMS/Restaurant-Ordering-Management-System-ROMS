@@ -58,6 +58,14 @@ export default function CustomerLayout() {
   const isMenu = location.pathname.includes('/menu');
   const isCart = location.pathname.includes('/cart');
   const isTracking = location.pathname.includes('/tracking');
+  const isWelcome = location.pathname.includes('/welcome');
+
+  // Lắng nghe sự kiện mở modal hỗ trợ từ các trang con (ví dụ trang Tracking Bàn ăn)
+  useEffect(() => {
+    const handleOpenAssist = () => setShowAssistModal(true);
+    window.addEventListener('roms:open-assist-modal', handleOpenAssist);
+    return () => window.removeEventListener('roms:open-assist-modal', handleOpenAssist);
+  }, []);
 
   const [tableStatus, setTableStatus] = useState(
     tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE')
@@ -214,46 +222,50 @@ export default function CustomerLayout() {
             }}>
               {restaurantProfile.brandName || restaurantProfile.name || 'ROMS Dining'}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center',
-                padding: '1px 8px', borderRadius: '9999px',
-                background: 'var(--primary-container)',
-                color: 'var(--on-primary)',
-                fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.03em',
-              }}>
-                {tableInfo?.tableNumber ? `${tableInfo.tableNumber} • ${tableInfo.guestCount || 4} Khách` : 'ROMS Dining'}
-              </span>
-            </div>
+            {!isWelcome && tableInfo?.tableNumber && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  padding: '1px 8px', borderRadius: '9999px',
+                  background: 'var(--primary-container)',
+                  color: 'var(--on-primary)',
+                  fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
+                  letterSpacing: '0.03em',
+                }}>
+                  {`${tableInfo.tableNumber} • ${tableInfo.guestCount || 4} Khách`}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Nut goi phu vu */}
-        <button
-          onClick={handleCallWaiter}
-          aria-label="Gọi nhân viên phục vụ tại bàn"
-          style={{
-            width: 40, height: 40, borderRadius: '50%',
-            background: 'var(--surface-container-high)',
-            border: '1px solid rgba(220, 192, 185, 0.3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', flexShrink: 0,
-            boxShadow: 'var(--shadow-xs)',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <Icon name="notifications" size={20} style={{ color: 'var(--secondary)' }} />
-        </button>
+        {/* Nut goi phu vu (chi hien khi khong o trang Welcome) */}
+        {!isWelcome && (
+          <button
+            onClick={handleCallWaiter}
+            aria-label="Gọi nhân viên phục vụ tại bàn"
+            style={{
+              width: 40, height: 40, borderRadius: '50%',
+              background: 'var(--surface-container-high)',
+              border: '1px solid rgba(220, 192, 185, 0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0,
+              boxShadow: 'var(--shadow-xs)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Icon name="notifications" size={20} style={{ color: 'var(--secondary)' }} />
+          </button>
+        )}
       </header>
 
       {/* --- Main Content (padding cho header + nav) --- */}
-      <main style={{ flex: 1, paddingTop: 64, paddingBottom: 96 }}>
+      <main style={{ flex: 1, paddingTop: 64, paddingBottom: isWelcome ? 20 : 96 }}>
         <Outlet />
       </main>
 
-      {/* --- Floating Cart Bar (chi hien khi co mon trong gio + khong o trang cart) --- */}
-      {totalCount > 0 && !isCart && isTableOccupied && (
+      {/* --- Floating Cart Bar (chi hien khi co mon trong gio + khong o trang cart va welcome) --- */}
+      {totalCount > 0 && !isCart && !isWelcome && isTableOccupied && (
         <div style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           width: '100%', maxWidth: 430,
@@ -318,105 +330,107 @@ export default function CustomerLayout() {
         </div>
       )}
 
-      {/* --- Bottom Navigation Bar --- */}
-      <nav
-        style={{
-          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-          width: '100%', maxWidth: 430,
-          height: 64,
-          background: 'rgba(255, 248, 246, 0.92)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(220, 192, 185, 0.35)',
-          boxShadow: '0 -2px 12px rgba(44, 34, 30, 0.05)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-          zIndex: 50,
-          paddingBottom: 'env(safe-area-inset-bottom, 0)',
-        }}
-      >
-        {/* Thuc don tab */}
-        <Link
-          to="/dining/menu"
-          onClick={handleProtectedNav}
+      {/* --- Bottom Navigation Bar (Ẩn khi ở trang Welcome) --- */}
+      {!isWelcome && (
+        <nav
           style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
-            textDecoration: 'none',
-            color: isMenu ? 'var(--primary)' : 'var(--on-surface-variant)',
-            fontFamily: 'Plus Jakarta Sans',
-            fontWeight: isMenu ? 700 : 400,
-            fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase',
-            transition: 'color 0.2s ease',
+            position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+            width: '100%', maxWidth: 430,
+            height: 64,
+            background: 'rgba(255, 248, 246, 0.92)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderTop: '1px solid rgba(220, 192, 185, 0.35)',
+            boxShadow: '0 -2px 12px rgba(44, 34, 30, 0.05)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+            zIndex: 50,
+            paddingBottom: 'env(safe-area-inset-bottom, 0)',
           }}
         >
-          <Icon name="restaurant_menu" size={22} fill={isMenu ? 1 : 0} />
-          Thực đơn
-        </Link>
+          {/* Thuc don tab */}
+          <Link
+            to="/dining/menu"
+            onClick={handleProtectedNav}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
+              textDecoration: 'none',
+              color: isMenu ? 'var(--primary)' : 'var(--on-surface-variant)',
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: isMenu ? 700 : 400,
+              fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase',
+              transition: 'color 0.2s ease',
+            }}
+          >
+            <Icon name="restaurant_menu" size={22} fill={isMenu ? 1 : 0} />
+            Thực đơn
+          </Link>
 
-        {/* Gio hang tab (Cung cap voi Thuc Don va Ban An) */}
-        <Link
-          to="/dining/cart"
-          onClick={handleProtectedNav}
-          style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
-            textDecoration: 'none',
-            color: isCart ? 'var(--primary)' : 'var(--on-surface-variant)',
-            fontFamily: 'Plus Jakarta Sans',
-            fontWeight: isCart ? 700 : 400,
-            fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase',
-            transition: 'color 0.2s ease',
-            position: 'relative',
-          }}
-        >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="shopping_bag" size={22} fill={isCart ? 1 : 0} />
-            {totalCount > 0 && (
+          {/* Gio hang tab (Cung cap voi Thuc Don va Ban An) */}
+          <Link
+            to="/dining/cart"
+            onClick={handleProtectedNav}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
+              textDecoration: 'none',
+              color: isCart ? 'var(--primary)' : 'var(--on-surface-variant)',
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: isCart ? 700 : 400,
+              fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase',
+              transition: 'color 0.2s ease',
+              position: 'relative',
+            }}
+          >
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="shopping_bag" size={22} fill={isCart ? 1 : 0} />
+              {totalCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -5, right: -10,
+                  minWidth: 16, height: 16, borderRadius: '9999px',
+                  background: 'var(--primary)', color: '#FFFFFF',
+                  fontSize: 10, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 4px',
+                  fontFamily: 'Plus Jakarta Sans',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                }}>
+                  {totalCount}
+                </span>
+              )}
+            </div>
+            Giỏ hàng
+          </Link>
+
+          {/* Ban an tab */}
+          <Link
+            to="/dining/orders/tracking"
+            onClick={handleProtectedNav}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
+              textDecoration: 'none',
+              color: isTracking ? 'var(--primary)' : 'var(--on-surface-variant)',
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: isTracking ? 700 : 400,
+              fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase',
+              transition: 'color 0.2s ease',
+              position: 'relative',
+            }}
+          >
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="table_restaurant" size={22} fill={isTracking ? 1 : 0} />
+              {/* Dot indicator neu co mon dang nau */}
               <span style={{
-                position: 'absolute', top: -5, right: -10,
-                minWidth: 16, height: 16, borderRadius: '9999px',
-                background: 'var(--primary)', color: '#FFFFFF',
-                fontSize: 10, fontWeight: 800,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '0 4px',
-                fontFamily: 'Plus Jakarta Sans',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-              }}>
-                {totalCount}
-              </span>
-            )}
-          </div>
-          Giỏ hàng
-        </Link>
-
-        {/* Ban an tab */}
-        <Link
-          to="/dining/orders/tracking"
-          onClick={handleProtectedNav}
-          style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 2, flex: 1, minHeight: 44, justifyContent: 'center',
-            textDecoration: 'none',
-            color: isTracking ? 'var(--primary)' : 'var(--on-surface-variant)',
-            fontFamily: 'Plus Jakarta Sans',
-            fontWeight: isTracking ? 700 : 400,
-            fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase',
-            transition: 'color 0.2s ease',
-            position: 'relative',
-          }}
-        >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="table_restaurant" size={22} fill={isTracking ? 1 : 0} />
-            {/* Dot indicator neu co mon dang nau */}
-            <span style={{
-              position: 'absolute', top: -2, right: -8,
-              width: 8, height: 8, borderRadius: '50%',
-              background: 'var(--primary)',
-            }} />
-          </div>
-          Bàn ăn
-        </Link>
-      </nav>
+                position: 'absolute', top: -2, right: -8,
+                width: 8, height: 8, borderRadius: '50%',
+                background: 'var(--primary)',
+              }} />
+            </div>
+            Bàn ăn
+          </Link>
+        </nav>
+      )}
 
       {/* --- Modal Bảng Chọn Nhanh Yêu Cầu Hỗ Trợ --- */}
       {showAssistModal && (
@@ -557,33 +571,37 @@ export default function CustomerLayout() {
       {/* ============================================================== */}
       {/* 👉 DÁN ĐOẠN NÀY VÀO ĐÂY (NGAY TRƯỚC THẺ </div> NGOÀI CÙNG)     */}
       {/* ============================================================== */}
-      {/* --- Nút Nổi AI Trợ Lý Ẩm Thực (Floating Action Button) --- */}
-      <button
-        onClick={handleOpenAiChat}
-        aria-label="Mở Trợ lý Ẩm thực AI"
-        style={{
-          position: 'fixed',
-          bottom: totalCount > 0 && !isCart ? 145 : 78,
-          right: 'calc(50% - 200px)',
-          width: 50, height: 50, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #A04020 0%, #D86030 100%)',
-          color: '#FFFFFF',
-          border: '2px solid rgba(255, 255, 255, 0.8)',
-          boxShadow: '0 4px 16px rgba(160, 64, 32, 0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', zIndex: 45,
-          transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-      >
-        <span style={{ fontSize: 22 }}>✨</span>
-      </button>
-      {/* --- Modal Trợ Lý Ẩm Thực AI --- */}
-      <CustomerAiChatModal
-        isOpen={isAiModalOpen}
-        onClose={() => setIsAiModalOpen(false)}
-      />
+      {/* --- Nút Nổi AI Trợ Lý Ẩm Thực (Ẩn khi ở trang Welcome) --- */}
+      {!isWelcome && (
+        <>
+          <button
+            onClick={handleOpenAiChat}
+            aria-label="Mở Trợ lý Ẩm thực AI"
+            style={{
+              position: 'fixed',
+              bottom: totalCount > 0 && !isCart ? 145 : 78,
+              right: 'calc(50% - 200px)',
+              width: 50, height: 50, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #A04020 0%, #D86030 100%)',
+              color: '#FFFFFF',
+              border: '2px solid rgba(255, 255, 255, 0.8)',
+              boxShadow: '0 4px 16px rgba(160, 64, 32, 0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', zIndex: 45,
+              transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            <span style={{ fontSize: 22 }}>✨</span>
+          </button>
+          {/* --- Modal Trợ Lý Ẩm Thực AI --- */}
+          <CustomerAiChatModal
+            isOpen={isAiModalOpen}
+            onClose={() => setIsAiModalOpen(false)}
+          />
+        </>
+      )}
     </div>
   );
 }

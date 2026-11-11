@@ -437,47 +437,6 @@ export default function TableWelcomePage() {
           </p>
         </div>
 
-        {/* Table Identification Badge */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '8px 16px',
-          borderRadius: '16px',
-          background: 'rgba(189, 89, 58, 0.08)',
-          border: '2px solid #9D4124',
-          color: '#9D4124',
-          boxShadow: '0 2px 8px rgba(157, 65, 36, 0.12)',
-          marginTop: '4px'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: isVip ? '#78350F' : '#9D4124',
-            color: '#FFFFFF',
-            padding: '4px 12px',
-            borderRadius: '10px',
-            fontWeight: 900,
-            fontSize: '0.95rem',
-            letterSpacing: '0.04em'
-          }}>
-            <Icon name={isVip ? "stars" : "table_restaurant"} size={18} fill={1} />
-            <span>{tableCode}</span>
-          </div>
-          {isVip && verifiedTable?.name ? (
-            <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1F1B1A' }}>
-              {verifiedTable.name}
-              <span style={{ fontWeight: 500, color: '#89726B', fontSize: '0.78rem' }}>
-                {verifiedTable?.zoneName ? ` • ${verifiedTable.zoneName}` : ''} • {guestCount} Chỗ ngồi
-              </span>
-            </span>
-          ) : (
-            <span style={{ fontWeight: 600, color: '#89726B', fontSize: '0.82rem' }}>
-              {verifiedTable?.zoneName ? `${verifiedTable.zoneName} • ` : ''}{guestCount} Chỗ ngồi
-            </span>
-          )}
-        </div>
       </header>
 
       {/* HERO CARD DISPLAY (SCR-09) */}
@@ -526,8 +485,8 @@ export default function TableWelcomePage() {
             <Icon name={isTableOccupied ? "check_circle" : "hourglass_top"} size={15} fill={1} />
             <span>
               {isTableOccupied
-                ? `Đã kết nối ${tableCode}${isVip && verifiedTable?.name ? ` (${verifiedTable.name})` : ''} • Sẵn sàng phục vụ`
-                : `${tableCode} • Chờ nhân viên mở bàn`}
+                ? `Đã kết nối ${tableCode} • Sẵn sàng phục vụ`
+                : `${tableCode} • Chờ mở Bàn`}
             </span>
           </div>
 
@@ -547,69 +506,38 @@ export default function TableWelcomePage() {
             <Icon name="room_service" size={40} fill={1} style={{ color: '#9D4124' }} />
           </div>
 
-          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.45rem', color: '#1F1B1A', margin: '0 0 6px', letterSpacing: '-0.01em' }}>
+          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.45rem', color: '#1F1B1A', margin: '0 0 10px', letterSpacing: '-0.01em' }}>
             {isTableOccupied ? 'Xin chào quý khách!' : 'Chào mừng quý khách!'}
           </h2>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-            <span style={{ padding: '4px 12px', borderRadius: '10px', background: isVip ? '#78350F' : '#9D4124', color: '#FFFFFF', fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.05rem', boxShadow: '0 2px 6px rgba(157, 65, 36, 0.25)' }}>
+          {/* Dòng 1: Tên bàn (Mã bàn) ở trên riêng biệt */}
+          <div style={{ marginBottom: '8px' }}>
+            <span style={{
+              display: 'inline-block',
+              padding: '6px 20px',
+              borderRadius: '12px',
+              background: isVip ? '#78350F' : '#9D4124',
+              color: '#FFFFFF',
+              fontFamily: "'Epilogue', sans-serif",
+              fontWeight: 900,
+              fontSize: '1.25rem',
+              letterSpacing: '0.02em',
+              boxShadow: '0 4px 14px rgba(157, 65, 36, 0.25)'
+            }}>
               {isVip ? `PHÒNG ${tableCode}` : `BÀN ${tableCode}`}
-            </span>
-            {isVip && verifiedTable?.name && (
-              <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#78350F' }}>
-                {verifiedTable.name}
-              </span>
-            )}
-            <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: isTableOccupied ? '#9D4124' : '#E65100' }}>
-              {isTableOccupied ? 'của bạn đã sẵn sàng!' : 'Chờ nhân viên mở bàn'}
             </span>
           </div>
 
-          <p style={{ fontSize: '0.82rem', color: '#56423D', margin: '0 auto 16px', maxWidth: '340px', lineHeight: 1.5 }}>
-            {isTableOccupied
-              ? 'Quý khách có thể bắt đầu chọn món ngay trên thiết bị này hoặc duyệt toàn bộ danh mục thực đơn đặc sắc.'
-              : 'Bàn ăn đang chờ nhân viên phục vụ mở bàn (Check-in). Vui lòng nhấn "Gọi nhân viên mở bàn" để nhân viên đến phục vụ bạn!'}
-          </p>
-
-          {/* Guest Count Selector */}
-          <div style={{
-            background: '#FFF8F6',
-            borderRadius: '16px',
-            padding: '12px 14px',
-            border: '1px solid #F6ECEA',
-            marginBottom: '16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 700, color: '#56423D', marginBottom: '8px' }}>
-              <Icon name="group" size={16} style={{ color: '#9D4124' }} />
-              <span>Số lượng khách dùng bữa tại bàn:</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-              {[1, 2, 4, 6, 8].map(num => {
-                const isSel = guestCount === num;
-                return (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setGuestCount(num)}
-                    style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '10px',
-                      border: isSel ? '2px solid #9D4124' : '1px solid #EAE0DE',
-                      background: isSel ? '#9D4124' : '#FFFFFF',
-                      color: isSel ? '#FFFFFF' : '#1F1B1A',
-                      fontFamily: "'Epilogue', sans-serif",
-                      fontWeight: 800,
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    {num}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Dòng 2: Trạng thái bàn ở dưới */}
+          <div style={{ marginBottom: '18px' }}>
+            <span style={{
+              fontFamily: "'Epilogue', sans-serif",
+              fontWeight: 800,
+              fontSize: '1.15rem',
+              color: isTableOccupied ? '#2E7D32' : '#E65100'
+            }}>
+              {isTableOccupied ? 'Bàn đã sẵn sàng' : 'Chờ mở Bàn'}
+            </span>
           </div>
 
           {/* Sub service perks */}
@@ -797,7 +725,7 @@ export default function TableWelcomePage() {
         gap: '4px',
         textAlign: 'center'
       }}>
-        <div>Giờ phục vụ: 10:00 AM – 10:00 PM | Hotline: 1900 8924</div>
+        <div>Giờ phục vụ: 10:00 AM – 10:00 PM</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#2E7D32' }} />
           <span style={{ fontWeight: 600, color: '#1F1B1A' }}>ROMS Table Terminal v2.4 • Online</span>

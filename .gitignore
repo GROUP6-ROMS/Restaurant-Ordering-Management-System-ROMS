@@ -8,3 +8,5 @@ scratch/
 # Office temporary files
 ~$*.pptx
 ~$*.docx
+*_backup.pptx
+*_local_backup.pptx

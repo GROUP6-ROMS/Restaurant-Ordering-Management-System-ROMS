@@ -148,9 +148,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             throw new AppException("Mã bàn '" + cleanCode + "' đã tồn tại trong hệ thống!", HttpStatus.CONFLICT);
         }
 
-        String displayName = (request.getName() != null && !request.getName().trim().isEmpty())
-                ? request.getName().trim()
-                : "Bàn " + cleanCode;
+        String displayName = cleanCode;
 
         // Sinh mã bí mật QR Code ngẫu nhiên
         String generatedQrToken = "qr-" + cleanCode.toLowerCase() + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -200,9 +198,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             }
         }
 
-        String displayName = (request.getName() != null && !request.getName().trim().isEmpty())
-                ? request.getName().trim()
-                : "Bàn " + cleanCode;
+        String displayName = cleanCode;
 
         table.setTableNumber(cleanCode);
         table.setName(displayName);
@@ -526,7 +522,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         return TableResponse.builder()
                 .id(table.getId())
                 .code(table.getTableNumber())
-                .name(table.getName())
+                .name(table.getTableNumber())
                 .zone(table.getZone())
                 .zoneName(zoneName)
                 .capacity(table.getCapacity())
@@ -571,7 +567,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             return TableOrdersResponse.builder()
                     .tableId(table.getId())
                     .tableNumber(table.getTableNumber())
-                    .tableName(table.getName())
+                    .tableName(table.getTableNumber())
                     .zoneName(resolveZoneName(table.getZone()))
                     .totalAmount(BigDecimal.ZERO)
                     .totalItems(0)
@@ -635,7 +631,7 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         return TableOrdersResponse.builder()
                 .tableId(table.getId())
                 .tableNumber(table.getTableNumber())
-                .tableName(table.getName())
+                .tableName(table.getTableNumber())
                 .zoneName(resolveZoneName(table.getZone()))
                 .sessionId(session.getId())
                 .sessionToken(session.getSessionToken())

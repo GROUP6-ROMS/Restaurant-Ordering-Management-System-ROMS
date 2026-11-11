@@ -1184,9 +1184,10 @@ export default function TableManagementPage() {
     if (!formData.code.trim()) return;
 
     try {
+      const cleanCode = formData.code.trim().toUpperCase();
       const payload = {
-        tableNumber: formData.code.trim().toUpperCase(),
-        name: formData.name.trim() || `Bàn ${formData.code.trim().toUpperCase()}`,
+        tableNumber: cleanCode,
+        name: cleanCode,
         zone: formData.zone,
         capacity: parseInt(formData.capacity) || 4
       };
@@ -1227,9 +1228,10 @@ export default function TableManagementPage() {
     if (!editTableData || !editFormData.code.trim()) return;
 
     try {
+      const cleanCode = editFormData.code.trim().toUpperCase();
       const payload = {
-        tableNumber: editFormData.code.trim().toUpperCase(),
-        name: editFormData.name.trim() || `Bàn ${editFormData.code.trim().toUpperCase()}`,
+        tableNumber: cleanCode,
+        name: cleanCode,
         zone: editFormData.zone,
         capacity: parseInt(editFormData.capacity) || 4
       };
@@ -3124,28 +3126,6 @@ export default function TableManagementPage() {
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
-                  Tên Hiển Thị (Tùy chọn)
-                </label>
-                <input
-                  type="text"
-                  placeholder="VD: Bàn Cạnh Cửa Sổ, Phòng Sen Vàng"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1px solid #EAE0DE',
-                    background: '#FDF7F5',
-                    fontSize: '0.88rem',
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
@@ -3532,28 +3512,6 @@ export default function TableManagementPage() {
                   placeholder="Nhập mã bàn..."
                   value={editFormData.code}
                   onChange={(e) => setEditFormData({ ...editFormData, code: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1px solid #EAE0DE',
-                    background: '#FDF7F5',
-                    fontSize: '0.88rem',
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
-                  Tên Hiển Thị (Tùy chọn)
-                </label>
-                <input
-                  type="text"
-                  placeholder="VD: Bàn Cạnh Cửa Sổ, Phòng Sen Vàng"
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '10px 14px',
