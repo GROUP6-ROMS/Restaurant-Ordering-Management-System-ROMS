@@ -91,6 +91,15 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
         List<CustomerMenuResponse> responseList = new ArrayList<>();
         for (Category cat : categories) {
             List<CustomerMenuItemResponse> items = itemsByCategory.getOrDefault(cat.getId(), Collections.emptyList());
+            // Đảm bảo tuyệt đối các món không khoá (còn hàng, sẵn sàng bán) luôn đứng ở đầu danh mục
+            items.sort((a, b) -> {
+                boolean aUnlocked = Boolean.TRUE.equals(a.getIsAvailable()) && (a.getRemainingStock() == null || a.getRemainingStock() > 0);
+                boolean bUnlocked = Boolean.TRUE.equals(b.getIsAvailable()) && (b.getRemainingStock() == null || b.getRemainingStock() > 0);
+                if (aUnlocked != bUnlocked) {
+                    return aUnlocked ? -1 : 1;
+                }
+                return 0;
+            });
             responseList.add(CustomerMenuResponse.builder()
                     .categoryId(cat.getId())
                     .categoryName(cat.getName())

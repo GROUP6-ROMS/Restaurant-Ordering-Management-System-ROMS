@@ -493,7 +493,9 @@ export default function CustomerMenuPage() {
     }
   };
 
-  // Loc mon an theo category va search
+  // Lọc món ăn theo category, search và luôn ưu tiên món KHÔNG KHÓA lên đầu
+  const isUnlocked = (item) => Boolean(item.isAvailable) && (item.remainingStock === undefined || item.remainingStock === null || item.remainingStock > 0);
+
   const filteredItems = allItems.filter(item => {
     const matchCat = selectedCategory === 0 || item.categoryId === selectedCategory;
     const matchSearch =
@@ -501,6 +503,10 @@ export default function CustomerMenuPage() {
       item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
+  }).sort((a, b) => {
+    const aUn = isUnlocked(a) ? 1 : 0;
+    const bUn = isUnlocked(b) ? 1 : 0;
+    return bUn - aUn;
   });
 
   // Lay so luong mon trong gio

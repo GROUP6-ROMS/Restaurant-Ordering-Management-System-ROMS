@@ -12,10 +12,16 @@ import java.util.Optional;
 @Repository
 public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
 
-    // Lấy toàn bộ món ăn còn kinh doanh (chưa bị xóa mềm), xếp theo thứ tự hiển thị
+    // Lấy toàn bộ món ăn còn kinh doanh (chưa bị xóa mềm), xếp ưu tiên món không khoá lên đầu
+    @Query("SELECT m FROM MenuItem m WHERE m.isActive = true " +
+           "ORDER BY CASE WHEN (m.isAvailable = true AND (m.remainingStock IS NULL OR m.remainingStock > 0)) THEN 0 ELSE 1 END ASC, " +
+           "m.displayOrder ASC, m.id DESC")
     List<MenuItem> findByIsActiveTrueOrderByDisplayOrderAsc();
 
-    // Lấy các món ăn đang cho phép bán (đang kinh doanh và còn hàng)
+    // Lấy các món ăn đang cho phép bán (đang kinh doanh và còn hàng), ưu tiên còn tồn kho lên đầu
+    @Query("SELECT m FROM MenuItem m WHERE m.isActive = true AND m.isAvailable = true " +
+           "ORDER BY CASE WHEN (m.remainingStock IS NULL OR m.remainingStock > 0) THEN 0 ELSE 1 END ASC, " +
+           "m.displayOrder ASC, m.id DESC")
     List<MenuItem> findByIsAvailableTrueAndIsActiveTrue();
 
     // Lấy các món ăn thuộc về 1 danh mục cụ thể
@@ -48,7 +54,7 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
            "AND (:station IS NULL OR m.station = :station) " +
            "AND (:isAvailable IS NULL OR m.isAvailable = :isAvailable) " +
            "AND (:keyword IS NULL OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(m.sku) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-           "ORDER BY m.displayOrder ASC, m.id DESC")
+           "ORDER BY CASE WHEN (m.isAvailable = true AND (m.remainingStock IS NULL OR m.remainingStock > 0)) THEN 0 ELSE 1 END ASC, m.displayOrder ASC, m.id DESC")
     List<MenuItem> searchMenuItems(
             @Param("categoryId") Long categoryId,
             @Param("station") String station,

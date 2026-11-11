@@ -1001,12 +1001,18 @@ export default function PosCheckoutPage() {
     }
   };
 
-  // Lọc catalog menu theo tìm kiếm và danh mục
+  // Lọc catalog menu theo tìm kiếm và danh mục, ưu tiên món không khóa lên đầu
+  const isPosItemUnlocked = (item) => Boolean(item.isAvailable) && (item.remainingStock === undefined || item.remainingStock === null || item.remainingStock > 0);
+
   const filteredCatalog = menuCatalog.filter(item => {
     const matchSearch = item.name.toLowerCase().includes(searchDishQuery.toLowerCase());
     if (!matchSearch) return false;
     if (selectedCategory === 'ALL') return true;
     return item.categoryName === selectedCategory || item.category?.name === selectedCategory;
+  }).sort((a, b) => {
+    const aUn = isPosItemUnlocked(a) ? 1 : 0;
+    const bUn = isPosItemUnlocked(b) ? 1 : 0;
+    return bUn - aUn;
   });
 
   return (

@@ -730,7 +730,7 @@ public class WaiterServiceImpl implements WaiterService {
             seedDefaultMenuData();
         }
 
-        List<MenuItem> items = menuItemRepository.findByIsAvailableTrueAndIsActiveTrue();
+        List<MenuItem> items = menuItemRepository.findByIsActiveTrueOrderByDisplayOrderAsc();
         List<WaiterMenuItemResponse> result = new ArrayList<>();
         for (MenuItem item : items) {
             String catName = item.getCategory() != null ? item.getCategory().getName() : "Món ăn";
@@ -746,6 +746,15 @@ public class WaiterServiceImpl implements WaiterService {
                     .remainingStock(item.getRemainingStock())
                     .build());
         }
+        // Đảm bảo món không khoá luôn đứng trên đầu danh mục
+        result.sort((a, b) -> {
+            boolean aUnlocked = Boolean.TRUE.equals(a.getIsAvailable()) && (a.getRemainingStock() == null || a.getRemainingStock() > 0);
+            boolean bUnlocked = Boolean.TRUE.equals(b.getIsAvailable()) && (b.getRemainingStock() == null || b.getRemainingStock() > 0);
+            if (aUnlocked != bUnlocked) {
+                return aUnlocked ? -1 : 1;
+            }
+            return 0;
+        });
         return result;
     }
 
