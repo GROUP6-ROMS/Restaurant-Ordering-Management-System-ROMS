@@ -375,14 +375,43 @@ public class KitchenServiceImpl implements KitchenService {
             String tableNumber = "Mang về";
             String tableName = "Khách mang về";
             String zoneName = "Quầy";
+            Long sessionId = null;
+            String sessionCode = null;
+            String sessionStatus = null;
+            String sessionStatusText = null;
 
-            Order firstOrder = tblOrders.get(0);
-            if (firstOrder.getSession() != null && firstOrder.getSession().getTable() != null) {
-                RestaurantTable t = firstOrder.getSession().getTable();
-                tableId = t.getId();
-                tableNumber = t.getTableNumber();
-                tableName = t.getName();
-                zoneName = resolveZoneName(t.getZone());
+            DiningSession session = tblOrders.stream()
+                    .map(Order::getSession)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+
+            if (session != null) {
+                sessionId = session.getId();
+                sessionCode = "SES-" + session.getId();
+                sessionStatus = session.getStatus() != null ? session.getStatus().name() : "ACTIVE";
+                sessionStatusText = switch (sessionStatus) {
+                    case "ACTIVE" -> "Đang dùng bữa";
+                    case "COMPLETED" -> "Đã thanh toán";
+                    case "CANCELLED" -> "Đã hủy";
+                    default -> "Đang phục vụ";
+                };
+                if (session.getTable() != null) {
+                    RestaurantTable t = session.getTable();
+                    tableId = t.getId();
+                    tableNumber = t.getTableNumber();
+                    tableName = t.getName();
+                    zoneName = resolveZoneName(t.getZone());
+                }
+            } else {
+                Order firstOrder = tblOrders.get(0);
+                if (firstOrder.getSession() != null && firstOrder.getSession().getTable() != null) {
+                    RestaurantTable t = firstOrder.getSession().getTable();
+                    tableId = t.getId();
+                    tableNumber = t.getTableNumber();
+                    tableName = t.getName();
+                    zoneName = resolveZoneName(t.getZone());
+                }
             }
 
             List<KitchenHistoryItemResponse> itemsList = new ArrayList<>();
@@ -443,6 +472,10 @@ public class KitchenServiceImpl implements KitchenService {
                     .tableNumber(tableNumber)
                     .tableName(tableName)
                     .zoneName(zoneName)
+                    .sessionId(sessionId)
+                    .sessionCode(sessionCode)
+                    .sessionStatus(sessionStatus)
+                    .sessionStatusText(sessionStatusText)
                     .totalItems(itemsList.size())
                     .readyItems(readyCount)
                     .servedItems(servedCount)
@@ -514,9 +547,14 @@ public class KitchenServiceImpl implements KitchenService {
             }
         }
 
+        Long sessionId = (order.getSession() != null) ? order.getSession().getId() : null;
+        String sessionCode = sessionId != null ? "SES-" + sessionId : null;
+
         return KitchenOrderResponse.builder()
                 .id(order.getId())
                 .orderCode(order.getOrderCode())
+                .sessionId(sessionId)
+                .sessionCode(sessionCode)
                 .tableId(table != null ? table.getId() : null)
                 .tableNumber(tableNumber)
                 .tableName(tableName)

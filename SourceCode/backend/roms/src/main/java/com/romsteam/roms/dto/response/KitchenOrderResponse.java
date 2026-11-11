@@ -20,6 +20,12 @@ public class KitchenOrderResponse {
     // Mã đơn hiển thị (Ví dụ: "ORD-T01-1234")
     private String orderCode;
 
+    // ID phiên ăn (DiningSession)
+    private Long sessionId;
+
+    // Mã phiên ăn hiển thị (Ví dụ: "SES-102")
+    private String sessionCode;
+
     // ID bàn ăn
     private Long tableId;
 
