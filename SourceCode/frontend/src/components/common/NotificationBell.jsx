@@ -126,7 +126,8 @@ export default function NotificationBell() {
         event?.type === 'NEW_ORDER_CREATED' ||
         event?.type === 'ORDER_UPDATE' ||
         event?.type === 'NEW_RESERVATION' ||
-        event?.type === 'RESERVATION_UPDATE'
+        event?.type === 'RESERVATION_UPDATE' ||
+        event?.type === 'WAITER_ITEM_READY'
       ) {
         fetchNotifications();
       }

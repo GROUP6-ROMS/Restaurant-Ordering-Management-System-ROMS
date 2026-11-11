@@ -45,6 +45,14 @@ public class KitchenServiceImpl implements KitchenService {
     private final MenuItemRepository menuItemRepository;
     private final CacheManager cacheManager;
 
+    private boolean isKitchenItem(OrderItem i) {
+        if (i == null) return false;
+        if (i.getMenuItem() != null && "WAITER".equalsIgnoreCase(i.getMenuItem().getStation())) {
+            return false;
+        }
+        return true;
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<KitchenOrderResponse> getActiveKitchenOrders() {
@@ -55,11 +63,12 @@ public class KitchenServiceImpl implements KitchenService {
         return orders.stream()
                 // 1. Chỉ lấy đơn thuộc phiên ăn đang ACTIVE (Bỏ các đơn của phiên đã COMPLETED/CANCELLED như bàn B-01 cũ)
                 .filter(o -> o.getSession() != null && o.getSession().getStatus() == SessionStatus.ACTIVE)
-                // 2. Chỉ lấy đơn còn món chưa bưng (Bỏ các đơn mà toàn bộ món đã SERVED hoặc CANCELLED)
+                // 2. Chỉ lấy đơn còn món của Bếp chưa bưng (Bỏ các đơn mà toàn bộ món bếp đã SERVED/CANCELLED hoặc chỉ gồm món trạm Phục Vụ)
                 .filter(o -> o.getItems() != null && o.getItems().stream().anyMatch(i -> 
-                        i.getStatus() != OrderItemStatus.SERVED && i.getStatus() != OrderItemStatus.CANCELLED
+                        isKitchenItem(i) && i.getStatus() != OrderItemStatus.SERVED && i.getStatus() != OrderItemStatus.CANCELLED
                 ))
                 .map(this::mapToKitchenOrderResponse)
+                .filter(o -> o.getItems() != null && !o.getItems().isEmpty())
                 .sorted((o1, o2) -> {
                     // Ưu tiên đơn RUSH lên vị trí đầu tiên
                     if (Boolean.TRUE.equals(o1.getIsRush()) && !Boolean.TRUE.equals(o2.getIsRush())) return -1;
@@ -306,7 +315,7 @@ public class KitchenServiceImpl implements KitchenService {
                 .stream()
                 .filter(o -> o.getSession() != null && o.getSession().getStatus() == SessionStatus.ACTIVE)
                 .filter(o -> o.getItems() != null && o.getItems().stream().anyMatch(i -> 
-                        i.getStatus() != OrderItemStatus.SERVED && i.getStatus() != OrderItemStatus.CANCELLED
+                        isKitchenItem(i) && i.getStatus() != OrderItemStatus.SERVED && i.getStatus() != OrderItemStatus.CANCELLED
                 ))
                 .collect(Collectors.toList());
 
@@ -357,19 +366,23 @@ public class KitchenServiceImpl implements KitchenService {
         LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         List<Order> ordersToday = orderRepository.findOrdersToday(startOfDay);
 
-        // Gom nhóm theo Bàn
-        Map<String, List<Order>> ordersByTable = ordersToday.stream()
+        // Gom nhóm theo Bàn VÀ Mã phiên ăn (đảm bảo mỗi phiên ăn của bàn là 1 thẻ riêng biệt)
+        Map<String, List<Order>> ordersBySession = ordersToday.stream()
                 .collect(Collectors.groupingBy(o -> {
-                    if (o.getSession() != null && o.getSession().getTable() != null) {
-                        return o.getSession().getTable().getTableNumber();
+                    if (o.getSession() != null) {
+                        String tblNum = (o.getSession().getTable() != null) 
+                                ? o.getSession().getTable().getTableNumber() 
+                                : "MANG_VE";
+                        return tblNum + "_SES_" + o.getSession().getId();
                     }
-                    return "MANG_VE";
+                    return "MANG_VE_ORD_" + o.getId();
                 }, LinkedHashMap::new, Collectors.toList()));
 
         List<KitchenHistoryTableResponse> historyList = new ArrayList<>();
 
-        for (Map.Entry<String, List<Order>> entry : ordersByTable.entrySet()) {
+        for (Map.Entry<String, List<Order>> entry : ordersBySession.entrySet()) {
             List<Order> tblOrders = entry.getValue();
+            if (tblOrders.isEmpty()) continue;
 
             Long tableId = null;
             String tableNumber = "Mang về";
@@ -421,6 +434,11 @@ public class KitchenServiceImpl implements KitchenService {
             for (Order order : tblOrders) {
                 if (order.getItems() != null) {
                     for (OrderItem item : order.getItems()) {
+                        // KDS chỉ hiển thị lịch sử các món Bếp xử lý (loại bỏ món trạm Phục Vụ)
+                        if (!isKitchenItem(item)) {
+                            continue;
+                        }
+
                         String statusStr = item.getStatus() != null ? item.getStatus().name() : "PENDING";
                         if ("READY".equals(statusStr)) readyCount++;
                         if ("SERVED".equals(statusStr)) servedCount++;
@@ -459,7 +477,12 @@ public class KitchenServiceImpl implements KitchenService {
                 }
             }
 
-            // Sắp xếp món mới cập nhật lên trước
+            // Nếu phiên này không có món nào thuộc trạm Bếp thì không cần hiện trên KDS
+            if (itemsList.isEmpty()) {
+                continue;
+            }
+
+            // Sắp xếp món mới cập nhật lên trước trong cùng 1 phiên
             itemsList.sort((i1, i2) -> {
                 if (i1.getCompletedTime() != null && i2.getCompletedTime() != null) {
                     return i2.getCompletedTime().compareTo(i1.getCompletedTime());
@@ -483,6 +506,19 @@ public class KitchenServiceImpl implements KitchenService {
                     .build());
         }
 
+        // Sắp xếp các phiên ăn mới nhất lên đầu danh sách lịch sử
+        historyList.sort((h1, h2) -> {
+            LocalDateTime t1 = (h1.getItems() != null && !h1.getItems().isEmpty()) ? h1.getItems().get(0).getCompletedTime() : null;
+            LocalDateTime t2 = (h2.getItems() != null && !h2.getItems().isEmpty()) ? h2.getItems().get(0).getCompletedTime() : null;
+            if (t1 != null && t2 != null) {
+                return t2.compareTo(t1);
+            }
+            if (h1.getSessionId() != null && h2.getSessionId() != null) {
+                return h2.getSessionId().compareTo(h1.getSessionId());
+            }
+            return 0;
+        });
+
         return historyList;
     }
 
@@ -502,6 +538,11 @@ public class KitchenServiceImpl implements KitchenService {
         List<KitchenOrderItemResponse> itemResponses = new ArrayList<>();
         if (order.getItems() != null) {
             for (OrderItem item : order.getItems()) {
+                // Không đưa món có Trạm điều phối là Phục Vụ xuống Bếp KDS
+                if (!isKitchenItem(item)) {
+                    continue;
+                }
+
                 String statusStr = item.getStatus() != null ? item.getStatus().name() : "PENDING";
                 String statusText = switch (statusStr) {
                     case "COOKING" -> "Đang nấu";

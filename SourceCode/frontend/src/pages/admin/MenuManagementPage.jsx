@@ -1060,7 +1060,7 @@ export default function MenuManagementPage() {
                 {/* Trạm điều phối KDS */}
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '4px' }}>
-                    Trạm điều phối nhận vé:
+                    Trạm điều phối:
                   </label>
                   <select
                     value={selectedDish.station || 'KITCHEN'}

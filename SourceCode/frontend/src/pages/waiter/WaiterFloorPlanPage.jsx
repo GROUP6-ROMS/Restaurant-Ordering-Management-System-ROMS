@@ -7,6 +7,32 @@ import Icon from '../../components/common/Icon';
 import { useDialog } from '../../context/DialogContext';
 import './waiterMobile.css';
 
+// Âm thanh chuông báo phục vụ nhẹ nhàng bằng Web Audio API
+const playWaiterChime = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, now); // Note D5
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // Ramp to A5
+    osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.35); // Ramp to D6
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.6);
+  } catch (err) {
+    // Trình duyệt có thể chặn audio nếu chưa tương tác
+  }
+};
+
 export default function WaiterFloorPlanPage() {
   const navigate = useNavigate();
   const { showConfirm, showAlert } = useDialog();
@@ -92,6 +118,16 @@ export default function WaiterFloorPlanPage() {
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'WAITER_ITEM_READY') {
+        playWaiterChime();
+        const tbl = event.tableNumber ? (event.tableNumber.toLowerCase().includes('phòng') ? event.tableNumber : `Bàn ${event.tableNumber}`) : 'Bàn ăn';
+        const itemsMsg = event.payload?.itemsText || event.note || 'Có món trạm Phục Vụ sẵn sàng lên bàn';
+        setToastMessage(`🔔 [${tbl}] Trạm Phục Vụ: ${itemsMsg}`);
+        setTimeout(() => setToastMessage(null), 4000);
+        loadFloorPlan();
+        return;
+      }
+
       if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE' || event?.type === 'NEW_ORDER_CREATED' || event?.type === 'CALL_WAITER') {
         loadFloorPlan();
       }
