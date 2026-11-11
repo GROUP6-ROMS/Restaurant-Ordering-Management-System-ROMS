@@ -267,21 +267,14 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
       }}>
         <div>
+          {/* Dòng 1: Tên bàn riêng biệt (+ Badge RUSH nếu có) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{
               fontFamily: 'Epilogue', fontWeight: 800, fontSize: 22,
-              color: order.isRush ? 'var(--error)' : 'var(--primary)', lineHeight: 1,
+              color: order.isRush ? 'var(--error)' : 'var(--primary)', lineHeight: 1.1,
               letterSpacing: '-0.02em',
             }}>
-              {order.tableNumber ? `Bàn ${order.tableNumber}` : 'Mang Về'}
-            </span>
-            <span style={{
-              fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
-              padding: '2px 6px', borderRadius: 4,
-              background: 'var(--primary-container)', color: '#fff',
-              letterSpacing: '0.04em',
-            }}>
-              #{order.orderCode || order.id}
+              {order.tableNumber ? (order.tableNumber.toLowerCase().includes('phòng') ? order.tableNumber : `Bàn ${order.tableNumber}`) : 'Mang Về'}
             </span>
 
             {/* Badge RUSH nếu là đơn hỏa tốc (thẻ rush đỏ gắn lên đơn) */}
@@ -299,7 +292,29 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
             )}
           </div>
 
-          {/* Giờ đẩy đơn xuống bếp */}
+          {/* Dòng 2: Mã phiên ăn riêng biệt */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+            {(order.sessionCode || order.sessionId) && (
+              <span style={{
+                fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+                padding: '2px 7px', borderRadius: 4,
+                background: 'var(--primary-container)', color: '#fff',
+                letterSpacing: '0.04em',
+              }}>
+                #{order.sessionCode || `SES-${order.sessionId}`}
+              </span>
+            )}
+            <span style={{
+              fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+              padding: '2px 6px', borderRadius: 4,
+              background: 'var(--surface-container-high)', color: 'var(--on-surface-variant)',
+              letterSpacing: '0.03em',
+            }}>
+              #{order.orderCode || order.id}
+            </span>
+          </div>
+
+          {/* Dòng 3: Giờ đẩy đơn xuống bếp */}
           {order.startedAt && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 4, marginTop: 5,
