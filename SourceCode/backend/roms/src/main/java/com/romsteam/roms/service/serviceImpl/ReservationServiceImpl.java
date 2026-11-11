@@ -24,6 +24,7 @@ import com.romsteam.roms.repository.ZoneRepository;
 import com.romsteam.roms.service.ReservationService;
 import com.romsteam.roms.service.RestaurantTableService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -103,6 +104,10 @@ public class ReservationServiceImpl implements ReservationService {
                         .orElseThrow(() -> new AppException("Món ăn ID #" + itemReq.getMenuItemId() + " không tồn tại trong hệ thống!"));
                 if (!menuItem.getIsActive()) {
                     throw new AppException("Món '" + menuItem.getName() + "' hiện không còn kinh doanh!");
+                }
+                if (!Boolean.TRUE.equals(menuItem.getIsAvailable()) ||
+                        (menuItem.getRemainingStock() != null && menuItem.getRemainingStock() <= 0)) {
+                    throw new AppException("Món '" + menuItem.getName() + "' hiện đã tạm ngưng phục vụ hoặc hết hàng, vui lòng chọn món khác!", HttpStatus.BAD_REQUEST);
                 }
                 BigDecimal unitPrice = menuItem.getPrice();
                 BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
@@ -395,6 +400,10 @@ public class ReservationServiceImpl implements ReservationService {
                 if (!menuItem.getIsActive()) {
                     throw new AppException("Món '" + menuItem.getName() + "' hiện không còn kinh doanh!");
                 }
+                if (!Boolean.TRUE.equals(menuItem.getIsAvailable()) ||
+                        (menuItem.getRemainingStock() != null && menuItem.getRemainingStock() <= 0)) {
+                    throw new AppException("Món '" + menuItem.getName() + "' hiện đã tạm ngưng phục vụ hoặc hết hàng, vui lòng chọn món khác!", HttpStatus.BAD_REQUEST);
+                }
                 BigDecimal unitPrice = menuItem.getPrice();
                 BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
 
@@ -465,7 +474,7 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         String zoneName = null;
-        if (r.getRequestedZone() != null) {
+        if (r.getRequestedZone() != null && zoneRepository != null) {
             zoneName = zoneRepository.findByZoneCode(r.getRequestedZone())
                     .map(Zone::getName)
                     .orElse(null);

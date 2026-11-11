@@ -954,6 +954,28 @@
   color: #FFFFFF;
 }
 
+.preorder-card.out-of-stock {
+  opacity: 0.58;
+  background: #FBF8F7;
+  border: 1px dashed #DDD2D0;
+}
+
+.preorder-btn-disabled {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #EAE0DE;
+  background: #F0E6E4;
+  color: #89726B;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  user-select: none;
+}
+
 /* Mini Cart Bar trong Step 3 */
 .preorder-mini-cart {
   background: linear-gradient(135deg, #FFF8F6 0%, #FCF1EF 100%);

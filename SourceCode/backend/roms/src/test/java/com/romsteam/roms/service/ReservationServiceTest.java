@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.romsteam.roms.repository.ZoneRepository;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,6 +49,9 @@ class ReservationServiceTest {
 
     @Mock
     private RestaurantTableService tableService;
+
+    @Mock
+    private ZoneRepository zoneRepository;
 
     @InjectMocks
     private ReservationServiceImpl reservationService;
@@ -166,6 +170,40 @@ class ReservationServiceTest {
         assertThat(response.getPreOrderItems()).hasSize(1);
         assertThat(response.getPreOrderTotal()).isEqualByComparingTo(BigDecimal.valueOf(360000)); // 180k * 2
         verify(reservationRepository).save(any(Reservation.class));
+    }
+
+    @Test
+    @DisplayName("2.1. Từ chối đặt món trước khi món đã ngưng phục vụ (isAvailable = false)")
+    void createCustomerReservation_WhenDishUnavailable_ThrowsException() {
+        MenuItem unavailableDish = MenuItem.builder()
+                .id(2L)
+                .name("Cua Hoàng Đế Sốt Bơ Tỏi")
+                .price(BigDecimal.valueOf(500000))
+                .isActive(true)
+                .isAvailable(false)
+                .build();
+
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        ReservationItemRequest itemReq = new ReservationItemRequest();
+        itemReq.setMenuItemId(2L);
+        itemReq.setQuantity(1);
+
+        CreateReservationRequest request = CreateReservationRequest.builder()
+                .customerName("Nguyễn Văn A")
+                .customerPhone("0912345678")
+                .guestCount(2)
+                .reservationDate(tomorrow.toString())
+                .reservationTime("18:30")
+                .requestedZone("VIP")
+                .preOrderItems(List.of(itemReq))
+                .build();
+
+        when(reservationRepository.existsByBookingCode(anyString())).thenReturn(false);
+        when(menuItemRepository.findById(2L)).thenReturn(Optional.of(unavailableDish));
+
+        assertThatThrownBy(() -> reservationService.createCustomerReservation(request))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("hiện đã tạm ngưng phục vụ hoặc hết hàng");
     }
 
     @Test

@@ -167,6 +167,7 @@ export default function ReservationPage() {
           res.data.forEach(c => {
             if (c.items) {
               c.items.forEach(item => {
+                const isOutOfStock = !item.isAvailable || (item.remainingStock !== undefined && item.remainingStock !== null && item.remainingStock <= 0);
                 flatDishes.push({
                   id: item.id,
                   name: item.name,
@@ -175,7 +176,9 @@ export default function ReservationPage() {
                   imageUrl: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80',
                   categoryId: c.categoryId,
                   categoryName: c.categoryName,
-                  isAvailable: item.isAvailable
+                  isAvailable: item.isAvailable,
+                  remainingStock: item.remainingStock,
+                  isOutOfStock: isOutOfStock
                 });
               });
             }
@@ -263,6 +266,7 @@ export default function ReservationPage() {
 
   // Pre-order handlers
   const handleAddDish = (dish) => {
+    if (dish.isOutOfStock) return;
     setPreOrderItems(prev => {
       const existing = prev.find(i => i.id === dish.id);
       if (existing) {
@@ -273,6 +277,8 @@ export default function ReservationPage() {
   };
 
   const handleUpdateDishQty = (dishId, delta) => {
+    const targetDish = menuDishes.find(d => d.id === dishId);
+    if (delta > 0 && targetDish?.isOutOfStock) return;
     setPreOrderItems(prev => {
       return prev.map(i => {
         if (i.id === dishId) {
@@ -424,14 +430,21 @@ export default function ReservationPage() {
     }
   };
 
-  const filteredMenuItems = menuDishes.filter(d => {
-    if (menuCatFilter !== 'ALL' && d.categoryId !== menuCatFilter) return false;
-    if (menuSearch.trim() !== '') {
-      return d.name?.toLowerCase().includes(menuSearch.toLowerCase()) ||
-             d.description?.toLowerCase().includes(menuSearch.toLowerCase());
-    }
-    return true;
-  });
+  const filteredMenuItems = menuDishes
+    .filter(d => {
+      if (menuCatFilter !== 'ALL' && d.categoryId !== menuCatFilter) return false;
+      if (menuSearch.trim() !== '') {
+        return d.name?.toLowerCase().includes(menuSearch.toLowerCase()) ||
+               d.description?.toLowerCase().includes(menuSearch.toLowerCase());
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      // Ưu tiên hiển thị các món sẵn sàng phục vụ lên đầu tiên
+      const aOutOfStock = a.isOutOfStock ? 1 : 0;
+      const bOutOfStock = b.isOutOfStock ? 1 : 0;
+      return aOutOfStock - bOutOfStock;
+    });
 
   return (
     <div style={{ minHeight: '100vh', background: '#FFF8F6', color: '#1F1B1A', display: 'flex', flexDirection: 'column' }}>
@@ -1162,12 +1175,13 @@ export default function ReservationPage() {
                       className="preorder-category-select touch-input"
                       title="Chọn danh mục món"
                     >
-                      <option value="ALL">Tất cả ({menuDishes.length})</option>
+                      <option value="ALL">Tất cả ({menuDishes.filter(d => !d.isOutOfStock).length} sẵn sàng / {menuDishes.length})</option>
                       {menuCategories.map(c => {
                         const count = menuDishes.filter(d => d.categoryId === c.id).length;
+                        const readyCount = menuDishes.filter(d => d.categoryId === c.id && !d.isOutOfStock).length;
                         return (
                           <option key={c.id} value={c.id}>
-                            {c.name} ({count})
+                            {c.name} ({readyCount}/{count})
                           </option>
                         );
                       })}
@@ -1181,6 +1195,11 @@ export default function ReservationPage() {
                   <div className="preorder-active-filters-bar">
                     <span style={{ fontSize: '0.74rem', color: '#56423D', fontWeight: 600 }}>
                       Tìm thấy: <strong style={{ color: '#9D4124' }}>{filteredMenuItems.length} món</strong>
+                      {filteredMenuItems.some(d => d.isOutOfStock) && (
+                        <span style={{ marginLeft: '6px', color: '#89726B', fontSize: '0.72rem' }}>
+                          ({filteredMenuItems.filter(d => !d.isOutOfStock).length} sẵn sàng)
+                        </span>
+                      )}
                     </span>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       {menuCatFilter !== 'ALL' && (
@@ -1234,10 +1253,12 @@ export default function ReservationPage() {
                   <div className="reservation-preorder-grid">
                     {filteredMenuItems.map(dish => {
                       const selected = preOrderItems.find(i => i.id === dish.id);
+                      const isUnavailable = dish.isOutOfStock;
                       return (
                         <div
                           key={dish.id}
-                          className={`preorder-card ${selected ? 'selected' : ''}`}
+                          className={`preorder-card ${selected ? 'selected' : ''} ${isUnavailable ? 'out-of-stock' : ''}`}
+                          style={isUnavailable ? { opacity: 0.58, background: '#FBF8F7', border: '1px dashed #DDD2D0' } : undefined}
                         >
                           <div className="preorder-card-body">
                             <div className="preorder-card-thumb-wrap">
@@ -1245,8 +1266,27 @@ export default function ReservationPage() {
                                 src={dish.imageUrl}
                                 alt={dish.name}
                                 className="preorder-card-thumb"
+                                style={isUnavailable ? { filter: 'grayscale(50%)' } : undefined}
                               />
-                              {selected && (
+                              {isUnavailable ? (
+                                <div style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  background: 'rgba(53, 47, 46, 0.55)',
+                                  borderRadius: '12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#FFFFFF',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  textAlign: 'center',
+                                  padding: '2px',
+                                  backdropFilter: 'blur(1px)'
+                                }}>
+                                  Tạm hết
+                                </div>
+                              ) : selected && (
                                 <span className="preorder-card-badge">
                                   {selected.qty}
                                 </span>
@@ -1254,9 +1294,26 @@ export default function ReservationPage() {
                             </div>
 
                             <div className="preorder-card-info">
-                              <h4 className="preorder-card-title">
-                                {dish.name}
-                              </h4>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <h4 className="preorder-card-title" style={isUnavailable ? { color: '#73615C' } : undefined}>
+                                  {dish.name}
+                                </h4>
+                                {isUnavailable && (
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    background: '#FFDAD6',
+                                    color: '#BA1A1A',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '2px'
+                                  }}>
+                                    <Icon name="block" size={12} /> Ngưng phục vụ
+                                  </span>
+                                )}
+                              </div>
                               {dish.description && (
                                 <p className="preorder-card-desc">
                                   {dish.description}
@@ -1265,7 +1322,7 @@ export default function ReservationPage() {
                             </div>
                           </div>
 
-                          {selected && (
+                          {selected && !isUnavailable && (
                             <div style={{ position: 'relative' }}>
                               <input
                                 type="text"
@@ -1288,11 +1345,20 @@ export default function ReservationPage() {
                           )}
 
                           <div className="preorder-card-bottom">
-                            <span className="preorder-card-price">
+                            <span className="preorder-card-price" style={isUnavailable ? { color: '#89726B' } : undefined}>
                               {dish.price.toLocaleString('vi-VN')}₫
                             </span>
 
-                            {selected ? (
+                            {isUnavailable ? (
+                              <button
+                                type="button"
+                                disabled
+                                className="preorder-btn-disabled"
+                                title="Món ăn hiện đang tạm hết hoặc ngưng phục vụ"
+                              >
+                                <Icon name="lock" size={15} /> Đã khóa
+                              </button>
+                            ) : selected ? (
                               <div className="preorder-qty-group">
                                 <button
                                   type="button"
