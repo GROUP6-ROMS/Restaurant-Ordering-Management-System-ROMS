@@ -1,6 +1,10 @@
 package com.romsteam.roms.service.serviceImpl;
 
+import com.romsteam.roms.dto.request.BatchKitchenItemRushRequest;
+import com.romsteam.roms.dto.request.BatchKitchenItemStatusRequest;
 import com.romsteam.roms.dto.request.UpdateKitchenStatusRequest;
+import com.romsteam.roms.dto.response.KitchenHistoryItemResponse;
+import com.romsteam.roms.dto.response.KitchenHistoryTableResponse;
 import com.romsteam.roms.dto.response.KitchenOrderItemResponse;
 import com.romsteam.roms.dto.response.KitchenOrderResponse;
 import com.romsteam.roms.dto.response.KitchenSummaryResponse;
@@ -132,6 +136,107 @@ public class KitchenServiceImpl implements KitchenService {
 
     @Override
     @Transactional
+    public List<KitchenOrderResponse> batchUpdateItemStatus(BatchKitchenItemStatusRequest request) {
+        if (request.getItemIds() == null || request.getItemIds().isEmpty()) {
+            return Collections.emptyList();
+        }
+        OrderItemStatus newStatus;
+        try {
+            newStatus = OrderItemStatus.valueOf(request.getStatus().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new AppException("Trạng thái món không hợp lệ: " + request.getStatus(), HttpStatus.BAD_REQUEST);
+        }
+
+        List<OrderItem> items = orderItemRepository.findAllById(request.getItemIds());
+        Set<Order> affectedOrders = new HashSet<>();
+
+        for (OrderItem item : items) {
+            OrderItemStatus oldStatus = item.getStatus();
+            item.setStatus(newStatus);
+            orderItemRepository.save(item);
+            if (newStatus == OrderItemStatus.CANCELLED && oldStatus != OrderItemStatus.CANCELLED) {
+                restoreItemStock(item);
+            }
+            if (item.getOrder() != null) {
+                affectedOrders.add(item.getOrder());
+            }
+        }
+
+        List<KitchenOrderResponse> results = new ArrayList<>();
+        for (Order order : affectedOrders) {
+            if (order.getItems() != null) {
+                boolean allCancelled = order.getItems().stream()
+                        .allMatch(i -> i.getStatus() == OrderItemStatus.CANCELLED);
+                boolean allReadyOrServed = order.getItems().stream()
+                        .allMatch(i -> i.getStatus() == OrderItemStatus.READY ||
+                                       i.getStatus() == OrderItemStatus.SERVED ||
+                                       i.getStatus() == OrderItemStatus.CANCELLED);
+                boolean anyCooking = order.getItems().stream()
+                        .anyMatch(i -> i.getStatus() == OrderItemStatus.COOKING);
+
+                if (allCancelled) {
+                    order.setStatus(OrderStatus.CANCELLED);
+                } else if (allReadyOrServed) {
+                    order.setStatus(OrderStatus.READY);
+                } else if (anyCooking) {
+                    order.setStatus(OrderStatus.COOKING);
+                }
+
+                BigDecimal recalculatedTotal = order.getItems().stream()
+                        .filter(i -> i.getStatus() != OrderItemStatus.CANCELLED)
+                        .map(i -> i.getSubtotal() != null ? i.getSubtotal() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                order.setTotalAmount(recalculatedTotal);
+
+                Order saved = orderRepository.save(order);
+
+                try {
+                    Long tableId = saved.getSession() != null && saved.getSession().getTable() != null ? saved.getSession().getTable().getId() : null;
+                    String tableNumber = saved.getSession() != null && saved.getSession().getTable() != null ? saved.getSession().getTable().getTableNumber() : "Bàn";
+                    realtimeService.notifyOrderStatus(saved.getId(), tableId, tableNumber, request.getStatus(), null);
+                } catch (Exception ignored) {}
+
+                results.add(mapToKitchenOrderResponse(saved));
+            }
+        }
+        return results;
+    }
+
+    @Override
+    @Transactional
+    public List<KitchenOrderResponse> batchToggleItemRush(BatchKitchenItemRushRequest request) {
+        if (request.getItemIds() == null || request.getItemIds().isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<OrderItem> items = orderItemRepository.findAllById(request.getItemIds());
+        Set<Order> affectedOrders = new HashSet<>();
+
+        // Nếu tất cả món được chọn đã rush -> hủy rush; ngược lại gắn cờ rush
+        boolean allRushed = items.stream().allMatch(i -> i.getNote() != null && i.getNote().contains("[RUSH]"));
+
+        for (OrderItem item : items) {
+            String currentNote = item.getNote() != null ? item.getNote().trim() : "";
+            if (allRushed) {
+                String cleaned = currentNote.replace("[RUSH]", "").trim();
+                item.setNote(cleaned.isEmpty() ? null : cleaned);
+            } else {
+                if (!currentNote.contains("[RUSH]")) {
+                    item.setNote(currentNote.isEmpty() ? "[RUSH]" : "[RUSH] " + currentNote);
+                }
+            }
+            orderItemRepository.save(item);
+            if (item.getOrder() != null) {
+                affectedOrders.add(item.getOrder());
+            }
+        }
+
+        return affectedOrders.stream()
+                .map(this::mapToKitchenOrderResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
     public KitchenOrderResponse updateOrderStatus(Long orderId, UpdateKitchenStatusRequest request) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
@@ -246,6 +351,108 @@ public class KitchenServiceImpl implements KitchenService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<KitchenHistoryTableResponse> getTodayCookingHistory() {
+        LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+        List<Order> ordersToday = orderRepository.findOrdersToday(startOfDay);
+
+        // Gom nhóm theo Bàn
+        Map<String, List<Order>> ordersByTable = ordersToday.stream()
+                .collect(Collectors.groupingBy(o -> {
+                    if (o.getSession() != null && o.getSession().getTable() != null) {
+                        return o.getSession().getTable().getTableNumber();
+                    }
+                    return "MANG_VE";
+                }, LinkedHashMap::new, Collectors.toList()));
+
+        List<KitchenHistoryTableResponse> historyList = new ArrayList<>();
+
+        for (Map.Entry<String, List<Order>> entry : ordersByTable.entrySet()) {
+            List<Order> tblOrders = entry.getValue();
+
+            Long tableId = null;
+            String tableNumber = "Mang về";
+            String tableName = "Khách mang về";
+            String zoneName = "Quầy";
+
+            Order firstOrder = tblOrders.get(0);
+            if (firstOrder.getSession() != null && firstOrder.getSession().getTable() != null) {
+                RestaurantTable t = firstOrder.getSession().getTable();
+                tableId = t.getId();
+                tableNumber = t.getTableNumber();
+                tableName = t.getName();
+                zoneName = resolveZoneName(t.getZone());
+            }
+
+            List<KitchenHistoryItemResponse> itemsList = new ArrayList<>();
+            int readyCount = 0;
+            int servedCount = 0;
+
+            for (Order order : tblOrders) {
+                if (order.getItems() != null) {
+                    for (OrderItem item : order.getItems()) {
+                        String statusStr = item.getStatus() != null ? item.getStatus().name() : "PENDING";
+                        if ("READY".equals(statusStr)) readyCount++;
+                        if ("SERVED".equals(statusStr)) servedCount++;
+
+                        String statusText = switch (statusStr) {
+                            case "COOKING" -> "Đang nấu";
+                            case "READY" -> "Đã xong (Chờ bưng)";
+                            case "SERVED" -> "Đã lên bàn";
+                            case "CANCELLED" -> "Đã hủy";
+                            default -> "Chờ tiếp nhận";
+                        };
+
+                        String rawNote = item.getNote();
+                        boolean isItemRush = rawNote != null && rawNote.contains("[RUSH]");
+                        String displayNote = rawNote;
+                        if (isItemRush) {
+                            displayNote = rawNote.replace("[RUSH]", "").trim();
+                            if (displayNote.isEmpty()) displayNote = null;
+                        }
+
+                        itemsList.add(KitchenHistoryItemResponse.builder()
+                                .id(item.getId())
+                                .menuItemId(item.getMenuItem() != null ? item.getMenuItem().getId() : null)
+                                .orderCode(order.getOrderCode() != null ? order.getOrderCode() : String.valueOf(order.getId()))
+                                .name(item.getMenuItem() != null ? item.getMenuItem().getName() : "Món chưa đặt tên")
+                                .imageUrl(item.getMenuItem() != null ? item.getMenuItem().getImageUrl() : null)
+                                .quantity(item.getQuantity())
+                                .note(displayNote)
+                                .isRush(isItemRush)
+                                .status(statusStr)
+                                .statusText(statusText)
+                                .orderTime(order.getOrderTime() != null ? order.getOrderTime() : order.getCreatedAt())
+                                .completedTime(item.getUpdatedAt() != null ? item.getUpdatedAt() : item.getCreatedAt())
+                                .build());
+                    }
+                }
+            }
+
+            // Sắp xếp món mới cập nhật lên trước
+            itemsList.sort((i1, i2) -> {
+                if (i1.getCompletedTime() != null && i2.getCompletedTime() != null) {
+                    return i2.getCompletedTime().compareTo(i1.getCompletedTime());
+                }
+                return 0;
+            });
+
+            historyList.add(KitchenHistoryTableResponse.builder()
+                    .tableId(tableId)
+                    .tableNumber(tableNumber)
+                    .tableName(tableName)
+                    .zoneName(zoneName)
+                    .totalItems(itemsList.size())
+                    .readyItems(readyCount)
+                    .servedItems(servedCount)
+                    .items(itemsList)
+                    .build());
+        }
+
+        return historyList;
+    }
+
     private KitchenOrderResponse mapToKitchenOrderResponse(Order order) {
         RestaurantTable table = (order.getSession() != null) ? order.getSession().getTable() : null;
         String tableNumber = table != null ? table.getTableNumber() : "Mang về";
@@ -271,6 +478,14 @@ public class KitchenServiceImpl implements KitchenService {
                     default -> "Chờ tiếp nhận";
                 };
 
+                String rawItemNote = item.getNote();
+                boolean isItemRush = rawItemNote != null && rawItemNote.contains("[RUSH]");
+                String displayItemNote = rawItemNote;
+                if (isItemRush) {
+                    displayItemNote = rawItemNote.replace("[RUSH]", "").trim();
+                    if (displayItemNote.isEmpty()) displayItemNote = null;
+                }
+
                 itemResponses.add(KitchenOrderItemResponse.builder()
                         .id(item.getId())
                         .menuItemId(item.getMenuItem() != null ? item.getMenuItem().getId() : null)
@@ -278,7 +493,8 @@ public class KitchenServiceImpl implements KitchenService {
                         .imageUrl(item.getMenuItem() != null ? item.getMenuItem().getImageUrl() : null)
                         .quantity(item.getQuantity())
                         .unitPrice(item.getUnitPrice())
-                        .note(item.getNote())
+                        .note(displayItemNote)
+                        .isRush(isItemRush)
                         .status(statusStr)
                         .statusText(statusText)
                         .build());

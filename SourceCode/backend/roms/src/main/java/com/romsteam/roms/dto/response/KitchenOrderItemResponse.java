@@ -39,4 +39,7 @@ public class KitchenOrderItemResponse {
 
     // Trạng thái tiếng Việt thân thiện
     private String statusText;
+
+    // Cờ ưu tiên hỏa tốc từng món
+    private Boolean isRush;
 }

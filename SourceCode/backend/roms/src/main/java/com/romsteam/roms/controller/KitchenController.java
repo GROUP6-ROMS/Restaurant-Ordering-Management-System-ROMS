@@ -1,7 +1,10 @@
 package com.romsteam.roms.controller;
 
+import com.romsteam.roms.dto.request.BatchKitchenItemRushRequest;
+import com.romsteam.roms.dto.request.BatchKitchenItemStatusRequest;
 import com.romsteam.roms.dto.request.UpdateKitchenStatusRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
+import com.romsteam.roms.dto.response.KitchenHistoryTableResponse;
 import com.romsteam.roms.dto.response.KitchenOrderResponse;
 import com.romsteam.roms.dto.response.KitchenSummaryResponse;
 import com.romsteam.roms.dto.response.AdminMenuItemResponse;
@@ -48,6 +51,28 @@ public class KitchenController {
             @Valid @RequestBody UpdateKitchenStatusRequest request) {
         KitchenOrderResponse updated = kitchenService.updateItemStatus(itemId, request);
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái món thành công"));
+    }
+
+    /**
+     * 2b. Cập nhật trạng thái hàng loạt cho nhiều món ăn được chọn
+     * PATCH /api/kitchen/items/batch-status
+     */
+    @PatchMapping("/items/batch-status")
+    public ResponseEntity<ApiResponse<List<KitchenOrderResponse>>> batchUpdateItemStatus(
+            @Valid @RequestBody BatchKitchenItemStatusRequest request) {
+        List<KitchenOrderResponse> updated = kitchenService.batchUpdateItemStatus(request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái các món đã chọn thành công"));
+    }
+
+    /**
+     * 2c. Bật / Tắt ưu tiên hỏa tốc (RUSH) cho nhiều món ăn được chọn
+     * PATCH /api/kitchen/items/batch-rush
+     */
+    @PatchMapping("/items/batch-rush")
+    public ResponseEntity<ApiResponse<List<KitchenOrderResponse>>> batchToggleItemRush(
+            @Valid @RequestBody BatchKitchenItemRushRequest request) {
+        List<KitchenOrderResponse> updated = kitchenService.batchToggleItemRush(request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật ưu tiên hỏa tốc các món thành công"));
     }
 
     /**
@@ -102,5 +127,15 @@ public class KitchenController {
             @PathVariable Long itemId) {
         AdminMenuItemResponse updated = menuService.toggleMenuItemAvailability(itemId);
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái món thành công"));
+    }
+
+    /**
+     * 8. Lấy lịch sử các món đã nấu trong ngày gom nhóm theo bàn
+     * GET /api/kitchen/history/today
+     */
+    @GetMapping("/history/today")
+    public ResponseEntity<ApiResponse<List<KitchenHistoryTableResponse>>> getTodayCookingHistory() {
+        List<KitchenHistoryTableResponse> history = kitchenService.getTodayCookingHistory();
+        return ResponseEntity.ok(ApiResponse.success(history, "Lấy lịch sử nấu món trong ngày thành công"));
     }
 }
