@@ -16,6 +16,10 @@ public class KitchenHistoryTableResponse {
     private String tableNumber;
     private String tableName;
     private String zoneName;
+    private Long sessionId;
+    private String sessionCode;
+    private String sessionStatus;
+    private String sessionStatusText;
     private Integer totalItems;
     private Integer readyItems;
     private Integer servedItems;

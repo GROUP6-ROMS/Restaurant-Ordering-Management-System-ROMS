@@ -489,10 +489,8 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
                 type="checkbox"
                 checked={isSelected}
                 disabled={isServed || isCancelled}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  toggleSelectItem(item.id);
-                }}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleSelectItem(item.id)}
                 title={
                   isCancelled
                     ? "Món đã bị hủy"
@@ -503,6 +501,7 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
                 style={{
                   width: 22, height: 22, marginTop: 2, accentColor: 'var(--primary)',
                   cursor: isServed || isCancelled ? 'not-allowed' : 'pointer',
+                  flexShrink: 0,
                 }}
               />
             </div>
@@ -692,29 +691,40 @@ function KitchenDailyHistoryView({ dailyHistory, loadingHistory, onRefresh }) {
                 display: 'flex', flexDirection: 'column',
               }}
             >
-              {/* Table Header */}
+              {/* Table Header (Tách Tên bàn, Trạng thái bàn ra các dòng riêng biệt, thêm mã phiên ăn, xoá mô tả bàn) */}
               <div style={{
                 background: 'var(--surface-container-low)', padding: '12px 16px',
                 borderBottom: '1px solid var(--outline-variant)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                display: 'flex', flexDirection: 'column', gap: 6,
               }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontFamily: 'Epilogue', fontWeight: 800, fontSize: 18, color: 'var(--primary)' }}>
-                      {table.tableNumber ? `Bàn ${table.tableNumber}` : 'Mang Về'}
+                {/* Dòng 1: Tên bàn + Mã phiên ăn */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontFamily: 'Epilogue', fontWeight: 800, fontSize: 18, color: 'var(--primary)' }}>
+                    {table.tableNumber ? `Bàn ${table.tableNumber}` : 'Mang Về'}
+                  </span>
+                  {table.sessionId && (
+                    <span style={{
+                      fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+                      padding: '2px 8px', borderRadius: 6,
+                      background: 'var(--primary-container)', color: '#fff',
+                      letterSpacing: '0.04em',
+                    }}>
+                      #{table.sessionCode || `SES-${table.sessionId}`}
                     </span>
-                    {table.zoneName && (
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: 'rgba(0,0,0,0.05)', color: 'var(--on-surface-variant)' }}>
-                        {table.zoneName}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 2 }}>
-                    {table.tableName || ''}
-                  </div>
+                  )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700 }}>
+                {/* Dòng 2: Trạng thái bàn & Thống kê món */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, flexWrap: 'wrap' }}>
+                  {table.sessionStatusText && (
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 6,
+                      background: table.sessionStatus === 'ACTIVE' ? 'rgba(189, 89, 58, 0.12)' : 'var(--surface-container-high)',
+                      color: table.sessionStatus === 'ACTIVE' ? 'var(--primary)' : 'var(--on-surface-variant)',
+                    }}>
+                      {table.sessionStatusText}
+                    </span>
+                  )}
                   <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(46, 125, 50, 0.1)', color: '#2e7d32' }}>
                     {table.readyItems || 0} Chờ bưng
                   </span>
