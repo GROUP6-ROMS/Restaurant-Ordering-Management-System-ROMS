@@ -243,12 +243,18 @@ export default function WaiterOrderDetailPage() {
 
   const availableCategories = ['ALL', ...Array.from(new Set(menuCatalog.map(m => m.category).filter(Boolean)))];
 
+  const isDishUnlocked = (d) => Boolean(d.isAvailable) && (d.remainingStock === undefined || d.remainingStock === null || d.remainingStock > 0);
+
   const filteredCatalog = menuCatalog.filter(d => {
     if (selectedCat !== 'ALL' && d.category !== selectedCat) return false;
     if (searchDish.trim() !== '') {
       return d.name?.toLowerCase().includes(searchDish.toLowerCase());
     }
     return true;
+  }).sort((a, b) => {
+    const aUn = isDishUnlocked(a) ? 1 : 0;
+    const bUn = isDishUnlocked(b) ? 1 : 0;
+    return bUn - aUn;
   });
 
   return (

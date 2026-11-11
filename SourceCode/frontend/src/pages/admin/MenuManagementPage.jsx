@@ -448,6 +448,13 @@ export default function MenuManagementPage() {
       if (selectedStationFilter !== 'ALL' && d.station !== selectedStationFilter) return false;
 
       return true;
+    }).sort((a, b) => {
+      const aUnlocked = Boolean(a.isAvailable) && (a.remainingStock === undefined || a.remainingStock === null || a.remainingStock > 0);
+      const bUnlocked = Boolean(b.isAvailable) && (b.remainingStock === undefined || b.remainingStock === null || b.remainingStock > 0);
+      if (aUnlocked !== bUnlocked) {
+        return aUnlocked ? -1 : 1;
+      }
+      return (a.displayOrder || 0) - (b.displayOrder || 0);
     });
   }, [dishes, searchQuery, activeCategoryFilter, selectedStationFilter]);
 

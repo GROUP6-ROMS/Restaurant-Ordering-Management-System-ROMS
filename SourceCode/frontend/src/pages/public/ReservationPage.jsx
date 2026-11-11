@@ -183,6 +183,7 @@ export default function ReservationPage() {
               });
             }
           });
+          flatDishes.sort((a, b) => (a.isOutOfStock ? 1 : 0) - (b.isOutOfStock ? 1 : 0));
           setMenuDishes(flatDishes);
         }
       } catch (err) {
