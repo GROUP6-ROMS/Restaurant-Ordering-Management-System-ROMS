@@ -63,6 +63,14 @@ export default function PosCheckoutPage() {
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('IN_USE'); // 'IN_USE' (Mặc định: Bàn đang phục vụ / cần tính tiền) | 'CALLING' | 'DIRTY' | 'ALL'
   const [zonesList, setZonesList] = useState([]);
   const [isLoadingTables, setIsLoadingTables] = useState(false);
+  const zoneScrollRef = useRef(null);
+
+  const scrollZones = (direction) => {
+    if (zoneScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220;
+      zoneScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   // State chi tiết tạm tính của bàn được chọn (Bill Preview)
   const [billPreview, setBillPreview] = useState(null);
@@ -1187,63 +1195,147 @@ export default function PosCheckoutPage() {
       {/* VIEW 1: TRẠM THU NGÂN & BÁN HÀNG POS */}
       {activePosTab === 'POS' && (
         <>
-          {/* Sub-bar Lọc Khu Vực Bàn */}
+          {/* Sub-bar Lọc Khu Vực Bàn (Phương án A: Cuộn ngang thông minh chống tràn) */}
           <div style={{
             background: '#FCF1EF',
-            padding: '10px 24px',
+            padding: '8px 20px',
             borderBottom: '1px solid #EAE0DE',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '12px',
-            flexWrap: 'wrap'
+            flexWrap: 'nowrap',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto' }}>
+            <style>{`
+              .pos-zone-scroll::-webkit-scrollbar { display: none; }
+            `}</style>
+
+            {/* Cụm lọc khu vực dạng thanh cuộn ngang thông minh */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              flex: 1,
+              minWidth: 0,
+              position: 'relative'
+            }}>
+              {/* Nút cuộn trái */}
               <button
                 type="button"
-                onClick={() => setSelectedZone('ALL')}
+                onClick={() => scrollZones('left')}
+                title="Cuộn khu vực sang trái"
                 style={{
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: selectedZone === 'ALL' ? '#9D4124' : '#FFFFFF',
-                  color: selectedZone === 'ALL' ? '#FFFFFF' : '#56423D',
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: selectedZone === 'ALL' ? '0 2px 6px rgba(157, 65, 36, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)'
+                  flexShrink: 0,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
                 }}
               >
-                Tất cả khu vực ({posTables.length})
+                <Icon name="chevron_left" size={18} />
               </button>
 
-              {zonesList.map(z => {
-                const isActive = selectedZone === z.zoneCode;
-                const count = posTables.filter(t => t.zone === z.zoneCode).length;
-                return (
-                  <button
-                    key={z.zoneCode}
-                    type="button"
-                    onClick={() => setSelectedZone(z.zoneCode)}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: isActive ? '#9D4124' : '#FFFFFF',
-                      color: isActive ? '#FFFFFF' : '#56423D',
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      boxShadow: isActive ? '0 2px 6px rgba(157, 65, 36, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)'
-                    }}
-                  >
-                    {z.name} ({count})
-                  </button>
-                );
-              })}
+              {/* Dải nút các khu vực */}
+              <div
+                ref={zoneScrollRef}
+                className="pos-zone-scroll"
+                onWheel={(e) => {
+                  if (e.deltaY !== 0) {
+                    e.currentTarget.scrollLeft += e.deltaY;
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  overflowX: 'auto',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                  padding: '2px 4px',
+                  whiteSpace: 'nowrap',
+                  flex: 1
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSelectedZone('ALL')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: selectedZone === 'ALL' ? '#9D4124' : '#FFFFFF',
+                    color: selectedZone === 'ALL' ? '#FFFFFF' : '#56423D',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    boxShadow: selectedZone === 'ALL' ? '0 2px 6px rgba(157, 65, 36, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                >
+                  Tất cả khu vực ({posTables.length})
+                </button>
+
+                {zonesList.map(z => {
+                  const isActive = selectedZone === z.zoneCode;
+                  const count = posTables.filter(t => t.zone === z.zoneCode).length;
+                  return (
+                    <button
+                      key={z.zoneCode}
+                      type="button"
+                      onClick={() => setSelectedZone(z.zoneCode)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: isActive ? '#9D4124' : '#FFFFFF',
+                        color: isActive ? '#FFFFFF' : '#56423D',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        boxShadow: isActive ? '0 2px 6px rgba(157, 65, 36, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)'
+                      }}
+                    >
+                      {z.name} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Nút cuộn phải */}
+              <button
+                type="button"
+                onClick={() => scrollZones('right')}
+                title="Cuộn khu vực sang phải"
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFFFFF',
+                  color: '#56423D',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                }}
+              >
+                <Icon name="chevron_right" size={18} />
+              </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap', flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={() => setSelectedStatusFilter('IN_USE')}
@@ -1259,6 +1351,8 @@ export default function PosCheckoutPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
                   boxShadow: selectedStatusFilter === 'IN_USE' ? '0 2px 6px rgba(157, 65, 36, 0.2)' : '0 1px 3px rgba(0,0,0,0.03)'
                 }}
               >
@@ -1281,6 +1375,8 @@ export default function PosCheckoutPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
                   boxShadow: selectedStatusFilter === 'CALLING' ? '0 2px 6px rgba(186, 26, 26, 0.2)' : '0 1px 3px rgba(0,0,0,0.03)'
                 }}
               >
@@ -1303,6 +1399,8 @@ export default function PosCheckoutPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
                   boxShadow: selectedStatusFilter === 'DIRTY' ? '0 2px 6px rgba(117, 52, 0, 0.2)' : '0 1px 3px rgba(0,0,0,0.03)'
                 }}
               >
@@ -1325,6 +1423,8 @@ export default function PosCheckoutPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
                   boxShadow: selectedStatusFilter === 'ALL' ? '0 2px 6px rgba(86, 66, 61, 0.2)' : '0 1px 3px rgba(0,0,0,0.03)'
                 }}
               >
@@ -1626,44 +1726,88 @@ export default function PosCheckoutPage() {
                 }}>
                 {/* Header Hóa đơn */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '14px', borderBottom: '1px dashed #EAE0DE', marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '12px',
-                      background: '#9D4124',
-                      color: '#FFFFFF',
-                      fontFamily: "'Epilogue', sans-serif",
-                      fontWeight: 800,
-                      fontSize: '1.15rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      {currentTable ? currentTable.code : '--'}
-                    </span>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#1F1B1A', margin: 0 }}>
-                          {currentTable ? currentTable.name : 'Chưa chọn bàn'}
-                        </h3>
-                        <span style={{ fontSize: '0.75rem', background: '#F6ECEA', color: '#56423D', padding: '2px 6px', borderRadius: '6px', fontWeight: 600 }}>
-                          {activeBill?.billCode || currentTable?.orderCode || '#ROMS'}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {/* Dòng 1: Tên bàn riêng biệt to rõ (Loại bỏ ô vuông đỏ lỗi tràn chữ & lặp tên) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h3 style={{
+                        fontFamily: "'Epilogue', sans-serif",
+                        fontWeight: 800,
+                        fontSize: '1.25rem',
+                        color: '#1F1B1A',
+                        margin: 0,
+                        lineHeight: 1.2,
+                        letterSpacing: '-0.02em'
+                      }}>
+                        {currentTable
+                          ? (currentTable.name
+                              ? (currentTable.name.toLowerCase().includes('phòng') || currentTable.name.toLowerCase().startsWith('bàn')
+                                  ? currentTable.name
+                                  : `Bàn ${currentTable.name}`)
+                              : (currentTable.code
+                                  ? (currentTable.code.toLowerCase().includes('phòng') || currentTable.code.toLowerCase().startsWith('bàn')
+                                      ? currentTable.code
+                                      : `Bàn ${currentTable.code}`)
+                                  : 'Chưa chọn bàn'))
+                          : 'Chưa chọn bàn'}
+                      </h3>
+                      {activeBill?.zoneName && (
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          background: '#F6ECEA',
+                          color: '#89726B'
+                        }}>
+                          {activeBill.zoneName}
                         </span>
-                        {activeBill && (
-                          <span style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            padding: '2px 8px',
-                            borderRadius: '9999px',
-                            background: activeBill.hasPaymentRequest ? '#FFDAD6' : (activeBill.isDraftPrinted ? '#FFDBC9' : '#DDE8AB'),
-                            color: activeBill.hasPaymentRequest ? '#93000A' : (activeBill.isDraftPrinted ? '#753400' : '#181E00')
-                          }}>
-                            {activeBill.hasPaymentRequest ? '🔔 Chờ thanh toán' : (activeBill.isDraftPrinted ? '📄 Đã in tạm tính' : '🍽️ Đang dùng bữa')}
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
+                      )}
+                    </div>
+
+                    {/* Dòng 2: Mã phiên ăn / Mã đơn & Trạng thái thanh toán riêng biệt */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      {(activeBill?.sessionId || currentTable?.sessionId) && (
+                        <span style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: '0.72rem',
+                          background: '#9D4124',
+                          color: '#FFFFFF',
+                          padding: '2px 7px',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          letterSpacing: '0.03em'
+                        }}>
+                          #{activeBill?.sessionCode || `SES-${activeBill?.sessionId || currentTable?.sessionId}`}
+                        </span>
+                      )}
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: '0.72rem',
+                        background: '#F6ECEA',
+                        color: '#56423D',
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        fontWeight: 700
+                      }}>
+                        {activeBill?.billCode || currentTable?.orderCode || '#ROMS'}
+                      </span>
+                      {activeBill && (
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '9999px',
+                          background: activeBill.hasPaymentRequest ? '#FFDAD6' : (activeBill.isDraftPrinted ? '#FFDBC9' : '#DDE8AB'),
+                          color: activeBill.hasPaymentRequest ? '#93000A' : (activeBill.isDraftPrinted ? '#753400' : '#181E00')
+                        }}>
+                          {activeBill.hasPaymentRequest ? '🔔 Chờ thanh toán' : (activeBill.isDraftPrinted ? '📄 Đã in tạm tính' : '🍽️ Đang dùng bữa')}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Dòng 3: Số khách & Thời gian dùng bữa */}
+                    <div style={{ marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 500 }}>
                         {activeBill ? `${activeBill.guestCount} khách • Vào lúc ${activeBill.timeIn} (${activeBill.durationMinutes}p)` : 'Chưa có thông tin phiên ăn'}
                       </span>
                     </div>
