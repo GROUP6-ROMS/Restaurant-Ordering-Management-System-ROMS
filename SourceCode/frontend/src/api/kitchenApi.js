@@ -14,6 +14,16 @@ export const kitchenApi = {
     return axiosClient.patch(`/kitchen/items/${itemId}/status`, { status });
   },
 
+  // 2b. Cập nhật trạng thái hàng loạt cho nhiều món được chọn
+  batchUpdateItemStatus: (itemIds, status) => {
+    return axiosClient.patch('/kitchen/items/batch-status', { itemIds, status });
+  },
+
+  // 2c. Bật / Tắt ưu tiên hỏa tốc RUSH cho nhiều món được chọn
+  batchToggleItemRush: (itemIds) => {
+    return axiosClient.patch('/kitchen/items/batch-rush', { itemIds });
+  },
+
   // 3. Cập nhật trạng thái cả phiếu order (COOKING / READY)
   updateOrderStatus: (orderId, status) => {
     return axiosClient.patch(`/kitchen/orders/${orderId}/status`, { status });
@@ -37,6 +47,11 @@ export const kitchenApi = {
   // 7. Bật / Tắt trạng thái 86'd (Tạm hết / Mở bán) trực tiếp từ Bếp
   toggleItemAvailability: (itemId) => {
     return axiosClient.patch(`/kitchen/items/${itemId}/availability`, {});
+  },
+
+  // 8. Lấy lịch sử món đã nấu trong ngày gom nhóm theo bàn
+  getDailyHistory: () => {
+    return axiosClient.get('/kitchen/history/today');
   },
 };
 

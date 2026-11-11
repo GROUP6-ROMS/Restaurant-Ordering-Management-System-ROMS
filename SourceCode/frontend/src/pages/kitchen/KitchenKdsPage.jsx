@@ -155,11 +155,48 @@ function playKitchenChime() {
 }
 
 // --- KDS Ticket Card ---
-function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemStatus, onToggleRush }) {
+function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatchToggleItemRush, onToggleRushOrder }) {
   const elapsedSeconds = useElapsedSeconds(order.startedAt, order.elapsedSeconds);
   const isOverdue = elapsedSeconds > 15 * 60; // Trễ hơn 15 phút (Overdue SLA)
   const isUrgent = elapsedSeconds > 10 * 60;  // Cảnh báo sau 10 phút
-  const isOrderUpdating = actionLoadingId === `order-${order.id}`;
+  const isOrderUpdating = actionLoadingId === `order-${order.id}` || actionLoadingId === 'batch-status' || actionLoadingId === 'batch-rush';
+
+  const [selectedItemIds, setSelectedItemIds] = useState(new Set());
+
+  // Lọc các món có thể tick chọn: món chưa hoàn tất lên bàn và chưa bị hủy
+  const selectableItems = (order.items || []).filter(i => i.status !== 'SERVED' && i.status !== 'CANCELLED');
+  const allSelected = selectableItems.length > 0 && selectableItems.every(i => selectedItemIds.has(i.id));
+
+  const toggleSelectItem = (itemId) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(selectableItems.map(i => i.id)));
+    }
+  };
+
+  const handleMarkDoneSelected = async () => {
+    if (selectedItemIds.size === 0) return;
+    const ids = Array.from(selectedItemIds);
+    await onBatchUpdateItemStatus(ids, 'READY');
+    setSelectedItemIds(new Set());
+  };
+
+  const handleRushSelected = async () => {
+    if (selectedItemIds.size === 0) return;
+    const ids = Array.from(selectedItemIds);
+    await onBatchToggleItemRush(ids);
+    setSelectedItemIds(new Set());
+  };
 
   const getStatusConfig = (status) => {
     switch (status) {
@@ -172,11 +209,6 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
           headerBg: 'var(--surface-container-low)',
           timerBg: 'var(--surface-container)',
           timerColor: 'var(--on-surface)',
-          nextStatus: 'COOKING',
-          nextLabel: 'Bắt đầu nấu',
-          nextIcon: 'local_fire_department',
-          nextBg: 'var(--secondary, #825345)',
-          nextColor: '#fff',
         };
       case 'COOKING':
         return {
@@ -185,11 +217,6 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
           headerBg: 'var(--primary-fixed)',
           timerBg: 'var(--primary)',
           timerColor: '#fff',
-          nextStatus: 'READY',
-          nextLabel: 'Xác nhận xong món',
-          nextIcon: 'check_circle',
-          nextBg: 'var(--tertiary-container, #2e7d32)',
-          nextColor: '#fff',
         };
       case 'READY':
         return {
@@ -198,11 +225,6 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
           headerBg: 'var(--tertiary-fixed, #e8f5e9)',
           timerBg: 'var(--tertiary-container, #2e7d32)',
           timerColor: '#fff',
-          nextStatus: null,
-          nextLabel: 'Chờ phục vụ bưng món',
-          nextIcon: 'table_restaurant',
-          nextBg: 'var(--surface-container)',
-          nextColor: 'var(--on-surface)',
         };
       default:
         return {
@@ -211,11 +233,6 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
           headerBg: 'var(--surface-container)',
           timerBg: 'var(--surface-container-high)',
           timerColor: 'var(--on-surface-variant)',
-          nextStatus: null,
-          nextLabel: '',
-          nextIcon: '',
-          nextBg: '',
-          nextColor: '',
         };
     }
   };
@@ -238,7 +255,7 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
       opacity: isOrderUpdating ? 0.7 : 1,
     }}>
 
-      {/* --- Header card --- */}
+      {/* --- Header card (Chỉ giữ Tên bàn, Mã đơn, Giờ nhận đơn và Thẻ Rush đỏ nếu có) --- */}
       <div style={{
         background: order.isRush
           ? '#ffebee'
@@ -267,7 +284,7 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
               #{order.orderCode || order.id}
             </span>
 
-            {/* Badge RUSH nếu là đơn hỏa tốc */}
+            {/* Badge RUSH nếu là đơn hỏa tốc (thẻ rush đỏ gắn lên đơn) */}
             {order.isRush && (
               <span style={{
                 fontFamily: 'JetBrains Mono', fontSize: 10, fontWeight: 800,
@@ -282,29 +299,16 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
             )}
           </div>
 
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap',
-            fontFamily: 'Plus Jakarta Sans', fontSize: 12, color: 'var(--on-surface-variant)',
-          }}>
-            {order.zoneName && (
-              <span style={{
-                padding: '1px 6px', borderRadius: 4,
-                background: 'rgba(0,0,0,0.05)', fontSize: 11, fontWeight: 600,
-              }}>
-                {order.zoneName}
-              </span>
-            )}
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Icon name="person" size={13} style={{ color: 'var(--primary)' }} />
-              {order.staffName || 'Khách quét QR'}
-            </span>
-            {order.startedAt && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--outline)' }}>
-                <Icon name="schedule" size={13} />
-                {formatOrderTime(order.startedAt)}
-              </span>
-            )}
-          </div>
+          {/* Giờ đẩy đơn xuống bếp */}
+          {order.startedAt && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4, marginTop: 5,
+              fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 600, color: 'var(--outline)',
+            }}>
+              <Icon name="schedule" size={13} />
+              <span>Nhận đơn: {formatOrderTime(order.startedAt)}</span>
+            </div>
+          )}
 
           {/* Ghi chú chung hoặc cảnh báo chuyển bàn */}
           {order.note && (
@@ -353,26 +357,51 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
 
       {/* --- Danh sách món ăn trong ticket --- */}
       <div style={{ padding: '12px 14px', background: 'var(--surface)', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {selectableItems.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 6, borderBottom: '1px dashed var(--outline-variant)' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Món trong đơn ({order.items ? order.items.length : 0})
+            </span>
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 11, fontWeight: 700, color: 'var(--primary)',
+                padding: '2px 6px', borderRadius: 4,
+              }}
+            >
+              {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+            </button>
+          </div>
+        )}
+
         {order.items && order.items.map((item, idx) => {
           const isCancelled = item.status === 'CANCELLED';
           const isServed = item.status === 'SERVED';
           const isReady = item.status === 'READY';
-          const isDone = isReady || isServed;
-          const isItemUpdating = actionLoadingId === `item-${item.id}`;
+          const isSelected = selectedItemIds.has(item.id);
 
           return (
             <div
               key={item.id}
+              onClick={() => {
+                if (!isServed && !isCancelled) toggleSelectItem(item.id);
+              }}
               style={{
                 paddingBottom: idx < order.items.length - 1 ? 10 : 0,
                 borderBottom: idx < order.items.length - 1 ? '1px solid var(--outline-variant)' : 'none',
                 display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
                 opacity: isServed ? 0.45 : isCancelled ? 0.55 : 1,
-                transition: 'opacity 0.2s ease',
+                background: isSelected ? 'rgba(189, 89, 58, 0.08)' : 'transparent',
+                borderRadius: 8,
+                padding: '6px 4px',
+                cursor: isServed || isCancelled ? 'default' : 'pointer',
+                transition: 'background 0.15s ease',
               }}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{
                     fontFamily: 'Epilogue', fontWeight: 700, fontSize: 16,
                     color: isCancelled ? '#ba1a1a' : isServed ? 'var(--outline)' : 'var(--primary)',
@@ -388,7 +417,23 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
                     {item.name}
                   </span>
 
-                  {/* Badge phân biệt trạng thái món rõ nét theo chuẩn F&B */}
+                  {/* Icon Rush đỏ bên cạnh món nếu món được rush VÀ đơn chưa bị rush toàn bộ */}
+                  {!order.isRush && item.isRush && (
+                    <span
+                      title="Món được ưu tiên hỏa tốc (RUSH)"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 2,
+                        padding: '1px 5px', borderRadius: 4,
+                        background: '#ffebee', color: '#ba1a1a', border: '1px solid #ffcdd2',
+                        fontSize: 10, fontWeight: 800, fontFamily: 'JetBrains Mono',
+                      }}
+                    >
+                      <Icon name="bolt" size={12} fill={1} />
+                      RUSH
+                    </span>
+                  )}
+
+                  {/* Badges trạng thái */}
                   {isCancelled && (
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
@@ -421,9 +466,9 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
                   )}
                 </div>
 
-                {/* Ghi chú bếp cho từng món (chống vỡ layout chữ dài) */}
+                {/* Ghi chú món */}
                 {item.note && (
-                  <div style={{ marginTop: 4, paddingLeft: 28, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ marginTop: 4, paddingLeft: 24, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
                     <span style={{
                       display: 'inline-flex', alignItems: 'flex-start', gap: 4,
                       padding: '2px 8px', borderRadius: 4,
@@ -439,25 +484,25 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
                 )}
               </div>
 
-              {/* Checkbox item - Click đổi trạng thái món sang READY hoặc COOKING */}
+              {/* Checkbox item - Đánh dấu chọn món để thao tác */}
               <input
                 type="checkbox"
-                checked={isDone}
-                disabled={isServed || isCancelled || isItemUpdating}
-                onChange={() => onToggleItemStatus(order.id, item.id, item.status)}
+                checked={isSelected}
+                disabled={isServed || isCancelled}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  toggleSelectItem(item.id);
+                }}
                 title={
                   isCancelled
                     ? "Món đã bị hủy"
                     : isServed
                     ? "Món đã được phục vụ lên bàn"
-                    : isReady
-                    ? "Bấm để nấu lại món này"
-                    : "Bấm xác nhận đã xong món này"
+                    : "Tick để chọn món thực hiện Xong món hoặc Rush món"
                 }
                 style={{
                   width: 22, height: 22, marginTop: 2, accentColor: 'var(--primary)',
-                  cursor: isServed || isCancelled || isItemUpdating ? 'not-allowed' : 'pointer',
-                  opacity: isItemUpdating ? 0.5 : 1,
+                  cursor: isServed || isCancelled ? 'not-allowed' : 'pointer',
                 }}
               />
             </div>
@@ -465,54 +510,66 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
         })}
       </div>
 
-      {/* --- Footer actions --- */}
+      {/* --- Footer actions (Không còn chức năng lên hết món) --- */}
       <div style={{
         padding: '10px 12px',
         background: 'var(--surface-container)',
         borderTop: '1px solid var(--outline-variant)',
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
-        {cfg.nextStatus ? (
-          <button
-            type="button"
-            disabled={isOrderUpdating}
-            onClick={() => onUpdateStatus(order.id, cfg.nextStatus)}
-            style={{
-              flex: 1, height: 44, borderRadius: 12,
-              background: isOverdue ? 'var(--error)' : cfg.nextBg,
-              color: cfg.nextColor,
-              border: 'none',
-              cursor: isOrderUpdating ? 'not-allowed' : 'pointer',
-              opacity: isOrderUpdating ? 0.6 : 1,
-              fontFamily: 'Epilogue', fontWeight: 700, fontSize: 13,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Icon name={cfg.nextIcon} size={18} fill={1} />
-            {isOverdue ? 'CHUYỂN GIAO MÓN (OVERDUE)' : cfg.nextLabel.toUpperCase()}
-          </button>
-        ) : (
-          <div style={{
-            flex: 1, height: 44, borderRadius: 12,
-            background: 'var(--surface-container-high)',
-            color: 'var(--on-surface-variant)',
-            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
+        {/* Nút Xong món (Đổi trạng thái chờ bưng cho các món đã chọn) */}
+        <button
+          type="button"
+          disabled={selectedItemIds.size === 0 || isOrderUpdating}
+          onClick={handleMarkDoneSelected}
+          title={selectedItemIds.size === 0 ? "Tick chọn ít nhất 1 món để xác nhận xong" : `Xác nhận xong ${selectedItemIds.size} món đã chọn (Chờ bưng)`}
+          style={{
+            flex: 1, height: 42, borderRadius: 10,
+            background: selectedItemIds.size > 0 ? 'var(--tertiary-container, #2e7d32)' : 'var(--surface-container-high)',
+            color: selectedItemIds.size > 0 ? '#fff' : 'var(--outline)',
+            border: 'none',
+            cursor: selectedItemIds.size > 0 && !isOrderUpdating ? 'pointer' : 'not-allowed',
+            opacity: isOrderUpdating ? 0.6 : 1,
+            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 13,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          }}>
-            <Icon name="check_circle" size={18} fill={1} style={{ color: 'var(--tertiary, #2e7d32)' }} />
-            TOÀN BỘ ĐÃ XONG (CHỜ BƯNG)
-          </div>
-        )}
+            transition: 'all 0.15s ease',
+            boxShadow: selectedItemIds.size > 0 ? '0 2px 6px rgba(46, 125, 50, 0.25)' : 'none',
+          }}
+        >
+          <Icon name="check_circle" size={17} fill={1} />
+          {selectedItemIds.size > 0 ? `XONG MÓN (${selectedItemIds.size})` : 'XONG MÓN'}
+        </button>
 
-        {/* Nút RUSH */}
+        {/* Nút Rush món đã chọn */}
+        <button
+          type="button"
+          disabled={selectedItemIds.size === 0 || isOrderUpdating}
+          onClick={handleRushSelected}
+          title={selectedItemIds.size === 0 ? "Tick chọn món để gắn/gỡ cờ Rush" : `Gắn/gỡ cờ Rush cho ${selectedItemIds.size} món đã chọn`}
+          style={{
+            height: 42, padding: '0 12px', borderRadius: 10,
+            background: selectedItemIds.size > 0 ? '#fff' : 'var(--surface-container-lowest)',
+            border: `1px solid ${selectedItemIds.size > 0 ? '#ba1a1a' : 'var(--outline-variant)'}`,
+            color: selectedItemIds.size > 0 ? '#ba1a1a' : 'var(--outline)',
+            cursor: selectedItemIds.size > 0 && !isOrderUpdating ? 'pointer' : 'not-allowed',
+            opacity: isOrderUpdating ? 0.6 : 1,
+            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
+            display: 'flex', alignItems: 'center', gap: 4,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <Icon name="bolt" size={16} fill={selectedItemIds.size > 0 ? 1 : 0} />
+          RUSH MÓN
+        </button>
+
+        {/* Nút Rush cả đơn */}
         <button
           type="button"
           disabled={isOrderUpdating}
-          onClick={() => onToggleRush(order.id)}
-          title={order.isRush ? "Hủy chế độ hỏa tốc" : "Đánh dấu đơn hỏa tốc (RUSH)"}
+          onClick={() => onToggleRushOrder(order.id)}
+          title={order.isRush ? "Hủy chế độ hỏa tốc cho cả đơn" : "Đánh dấu hỏa tốc cho toàn bộ đơn"}
           style={{
-            height: 44, padding: '0 12px', borderRadius: 12,
+            height: 42, padding: '0 12px', borderRadius: 10,
             background: order.isRush ? 'var(--error, #ba1a1a)' : 'var(--surface-container-lowest)',
             border: `1px solid ${order.isRush ? 'var(--error, #ba1a1a)' : 'var(--outline-variant)'}`,
             color: order.isRush ? '#fff' : 'var(--primary)',
@@ -524,10 +581,227 @@ function KdsTicketCard({ order, actionLoadingId, onUpdateStatus, onToggleItemSta
           }}
         >
           <Icon name="bolt" size={16} fill={order.isRush ? 1 : 0} />
-          RUSH
+          {order.isRush ? 'HỦY RUSH ĐƠN' : 'RUSH ĐƠN'}
         </button>
       </div>
     </article>
+  );
+}
+
+// --- Component Lịch Sử Trong Ngày (Check món đã nấu theo bàn) ---
+function KitchenDailyHistoryView({ dailyHistory, loadingHistory, onRefresh }) {
+  const [search, setSearch] = useState('');
+
+  const filteredHistory = dailyHistory.filter(t => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    const matchTable = (t.tableNumber || '').toLowerCase().includes(q) || (t.tableName || '').toLowerCase().includes(q);
+    const matchDish = (t.items || []).some(i => (i.name || '').toLowerCase().includes(q) || (i.orderCode || '').toLowerCase().includes(q));
+    return matchTable || matchDish;
+  });
+
+  const totalDishesCooked = dailyHistory.reduce((sum, t) => sum + (t.totalItems || 0), 0);
+  const totalTables = dailyHistory.length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
+      {/* Search & Statistics Bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+        background: 'var(--surface)', padding: '12px 16px', borderRadius: 14,
+        border: '1px solid var(--outline-variant)', boxShadow: 'var(--shadow-xs)',
+      }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, maxWidth: 360 }}>
+          <Icon name="search" size={16} style={{ position: 'absolute', left: 10, color: 'var(--outline)', pointerEvents: 'none' }} />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm theo bàn (B-01...) hoặc tên món đã nấu..."
+            style={{
+              width: '100%', padding: '8px 12px 8px 34px',
+              borderRadius: 8, border: '1px solid var(--outline-variant)',
+              background: 'var(--surface-container-low)', fontSize: 13,
+              fontFamily: 'Plus Jakarta Sans', outline: 'none',
+            }}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span>Số bàn hôm nay: <strong style={{ color: 'var(--primary)' }}>{totalTables}</strong></span>
+            <span>•</span>
+            <span>Tổng món đã xử lý: <strong style={{ color: 'var(--tertiary, #2e7d32)' }}>{totalDishesCooked}</strong></span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Làm mới lịch sử"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 8,
+              background: 'var(--surface-container)', border: '1px solid var(--outline-variant)',
+              color: 'var(--on-surface)', fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            <Icon name="refresh" size={15} />
+            <span>Làm mới</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tables List */}
+      {loadingHistory ? (
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--on-surface-variant)' }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%',
+            border: '3px solid var(--primary-container)',
+            borderTopColor: 'transparent',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 12px',
+          }} />
+          <p style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 14 }}>Đang tải lịch sử chế biến trong ngày...</p>
+        </div>
+      ) : filteredHistory.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--outline)' }}>
+          <Icon name="history_toggle_off" size={48} style={{ color: 'var(--outline-variant)', marginBottom: 8 }} />
+          <p style={{ fontFamily: 'Epilogue', fontSize: 16, fontWeight: 700 }}>
+            {search ? 'Không tìm thấy kết quả phù hợp' : 'Chưa có lịch sử món nào trong ngày hôm nay'}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, paddingBottom: 24 }}>
+          {filteredHistory.map(table => (
+            <div
+              key={table.tableNumber || table.tableId || Math.random()}
+              style={{
+                background: 'var(--surface)', borderRadius: 16,
+                border: '1px solid var(--outline-variant)',
+                boxShadow: 'var(--shadow-xs)', overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+              }}
+            >
+              {/* Table Header */}
+              <div style={{
+                background: 'var(--surface-container-low)', padding: '12px 16px',
+                borderBottom: '1px solid var(--outline-variant)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: 'Epilogue', fontWeight: 800, fontSize: 18, color: 'var(--primary)' }}>
+                      {table.tableNumber ? `Bàn ${table.tableNumber}` : 'Mang Về'}
+                    </span>
+                    {table.zoneName && (
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: 'rgba(0,0,0,0.05)', color: 'var(--on-surface-variant)' }}>
+                        {table.zoneName}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 2 }}>
+                    {table.tableName || ''}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700 }}>
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(46, 125, 50, 0.1)', color: '#2e7d32' }}>
+                    {table.readyItems || 0} Chờ bưng
+                  </span>
+                  <span style={{ padding: '2px 8px', borderRadius: 6, background: 'var(--surface-container-high)', color: 'var(--on-surface-variant)' }}>
+                    {table.servedItems || 0} Đã lên bàn
+                  </span>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div style={{ padding: '10px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 380, overflowY: 'auto' }}>
+                {table.items && table.items.map(item => {
+                  const isReady = item.status === 'READY';
+                  const isServed = item.status === 'SERVED';
+                  const isCancelled = item.status === 'CANCELLED';
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '8px 10px', borderRadius: 10,
+                        background: 'var(--surface-container-lowest)',
+                        border: '1px solid var(--outline-variant)',
+                        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: 'Epilogue', fontWeight: 700, fontSize: 14, color: isCancelled ? '#ba1a1a' : 'var(--primary)' }}>
+                            {item.quantity}x
+                          </span>
+                          <span style={{
+                            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 14,
+                            color: isCancelled ? '#ba1a1a' : isServed ? 'var(--on-surface-variant)' : 'var(--on-surface)',
+                            textDecoration: isCancelled ? 'line-through' : 'none',
+                          }}>
+                            {item.name}
+                          </span>
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--outline)', padding: '1px 4px', background: 'rgba(0,0,0,0.04)', borderRadius: 3 }}>
+                            #{item.orderCode}
+                          </span>
+                        </div>
+
+                        {item.note && (
+                          <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, marginTop: 2, paddingLeft: 18 }}>
+                            • {item.note}
+                          </div>
+                        )}
+
+                        <div style={{ fontSize: 10, color: 'var(--outline)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {item.orderTime && <span>Gọi: {formatOrderTime(item.orderTime)}</span>}
+                          {item.completedTime && <span>• Xử lý: {formatOrderTime(item.completedTime)}</span>}
+                        </div>
+                      </div>
+
+                      {/* Status Tag */}
+                      <div style={{ flexShrink: 0 }}>
+                        {isReady && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(46, 125, 50, 0.12)', color: '#2e7d32', border: '1px solid rgba(46, 125, 50, 0.25)' }}>
+                            ĐÃ XONG
+                          </span>
+                        )}
+                        {isServed && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'var(--surface-container-high)', color: 'var(--on-surface-variant)' }}>
+                            ĐÃ LÊN BÀN
+                          </span>
+                        )}
+                        {isCancelled && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#ffebee', color: '#ba1a1a' }}>
+                            ĐÃ HỦY
+                          </span>
+                        )}
+                        {!isReady && !isServed && !isCancelled && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'var(--surface-container)', color: 'var(--on-surface-variant)' }}>
+                            {item.statusText || item.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -545,6 +819,11 @@ export default function KitchenKdsPage() {
   const [toastMessage, setToastMessage] = useState(null);
   const [cancelledAlert, setCancelledAlert] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
+
+  // Chế độ xem: 'QUEUE' (Chế biến thời gian thực) | 'HISTORY' (Lịch sử trong ngày)
+  const [activeTab, setActiveTab] = useState('QUEUE');
+  const [dailyHistory, setDailyHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // State Quản lý món hết (86'd)
   const [show86Modal, setShow86Modal] = useState(false);
@@ -706,41 +985,57 @@ export default function KitchenKdsPage() {
     }
   };
 
-  // Cập nhật trạng thái cho cả đơn hàng
-  const handleUpdateStatus = async (orderId, newStatus) => {
+  // Tải lịch sử các món đã nấu trong ngày
+  const loadDailyHistory = async () => {
     try {
-      setActionLoadingId(`order-${orderId}`);
-      const res = await kitchenApi.updateOrderStatus(orderId, newStatus);
+      setLoadingHistory(true);
+      const res = await kitchenApi.getDailyHistory();
       if (res.data && res.data.success) {
-        showToast('Đã cập nhật trạng thái đơn thành công');
-        await loadOrders(true);
+        setDailyHistory(res.data.data || []);
       }
     } catch (err) {
-      console.error('Lỗi cập nhật trạng thái đơn:', err);
-      showToast('Không thể cập nhật trạng thái đơn. Vui lòng thử lại!', true);
+      console.error('Lỗi khi tải lịch sử trong ngày:', err);
+      showToast('Không thể tải lịch sử nấu trong ngày', true);
     } finally {
-      setActionLoadingId(null);
+      setLoadingHistory(false);
     }
   };
 
-  // Cập nhật trạng thái từng món ăn riêng lẻ (tick hoàn thành)
-  const handleToggleItemStatus = async (orderId, itemId, currentStatus) => {
-    const nextStatus = (currentStatus === 'READY' || currentStatus === 'SERVED') ? 'COOKING' : 'READY';
+  // Cập nhật trạng thái món hàng loạt (Xong món -> Chờ bưng)
+  const handleBatchUpdateItemStatus = async (itemIds, status) => {
     try {
-      setActionLoadingId(`item-${itemId}`);
-      const res = await kitchenApi.updateItemStatus(itemId, nextStatus);
+      setActionLoadingId('batch-status');
+      const res = await kitchenApi.batchUpdateItemStatus(itemIds, status);
       if (res.data && res.data.success) {
+        showToast(`Đã chuyển ${itemIds.length} món sang trạng thái Chờ bưng`);
         await loadOrders(true);
       }
     } catch (err) {
-      console.error('Lỗi cập nhật trạng thái món:', err);
+      console.error('Lỗi cập nhật trạng thái món hàng loạt:', err);
       showToast('Không thể cập nhật trạng thái món. Vui lòng thử lại!', true);
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  // Bật/Tắt chế độ ưu tiên hỏa tốc RUSH
+  // Gắn/gỡ cờ Rush hàng loạt cho các món được chọn
+  const handleBatchToggleItemRush = async (itemIds) => {
+    try {
+      setActionLoadingId('batch-rush');
+      const res = await kitchenApi.batchToggleItemRush(itemIds);
+      if (res.data && res.data.success) {
+        showToast(`Đã cập nhật ưu tiên Rush cho ${itemIds.length} món`);
+        await loadOrders(true);
+      }
+    } catch (err) {
+      console.error('Lỗi cập nhật Rush món hàng loạt:', err);
+      showToast('Không thể cập nhật cờ Rush món. Vui lòng thử lại!', true);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Bật/Tắt chế độ ưu tiên hỏa tốc RUSH cho cả đơn hàng
   const handleToggleRush = async (orderId) => {
     try {
       setActionLoadingId(`order-${orderId}`);
@@ -808,89 +1103,130 @@ export default function KitchenKdsPage() {
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* Ô tìm kiếm nhanh theo Số Bàn / Mã Đơn / Tên Món (Chuẩn F&B Rush Hour) */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Icon name="search" size={16} style={{ position: 'absolute', left: 10, color: 'var(--outline)', pointerEvents: 'none' }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm bàn / mã / món..."
+          {/* Chuyển đổi chế độ: Hàng đợi Chế biến vs Lịch sử trong ngày */}
+          <div style={{
+            display: 'inline-flex', background: 'var(--surface-container)', padding: 3, borderRadius: 10,
+            border: '1px solid var(--outline-variant)',
+          }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('QUEUE')}
               style={{
-                padding: '6px 28px 6px 32px',
-                borderRadius: 8,
-                border: '1px solid var(--outline-variant)',
-                background: 'var(--surface)',
-                color: 'var(--on-surface)',
-                fontSize: 12,
-                fontFamily: 'Plus Jakarta Sans',
-                outline: 'none',
-                width: 175,
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8, border: 'none',
+                background: activeTab === 'QUEUE' ? 'var(--primary)' : 'transparent',
+                color: activeTab === 'QUEUE' ? '#fff' : 'var(--on-surface-variant)',
+                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12, cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                title="Xóa tìm kiếm"
-                style={{
-                  position: 'absolute', right: 6,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 2, display: 'flex', alignItems: 'center', color: 'var(--outline)'
-                }}
-              >
-                <Icon name="close" size={14} />
-              </button>
-            )}
+            >
+              <Icon name="soup_kitchen" size={16} fill={activeTab === 'QUEUE' ? 1 : 0} />
+              <span>Chế Biến ({orders.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('HISTORY'); loadDailyHistory(); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8, border: 'none',
+                background: activeTab === 'HISTORY' ? 'var(--primary)' : 'transparent',
+                color: activeTab === 'HISTORY' ? '#fff' : 'var(--on-surface-variant)',
+                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Icon name="history" size={16} fill={activeTab === 'HISTORY' ? 1 : 0} />
+              <span>Lịch Sử Hôm Nay</span>
+            </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{
-              fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
-              color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em',
-              marginRight: 2,
-            }}>
-              Lọc:
-            </span>
-            {filterOptions.map(opt => {
-              const isActive = filterStatus === opt.key;
-              return (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setFilterStatus(opt.key)}
+          {activeTab === 'QUEUE' && (
+            <>
+              {/* Ô tìm kiếm nhanh theo Số Bàn / Mã Đơn / Tên Món (Chuẩn F&B Rush Hour) */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Icon name="search" size={16} style={{ position: 'absolute', left: 10, color: 'var(--outline)', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm bàn / mã / món..."
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '4px 12px', borderRadius: '9999px',
-                    background: isActive ? 'var(--primary)' : 'var(--surface-container)',
-                    color: isActive ? '#fff' : 'var(--on-surface-variant)',
-                    border: isActive ? 'none' : '1px solid var(--outline-variant)',
-                    cursor: 'pointer',
-                    fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 12,
-                    boxShadow: isActive ? 'var(--shadow-xs)' : 'none',
+                    padding: '6px 28px 6px 32px',
+                    borderRadius: 8,
+                    border: '1px solid var(--outline-variant)',
+                    background: 'var(--surface)',
+                    color: 'var(--on-surface)',
+                    fontSize: 12,
+                    fontFamily: 'Plus Jakarta Sans',
+                    outline: 'none',
+                    width: 175,
                     transition: 'all 0.15s ease',
-                    flexShrink: 0,
                   }}
-                >
-                  <span style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: isActive ? 'rgba(255,255,255,0.5)' : opt.dotColor,
-                    display: 'inline-block',
-                  }} />
-                  {opt.label}
-                  <span style={{
-                    padding: '0 5px', borderRadius: 4,
-                    background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--surface-container-high)',
-                    color: isActive ? '#fff' : 'var(--on-surface)',
-                    fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
-                  }}>
-                    {counts[opt.key]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    title="Xóa tìm kiếm"
+                    style={{
+                      position: 'absolute', right: 6,
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      padding: 2, display: 'flex', alignItems: 'center', color: 'var(--outline)'
+                    }}
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{
+                  fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
+                  color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em',
+                  marginRight: 2,
+                }}>
+                  Lọc:
+                </span>
+                {filterOptions.map(opt => {
+                  const isActive = filterStatus === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setFilterStatus(opt.key)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: '4px 12px', borderRadius: '9999px',
+                        background: isActive ? 'var(--primary)' : 'var(--surface-container)',
+                        color: isActive ? '#fff' : 'var(--on-surface-variant)',
+                        border: isActive ? 'none' : '1px solid var(--outline-variant)',
+                        cursor: 'pointer',
+                        fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 12,
+                        boxShadow: isActive ? 'var(--shadow-xs)' : 'none',
+                        transition: 'all 0.15s ease',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: isActive ? 'rgba(255,255,255,0.5)' : opt.dotColor,
+                        display: 'inline-block',
+                      }} />
+                      {opt.label}
+                      <span style={{
+                        padding: '0 5px', borderRadius: 4,
+                        background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--surface-container-high)',
+                        color: isActive ? '#fff' : 'var(--on-surface)',
+                        fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+                      }}>
+                        {counts[opt.key]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Metrics */}
@@ -1008,7 +1344,13 @@ export default function KitchenKdsPage() {
         padding: '16px 20px',
         background: 'rgba(252, 241, 239, 0.4)',
       }}>
-        {loading && orders.length === 0 ? (
+        {activeTab === 'HISTORY' ? (
+          <KitchenDailyHistoryView
+            dailyHistory={dailyHistory}
+            loadingHistory={loadingHistory}
+            onRefresh={loadDailyHistory}
+          />
+        ) : loading && orders.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
@@ -1041,7 +1383,7 @@ export default function KitchenKdsPage() {
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
             gap: 16,
             paddingBottom: 24,
           }}>
@@ -1050,9 +1392,9 @@ export default function KitchenKdsPage() {
                 key={order.id}
                 order={order}
                 actionLoadingId={actionLoadingId}
-                onUpdateStatus={handleUpdateStatus}
-                onToggleItemStatus={handleToggleItemStatus}
-                onToggleRush={handleToggleRush}
+                onBatchUpdateItemStatus={handleBatchUpdateItemStatus}
+                onBatchToggleItemRush={handleBatchToggleItemRush}
+                onToggleRushOrder={handleToggleRush}
               />
             ))}
           </div>
