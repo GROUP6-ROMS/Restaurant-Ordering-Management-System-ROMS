@@ -696,9 +696,9 @@ function KitchenDailyHistoryView({ dailyHistory, loadingHistory, onRefresh }) {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, paddingBottom: 24 }}>
-          {filteredHistory.map(table => (
+          {filteredHistory.map((table, idx) => (
             <div
-              key={table.tableNumber || table.tableId || Math.random()}
+              key={table.sessionId ? `${table.tableNumber || 'MV'}_SES_${table.sessionId}` : `${table.tableNumber || 'TBL'}_${idx}`}
               style={{
                 background: 'var(--surface)', borderRadius: 16,
                 border: '1px solid var(--outline-variant)',
@@ -715,7 +715,7 @@ function KitchenDailyHistoryView({ dailyHistory, loadingHistory, onRefresh }) {
                 {/* Dòng 1: Tên bàn + Mã phiên ăn */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ fontFamily: 'Epilogue', fontWeight: 800, fontSize: 18, color: 'var(--primary)' }}>
-                    {table.tableNumber ? `Bàn ${table.tableNumber}` : 'Mang Về'}
+                    {table.tableNumber ? (table.tableNumber.toLowerCase().includes('phòng') ? table.tableNumber : `Bàn ${table.tableNumber}`) : 'Mang Về'}
                   </span>
                   {table.sessionId && (
                     <span style={{

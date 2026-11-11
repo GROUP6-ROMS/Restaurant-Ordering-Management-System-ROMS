@@ -530,6 +530,7 @@ public class WaiterServiceImpl implements WaiterService {
         BigDecimal totalOrderAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
         boolean hasCookingItems = false;
+        List<String> waiterItemNames = new ArrayList<>();
 
         for (WaiterAddOrderRequest.WaiterOrderItemRequest itemReq : request.getItems()) {
             MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
@@ -557,14 +558,12 @@ public class WaiterServiceImpl implements WaiterService {
             BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(qty));
             totalOrderAmount = totalOrderAmount.add(subtotal);
 
-            // Nhận diện đồ uống đóng chai / pha chế sẵn:
-            boolean isDrink = false;
-            if (menuItem.getCategory() != null && menuItem.getCategory().getName() != null) {
-                String catLower = menuItem.getCategory().getName().toLowerCase();
-                if (catLower.contains("uống") || catLower.contains("drink") || catLower.contains("nước")) {
-                    isDrink = true;
-                }
-            }
+            // Nhận diện món ăn thuộc Trạm Phục Vụ (nước lon/chai, đồ lấy tại tủ mát phục vụ):
+            boolean isWaiterStation = "WAITER".equalsIgnoreCase(menuItem.getStation()) ||
+                    (menuItem.getCategory() != null && menuItem.getCategory().getName() != null &&
+                    (menuItem.getCategory().getName().toLowerCase().contains("uống") ||
+                     menuItem.getCategory().getName().toLowerCase().contains("drink") ||
+                     menuItem.getCategory().getName().toLowerCase().contains("nước")));
 
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(newOrder);
@@ -574,10 +573,11 @@ public class WaiterServiceImpl implements WaiterService {
             orderItem.setSubtotal(subtotal);
             orderItem.setNote(itemReq.getNote());
 
-            // Đồ uống đóng chai: Sẵn sàng ngay (READY) tại tủ mát/quầy pass để bồi bàn lấy ra bàn
+            // Món Trạm Phục Vụ: Sẵn sàng ngay (READY) tại tủ mát/quầy pass để bồi bàn lấy ra bàn
             // Món ăn xào nấu: Chuyển COOKING vào Bếp KDS
-            if (isDrink) {
+            if (isWaiterStation) {
                 orderItem.setStatus(OrderItemStatus.READY);
+                waiterItemNames.add(qty + "x " + menuItem.getName());
             } else {
                 orderItem.setStatus(OrderItemStatus.COOKING);
                 hasCookingItems = true;
@@ -597,8 +597,39 @@ public class WaiterServiceImpl implements WaiterService {
             tableRepository.save(table);
         }
 
+        // 1. Chỉ đưa đơn xuống Bếp KDS nếu có món Bếp nấu
+        if (hasCookingItems) {
+            try {
+                realtimeService.notifyKitchenOrder(newOrder.getId(), table.getTableNumber(), "ORDER_NEW", Map.of("orderId", newOrder.getId(), "itemsCount", newOrder.getItems().size()));
+            } catch (Exception e) {
+                log.warn("[Realtime] Lỗi broadcast addOrderToTable bàn {}: {}", table.getTableNumber(), e.getMessage());
+            }
+        }
+
+        // 2. Nếu có món trạm Phục Vụ -> Bắn sự kiện riêng cho Phục Vụ (kèm chuông báo)
+        if (!waiterItemNames.isEmpty()) {
+            try {
+                String waiterItemsText = String.join(", ", waiterItemNames);
+                com.romsteam.roms.dto.response.RomsRealtimeEvent waiterEvent = com.romsteam.roms.dto.response.RomsRealtimeEvent.builder()
+                        .type("WAITER_ITEM_READY")
+                        .tableId(table.getId())
+                        .tableNumber(table.getTableNumber())
+                        .status("READY")
+                        .note("Món trạm Phục Vụ: " + waiterItemsText)
+                        .payload(Map.of(
+                                "orderId", newOrder.getId(),
+                                "tableId", table.getId(),
+                                "tableNumber", table.getTableNumber(),
+                                "items", waiterItemNames,
+                                "itemsText", waiterItemsText
+                        ))
+                        .build();
+                realtimeService.publish("/topic/tables", waiterEvent);
+                realtimeService.publish("/topic/orders", waiterEvent);
+            } catch (Exception ignored) {}
+        }
+
         try {
-            realtimeService.notifyKitchenOrder(newOrder.getId(), table.getTableNumber(), "ORDER_NEW", Map.of("orderId", newOrder.getId(), "itemsCount", newOrder.getItems().size()));
             realtimeService.notifyTableUpdate(table.getId(), table.getTableNumber(), table.getStatus().name(), "Đã gọi thêm món");
         } catch (Exception e) {
             log.warn("[Realtime] Lỗi broadcast addOrderToTable bàn {}: {}", table.getTableNumber(), e.getMessage());
