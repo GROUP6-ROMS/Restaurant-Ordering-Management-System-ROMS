@@ -819,3 +819,109 @@ html {
   box-shadow: 0 12px 28px rgba(157, 65, 36, 0.12);
 }
 
+/* ============================================================
+   CUSTOMER DINING RESPONSIVE & TABLET UX
+   ============================================================ */
+.customer-layout-shell {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 0 40px rgba(44, 34, 30, 0.06);
+  transition: max-width 0.25s ease;
+}
+
+.customer-fixed-shell {
+  width: 100%;
+  max-width: 430px;
+  transition: max-width 0.25s ease;
+}
+
+.customer-ai-floating-btn {
+  position: fixed;
+  right: max(16px, calc(50% - 200px));
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.customer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(53, 47, 46, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.customer-modal-sheet {
+  width: 100%;
+  max-width: 430px;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  transition: max-width 0.25s ease, border-radius 0.25s ease;
+}
+
+.dish-responsive-grid {
+  padding: 0 var(--gutter);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+/* Tablet & iPad Viewports (>= 768px) */
+@media (min-width: 768px) {
+  .customer-layout-shell {
+    max-width: 880px !important;
+    box-shadow: 0 0 50px rgba(44, 34, 30, 0.1) !important;
+  }
+
+  .customer-fixed-shell {
+    max-width: 880px !important;
+  }
+
+  .customer-ai-floating-btn {
+    right: max(24px, calc(50% - 425px)) !important;
+  }
+
+  .customer-modal-overlay {
+    align-items: center !important;
+    padding: 24px !important;
+  }
+
+  .customer-modal-sheet {
+    max-width: 560px !important;
+    border-radius: 24px !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .dish-responsive-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+  }
+}
+
+/* Large Tablet / Desktop Viewports (>= 1024px) */
+@media (min-width: 1024px) {
+  .customer-layout-shell {
+    max-width: 960px !important;
+  }
+
+  .customer-fixed-shell {
+    max-width: 960px !important;
+  }
+
+  .customer-ai-floating-btn {
+    right: max(28px, calc(50% - 465px)) !important;
+  }
+
+  .dish-responsive-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 18px !important;
+  }
+}
+
