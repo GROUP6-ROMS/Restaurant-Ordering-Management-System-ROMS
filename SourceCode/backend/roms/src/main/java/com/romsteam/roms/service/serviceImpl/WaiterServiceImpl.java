@@ -533,7 +533,8 @@ public class WaiterServiceImpl implements WaiterService {
         List<String> waiterItemNames = new ArrayList<>();
 
         for (WaiterAddOrderRequest.WaiterOrderItemRequest itemReq : request.getItems()) {
-            MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
+            // Sử dụng Pessimistic Write Lock để chống tranh chấp tồn kho khi nhân viên/khách đặt cùng lúc (Issue #29)
+            MenuItem menuItem = menuItemRepository.findByIdForUpdate(itemReq.getMenuItemId())
                     .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại với ID: " + itemReq.getMenuItemId()));
 
             if (!menuItem.getIsAvailable()) {

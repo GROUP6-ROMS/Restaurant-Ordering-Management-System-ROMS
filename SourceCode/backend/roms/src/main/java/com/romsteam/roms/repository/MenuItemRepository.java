@@ -1,7 +1,9 @@
 package com.romsteam.roms.repository;
 
 import com.romsteam.roms.entity.MenuItem;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -11,6 +13,14 @@ import java.util.Optional;
 
 @Repository
 public interface MenuItemRepository extends JpaRepository<MenuItem, Long> {
+
+    /**
+     * Khóa dòng dữ liệu mức PESSIMISTIC_WRITE (Khóa Bi quan) khi trừ hoặc cập nhật tồn kho món ăn.
+     * Đảm bảo tính tuần tự tuyệt đối (ACID) khi nhiều khách/nhân viên cùng đặt món có số lượng giới hạn.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM MenuItem m WHERE m.id = :id AND m.isActive = true")
+    Optional<MenuItem> findByIdForUpdate(@Param("id") Long id);
 
     // Lấy toàn bộ món ăn còn kinh doanh (chưa bị xóa mềm), xếp ưu tiên món không khoá lên đầu
     @Query("SELECT m FROM MenuItem m WHERE m.isActive = true " +

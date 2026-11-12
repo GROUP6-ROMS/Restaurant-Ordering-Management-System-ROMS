@@ -149,7 +149,8 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
         List<String> waiterItemNames = new ArrayList<>();
 
         for (CustomerOrderItemRequest itemReq : request.getItems()) {
-            MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
+            // Sử dụng Pessimistic Write Lock để chống tranh chấp tồn kho khi nhiều khách đặt cùng lúc (Issue #29)
+            MenuItem menuItem = menuItemRepository.findByIdForUpdate(itemReq.getMenuItemId())
                     .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại với ID: " + itemReq.getMenuItemId()));
 
             if (!Boolean.TRUE.equals(menuItem.getIsAvailable())) {

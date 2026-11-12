@@ -222,4 +222,58 @@ class OrderConcurrencyTest {
         DiningSession finalSession = sessionRepository.findById(sessionId).orElseThrow();
         assertThat(finalSession.getNote()).isEqualTo("Thread 1: Yêu cầu thêm bát đũa");
     }
+
+    @Test
+    @DisplayName("Conflict Scenario 3 (Issue #29): 5 thực khách cùng tranh chấp đặt 1 món ăn duy nhất chỉ còn lại đúng 1 suất (Pessimistic Locking)")
+    void testPessimisticLocking_StockExhaustion() throws Exception {
+        // Chuẩn bị món ăn chỉ còn đúng 1 phần tồn kho trong ngày
+        itemGoiCuon.setRemainingStock(1);
+        itemGoiCuon = menuItemRepository.save(itemGoiCuon);
+
+        int numberOfThreads = 5;
+        ExecutorService executor = Executors.newFixedThreadPool(numberOfThreads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch finishLatch = new CountDownLatch(numberOfThreads);
+
+        java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger failureCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        for (int i = 0; i < numberOfThreads; i++) {
+            final int guestIdx = i;
+            executor.submit(() -> {
+                try {
+                    startLatch.await(); // Đợi xuất phát đồng thời
+                    CustomerPlaceOrderRequest req = new CustomerPlaceOrderRequest();
+                    req.setTableId(table.getId());
+                    req.setTableNumber(table.getTableNumber());
+                    req.setOrderNote("Khách " + guestIdx + " tranh đặt món cuối cùng");
+
+                    CustomerOrderItemRequest itemReq = new CustomerOrderItemRequest();
+                    itemReq.setMenuItemId(itemGoiCuon.getId());
+                    itemReq.setQuantity(1);
+                    req.setItems(List.of(itemReq));
+
+                    customerDiningService.placeOrder(req);
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    failureCount.incrementAndGet();
+                } finally {
+                    finishLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        finishLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // Assert: Do có Pessimistic Lock, chỉ DUY NHẤT 1 request thành công, 4 request còn lại bị từ chối
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(failureCount.get()).isEqualTo(4);
+
+        // Tồn kho cuối cùng phải về đúng 0 và tự động chuyển sang hết hàng (isAvailable = false)
+        MenuItem finalItem = menuItemRepository.findById(itemGoiCuon.getId()).orElseThrow();
+        assertThat(finalItem.getRemainingStock()).isEqualTo(0);
+        assertThat(finalItem.getIsAvailable()).isFalse();
+    }
 }
