@@ -1537,8 +1537,17 @@ export default function KitchenKdsPage() {
                           <div style={{ fontSize: '0.72rem', color: '#89726B', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{item.categoryName}</span>
                             <span>•</span>
-                            <span style={{ fontWeight: 700, color: item.remainingStock > 5 ? '#059669' : '#C5221F' }}>
-                              Tồn: {item.remainingStock ?? 100}/{item.dailyStock ?? 100}
+                            <span style={{
+                              fontWeight: 700,
+                              color: (item.remainingStock !== null && item.remainingStock !== undefined && item.remainingStock <= 5)
+                                ? '#C5221F'
+                                : '#059669'
+                            }}>
+                              {item.remainingStock === null || item.remainingStock === undefined
+                                ? 'Tồn: Không giới hạn'
+                                : (item.dailyStock
+                                    ? `Tồn: ${item.remainingStock}/${item.dailyStock}`
+                                    : `Tồn: ${item.remainingStock} suất`)}
                             </span>
                           </div>
                         </div>

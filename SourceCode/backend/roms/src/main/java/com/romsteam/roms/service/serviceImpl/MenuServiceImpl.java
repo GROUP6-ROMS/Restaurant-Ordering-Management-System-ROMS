@@ -189,15 +189,29 @@ public class MenuServiceImpl implements MenuService {
         }
 
         // Cập nhật hoặc xóa định mức ngày về null (Không giới hạn)
-        item.setDailyStock(request.getDailyStock() != null && request.getDailyStock() > 0 ? request.getDailyStock() : null);
-        item.setRemainingStock(request.getRemainingStock() != null && request.getRemainingStock() >= 0 ? request.getRemainingStock() : null);
+        Integer newDailyStock = request.getDailyStock() != null && request.getDailyStock() > 0 ? request.getDailyStock() : null;
+        Integer newRemainingStock = request.getRemainingStock() != null && request.getRemainingStock() >= 0 ? request.getRemainingStock() : null;
+        item.setDailyStock(newDailyStock);
+        item.setRemainingStock(newRemainingStock);
+
         if (item.getRemainingStock() != null && item.getRemainingStock() <= 0) {
             item.setIsAvailable(false);
             item.setTag("Tạm Hết (86d)");
+        } else if (item.getRemainingStock() == null || item.getRemainingStock() > 0) {
+            // Tự động mở bán lại khi món được bổ sung suất (>0) hoặc mở bán không giới hạn (null)
+            if ("Tạm Hết (86d)".equals(item.getTag()) || Boolean.FALSE.equals(item.getIsAvailable())) {
+                item.setIsAvailable(true);
+                if ("Tạm Hết (86d)".equals(item.getTag())) {
+                    item.setTag("Đang Bán");
+                }
+            }
         }
 
-        if (request.getIsAvailable() != null) {
+        if (request.getIsAvailable() != null && (item.getRemainingStock() == null || item.getRemainingStock() > 0)) {
             item.setIsAvailable(request.getIsAvailable());
+            if (Boolean.FALSE.equals(request.getIsAvailable()) && "Đang Bán".equals(item.getTag())) {
+                item.setTag("Tạm Hết (86d)");
+            }
         }
 
         MenuItem updated = menuItemRepository.save(item);
