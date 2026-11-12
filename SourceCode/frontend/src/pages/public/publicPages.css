@@ -88,6 +88,107 @@
   }
 }
 
+/* Mobile Hamburger Button & Drawer Navigation */
+.public-mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #EAE0DE;
+  background: #FFFFFF;
+  color: #56423D;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 2px;
+}
+
+.public-mobile-menu-btn:hover {
+  background: #FFF8F6;
+  border-color: #FFDBC9;
+  color: #9D4124;
+}
+
+.public-mobile-menu-btn:active {
+  transform: scale(0.92);
+}
+
+.public-mobile-drawer-overlay {
+  display: none;
+}
+
+.public-mobile-drawer {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .public-mobile-menu-btn {
+    display: inline-flex;
+  }
+
+  .public-mobile-drawer-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(31, 27, 26, 0.45);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .public-mobile-drawer-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .public-mobile-drawer {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 310px;
+    max-width: 85vw;
+    background: #FFF8F6;
+    box-shadow: -6px 0 24px rgba(44, 34, 30, 0.16);
+    z-index: 101;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    box-sizing: border-box;
+    padding: 20px 18px env(safe-area-inset-bottom, 20px);
+    overflow-y: auto;
+  }
+
+  .public-mobile-drawer.open {
+    transform: translateX(0);
+  }
+
+  .public-mobile-drawer-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 14px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1F1B1A;
+    transition: all 0.15s ease;
+    background: transparent;
+  }
+
+  .public-mobile-drawer-link:hover,
+  .public-mobile-drawer-link:active {
+    background: #FCF1EF;
+    color: #9D4124;
+  }
+}
+
 @media (max-width: 380px) {
   .public-header-btn-staff {
     padding: 6px 9px !important;

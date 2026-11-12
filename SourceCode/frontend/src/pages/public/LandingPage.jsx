@@ -11,6 +11,23 @@ export default function LandingPage() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Tự động đóng mobile drawer khi bấm Escape hoặc khi xoay ngang/phóng to màn hình (>768px)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    const handleResize = () => {
+      if (window.innerWidth > 768) setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   // Tải danh mục thực đơn thực tế từ CSDL Backend
   useEffect(() => {
@@ -219,9 +236,135 @@ export default function LandingPage() {
               <Icon name="calendar_month" size={17} />
               <span>Đặt Bàn</span>
             </Link>
+
+            {/* Nút Hamburger Menu trên điện thoại */}
+            <button
+              type="button"
+              className="public-mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(prev => !prev)}
+              aria-label={mobileMenuOpen ? 'Đóng danh mục' : 'Mở danh mục'}
+              aria-expanded={mobileMenuOpen}
+              title="Danh mục menu"
+            >
+              <Icon name={mobileMenuOpen ? 'close' : 'menu'} size={20} />
+            </button>
           </div>
         </div>
       </header>
+
+      {/* 1.1 Mobile Drawer Navigation Overlay & Drawer */}
+      <div
+        className={`public-mobile-drawer-overlay ${mobileMenuOpen ? 'open' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
+        aria-hidden={!mobileMenuOpen}
+      />
+      <aside
+        className={`public-mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}
+        aria-label="Menu điều hướng di động"
+        aria-hidden={!mobileMenuOpen}
+      >
+        {/* Drawer Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: '1px solid #F0E6E4', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RomsLogo size={32} />
+            <div>
+              <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#9D4124', lineHeight: 1.1 }}>
+                {restaurantProfile.brandName || 'ROMS'}
+              </div>
+              <div style={{ fontSize: '0.64rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Ẩm Thực Chuẩn Vị
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Đóng menu"
+            style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: '#F6ECEA', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#56423D', cursor: 'pointer'
+            }}
+          >
+            <Icon name="close" size={20} />
+          </button>
+        </div>
+
+        {/* Drawer Navigation Links */}
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+          <a
+            href="#about"
+            className="public-mobile-drawer-link"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Icon name="info" size={20} style={{ color: '#9D4124' }} />
+            <span>Về Chúng Tôi</span>
+          </a>
+          <a
+            href="#menu"
+            className="public-mobile-drawer-link"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Icon name="restaurant_menu" size={20} style={{ color: '#9D4124' }} />
+            <span>Thực Đơn Món Ngon</span>
+          </a>
+          <a
+            href="#workflow"
+            className="public-mobile-drawer-link"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Icon name="sync_alt" size={20} style={{ color: '#9D4124' }} />
+            <span>Quy Trình Vận Hành</span>
+          </a>
+
+          <div style={{ height: '1px', background: '#F0E6E4', margin: '12px 0' }} />
+
+          {/* Action CTAs in Drawer */}
+          <Link
+            to="/reservation"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '12px 16px', borderRadius: '9999px',
+              background: '#9D4124', color: '#FFFFFF',
+              fontWeight: 700, fontSize: '0.9rem',
+              textDecoration: 'none', boxShadow: '0 4px 12px rgba(157,65,36,0.25)',
+              marginBottom: '8px'
+            }}
+          >
+            <Icon name="calendar_month" size={18} />
+            <span>Đặt Bàn Giữ Chỗ</span>
+          </Link>
+
+          <Link
+            to="/login"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '11px 16px', borderRadius: '9999px',
+              background: '#FFFFFF', border: '1.2px solid #FFDBC9',
+              color: '#9D4124', fontWeight: 700, fontSize: '0.88rem',
+              textDecoration: 'none'
+            }}
+          >
+            <Icon name="badge" size={18} />
+            <span>Cổng Nhân Viên Ca Trực</span>
+          </Link>
+        </nav>
+
+        {/* Drawer Footer Info */}
+        <div style={{ paddingTop: '16px', borderTop: '1px solid #F0E6E4', fontSize: '0.78rem', color: '#89726B', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Icon name="call" size={15} style={{ color: '#9D4124' }} />
+            <span>Hotline: {restaurantProfile.phone || '1900-xxxx'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Icon name="schedule" size={15} style={{ color: '#596232' }} />
+            <span>Giờ mở cửa: {restaurantProfile.openingHours || '08:00 - 22:30'}</span>
+          </div>
+        </div>
+      </aside>
 
       {/* 2. Hero Section */}
       <section className="public-hero-section">
