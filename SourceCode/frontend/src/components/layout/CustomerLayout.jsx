@@ -251,8 +251,16 @@ export default function CustomerLayout() {
         )}
       </header>
 
-      {/* --- Main Content (padding cho header + nav) --- */}
-      <main style={{ flex: 1, paddingTop: 64, paddingBottom: isWelcome ? 20 : 96 }}>
+      {/* --- Main Content (padding cho header + nav, tự động thích ứng với giỏ hàng nổi và safe-area iOS) --- */}
+      <main style={{
+        flex: 1,
+        paddingTop: 64,
+        paddingBottom: isWelcome
+          ? 'calc(24px + env(safe-area-inset-bottom, 0px))'
+          : (totalCount > 0 && !isCart && isTableOccupied)
+            ? 'calc(160px + env(safe-area-inset-bottom, 0px))'
+            : 'calc(96px + env(safe-area-inset-bottom, 0px))'
+      }}>
         <Outlet />
       </main>
 
@@ -261,9 +269,13 @@ export default function CustomerLayout() {
         <div
           className="customer-fixed-shell"
           style={{
-            position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+            position: 'fixed',
+            bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
             padding: '0 var(--gutter)',
-            zIndex: 40, pointerEvents: 'none',
+            zIndex: 40,
+            pointerEvents: 'none',
           }}>
           <Link
             to="/dining/cart"
@@ -323,13 +335,14 @@ export default function CustomerLayout() {
         </div>
       )}
 
-      {/* --- Bottom Navigation Bar (Ẩn khi ở trang Welcome) --- */}
+      {/* --- Bottom Navigation Bar (Ẩn khi ở trang Welcome, thích ứng safe-area iOS) --- */}
       {!isWelcome && (
         <nav
           className="customer-fixed-shell"
           style={{
             position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-            height: 64,
+            height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+            minHeight: 64,
             background: 'rgba(255, 248, 246, 0.92)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
@@ -337,7 +350,8 @@ export default function CustomerLayout() {
             boxShadow: '0 -2px 12px rgba(44, 34, 30, 0.05)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-around',
             zIndex: 50,
-            paddingBottom: 'env(safe-area-inset-bottom, 0)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            boxSizing: 'border-box'
           }}
         >
           {/* Thuc don tab */}
@@ -562,7 +576,7 @@ export default function CustomerLayout() {
       {/* ============================================================== */}
       {/* 👉 DÁN ĐOẠN NÀY VÀO ĐÂY (NGAY TRƯỚC THẺ </div> NGOÀI CÙNG)     */}
       {/* ============================================================== */}
-      {/* --- Nút Nổi AI Trợ Lý Ẩm Thực (Ẩn khi ở trang Welcome) --- */}
+      {/* --- Nút Nổi AI Trợ Lý Ẩm Thực (Ẩn khi ở trang Welcome, thích ứng với giỏ hàng và safe-area) --- */}
       {!isWelcome && (
         <>
           <button
@@ -570,7 +584,9 @@ export default function CustomerLayout() {
             aria-label="Mở Trợ lý Ẩm thực AI"
             className="customer-ai-floating-btn"
             style={{
-              bottom: totalCount > 0 && !isCart ? 145 : 78,
+              bottom: (totalCount > 0 && !isCart && isTableOccupied)
+                ? 'calc(146px + env(safe-area-inset-bottom, 0px))'
+                : 'calc(78px + env(safe-area-inset-bottom, 0px))',
               width: 50, height: 50, borderRadius: '50%',
               background: 'linear-gradient(135deg, #A04020 0%, #D86030 100%)',
               color: '#FFFFFF',
@@ -579,8 +595,6 @@ export default function CustomerLayout() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', zIndex: 45,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           >
             <span style={{ fontSize: 22 }}>✨</span>
           </button>
