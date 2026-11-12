@@ -303,7 +303,8 @@ public class PayOsServiceImpl implements PayOsService {
         String code = String.valueOf(dataMap.get("code"));
 
         if (orderCode != null && "00".equals(code)) {
-            Optional<Bill> billOpt = billRepository.findByPayosOrderCode(orderCode);
+            // Khóa hóa đơn mức PESSIMISTIC_WRITE khi xử lý Webhook để chống xung đột với Thu ngân POS (Issue #31)
+            Optional<Bill> billOpt = billRepository.findByPayosOrderCodeForUpdate(orderCode);
             if (billOpt.isPresent()) {
                 finalizePaidBill(billOpt.get(), "PAYOS_WEBHOOK");
             } else {
@@ -317,7 +318,7 @@ public class PayOsServiceImpl implements PayOsService {
     @Override
     @Transactional
     public PayOsPaymentResponse checkPaymentStatus(Long orderCode) {
-        Bill bill = billRepository.findByPayosOrderCode(orderCode)
+        Bill bill = billRepository.findByPayosOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hóa đơn với mã giao dịch payOS: " + orderCode));
 
         RestaurantTable table = (bill.getSession() != null) ? bill.getSession().getTable() : null;
@@ -397,6 +398,8 @@ public class PayOsServiceImpl implements PayOsService {
         RestaurantTable table = null;
 
         if (session != null) {
+            // Khóa phiên ăn đối soát mức PESSIMISTIC_WRITE để chống xung đột với Thu ngân POS (Issue #31)
+            session = sessionRepository.findByIdForUpdate(session.getId()).orElse(session);
             session.setStatus(SessionStatus.COMPLETED);
             session.setEndTime(LocalDateTime.now());
             sessionRepository.save(session);

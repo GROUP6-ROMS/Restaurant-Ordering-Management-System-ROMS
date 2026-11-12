@@ -186,13 +186,15 @@ public class CashierServiceImpl implements CashierService {
         RestaurantTable table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bàn không tồn tại: " + tableId));
 
-        DiningSession session = sessionRepository.findByTableIdAndStatus(tableId, SessionStatus.ACTIVE)
-                .orElseThrow(() -> new AppException("Bàn không có phiên ăn đang hoạt động để thanh toán!", HttpStatus.BAD_REQUEST));
+        // Khóa phiên ăn bằng Pessimistic Write Lock để chống xung đột với Webhook PayOS đồng thời (Issue #31)
+        DiningSession session = sessionRepository.findByTableIdAndStatusForUpdate(tableId, SessionStatus.ACTIVE)
+                .orElseThrow(() -> new AppException("Bàn không có phiên ăn đang hoạt động hoặc hóa đơn vừa được thanh toán!", HttpStatus.BAD_REQUEST));
 
-        // 1. Kiểm tra Idempotency - Không cho phép thanh toán 2 lần nếu phiên ăn đã có hóa đơn PAID (chống double click / race condition)
-        Optional<Bill> existingBillOpt = billRepository.findBySessionId(session.getId());
+        // 1. Kiểm tra Idempotency có khóa hàng - Không cho phép thanh toán 2 lần nếu phiên ăn đã có hóa đơn PAID (chống double click / race condition)
+        Optional<Bill> existingBillOpt = billRepository.findBySessionIdForUpdate(session.getId());
         if (existingBillOpt.isPresent() && existingBillOpt.get().getStatus() == BillStatus.PAID) {
-            throw new AppException("Hóa đơn cho phiên ăn này đã được thanh toán! Vui lòng không thực hiện lại.", HttpStatus.CONFLICT);
+            String pmName = existingBillOpt.get().getPaymentMethod() != null ? existingBillOpt.get().getPaymentMethod().name() : "phương thức khác";
+            throw new AppException("Hóa đơn cho phiên ăn này đã được thanh toán hoàn tất (" + pmName + ")! Vui lòng không thực hiện lại.", HttpStatus.CONFLICT);
         }
 
         Staff cashier = null;

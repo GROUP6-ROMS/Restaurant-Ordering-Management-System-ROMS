@@ -2,7 +2,11 @@ package com.romsteam.roms.repository;
 
 import com.romsteam.roms.entity.DiningSession;
 import com.romsteam.roms.entity.enums.SessionStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -14,6 +18,18 @@ public interface DiningSessionRepository extends JpaRepository<DiningSession, Lo
 
     // Tìm phiên ăn ACTIVE duy nhất tại một bàn
     Optional<DiningSession> findByTableIdAndStatus(Long tableId, SessionStatus status);
+
+    /**
+     * Khóa dòng dữ liệu mức PESSIMISTIC_WRITE (Khóa Bi quan) khi thanh toán phiên ăn.
+     * Ngăn chặn triệt để xung đột đồng thời giữa Thu ngân POS Checkout và Webhook PayOS (Issue #31).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM DiningSession s WHERE s.table.id = :tableId AND s.status = :status")
+    Optional<DiningSession> findByTableIdAndStatusForUpdate(@Param("tableId") Long tableId, @Param("status") SessionStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM DiningSession s WHERE s.id = :id")
+    Optional<DiningSession> findByIdForUpdate(@Param("id") Long id);
 
     // Nhận diện phiên ăn qua token QR
     Optional<DiningSession> findBySessionToken(String sessionToken);
