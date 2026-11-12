@@ -45,6 +45,50 @@ const playBillChime = () => {
   }
 };
 
+// Helper gợi ý cơ cấu các tờ tiền thối thông minh cho thu ngân
+const getChangeBillBreakdown = (changeAmount) => {
+  if (!changeAmount || changeAmount <= 0) return [];
+  const bills = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000];
+  let remaining = changeAmount;
+  const breakdown = [];
+  for (const b of bills) {
+    if (remaining >= b) {
+      const count = Math.floor(remaining / b);
+      breakdown.push({
+        denom: b,
+        label: b >= 1000000 ? `${b / 1000000}M` : `${b / 1000}k`,
+        count
+      });
+      remaining %= b;
+    }
+  }
+  return breakdown;
+};
+
+// Helper sinh các mệnh giá tiền khách đưa nhanh và làm tròn thông minh
+const getSmartCashPresets = (due) => {
+  if (!due || due <= 0) return [];
+  const presets = [];
+
+  // Làm tròn 50.000₫
+  const ceil50 = Math.ceil(due / 50000) * 50000;
+  if (ceil50 > due) presets.push(ceil50);
+
+  // Làm tròn 100.000₫
+  const ceil100 = Math.ceil(due / 100000) * 100000;
+  if (ceil100 > due && ceil100 !== ceil50) presets.push(ceil100);
+
+  // Các tờ polyme phổ biến lớn hơn số tiền cần thanh toán
+  const commonBills = [100000, 200000, 500000, 1000000, 2000000];
+  for (const bill of commonBills) {
+    if (bill > due && !presets.includes(bill)) {
+      presets.push(bill);
+    }
+  }
+
+  return presets.slice(0, 4);
+};
+
 export default function PosCheckoutPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -88,6 +132,7 @@ export default function PosCheckoutPage() {
   // Phương thức thanh toán
   const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER'); // 'CASH' | 'BANK_TRANSFER' | 'CARD'
   const [cashGiven, setCashGiven] = useState('');
+  const [showTouchNumpad, setShowTouchNumpad] = useState(false);
   const [checkoutNote, setCheckoutNote] = useState('');
 
   // Lịch sử hóa đơn (Tab HISTORY)
@@ -431,7 +476,9 @@ export default function PosCheckoutPage() {
         }
       }
     });
-    return unsubscribe;
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [fetchPosTables, fetchBillPreview]);
 
   // Lắng nghe khi người dùng chuyển lại tab Thu Ngân hoặc focus cửa sổ
@@ -718,6 +765,34 @@ export default function PosCheckoutPage() {
     }
   };
 
+  // Xử lý bàn phím số cảm ứng Touch Numpad cho thu ngân POS
+  const handleNumpadInput = (val) => {
+    if (val === 'CLEAR') {
+      setCashGiven('');
+      return;
+    }
+    if (val === 'BACKSPACE') {
+      setCashGiven(prev => prev ? prev.slice(0, -1) : '');
+      return;
+    }
+    if (val === '000') {
+      if (!cashGiven || cashGiven === '0') return;
+      setCashGiven(prev => (prev || '') + '000');
+      return;
+    }
+    setCashGiven(prev => {
+      const cur = (prev || '').toString();
+      if (cur === '0') return val;
+      return cur + val;
+    });
+  };
+
+  // Cộng dồn nhanh các mệnh giá tiền mặt
+  const handleAddCashIncrement = (inc) => {
+    const current = Number(cashGiven) || 0;
+    setCashGiven((current + inc).toString());
+  };
+
   // Chốt thanh toán hóa đơn với đầy đủ kiểm tra an toàn F&B
   const handleInitiateCheckout = () => {
     if (!currentTable || !activeBill || rawSubtotal === 0) {
@@ -816,6 +891,7 @@ export default function PosCheckoutPage() {
       selectedTableIdRef.current = null;
       setBillPreview(null);
       setCashGiven('');
+      setShowTouchNumpad(false);
       setCheckoutNote('');
       setDiscountType('NONE');
       setDiscountValue(0);
@@ -940,6 +1016,7 @@ export default function PosCheckoutPage() {
       selectedTableIdRef.current = null;
       setBillPreview(null);
       setCashGiven('');
+      setShowTouchNumpad(false);
       setCheckoutNote('');
       setDiscountType('NONE');
       setDiscountValue(0);
@@ -2065,52 +2142,408 @@ export default function PosCheckoutPage() {
                   </div>
                 </div>
 
-                {/* Gợi ý & Nhập tiền mặt khách đưa (Validate đủ tiền) */}
+                {/* Giao diện Nhập & Tính tiền mặt khách đưa (Quick Tender + Touch Numpad + High-Contrast Change Display) */}
                 {paymentMethod === 'CASH' && (
-                  <div style={{ marginBottom: '14px', background: '#FCF1EF', padding: '10px 12px', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#89726B', fontWeight: 600 }}>Tiền khách đưa:</span>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {[roundedFinalAmount, Math.ceil(roundedFinalAmount / 100000) * 100000, 500000, 1000000].map(val => (
+                  <div style={{
+                    marginBottom: '16px',
+                    background: '#FCF1EF',
+                    padding: '14px',
+                    borderRadius: '16px',
+                    border: '1px solid #F5DDD6',
+                    boxShadow: '0 2px 8px rgba(157, 65, 36, 0.04)'
+                  }}>
+                    {/* Header: Tiêu đề + Nút bật/tắt Bàn phím số cảm ứng */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Icon name="payments" size={18} style={{ color: '#9D4124' }} />
+                        <span style={{ fontSize: '0.82rem', color: '#56423D', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                          Tiền mặt khách đưa
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTouchNumpad(prev => !prev)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          border: showTouchNumpad ? '1px solid #9D4124' : '1px solid #EAE0DE',
+                          background: showTouchNumpad ? '#FFF1EC' : '#FFFFFF',
+                          color: showTouchNumpad ? '#9D4124' : '#56423D',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Icon name={showTouchNumpad ? 'keyboard_hide' : 'dialpad'} size={15} />
+                        <span>{showTouchNumpad ? 'Ẩn phím số' : 'Phím số cảm ứng'}</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Tender: Nút Đủ Tiền To & Nổi Bật */}
+                    <div style={{ marginBottom: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setCashGiven(finalCalculatedAmount.toString())}
+                        style={{
+                          width: '100%',
+                          minHeight: '40px',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: cashGiven && Number(cashGiven) === finalCalculatedAmount ? '2px solid #059669' : '1.5px solid #10B981',
+                          background: cashGiven && Number(cashGiven) === finalCalculatedAmount ? '#ECFDF5' : '#F0FDF4',
+                          color: '#065F46',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          boxShadow: '0 1px 3px rgba(16, 185, 129, 0.12)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Icon name="check_circle" size={18} style={{ color: '#059669' }} />
+                          <span>Khách đưa đủ tiền (Vừa đúng bill)</span>
+                        </span>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800 }}>
+                          {finalCalculatedAmount.toLocaleString('vi-VN')}₫
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Quick Tender: Các mệnh giá làm tròn & polyme lớn hơn */}
+                    {getSmartCashPresets(finalCalculatedAmount).length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                        {getSmartCashPresets(finalCalculatedAmount).map(val => {
+                          const isSelected = cashGiven && Number(cashGiven) === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setCashGiven(val.toString())}
+                              style={{
+                                flex: '1 1 calc(25% - 6px)',
+                                minWidth: '70px',
+                                minHeight: '34px',
+                                padding: '6px 8px',
+                                borderRadius: '8px',
+                                border: isSelected ? '1.5px solid #9D4124' : '1px solid #EAE0DE',
+                                background: isSelected ? '#FFDBC9' : '#FFFFFF',
+                                color: isSelected ? '#9D4124' : '#1F1B1A',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                fontFamily: "'JetBrains Mono', monospace",
+                                cursor: 'pointer',
+                                textAlign: 'center',
+                                transition: 'all 0.12s ease'
+                              }}
+                            >
+                              {val.toLocaleString('vi-VN')}₫
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Phím bấm cộng dồn nhanh (+ tờ tiền) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#89726B', fontWeight: 600, whiteSpace: 'nowrap' }}>+ Thêm:</span>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', width: '100%' }}>
+                        {[20000, 50000, 100000, 200000, 500000].map(inc => (
                           <button
-                            key={val}
+                            key={inc}
                             type="button"
-                            onClick={() => setCashGiven(val.toString())}
-                            style={{ padding: '3px 6px', borderRadius: '6px', border: '1px solid #EAE0DE', background: '#FFF', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                            onClick={() => handleAddCashIncrement(inc)}
+                            style={{
+                              flex: '1',
+                              minWidth: '45px',
+                              padding: '4px 6px',
+                              borderRadius: '6px',
+                              border: '1px solid #EAE0DE',
+                              background: '#FFF',
+                              color: '#56423D',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              textAlign: 'center'
+                            }}
                           >
-                            {val.toLocaleString('vi-VN')}₫
+                            +{inc >= 1000 ? `${inc / 1000}k` : inc}
                           </button>
                         ))}
                       </div>
                     </div>
-                    <input
-                      type="number"
-                      placeholder="Nhập số tiền khách đưa..."
-                      value={cashGiven}
-                      onChange={(e) => setCashGiven(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        border: cashGiven && Number(cashGiven) < finalCalculatedAmount ? '1.5px solid #BA1A1A' : '1px solid #EAE0DE',
-                        background: '#FFF',
-                        fontSize: '0.85rem',
-                        fontFamily: "'JetBrains Mono', monospace",
-                        marginBottom: '6px',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    {cashGiven && Number(cashGiven) < finalCalculatedAmount && (
-                      <div style={{ color: '#BA1A1A', fontSize: '0.74rem', fontWeight: 700, paddingBottom: '4px' }}>
-                        ⚠️ Tiền khách đưa chưa đủ (thiếu {(finalCalculatedAmount - Number(cashGiven)).toLocaleString('vi-VN')}₫)
+
+                    {/* Ô Nhập số tiền tùy ý + Nút xóa nhanh */}
+                    <div style={{ position: 'relative', marginBottom: '8px' }}>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={cashGiven}
+                        onChange={(e) => setCashGiven(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 45px 10px 14px',
+                          borderRadius: '10px',
+                          border: cashGiven && Number(cashGiven) < finalCalculatedAmount ? '2px solid #BA1A1A' : '1.5px solid #D7C2BD',
+                          background: '#FFFFFF',
+                          fontSize: '1.15rem',
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontWeight: 700,
+                          color: '#1F1B1A',
+                          boxSizing: 'border-box',
+                          outline: 'none'
+                        }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        right: cashGiven ? '34px' : '14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        color: '#89726B'
+                      }}>
+                        ₫
+                      </span>
+                      {cashGiven && (
+                        <button
+                          type="button"
+                          onClick={() => setCashGiven('')}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: '#F4ECE9',
+                            color: '#56423D',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            padding: 0
+                          }}
+                        >
+                          <Icon name="close" size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Bàn phím số cảm ứng Touch Numpad khi mở */}
+                    {showTouchNumpad && (
+                      <div style={{
+                        marginBottom: '10px',
+                        padding: '10px',
+                        background: '#F4ECE9',
+                        borderRadius: '12px',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: '6px'
+                      }}>
+                        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0'].map(num => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => handleNumpadInput(num)}
+                            style={{
+                              minHeight: '44px',
+                              borderRadius: '8px',
+                              border: '1px solid #EAE0DE',
+                              background: '#FFFFFF',
+                              color: '#1F1B1A',
+                              fontSize: '1.1rem',
+                              fontWeight: 700,
+                              fontFamily: "'JetBrains Mono', monospace",
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                              transition: 'background 0.1s ease'
+                            }}
+                          >
+                            {num}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => handleNumpadInput('BACKSPACE')}
+                          style={{
+                            minHeight: '44px',
+                            borderRadius: '8px',
+                            border: '1px solid #EAE0DE',
+                            background: '#FFFFFF',
+                            color: '#BA1A1A',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          <Icon name="backspace" size={20} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleNumpadInput('CLEAR')}
+                          style={{
+                            gridColumn: 'span 3',
+                            minHeight: '34px',
+                            borderRadius: '8px',
+                            border: '1px solid #FECACA',
+                            background: '#FEF2F2',
+                            color: '#BA1A1A',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Icon name="delete_sweep" size={16} />
+                          <span>Xóa làm lại số tiền</span>
+                        </button>
                       </div>
                     )}
-                    {cashGiven && Number(cashGiven) >= finalCalculatedAmount && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 700, color: '#059669', paddingTop: '4px', borderTop: '1px dashed #EAE0DE' }}>
-                        <span>Tiền thối trả khách:</span>
-                        <span>{(Number(cashGiven) - finalCalculatedAmount).toLocaleString('vi-VN')}₫</span>
-                      </div>
-                    )}
+
+                    {/* Trạng thái tiền thối & cảnh báo thiếu tiền */}
+                    {(() => {
+                      const givenNum = Number(cashGiven) || 0;
+                      if (!cashGiven || givenNum === 0) {
+                        return (
+                          <div style={{
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            background: '#FFF8F6',
+                            border: '1px dashed #EAE0DE',
+                            color: '#89726B',
+                            fontSize: '0.74rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <Icon name="info" size={16} style={{ color: '#9D4124' }} />
+                            <span>Bấm nút gợi ý hoặc nhập số tiền khách đưa để tính tiền thối tự động.</span>
+                          </div>
+                        );
+                      }
+
+                      if (givenNum < finalCalculatedAmount) {
+                        const shortAmount = finalCalculatedAmount - givenNum;
+                        return (
+                          <div style={{
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            background: '#FEF2F2',
+                            border: '1.5px solid #FCA5A5',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div>
+                              <div style={{ color: '#BA1A1A', fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Icon name="error" size={16} />
+                                <span>Tiền khách đưa chưa đủ</span>
+                              </div>
+                              <span style={{ fontSize: '0.72rem', color: '#7F1D1D' }}>Còn thiếu:</span>
+                            </div>
+                            <span style={{
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: '1.15rem',
+                              fontWeight: 800,
+                              color: '#BA1A1A'
+                            }}>
+                              -{shortAmount.toLocaleString('vi-VN')}₫
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      const changeAmount = givenNum - finalCalculatedAmount;
+                      const billBreakdown = getChangeBillBreakdown(changeAmount);
+
+                      return (
+                        <div style={{
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          background: '#ECFDF5',
+                          border: '2px solid #10B981',
+                          boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: changeAmount > 0 ? '6px' : '0' }}>
+                            <div>
+                              <span style={{
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                color: '#065F46',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}>
+                                <Icon name="payments" size={17} />
+                                <span>Tiền thối trả khách</span>
+                              </span>
+                              {changeAmount === 0 && (
+                                <span style={{ fontSize: '0.72rem', color: '#047857' }}>Khách đưa vừa vặn, không cần thối</span>
+                              )}
+                            </div>
+                            <span style={{
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: '1.65rem',
+                              fontWeight: 900,
+                              color: '#065F46'
+                            }}>
+                              {changeAmount.toLocaleString('vi-VN')}₫
+                            </span>
+                          </div>
+
+                          {/* Gợi ý phân bổ tờ tiền thối thông minh */}
+                          {changeAmount > 0 && billBreakdown.length > 0 && (
+                            <div style={{
+                              paddingTop: '8px',
+                              marginTop: '6px',
+                              borderTop: '1px dashed #A7F3D0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              flexWrap: 'wrap'
+                            }}>
+                              <span style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 700 }}>Gợi ý lấy tiền két:</span>
+                              {billBreakdown.map(item => (
+                                <span
+                                  key={item.denom}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    background: '#FFFFFF',
+                                    border: '1px solid #6EE7B7',
+                                    color: '#065F46',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    fontFamily: "'JetBrains Mono', monospace"
+                                  }}
+                                >
+                                  <strong>{item.count}</strong>× {item.label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
