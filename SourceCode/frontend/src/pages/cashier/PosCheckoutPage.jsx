@@ -76,6 +76,11 @@ export default function PosCheckoutPage() {
   const [billPreview, setBillPreview] = useState(null);
   const [isLoadingBill, setIsLoadingBill] = useState(false);
 
+  // Menu món ăn từ CSDL cho thanh gọi nhanh món ăn tại quầy
+  const [menuCatalog, setMenuCatalog] = useState([]);
+  const [searchDishQuery, setSearchDishQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+
   // Chiết khấu & Giảm giá
   const [discountType, setDiscountType] = useState('NONE'); // 'NONE' | 'PERCENT' | 'AMOUNT'
   const [discountValue, setDiscountValue] = useState(0);
@@ -270,12 +275,19 @@ export default function PosCheckoutPage() {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const zonesRes = await waiterApi.getZones().catch(() => ({ data: { data: [] } }));
+        const [zonesRes, menuRes] = await Promise.all([
+          waiterApi.getZones().catch(() => ({ data: { data: [] } })),
+          waiterApi.getMenu().catch(() => ({ data: { data: [] } }))
+        ]);
+
         if (zonesRes.data?.data) {
           setZonesList(zonesRes.data.data);
         }
+        if (menuRes.data?.data) {
+          setMenuCatalog(menuRes.data.data);
+        }
       } catch (err) {
-        console.error('Lỗi tải dữ liệu khu vực:', err);
+        console.error('Lỗi tải dữ liệu khu vực và menu:', err);
       }
     };
     fetchMetadata();
@@ -586,6 +598,32 @@ export default function PosCheckoutPage() {
   const computedVat = 0;
   const finalCalculatedAmount = rawSubtotal;
   const roundedFinalAmount = rawSubtotal;
+
+  // Thêm nhanh món ăn vào bàn
+  const handleQuickAddDish = async (dish) => {
+    if (!currentTable) {
+      showToast('Vui lòng chọn một bàn ăn trước!');
+      return;
+    }
+    try {
+      await waiterApi.addOrder(currentTable.id, {
+        items: [
+          {
+            menuItemId: dish.id,
+            quantity: 1,
+            note: ''
+          }
+        ]
+      });
+      showToast(`Đã thêm [${dish.name}] vào ${currentTable.name}`);
+      await fetchBillPreview(currentTable.id);
+      await fetchPosTables(true);
+      broadcastRealtimeEvent({ type: 'ORDER_UPDATE', tableId: currentTable.id });
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: currentTable.id, status: 'OCCUPIED' });
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Không thể thêm món vào bàn!');
+    }
+  };
 
   // Đóng phiên ăn bàn trống (0đ) khi khách không dùng món
   const handleConfirmCloseEmpty = async () => {
@@ -971,7 +1009,19 @@ export default function PosCheckoutPage() {
     }
   };
 
+  // Lọc catalog menu theo tìm kiếm và danh mục, ưu tiên món không khóa lên đầu
+  const isPosItemUnlocked = (item) => Boolean(item.isAvailable) && (item.remainingStock === undefined || item.remainingStock === null || item.remainingStock > 0);
 
+  const filteredCatalog = menuCatalog.filter(item => {
+    const matchSearch = item.name.toLowerCase().includes(searchDishQuery.toLowerCase());
+    if (!matchSearch) return false;
+    if (selectedCategory === 'ALL') return true;
+    return item.categoryName === selectedCategory || item.category?.name === selectedCategory;
+  }).sort((a, b) => {
+    const aUn = isPosItemUnlocked(a) ? 1 : 0;
+    const bUn = isPosItemUnlocked(b) ? 1 : 0;
+    return bUn - aUn;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: 'calc(100vh - 120px)' }}>
@@ -1392,10 +1442,10 @@ export default function PosCheckoutPage() {
             padding: '20px',
             alignItems: 'flex-start'
           }}>
-            {/* Cột trái (7 cols): Sơ đồ bàn phục vụ POS Realtime */}
+            {/* Cột trái (7 cols): Sơ đồ bàn & Danh mục món ăn */}
             <div style={{ gridColumn: 'span 7', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Lưới bàn phục vụ POS */}
-              <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '16px', border: '1px solid #F0E6E4', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', minHeight: '520px' }}>
+              <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '16px', border: '1px solid #F0E6E4', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Icon name="table_restaurant" size={20} style={{ color: '#9D4124' }} />
@@ -1541,6 +1591,78 @@ export default function PosCheckoutPage() {
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* Gọi nhanh món ăn tại quầy POS */}
+              <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '16px', border: '1px solid #F0E6E4', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FCF1EF', borderRadius: '10px', padding: '6px 12px', flex: 1, minWidth: '180px' }}>
+                    <Icon name="search" size={18} style={{ color: '#89726B' }} />
+                    <input
+                      type="text"
+                      placeholder="Tìm nhanh món ăn để thêm vào hóa đơn..."
+                      value={searchDishQuery}
+                      onChange={(e) => setSearchDishQuery(e.target.value)}
+                      style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', width: '100%', color: '#1F1B1A' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Grid món ăn */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', maxHeight: '280px', overflowY: 'auto' }}>
+                  {filteredCatalog.slice(0, 12).map(dish => (
+                    <div
+                      key={dish.id}
+                      onClick={() => handleQuickAddDish(dish)}
+                      style={{
+                        background: '#FFF8F6',
+                        border: '1px solid #F0E6E4',
+                        borderRadius: '12px',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {dish.imageUrl && (
+                          <img src={dish.imageUrl} alt={dish.name} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
+                        )}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {dish.name}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#9D4124' }}>
+                            {Number(dish.price).toLocaleString('vi-VN')}₫
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        style={{
+                          width: '100%',
+                          marginTop: '6px',
+                          padding: '4px',
+                          borderRadius: '6px',
+                          background: '#FFFFFF',
+                          border: '1px solid #EAE0DE',
+                          color: '#9D4124',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Icon name="add" size={14} /> Thêm vào {currentTable ? currentTable.code : 'Bàn'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
