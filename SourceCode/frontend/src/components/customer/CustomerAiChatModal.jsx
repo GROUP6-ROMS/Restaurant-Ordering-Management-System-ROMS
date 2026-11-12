@@ -149,25 +149,27 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
     if (!isOpen) return null;
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex', justifyContent: 'center', alignItems: 'flex-end'
-        }}>
-            {/* Khung Bottom Sheet trượt từ dưới lên (Mobile-first max 430px) */}
-            <div style={{
-                width: '100%', maxWidth: 430, height: '85dvh',
-                background: 'var(--surface, #FFF8F6)',
-                borderTopLeftRadius: 24, borderTopRightRadius: 24,
-                display: 'flex', flexDirection: 'column',
-                boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
-                animation: 'slideUp 0.25s ease-out',
-                overflow: 'hidden',
-                overflowX: 'hidden',       // 👈 Khóa tuyệt đối không cho cuộn ngang
-                boxSizing: 'border-box',    // 👈 Đảm bảo không phình khung
-                position: 'relative'        // 👈 Giữ chân thông báo Toast
+        <div
+            className="customer-modal-overlay"
+            style={{
+                zIndex: 100,
+                background: 'rgba(0,0,0,0.5)',
+                backdropFilter: 'blur(4px)',
             }}>
+            {/* Khung Bottom Sheet trượt từ dưới lên (Responsive Mobile 430px, Tablet 560px) */}
+            <div
+                className="customer-modal-sheet"
+                style={{
+                    height: '85dvh',
+                    background: 'var(--surface, #FFF8F6)',
+                    display: 'flex', flexDirection: 'column',
+                    boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+                    animation: 'slideUp 0.25s ease-out',
+                    overflow: 'hidden',
+                    overflowX: 'hidden',
+                    boxSizing: 'border-box',
+                    position: 'relative'
+                }}>
 
                 {/* --- Header Chatbox --- */}
                 <div style={{

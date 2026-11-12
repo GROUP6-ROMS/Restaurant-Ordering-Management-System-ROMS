@@ -188,21 +188,13 @@ export default function CustomerLayout() {
   }, [showAssistModal]);
 
   return (
-    <div style={{
-      maxWidth: 430, margin: '0 auto',
-      minHeight: '100dvh',
-      background: 'var(--surface)',
-      display: 'flex', flexDirection: 'column',
-      position: 'relative',
-      boxShadow: '0 0 40px rgba(44, 34, 30, 0.06)',
-    }}>
+    <div className="customer-layout-shell">
 
       {/* --- Sticky Header Glassmorphism --- */}
       <header
-        className="glass-header"
+        className="glass-header customer-fixed-shell"
         style={{
           position: 'fixed', top: 0, zIndex: 50,
-          width: '100%', maxWidth: 430,
           height: 64,
           display: 'flex', alignItems: 'center',
           padding: '0 var(--gutter)',
@@ -266,12 +258,13 @@ export default function CustomerLayout() {
 
       {/* --- Floating Cart Bar (chi hien khi co mon trong gio + khong o trang cart va welcome) --- */}
       {totalCount > 0 && !isCart && !isWelcome && isTableOccupied && (
-        <div style={{
-          position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-          width: '100%', maxWidth: 430,
-          padding: '0 var(--gutter)',
-          zIndex: 40, pointerEvents: 'none',
-        }}>
+        <div
+          className="customer-fixed-shell"
+          style={{
+            position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+            padding: '0 var(--gutter)',
+            zIndex: 40, pointerEvents: 'none',
+          }}>
           <Link
             to="/dining/cart"
             style={{
@@ -333,9 +326,9 @@ export default function CustomerLayout() {
       {/* --- Bottom Navigation Bar (Ẩn khi ở trang Welcome) --- */}
       {!isWelcome && (
         <nav
+          className="customer-fixed-shell"
           style={{
             position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-            width: '100%', maxWidth: 430,
             height: 64,
             background: 'rgba(255, 248, 246, 0.92)',
             backdropFilter: 'blur(20px)',
@@ -438,22 +431,20 @@ export default function CustomerLayout() {
           role="dialog"
           aria-modal="true"
           aria-label="Bảng chọn nhanh yêu cầu hỗ trợ tại bàn"
+          className="customer-modal-overlay"
           style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(31, 27, 26, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            zIndex: 9999,
             animation: 'fadeIn 0.2s ease-out'
           }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%', maxWidth: 430,
-            borderTopLeftRadius: 24, borderTopRightRadius: 24,
-            padding: '20px 20px 28px',
-            boxShadow: '0 -8px 30px rgba(0,0,0,0.2)',
-            animation: 'slideUp 0.25s ease-out',
-            boxSizing: 'border-box'
-          }}>
+          <div
+            className="customer-modal-sheet"
+            style={{
+              background: '#FFFFFF',
+              padding: '20px 20px 28px',
+              boxShadow: '0 -8px 30px rgba(0,0,0,0.2)',
+              animation: 'slideUp 0.25s ease-out',
+              boxSizing: 'border-box'
+            }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div>
                 <h3 style={{ fontFamily: 'Epilogue', fontWeight: 800, fontSize: '1.05rem', color: '#1F1B1A', margin: 0 }}>
@@ -577,10 +568,9 @@ export default function CustomerLayout() {
           <button
             onClick={handleOpenAiChat}
             aria-label="Mở Trợ lý Ẩm thực AI"
+            className="customer-ai-floating-btn"
             style={{
-              position: 'fixed',
               bottom: totalCount > 0 && !isCart ? 145 : 78,
-              right: 'max(16px, calc(50% - 200px))',
               width: 50, height: 50, borderRadius: '50%',
               background: 'linear-gradient(135deg, #A04020 0%, #D86030 100%)',
               color: '#FFFFFF',
@@ -588,7 +578,6 @@ export default function CustomerLayout() {
               boxShadow: '0 4px 16px rgba(160, 64, 32, 0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', zIndex: 45,
-              transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
             onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}

@@ -197,7 +197,7 @@ export default function CustomerTrackingPage() {
   }
 
   return (
-    <div style={{ padding: '16px 16px 100px', maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{ padding: '16px 16px 100px', width: '100%', margin: '0 auto' }}>
       {/* Toast Notification */}
       {toastMessage && (
         <div style={{

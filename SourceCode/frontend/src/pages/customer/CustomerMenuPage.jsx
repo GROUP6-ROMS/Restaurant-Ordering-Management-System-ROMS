@@ -186,19 +186,13 @@ function DishDetailModal({ item, onClose, onConfirm }) {
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 100,
-        background: 'rgba(53, 47, 46, 0.55)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
+      className="customer-modal-overlay"
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="customer-modal-sheet"
         style={{
           background: 'var(--surface-container-lowest)',
-          width: '100%', maxWidth: 430,
-          borderTopLeftRadius: 24, borderTopRightRadius: 24,
           padding: '20px 16px 32px',
           maxHeight: '88vh', overflowY: 'auto',
         }}
@@ -682,19 +676,14 @@ export default function CustomerMenuPage() {
         </span>
       </div>
 
-      {/* --- Luoi mon an 2 cot --- */}
+      {/* --- Lưới món ăn Responsive (Mobile 2 cột, Tablet 3 cột) --- */}
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--on-surface-variant)' }}>
           <Icon name="sync" size={36} style={{ animation: 'spin 1s linear infinite' }} />
           <p style={{ marginTop: 12, fontSize: 14, fontFamily: 'Plus Jakarta Sans' }}>Đang nạp thực đơn từ nhà hàng...</p>
         </div>
       ) : (
-        <div style={{
-          padding: '0 var(--gutter)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 8,
-        }}>
+        <div className="dish-responsive-grid">
           {filteredItems.length === 0 ? (
             <div style={{
               gridColumn: '1/-1', textAlign: 'center', padding: '48px 16px',
