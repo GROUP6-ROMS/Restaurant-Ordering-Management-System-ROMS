@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CustomerAiServiceImpl implements CustomerAiService {
 
-    private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+    private static final String DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
     private static final Pattern BUDGET_PATTERN = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(k|nghin|ngan|tr|trieu|d|vnd)?");
 
     private final MenuItemRepository menuItemRepository;
@@ -44,8 +44,8 @@ public class CustomerAiServiceImpl implements CustomerAiService {
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
 
-    // Tên model (mặc định gemini-2.5-flash)
-    @Value("${gemini.api.model:gemini-2.5-flash}")
+    // Tên model (mặc định gemini-flash-latest)
+    @Value("${gemini.api.model:gemini-flash-latest}")
     private String geminiModel;
 
     // Template URL của Gemini API

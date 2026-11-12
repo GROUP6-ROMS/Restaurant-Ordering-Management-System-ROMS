@@ -45,7 +45,7 @@ class CustomerAiServiceTest {
     void setUp() {
         customerAiService = new CustomerAiServiceImpl(menuItemRepository, restTemplate, new ObjectMapper());
         ReflectionTestUtils.setField(customerAiService, "geminiApiKey", "");
-        ReflectionTestUtils.setField(customerAiService, "geminiModel", "gemini-2.5-flash");
+        ReflectionTestUtils.setField(customerAiService, "geminiModel", "gemini-flash-latest");
         ReflectionTestUtils.setField(
                 customerAiService,
                 "geminiApiUrl",
@@ -158,7 +158,7 @@ class CustomerAiServiceTest {
     }
 
     @Test
-    @DisplayName("Gemini API thành công: gọi đúng model gemini-2.5-flash và map món còn hàng")
+    @DisplayName("Gemini API thành công: gọi đúng model gemini-flash-latest và map món còn hàng")
     void geminiSuccess_parsesAiJsonAndMapsInStockDishes() {
         ReflectionTestUtils.setField(customerAiService, "geminiApiKey", "AIzaTestValidKey123");
         String mockGeminiJson = """
@@ -178,7 +178,7 @@ class CustomerAiServiceTest {
                 """;
 
         when(restTemplate.exchange(
-                contains("models/gemini-2.5-flash:generateContent"),
+                contains("models/gemini-flash-latest:generateContent"),
                 eq(HttpMethod.POST),
                 any(HttpEntity.class),
                 eq(String.class)
