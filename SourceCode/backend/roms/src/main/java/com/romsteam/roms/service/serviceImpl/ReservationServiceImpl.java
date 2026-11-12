@@ -333,7 +333,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         // 2. Cập nhật thông tin bàn ăn thành RESERVED
         table.setStatus(TableStatus.RESERVED);
-        table.setReservationInfo("Khách: " + reservation.getCustomerName() + " (" + reservation.getCustomerPhone() + ")");
+        table.setReservationInfo(reservation.getCustomerName() + " (" + reservation.getCustomerPhone() + ")");
         table.setReservedTime(reservation.getReservationTime().format(TIME_FORMATTER) + " ngày " + reservation.getReservationTime().format(DATE_FORMATTER));
 
         tableRepository.save(table);

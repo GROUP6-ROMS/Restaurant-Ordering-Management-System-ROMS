@@ -12,6 +12,12 @@ import { QRCodeCanvas } from 'qrcode.react';
 import JSZip from 'jszip';
 import { generateStandeeCanvas, downloadTableStandeePng } from '../../utils/tableStandeeGenerator';
 
+// Helper chuẩn hóa hiển thị thông tin khách đặt bàn (loại bỏ tiền tố trùng lặp)
+const formatCustomerReservation = (info) => {
+  if (!info) return '';
+  return String(info).replace(/^(Khách\s*đặt\s*trước:\s*|Khách hàng:\s*|Khách:\s*)+/gi, '').trim();
+};
+
 export default function TableManagementPage() {
   const location = useLocation();
   const restaurantProfile = useRestaurantProfile();
@@ -2469,20 +2475,21 @@ export default function TableManagementPage() {
                         </div>
                         <div style={{
                           fontSize: '0.72rem',
-                          color: '#78350F',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          marginTop: '1px'
+                          color: t.bufferLockMinutesRemaining !== null && t.bufferLockMinutesRemaining < 0 ? '#DC2626' : '#B45309',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          marginTop: '2px'
                         }}>
-                          {t.bufferLockCustomer || t.reservationInfo || 'Khách đặt trước'}
-                          {t.bufferLockMinutesRemaining !== null && t.bufferLockMinutesRemaining !== undefined && (
-                            <strong style={{ marginLeft: '4px', color: t.bufferLockMinutesRemaining < 0 ? '#DC2626' : '#B45309' }}>
-                              • {t.bufferLockMinutesRemaining > 0 
-                                  ? `Còn ${t.bufferLockMinutesRemaining} phút` 
-                                  : (t.bufferLockMinutesRemaining === 0 ? 'Đến giờ hẹn' : `Trễ ${Math.abs(t.bufferLockMinutesRemaining)}p`)}
-                            </strong>
-                          )}
+                          <Icon name="timer" size={13} />
+                          <span>
+                            {t.bufferLockMinutesRemaining !== null && t.bufferLockMinutesRemaining !== undefined
+                              ? (t.bufferLockMinutesRemaining > 0 
+                                  ? `Giữ bàn: Còn ${t.bufferLockMinutesRemaining} phút` 
+                                  : (t.bufferLockMinutesRemaining === 0 ? 'Đến giờ hẹn đón khách' : `Quá giờ hẹn ${Math.abs(t.bufferLockMinutesRemaining)} phút`))
+                              : 'Đang khóa giữ chỗ đón khách'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -2532,15 +2539,15 @@ export default function TableManagementPage() {
                     </div>
                   )}
 
-                  {t.status === 'RESERVED' && (
+                  {(t.status === 'RESERVED' || (isBufferLocked && (t.reservationInfo || t.bufferLockCustomer))) && (
                     <div style={{ gridColumn: 'span 2', borderTop: '1px dashed #EAE0DE', paddingTop: '6px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#89726B' }}>Thời gian hẹn:</span>
-                        <span style={{ fontWeight: 800, color: '#B45309' }}>{t.reservedTime || t.timeIn || 'Chưa định giờ'}</span>
+                        <span style={{ fontWeight: 800, color: '#B45309' }}>{t.bufferLockTargetTime || t.reservedTime || t.timeIn || 'Chưa định giờ'}</span>
                       </div>
-                      {t.reservationInfo && (
+                      {(t.reservationInfo || t.bufferLockCustomer) && (
                         <div style={{ fontSize: '0.72rem', color: '#56423D' }}>
-                          Khách: <strong>{t.reservationInfo}</strong>
+                          Khách đặt: <strong>{formatCustomerReservation(t.reservationInfo || t.bufferLockCustomer)}</strong>
                         </div>
                       )}
                     </div>
@@ -3268,7 +3275,7 @@ export default function TableManagementPage() {
                   Cài Đặt Trạng Thái Bàn
                 </h3>
                 <span style={{ fontSize: '0.82rem', color: '#89726B' }}>
-                  {statusModalTable.code} — {statusModalTable.name} ({statusModalTable.zoneName})
+                  Bàn {statusModalTable.code}{statusModalTable.name && statusModalTable.name.trim() !== statusModalTable.code.trim() ? ` — ${statusModalTable.name}` : ''} ({statusModalTable.zoneName})
                 </span>
               </div>
             </div>
@@ -3406,7 +3413,7 @@ export default function TableManagementPage() {
                       <span>Cảnh Báo: Bàn đang trong khung Khóa An Toàn Đặt Bàn!</span>
                     </div>
                     <p style={{ margin: '4px 0 8px', fontSize: '0.74rem', color: '#78350F', lineHeight: 1.4 }}>
-                      Bàn này đã được giữ chỗ cho khách <strong>{statusModalTable.bufferLockCustomer || statusModalTable.reservationInfo || 'Đặt trước'}</strong> vào lúc <strong>{statusModalTable.bufferLockTargetTime || statusModalTable.reservedTime}</strong>. Mở cho khách vãng lai có nguy cơ khiến khách đặt không có bàn khi đến!
+                      Bàn này đã được giữ chỗ cho khách <strong>{formatCustomerReservation(statusModalTable.bufferLockCustomer || statusModalTable.reservationInfo) || 'Đặt trước'}</strong> vào lúc <strong>{statusModalTable.bufferLockTargetTime || statusModalTable.reservedTime}</strong>. Mở cho khách vãng lai có nguy cơ khiến khách đặt không có bàn khi đến!
                     </p>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 800, color: '#B45309' }}>
                       <input
@@ -3657,7 +3664,7 @@ export default function TableManagementPage() {
             </h3>
 
             <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: '#56423D', lineHeight: 1.45 }}>
-              Bạn có chắc chắn muốn xóa <strong>{deletingTable.code}</strong> ({deletingTable.name}) khỏi hệ thống nhà hàng không?
+              Bạn có chắc chắn muốn xóa <strong>Bàn {deletingTable.code}</strong>{deletingTable.name && deletingTable.name.trim() !== deletingTable.code.trim() ? ` (${deletingTable.name})` : ''} khỏi hệ thống nhà hàng không?
             </p>
 
             <div style={{
@@ -3781,8 +3788,14 @@ export default function TableManagementPage() {
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF7F5' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>{orderDrawerTable.code}</span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1F1B1A' }}>{orderDrawerTable.name}</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>
+                    Bàn {orderDrawerTable.code}
+                  </span>
+                  {orderDrawerTable.name && orderDrawerTable.name.trim() !== orderDrawerTable.code.trim() && (
+                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1F1B1A' }}>
+                      ({orderDrawerTable.name})
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '3px' }}>
                   {orderDrawerTable.zoneName} • {activeOrdersData?.guestCount || orderDrawerTable.guests || orderDrawerTable.capacity} khách
@@ -4198,7 +4211,7 @@ export default function TableManagementPage() {
                     }}
                   >
                     <Icon name="add" size={16} />
-                    + Thêm Món
+                    Thêm Món
                   </button>
 
                   <button
@@ -7125,7 +7138,7 @@ export default function TableManagementPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9D4124' }}>
-                    {orderDrawerTable.code} - {orderDrawerTable.name}
+                    Bàn {orderDrawerTable.code}{orderDrawerTable.name && orderDrawerTable.name.trim() !== orderDrawerTable.code.trim() ? ` — ${orderDrawerTable.name}` : ''}
                   </span>
                   <span style={{
                     fontSize: '0.72rem',
@@ -7982,7 +7995,7 @@ export default function TableManagementPage() {
                   Xác Nhận Đón Khách Đặt Bàn
                 </h3>
                 <span style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700 }}>
-                  Bàn {checkInModalTable.code} — {checkInModalTable.name} ({checkInModalTable.zoneName})
+                  Bàn {checkInModalTable.code}{checkInModalTable.name && checkInModalTable.name.trim() !== checkInModalTable.code.trim() ? ` — ${checkInModalTable.name}` : ''} ({checkInModalTable.zoneName})
                 </span>
               </div>
             </div>
@@ -8001,7 +8014,7 @@ export default function TableManagementPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>Khách hàng:</span>
                 <span style={{ fontSize: '0.9rem', color: '#14532D', fontWeight: 800 }}>
-                  {checkInModalTable.bufferLockCustomer || checkInModalTable.reservationInfo || 'Khách đặt trước'}
+                  {formatCustomerReservation(checkInModalTable.bufferLockCustomer || checkInModalTable.reservationInfo) || 'Khách đặt trước'}
                 </span>
               </div>
 
@@ -8180,7 +8193,7 @@ export default function TableManagementPage() {
                   Cảnh Báo: Mở Cưỡng Chế
                 </h3>
                 <span style={{ fontSize: '0.85rem', color: '#78350F', fontWeight: 600 }}>
-                  Bàn {forceModalTable.code} — {forceModalTable.name} ({forceModalTable.zoneName})
+                  Bàn {forceModalTable.code}{forceModalTable.name && forceModalTable.name.trim() !== forceModalTable.code.trim() ? ` — ${forceModalTable.name}` : ''} ({forceModalTable.zoneName})
                 </span>
               </div>
             </div>
@@ -8199,7 +8212,7 @@ export default function TableManagementPage() {
                 Bàn này đang được <strong>Khóa An Toàn</strong> để giữ chỗ cho khách:
               </p>
               <div style={{ background: '#FFFFFF', padding: '10px 14px', borderRadius: '10px', border: '1px solid #FDE68A', marginBottom: '10px' }}>
-                <div>Khách: <strong>{forceModalTable.bufferLockCustomer || forceModalTable.reservationInfo || 'Khách đặt trước'}</strong></div>
+                <div>Khách đặt: <strong>{formatCustomerReservation(forceModalTable.bufferLockCustomer || forceModalTable.reservationInfo) || 'Khách đặt trước'}</strong></div>
                 <div>Giờ hẹn: <strong>{forceModalTable.bufferLockTargetTime || forceModalTable.reservedTime}</strong> {forceModalTable.bufferLockMinutesRemaining !== null && `(còn ${forceModalTable.bufferLockMinutesRemaining} phút)`}</div>
               </div>
               <p style={{ margin: 0, color: '#B45309', fontWeight: 600 }}>
