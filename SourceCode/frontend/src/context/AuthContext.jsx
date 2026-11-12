@@ -163,16 +163,21 @@ export function AuthProvider({ children }) {
         // Nếu đây là tab cuối cùng của nhân viên này, gửi tín hiệu đăng xuất ca trực
         if (!hasOtherActiveTab) {
           const payload = JSON.stringify({ username: user.username });
+          const authHeaders = {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          };
           if (typeof fetch === 'function') {
             fetch('/api/auth/logout', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: authHeaders,
               body: payload,
               keepalive: true
             }).catch(() => {});
           } else if (navigator.sendBeacon) {
+            const logoutUrl = token ? `/api/auth/logout?token=${encodeURIComponent(token)}` : '/api/auth/logout';
             const blob = new Blob([payload], { type: 'application/json' });
-            navigator.sendBeacon('/api/auth/logout', blob);
+            navigator.sendBeacon(logoutUrl, blob);
           }
         }
       } catch (e) {

@@ -90,7 +90,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket, Actuator, Webhook payOS
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/auth/login",
+                                "/api/auth/verify-manager-pin",
+                                "/api/auth/forgot-pin/**",
                                 "/api/customer/tables/**",
                                 "/api/customer/reservations/**",
                                 "/api/customer/dining/menu",
@@ -112,7 +114,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/customer/dining/**")
                         .hasAnyRole("CUSTOMER", "WAITER", "MANAGER")
 
-                        // 3. Các request còn lại bắt buộc phải xác thực
+                        // 3. Đăng xuất và heartbeat ca trực: Bắt buộc phải có Token đăng nhập hợp lệ
+                        .requestMatchers("/api/auth/logout", "/api/auth/heartbeat")
+                        .authenticated()
+
+                        // 4. Các request còn lại bắt buộc phải xác thực
                         .anyRequest().authenticated())
 
                 // 1. Chạy TraceIdFilter ở đầu tiên để mọi request đều có Trace ID trong MDC

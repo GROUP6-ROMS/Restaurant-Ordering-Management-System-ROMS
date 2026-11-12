@@ -85,11 +85,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    // Phuong thuc phu: Cat bo tien to "Bearer " de lay chuoi token thuan
+    // Phuong thuc phu: Cat bo tien to "Bearer " de lay chuoi token thuan, hoac query param token (cho beacon/websocket fallback)
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7); // Bo qua 7 ky tu "Bearer "
+        }
+        String tokenParam = request.getParameter("token");
+        if (StringUtils.hasText(tokenParam)) {
+            return tokenParam;
         }
         return null;
     }

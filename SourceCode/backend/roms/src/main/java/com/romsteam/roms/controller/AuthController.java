@@ -40,38 +40,26 @@ public class AuthController {
 
     // POST /api/auth/logout - Dang xuat ca truc (Cap nhat isOnShift = false)
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@RequestBody(required = false) Map<String, String> body,
-                                                    Authentication authentication) {
-        String username = null;
-        if (body != null && body.containsKey("username")) {
-            username = body.get("username");
-        } else if (authentication != null) {
-            username = authentication.getName();
+    public ResponseEntity<ApiResponse<Void>> logout(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Yêu cầu xác thực tài khoản trước khi đăng xuất", org.springframework.http.HttpStatus.UNAUTHORIZED.value()));
         }
 
-        if (username != null) {
-            authService.logout(username);
-        }
+        String username = authentication.getName();
+        authService.logout(username);
         return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất ca làm việc thành công!"));
     }
 
     // POST /api/auth/heartbeat - Duy trì phiên làm việc và tự động đồng bộ trạng thái ca trực (isOnShift = true)
     @PostMapping("/heartbeat")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> heartbeat(
-            @RequestBody(required = false) Map<String, String> body,
-            Authentication authentication) {
-        String username = null;
-        if (body != null && body.containsKey("username")) {
-            username = body.get("username");
-        } else if (authentication != null) {
-            username = authentication.getName();
-        }
-
-        if (username == null || username.trim().isEmpty()) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> heartbeat(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Không tìm thấy thông tin phiên làm việc", org.springframework.http.HttpStatus.UNAUTHORIZED.value()));
         }
 
+        String username = authentication.getName();
         Map<String, Object> response = authService.heartbeat(username);
         return ResponseEntity.ok(ApiResponse.success(response, "Duy trì phiên làm việc thành công!"));
     }
