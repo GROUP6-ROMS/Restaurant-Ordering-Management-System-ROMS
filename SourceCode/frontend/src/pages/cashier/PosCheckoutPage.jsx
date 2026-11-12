@@ -98,7 +98,6 @@ export default function PosCheckoutPage() {
 
   // Navigation tab chính: 'POS' | 'HISTORY' | 'SHIFT'
   const [activePosTab, setActivePosTab] = useState('POS');
-  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
   // State danh sách bàn POS từ Database
   const [posTables, setPosTables] = useState([]);
@@ -299,21 +298,6 @@ export default function PosCheckoutPage() {
     setTimeout(() => {
       setToastMessage(null);
     }, 3200);
-  };
-
-  // Fullscreen toggle
-  useEffect(() => {
-    const handleFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
   };
 
   // 1. Tải danh mục Khu vực & Menu món ăn từ CSDL
@@ -1242,30 +1226,6 @@ export default function PosCheckoutPage() {
             <Icon name="payments" size={16} />
             <span>Két tiền: <strong>{(theoreticalDrawerCash || 0).toLocaleString('vi-VN')}₫</strong></span>
           </div>
-
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'Thoát toàn màn hình' : 'Toàn màn hình POS'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '10px',
-              border: isFullscreen ? '1px solid #9D4124' : '1px solid #EAE0DE',
-              background: isFullscreen ? '#9D4124' : '#FFFFFF',
-              color: isFullscreen ? '#FFFFFF' : '#56423D',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Icon name={isFullscreen ? 'fullscreen_exit' : 'fullscreen'} size={16} />
-            <span>{isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}</span>
-          </button>
         </div>
       </div>
 

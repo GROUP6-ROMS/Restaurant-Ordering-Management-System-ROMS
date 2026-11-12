@@ -864,7 +864,6 @@ export default function KitchenKdsPage() {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [cancelledAlert, setCancelledAlert] = useState(null);
-  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
   // Chế độ xem: 'QUEUE' (Chế biến thời gian thực) | 'HISTORY' (Lịch sử trong ngày)
   const [activeTab, setActiveTab] = useState('QUEUE');
@@ -913,21 +912,6 @@ export default function KitchenKdsPage() {
       }
       return next;
     });
-  };
-
-  // Lắng nghe thay đổi toàn màn hình
-  useEffect(() => {
-    const handleFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
   };
 
   // Tải danh sách đơn hàng thực tế từ Backend
@@ -1297,7 +1281,7 @@ export default function KitchenKdsPage() {
             </strong>
           </div>
 
-          {/* Quick Audio & Fullscreen Actions */}
+          {/* Quick Actions (86'd & Audio) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
@@ -1335,25 +1319,6 @@ export default function KitchenKdsPage() {
             >
               <Icon name={soundEnabled ? "volume_up" : "volume_off"} size={16} style={{ color: soundEnabled ? '#2e7d32' : 'var(--outline)' }} />
               <span>{soundEnabled ? 'Âm báo: BẬT' : 'Âm báo: TẮT'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              title={isFullscreen ? 'Thu nhỏ / Thoát toàn màn hình' : 'Mở toàn màn hình bếp'}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                minHeight: 38, padding: '7px 14px', borderRadius: 10,
-                background: isFullscreen ? 'var(--inverse-surface, #342F2E)' : 'var(--primary)',
-                color: '#fff',
-                border: 'none', cursor: 'pointer',
-                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <Icon name={isFullscreen ? "fullscreen_exit" : "fullscreen"} size={16} />
-              <span>{isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}</span>
             </button>
           </div>
         </div>
