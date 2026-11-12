@@ -33,6 +33,12 @@ const playWaiterChime = () => {
   }
 };
 
+// Helper chuẩn hóa hiển thị thông tin khách đặt bàn (loại bỏ tiền tố trùng lặp)
+const formatCustomerReservation = (info) => {
+  if (!info) return '';
+  return String(info).replace(/^(Khách\s*đặt\s*trước:\s*|Khách hàng:\s*|Khách:\s*)+/gi, '').trim();
+};
+
 export default function WaiterFloorPlanPage() {
   const navigate = useNavigate();
   const { showConfirm, showAlert } = useDialog();
@@ -1145,7 +1151,7 @@ export default function WaiterFloorPlanPage() {
                     Thông Tin Khách Đặt Bàn
                   </div>
                   <div style={{ fontSize: '0.82rem', color: '#78350F', lineHeight: 1.5 }}>
-                    <div>👤 <strong>Khách hàng:</strong> {table.reservationInfo || 'Khách đặt trước'}</div>
+                    <div>👤 <strong>Khách hàng:</strong> {formatCustomerReservation(table.reservationInfo) || 'Khách đặt trước'}</div>
                     <div>⏰ <strong>Giờ hẹn:</strong> {table.reservedTime || 'Hôm nay'}</div>
                     <div>🪑 <strong>Quy mô:</strong> {table.seats} chỗ ngồi</div>
                   </div>
@@ -1705,7 +1711,7 @@ export default function WaiterFloorPlanPage() {
                       }}>
                         <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Icon name="person" size={14} />
-                          {t.reservationInfo || 'Khách đặt trước'}
+                          {formatCustomerReservation(t.reservationInfo) || 'Khách đặt trước'}
                         </div>
                         {t.reservedTime && (
                           <div style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '2px' }}>
