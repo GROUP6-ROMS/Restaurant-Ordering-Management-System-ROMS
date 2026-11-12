@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../api/authApi';
+import { disconnectRealtime } from '../utils/realtimeSync';
 
 const AuthContext = createContext();
 
@@ -66,6 +67,9 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.warn('Lỗi gọi API đăng xuất:', e);
     } finally {
+      // Đóng toàn bộ kết nối WebSocket STOMP và giải phóng bộ nhớ
+      disconnectRealtime();
+
       setUser(null);
       setToken(null);
       // Đăng xuất tab hiện tại khỏi sessionStorage

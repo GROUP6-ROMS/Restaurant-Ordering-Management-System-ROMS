@@ -132,7 +132,9 @@ export default function WaiterFloorPlanPage() {
         loadFloorPlan();
       }
     });
-    return unsubscribe;
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   const fetchMenu = useCallback(async () => {

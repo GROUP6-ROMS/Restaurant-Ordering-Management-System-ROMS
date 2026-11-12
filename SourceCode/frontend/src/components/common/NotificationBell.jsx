@@ -135,7 +135,7 @@ export default function NotificationBell() {
 
     return () => {
       clearInterval(interval);
-      unsubscribe();
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, []);
 
