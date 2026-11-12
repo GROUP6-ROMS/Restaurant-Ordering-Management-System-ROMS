@@ -551,6 +551,24 @@ export default function CustomerTrackingPage() {
                               {item.statusText || 'Chờ bếp nhận'}
                             </span>
                           )}
+                          {item.status === 'CANCELLED' && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '9999px',
+                              background: '#FFDAD6',
+                              color: '#93000A',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              textDecoration: 'line-through',
+                              opacity: 0.85
+                            }}>
+                              <Icon name="cancel" size={13} style={{ color: '#BA1A1A' }} />
+                              {item.statusText || 'Đã hủy'}
+                            </span>
+                          )}
 
                           <span style={{ fontSize: '0.72rem', color: '#89726B' }}>
                             {item.prepTime || '10-15 phút'}

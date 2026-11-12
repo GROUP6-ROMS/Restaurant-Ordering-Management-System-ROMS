@@ -293,29 +293,33 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
 
             if (o.getItems() != null) {
                 for (OrderItem item : o.getItems()) {
-                    if (item.getStatus() == OrderItemStatus.CANCELLED) continue;
+                    boolean isCancelled = (item.getStatus() == OrderItemStatus.CANCELLED);
 
                     int qty = item.getQuantity() != null ? item.getQuantity() : 1;
-                    totalItems += qty;
                     BigDecimal subtotal = item.getSubtotal() != null ? item.getSubtotal() : BigDecimal.ZERO;
-                    batchTotal = batchTotal.add(subtotal);
-                    totalAmount = totalAmount.add(subtotal);
 
-                    switch (item.getStatus()) {
-                        case PENDING:
-                            pendingItems += qty;
-                            break;
-                        case COOKING:
-                            cookingItems += qty;
-                            break;
-                        case READY:
-                            readyItems += qty;
-                            break;
-                        case SERVED:
-                            servedItems += qty;
-                            break;
-                        default:
-                            break;
+                    // Món bị hủy: không tính vào tổng tiền & đếm món, nhưng vẫn hiện cho khách biết
+                    if (!isCancelled) {
+                        totalItems += qty;
+                        batchTotal = batchTotal.add(subtotal);
+                        totalAmount = totalAmount.add(subtotal);
+
+                        switch (item.getStatus()) {
+                            case PENDING:
+                                pendingItems += qty;
+                                break;
+                            case COOKING:
+                                cookingItems += qty;
+                                break;
+                            case READY:
+                                readyItems += qty;
+                                break;
+                            case SERVED:
+                                servedItems += qty;
+                                break;
+                            default:
+                                break;
+                        }
                     }
 
                     String statusText = getStatusText(item.getStatus());
@@ -328,7 +332,8 @@ public class CustomerDiningServiceImpl implements CustomerDiningService {
                             .imageUrl(item.getMenuItem() != null ? item.getMenuItem().getImageUrl() : null)
                             .price(item.getUnitPrice())
                             .quantity(item.getQuantity())
-                            .subtotal(subtotal)
+                            // Món bị hủy: hiện subtotal = 0 để khách biết không bị tính tiền
+                            .subtotal(isCancelled ? BigDecimal.ZERO : subtotal)
                             .note(item.getNote())
                             .status(item.getStatus().name())
                             .statusText(statusText)

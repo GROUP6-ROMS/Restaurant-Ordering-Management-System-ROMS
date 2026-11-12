@@ -580,7 +580,7 @@ export default function CustomerLayout() {
             style={{
               position: 'fixed',
               bottom: totalCount > 0 && !isCart ? 145 : 78,
-              right: 'calc(50% - 200px)',
+              right: 'max(16px, calc(50% - 200px))',
               width: 50, height: 50, borderRadius: '50%',
               background: 'linear-gradient(135deg, #A04020 0%, #D86030 100%)',
               color: '#FFFFFF',
