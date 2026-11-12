@@ -1221,19 +1221,21 @@ export default function WaiterFloorPlanPage() {
                   onClick={handleOpenOrderModal}
                   style={{
                     width: '100%',
-                    padding: '12px',
+                    minHeight: 48,
+                    padding: '13px 18px',
                     borderRadius: '14px',
                     background: '#9D4124',
                     color: '#FFF',
                     border: 'none',
                     fontWeight: 800,
-                    fontSize: '0.92rem',
+                    fontSize: '0.96rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(157, 65, 36, 0.28)'
+                    boxShadow: '0 4px 14px rgba(157, 65, 36, 0.28)',
+                    transition: 'all 0.15s ease'
                   }}
                 >
                   <Icon name="restaurant_menu" size={20} /> Gọi Thêm Món Vào Bàn
@@ -1246,18 +1248,20 @@ export default function WaiterFloorPlanPage() {
                       setShowTransferModal(true);
                     }}
                     style={{
-                      padding: '11px',
+                      minHeight: 46,
+                      padding: '12px 14px',
                       borderRadius: '12px',
                       background: '#FFF8F6',
-                      border: '1px solid #F0E6E4',
+                      border: '1.5px solid #F0E6E4',
                       color: '#1F1B1A',
                       fontWeight: 700,
-                      fontSize: '0.85rem',
+                      fontSize: '0.88rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     <Icon name="swap_horiz" size={18} style={{ color: '#9D4124' }} />
@@ -1269,22 +1273,24 @@ export default function WaiterFloorPlanPage() {
                     disabled={table.status === 'AWAITING_PAYMENT'}
                     onClick={() => handleRequestPayment(table.id)}
                     style={{
-                      padding: '11px',
+                      minHeight: 46,
+                      padding: '12px 14px',
                       borderRadius: '12px',
-                      background: '#FFDBC9',
-                      border: table.status === 'AWAITING_PAYMENT' ? '1.5px solid #FFB68C' : '1px solid #FFB68C',
-                      color: '#753400',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
+                      background: '#EFF6FF',
+                      border: table.status === 'AWAITING_PAYMENT' ? '1.5px solid #93C5FD' : '1.5px solid #BFDBFE',
+                      color: '#1E40AF',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
                       cursor: table.status === 'AWAITING_PAYMENT' ? 'default' : 'pointer',
-                      opacity: table.status === 'AWAITING_PAYMENT' ? 0.85 : 1
+                      opacity: table.status === 'AWAITING_PAYMENT' ? 0.85 : 1,
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    <Icon name="point_of_sale" size={18} style={{ color: '#994703' }} />
+                    <Icon name="point_of_sale" size={18} style={{ color: '#1E40AF' }} />
                     {table.status === 'AWAITING_PAYMENT' ? 'Đã Báo Thu Ngân' : 'Báo Thu Ngân'}
                   </button>
                 </div>
@@ -1295,18 +1301,20 @@ export default function WaiterFloorPlanPage() {
                     onClick={() => handleCloseEmptyTable(table.id)}
                     style={{
                       width: '100%',
-                      padding: '11px',
+                      minHeight: 46,
+                      padding: '12px 14px',
                       borderRadius: '12px',
                       background: '#FFDAD6',
                       border: '1px solid #FFB4AB',
                       color: '#93000A',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     <Icon name="event_busy" size={18} />
@@ -1320,21 +1328,23 @@ export default function WaiterFloorPlanPage() {
                     setShowQrModal(true);
                   }}
                   style={{
-                    padding: '9px',
-                    borderRadius: '10px',
+                    minHeight: 44,
+                    padding: '10px 14px',
+                    borderRadius: '12px',
                     background: '#FCF1EF',
                     border: '1px solid #EAE0DE',
                     color: '#56423D',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <Icon name="qr_code_2" size={16} /> Xem Mã QR Khách Quét Đặt Món
+                  <Icon name="qr_code_2" size={18} /> Xem Mã QR Khách Quét Đặt Món
                 </button>
               </>
             )}

@@ -3,6 +3,7 @@ package com.romsteam.roms.repository;
 import com.romsteam.roms.entity.Staff;
 import com.romsteam.roms.entity.StaffSchedule;
 import com.romsteam.roms.entity.enums.ShiftType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +17,8 @@ import java.util.Optional;
 @Repository
 public interface StaffScheduleRepository extends JpaRepository<StaffSchedule, Long> {
 
-    // Tìm danh sách ca trực của nhân viên trong một ngày cụ thể (phục vụ kiểm tra điều kiện đăng nhập)
+    // Tìm danh sách ca trực của nhân viên trong một ngày cụ thể (fetch staff để tránh N+1)
+    @EntityGraph(attributePaths = {"staff"})
     List<StaffSchedule> findByStaffAndWorkDate(Staff staff, LocalDate workDate);
 
     // Lấy tất cả phân ca trong một ngày cụ thể (có join fetch Staff để tránh N+1)
@@ -31,15 +33,17 @@ public interface StaffScheduleRepository extends JpaRepository<StaffSchedule, Lo
     boolean existsByStaffAndWorkDateAndShiftType(Staff staff, LocalDate workDate, ShiftType shiftType);
 
     // Tìm một bản ghi phân ca cụ thể
+    @EntityGraph(attributePaths = {"staff"})
     Optional<StaffSchedule> findByStaffAndWorkDateAndShiftType(Staff staff, LocalDate workDate, ShiftType shiftType);
 
     // Xoá phân ca cụ thể theo staff, date, shiftType
     @Modifying
     @Query("DELETE FROM StaffSchedule s WHERE s.staff.id = :staffId AND s.workDate = :workDate AND s.shiftType = :shiftType")
     void deleteByStaffIdAndWorkDateAndShiftType(@Param("staffId") Long staffId,
-                                               @Param("workDate") LocalDate workDate,
-                                               @Param("shiftType") ShiftType shiftType);
+                                                @Param("workDate") LocalDate workDate,
+                                                @Param("shiftType") ShiftType shiftType);
 
-    // Lấy tất cả phân ca của một nhân viên
+    // Lấy tất cả phân ca của một nhân viên (fetch staff để tránh N+1)
+    @EntityGraph(attributePaths = {"staff"})
     List<StaffSchedule> findByStaffId(Long staffId);
 }
