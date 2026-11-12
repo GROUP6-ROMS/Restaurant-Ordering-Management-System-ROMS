@@ -33,7 +33,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CustomerAiServiceImpl implements CustomerAiService {
 
-    private static final String DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
+    private static final String DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
+    private static final List<String> FAILOVER_MODELS = List.of(
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite"
+    );
     private static final Pattern BUDGET_PATTERN = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(k|nghin|ngan|tr|trieu|d|vnd)?");
 
     private final MenuItemRepository menuItemRepository;
@@ -44,8 +49,8 @@ public class CustomerAiServiceImpl implements CustomerAiService {
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
 
-    // Tên model (mặc định gemini-flash-latest)
-    @Value("${gemini.api.model:gemini-flash-latest}")
+    // Tên model (mặc định gemini-flash-lite-latest)
+    @Value("${gemini.api.model:gemini-flash-lite-latest}")
     private String geminiModel;
 
     // Template URL của Gemini API
@@ -66,41 +71,64 @@ public class CustomerAiServiceImpl implements CustomerAiService {
             return buildFallbackResponse(request, activeMenu);
         }
 
-        try {
-            // 2. Xây dựng System Prompt với đầy đủ danh mục món ăn
-            String systemInstruction = buildSystemPrompt(activeMenu, request);
+        // 2. Xây dựng System Prompt & Payload gửi đến Google Gemini API
+        String systemInstruction = buildSystemPrompt(activeMenu, request);
+        Map<String, Object> geminiPayload = buildGeminiPayload(systemInstruction, request);
 
-            // 3. Xây dựng Payload gửi đến Google Gemini API
-            Map<String, Object> geminiPayload = buildGeminiPayload(systemInstruction, request);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("x-goog-api-key", geminiApiKey.trim());
+        HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(geminiPayload, headers);
 
-            // 4. Chuẩn bị Header HTTP
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("x-goog-api-key", geminiApiKey.trim());
-
-            HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(geminiPayload, headers);
-
-            // 5. Gửi request sang Google Gemini endpoint
-            String resolvedModel = (geminiModel != null && !geminiModel.trim().isEmpty())
-                    ? geminiModel.trim()
-                    : DEFAULT_GEMINI_MODEL;
-            String targetUrl = geminiApiUrl.replace("{model}", resolvedModel);
-            if (!targetUrl.contains("?key=")) {
-                targetUrl = targetUrl + "?key=" + geminiApiKey.trim();
-            }
-            ResponseEntity<String> response = restTemplate.exchange(targetUrl, HttpMethod.POST, httpEntity, String.class);
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                // 6. Phân tích kết quả JSON trả về từ Gemini
-                return parseGeminiResponse(response.getBody(), activeMenu, request);
-            }
-
-        } catch (Exception ex) {
-            log.error("Lỗi khi kết nối Google Gemini API: {}", ex.getMessage(), ex);
+        // 3. Thử lần lượt model chính và danh sách model dự phòng nếu gặp 503/404/429/timeout
+        Optional<CustomerAiChatResponse> aiResponse = callGeminiWithFailover(httpEntity, activeMenu);
+        if (aiResponse.isPresent()) {
+            return aiResponse.get();
         }
 
-        // Trường hợp API lỗi mạng, hết quota hoặc timeout: dùng Smart Fallback Response theo ngữ cảnh câu hỏi
+        // Trường hợp toàn bộ model lỗi mạng/quá tải: dùng Smart Fallback Response theo ngữ cảnh
         return buildFallbackResponse(request, activeMenu);
+    }
+
+    /**
+     * Gọi Gemini với cơ chế Failover tự chuyển model nhẹ/ổn định hơn nếu model hiện tại timeout hoặc trả 503/404/429
+     */
+    private Optional<CustomerAiChatResponse> callGeminiWithFailover(
+            HttpEntity<Map<String, Object>> httpEntity,
+            List<MenuItem> activeMenu
+    ) {
+        List<String> candidateModels = buildCandidateModels();
+        for (String modelName : candidateModels) {
+            try {
+                String targetUrl = geminiApiUrl.replace("{model}", modelName);
+                if (!targetUrl.contains("?key=")) {
+                    targetUrl = targetUrl + "?key=" + geminiApiKey.trim();
+                }
+
+                ResponseEntity<String> response = restTemplate.exchange(targetUrl, HttpMethod.POST, httpEntity, String.class);
+                if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                    Optional<CustomerAiChatResponse> parsed = parseGeminiResponse(response.getBody(), activeMenu);
+                    if (parsed.isPresent()) {
+                        return parsed;
+                    }
+                    log.warn("Model [{}] trả về phản hồi không đúng cấu trúc JSON kỳ vọng, thử model dự phòng tiếp theo.", modelName);
+                }
+            } catch (Exception ex) {
+                log.warn("Lỗi khi gọi model Gemini [{}]: {}. Đang thử chuyển model dự phòng...", modelName, ex.getMessage());
+            }
+        }
+        return Optional.empty();
+    }
+
+    private List<String> buildCandidateModels() {
+        Set<String> ordered = new LinkedHashSet<>();
+        if (geminiModel != null && !geminiModel.trim().isEmpty()) {
+            ordered.add(geminiModel.trim());
+        } else {
+            ordered.add(DEFAULT_GEMINI_MODEL);
+        }
+        ordered.addAll(FAILOVER_MODELS);
+        return ordered.stream().limit(3).toList();
     }
 
     /**
@@ -120,9 +148,9 @@ public class CustomerAiServiceImpl implements CustomerAiService {
 
         sb.append("NGUYÊN TẮC BẮT BUỘC:\n");
         sb.append("1. NGUYÊN TẮC THỰC ĐƠN: Chỉ được gợi ý các món ăn có trong danh sách thực đơn bên dưới. Tuyệt đối KHÔNG bịa ra món nhà hàng không bán.\n");
-        sb.append("2. XỬ LÝ MÓN NGOÀI THỰC ĐƠN: Nếu khách hỏi món nhà hàng KHÔNG BÁN (ví dụ Pizza, Trà sữa,...), BẮT BUỘC phải lịch thiệp giải thích: 'Dạ nhà hàng ROMS hiện chưa phục vụ món [Tên món], nhưng em xin gợi ý cho quý khách món [Tên món có sẵn tương tự] rất ngon ạ!'.\n");
+        sb.append("2. ĐÚNG NHÓM MÓN & XỬ LÝ MÓN KHÔNG CÓ: Khi khách hỏi một nhóm món cụ thể (ví dụ Đồ uống, Tráng miệng, Món chay...), CHỈ chọn món thực sự thuộc nhóm đó theo Danh mục/Tên món. Nếu thực đơn hiện tại không có hoặc đang tạm hết món thuộc nhóm đó, hãy trả \"suggestedDishIds\": [] và giải thích lịch sự thay vì nhét món mặn/món chính khác loại vào.\n");
         sb.append("3. RÀNG BUỘC NGÂN SÁCH: Nếu khách hỏi theo mức giá/ngân sách (ví dụ 'dưới 200k', 'khoảng 500k cho 2 người'), hãy tính tổng giá tiền các món sao cho tổng giá <= ngân sách yêu cầu.\n");
-        sb.append("4. AN TOÀN DỊ ỨNG & MÓN CHAY: Nếu khách báo ăn chay hoặc dị ứng (hải sản, đậu phộng, bò...), CHỈ ĐƯỢC CHỌN món mà Tên/Mô tả/Nhãn ghi rõ là Món Chay hoặc không có chất gây dị ứng đó. Nếu không chắc chắn, hãy nhắc khách lưu ý thêm với nhân viên phục vụ khi ra món.\n");
+        sb.append("4. AN TOÀN DỊ ỨNG & MÓN CHAY: Nếu khách báo ăn chay hoặc dị ứng (hải sản, đậu phộng, bò...), CHỈ ĐƯỢC CHỌN món mà Danh mục/Tên/Mô tả/Nhãn ghi rõ là Món Chay hoặc không có chất gây dị ứng đó. Nếu không chắc chắn, hãy nhắc khách lưu ý thêm với nhân viên phục vụ khi ra món.\n");
         sb.append("5. KHẨU PHẦN ĂN: Cân đối số lượng từ 1 đến 4 món ăn tiêu biểu phù hợp với số lượng ").append(request.getGuestCount() != null ? request.getGuestCount() : 2).append(" người.\n");
         sb.append("6. ĐỊNH DẠNG: Lời thoại bằng tiếng Việt, lịch thiệp, ấm áp, ngắn gọn và súc tích (vì khách đọc trên màn hình điện thoại). BẮT BUỘC trả về kết quả dưới định dạng JSON nguyên bản (Raw JSON) theo cấu trúc mẫu sau, không bọc markdown ```json:\n");
         sb.append("{\n");
@@ -134,8 +162,12 @@ public class CustomerAiServiceImpl implements CustomerAiService {
 
         sb.append("DANH SÁCH THỰC ĐƠN HIỆN CÓ CỦA NHÀ HÀNG (CÒN HÀNG VÀ ĐANG MỞ BÁN):\n");
         for (MenuItem item : menu) {
+            String catName = (item.getCategory() != null && item.getCategory().getName() != null)
+                    ? item.getCategory().getName()
+                    : "Khác";
             sb.append("- [ID: ").append(item.getId()).append("] ")
                     .append(item.getName())
+                    .append(" | Danh mục: ").append(catName)
                     .append(" | Giá: ").append(item.getPrice()).append(" VNĐ")
                     .append(" | Nhãn: ").append(item.getTag() != null ? item.getTag() : "Tiêu chuẩn")
                     .append(" | Mô tả: ").append(item.getDescription() != null ? item.getDescription() : "Món ăn đặc sắc")
@@ -191,28 +223,25 @@ public class CustomerAiServiceImpl implements CustomerAiService {
     }
 
     /**
-     * Bóc tách JSON từ phản hồi của Gemini và gắn đối tượng món ăn thực tế
+     * Bóc tách JSON từ phản hồi của Gemini (hỗ trợ bỏ qua thinking part nếu có) và gắn đối tượng món ăn thực tế
      */
-    private CustomerAiChatResponse parseGeminiResponse(String rawResponseBody, List<MenuItem> activeMenu, CustomerAiChatRequest request) {
+    private Optional<CustomerAiChatResponse> parseGeminiResponse(String rawResponseBody, List<MenuItem> activeMenu) {
         try {
             JsonNode root = objectMapper.readTree(rawResponseBody);
-            JsonNode candidate = root.path("candidates").get(0);
-            String aiRawText = candidate.path("content").path("parts").get(0).path("text").asText();
+            JsonNode candidates = root.path("candidates");
+            if (!candidates.isArray() || candidates.isEmpty()) {
+                return Optional.empty();
+            }
+
+            String aiRawText = extractCandidateText(candidates.get(0));
+            if (aiRawText == null || aiRawText.isBlank()) {
+                return Optional.empty();
+            }
 
             // Loại bỏ bớt ký tự markdown backticks nếu có
-            String cleanJson = aiRawText.trim();
-            if (cleanJson.startsWith("```json")) {
-                cleanJson = cleanJson.substring(7);
-            }
-            if (cleanJson.startsWith("```")) {
-                cleanJson = cleanJson.substring(3);
-            }
-            if (cleanJson.endsWith("```")) {
-                cleanJson = cleanJson.substring(0, cleanJson.length() - 3);
-            }
-            cleanJson = cleanJson.trim();
-
+            String cleanJson = stripMarkdownCodeFences(aiRawText);
             JsonNode parsedAi = objectMapper.readTree(cleanJson);
+
             String reply = parsedAi.path("reply").asText("Dạ ROMS xin chào quý khách!");
             String actionType = parsedAi.path("actionType").asText("NONE");
 
@@ -241,17 +270,50 @@ public class CustomerAiServiceImpl implements CustomerAiService {
                     .map(id -> mapToMenuItemResponse(menuMap.get(id)))
                     .collect(Collectors.toList());
 
-            return CustomerAiChatResponse.builder()
+            return Optional.of(CustomerAiChatResponse.builder()
                     .reply(reply)
                     .suggestedDishes(suggestedDishes)
                     .quickSuggestions(quickSuggestions.isEmpty() ? List.of("Món bán chạy", "Nước uống ngon") : quickSuggestions)
                     .actionType(actionType)
-                    .build();
+                    .build());
 
         } catch (Exception e) {
             log.error("Không thể bóc tách JSON từ AI: {}", e.getMessage());
-            return buildFallbackResponse(request, activeMenu);
+            return Optional.empty();
         }
+    }
+
+    private String extractCandidateText(JsonNode candidate) {
+        JsonNode parts = candidate.path("content").path("parts");
+        if (!parts.isArray() || parts.isEmpty()) {
+            return null;
+        }
+        String fallbackText = null;
+        for (JsonNode part : parts) {
+            boolean isThought = part.path("thought").asBoolean(false);
+            String text = part.path("text").asText("");
+            if (!text.isBlank()) {
+                if (!isThought) {
+                    return text;
+                }
+                fallbackText = text;
+            }
+        }
+        return fallbackText;
+    }
+
+    private String stripMarkdownCodeFences(String rawText) {
+        String cleanJson = rawText.trim();
+        if (cleanJson.startsWith("```json")) {
+            cleanJson = cleanJson.substring(7);
+        }
+        if (cleanJson.startsWith("```")) {
+            cleanJson = cleanJson.substring(3);
+        }
+        if (cleanJson.endsWith("```")) {
+            cleanJson = cleanJson.substring(0, cleanJson.length() - 3);
+        }
+        return cleanJson.trim();
     }
 
     /**
@@ -322,12 +384,18 @@ public class CustomerAiServiceImpl implements CustomerAiService {
             }
         }
 
-        // 2. Đối chiếu theo các nhóm chủ đề ẩm thực phổ biến (đồ uống, tráng miệng, chay, hải sản, bò, trẻ em...)
+        // 2. Đối chiếu theo các nhóm chủ đề ẩm thực phổ biến (ưu tiên Category & Tên món, có từ khóa loại trừ chống lệch món)
         for (FallbackIntentRule rule : FALLBACK_INTENT_RULES) {
             if (containsAny(normalizedMsg, rule.triggerKeywords())) {
                 List<MenuItem> matched = candidatePool.stream()
-                        .filter(item -> matchesDishKeywords(item, rule))
-                        .sorted(this::compareHotDishesFirst)
+                        .map(item -> Map.entry(item, scoreDishForRule(item, rule)))
+                        .filter(entry -> entry.getValue() > 0)
+                        .sorted((e1, e2) -> {
+                            int scoreCmp = Integer.compare(e2.getValue(), e1.getValue());
+                            if (scoreCmp != 0) return scoreCmp;
+                            return compareHotDishesFirst(e1.getKey(), e2.getKey());
+                        })
+                        .map(Map.Entry::getKey)
                         .limit(4)
                         .toList();
 
@@ -335,6 +403,16 @@ public class CustomerAiServiceImpl implements CustomerAiService {
                     return CustomerAiChatResponse.builder()
                             .reply(rule.reply())
                             .suggestedDishes(matched.stream().map(this::mapToMenuItemResponse).toList())
+                            .quickSuggestions(rule.quickSuggestions())
+                            .actionType("NONE")
+                            .build();
+                }
+
+                // Khách hỏi rõ một nhóm chuyên biệt (đồ uống / tráng miệng / chay...) nhưng menu hiện không có món khớp -> trả lời trung thực, không nhét bừa món mặn
+                if (rule.emptyReply() != null) {
+                    return CustomerAiChatResponse.builder()
+                            .reply(rule.emptyReply())
+                            .suggestedDishes(Collections.emptyList())
                             .quickSuggestions(rule.quickSuggestions())
                             .actionType("NONE")
                             .build();
@@ -364,7 +442,7 @@ public class CustomerAiServiceImpl implements CustomerAiService {
         if (hasCart) {
             List<MenuItem> companionItems = candidatePool.stream()
                     .filter(item -> "WAITER".equalsIgnoreCase(item.getStation())
-                            || containsAny(buildSearchableDishText(item), "nuoc", "tra", "salad", "sup", "trang mieng", "banh"))
+                            || containsAny(buildCategoryAndNameText(item), "nuoc loc", "nuoc ep", "tra", "salad", "sup", "trang mieng", "flan"))
                     .sorted(this::compareHotDishesFirst)
                     .limit(3)
                     .toList();
@@ -378,7 +456,7 @@ public class CustomerAiServiceImpl implements CustomerAiService {
             }
         }
 
-        // 4. Tìm kiếm trực tiếp theo từ khóa rời trong tên/mô tả món ăn nếu khách nhắc tên một món cụ thể
+        // 4. Tìm kiếm trực tiếp theo từ khóa rời trong tên/danh mục món ăn nếu khách nhắc tên một món cụ thể
         List<MenuItem> directMatches = findDirectKeywordMatches(normalizedMsg, candidatePool);
         if (!directMatches.isEmpty()) {
             return CustomerAiChatResponse.builder()
@@ -432,11 +510,33 @@ public class CustomerAiServiceImpl implements CustomerAiService {
                 .collect(Collectors.toList());
     }
 
-    private boolean matchesDishKeywords(MenuItem item, FallbackIntentRule rule) {
-        if (rule.includeWaiterStation() && "WAITER".equalsIgnoreCase(item.getStation())) {
-            return true;
+    /**
+     * Chấm điểm độ khớp theo Category (+3), Tên món (+2), Station/Tag (+1), bỏ qua nếu dính từ khóa loại trừ
+     */
+    private int scoreDishForRule(MenuItem item, FallbackIntentRule rule) {
+        String categoryText = normalizeText(item.getCategory() != null ? item.getCategory().getName() : "");
+        String nameText = normalizeText(item.getName());
+        String tagText = normalizeText(item.getTag());
+        String primaryIdentity = (categoryText + " " + nameText).trim();
+
+        if (rule.excludedDishKeywords().length > 0 && containsAny(primaryIdentity, rule.excludedDishKeywords())) {
+            return 0;
         }
-        return containsAny(buildSearchableDishText(item), rule.dishKeywords());
+
+        int score = 0;
+        if (rule.categoryKeywords().length > 0 && containsAny(categoryText, rule.categoryKeywords())) {
+            score += 3;
+        }
+        if (rule.nameKeywords().length > 0 && containsAny(nameText, rule.nameKeywords())) {
+            score += 2;
+        }
+        if (rule.nameKeywords().length > 0 && containsAny(tagText, rule.nameKeywords())) {
+            score += 1;
+        }
+        if (rule.includeWaiterStation() && "WAITER".equalsIgnoreCase(item.getStation())) {
+            score += 2;
+        }
+        return score;
     }
 
     private List<MenuItem> findDirectKeywordMatches(String normalizedMsg, List<MenuItem> pool) {
@@ -448,7 +548,7 @@ public class CustomerAiServiceImpl implements CustomerAiService {
 
         return pool.stream()
                 .filter(item -> {
-                    String dishText = buildSearchableDishText(item);
+                    String dishText = buildCategoryAndNameText(item);
                     return tokens.stream().anyMatch(dishText::contains);
                 })
                 .sorted(this::compareHotDishesFirst)
@@ -456,14 +556,13 @@ public class CustomerAiServiceImpl implements CustomerAiService {
                 .toList();
     }
 
-    private String buildSearchableDishText(MenuItem item) {
+    private String buildCategoryAndNameText(MenuItem item) {
         String categoryName = item.getCategory() != null ? item.getCategory().getName() : "";
         return normalizeText(
                 String.join(" ",
-                        Objects.toString(item.getName(), ""),
                         Objects.toString(categoryName, ""),
-                        Objects.toString(item.getTag(), ""),
-                        Objects.toString(item.getDescription(), ""))
+                        Objects.toString(item.getName(), ""),
+                        Objects.toString(item.getTag(), ""))
         );
     }
 
@@ -524,9 +623,12 @@ public class CustomerAiServiceImpl implements CustomerAiService {
 
     private record FallbackIntentRule(
             String[] triggerKeywords,
-            String[] dishKeywords,
+            String[] categoryKeywords,
+            String[] nameKeywords,
+            String[] excludedDishKeywords,
             boolean includeWaiterStation,
             String reply,
+            String emptyReply,
             List<String> quickSuggestions
     ) {}
 
@@ -538,44 +640,62 @@ public class CustomerAiServiceImpl implements CustomerAiService {
     private static final List<FallbackIntentRule> FALLBACK_INTENT_RULES = List.of(
             new FallbackIntentRule(
                     new String[]{"nuoc", "do uong", "uong", "tra", "ca phe", "bia", "ruou", "cocktail", "sinh to", "nuoc ep"},
-                    new String[]{"nuoc", "tra", "ca phe", "bia", "ruou", "cocktail", "sinh to", "ep", "soda", "lavie", "coca", "pepsi", "do uong"},
+                    new String[]{"do uong", "thuc uong", "nuoc uong", "nuoc giai khat", "giai khat", "beverage", "drinks", "tra", "ca phe"},
+                    new String[]{"nuoc loc", "nuoc suoi", "nuoc ngot", "nuoc ep", "sinh to", "tra dao", "tra chanh", "tra vai", "tra", "ca phe", "espresso", "latte", "cappuccino", "bia", "ruou vang", "cocktail", "mocktail", "soda", "lavie", "coca", "pepsi", "7up", "sprite"},
+                    new String[]{"bo", "ga", "heo", "cuu", "vit", "ca hoi", "tom", "muc", "mi", "mi y", "sup", "salad", "banh mi", "ham", "nuong", "bit tet", "steak", "tartare", "flan", "pho mai"},
                     true,
                     "Dạ nhà hàng hiện có các lựa chọn đồ uống mát lạnh và pha chế đi kèm rất hợp bữa ăn, mời mình tham khảo bên dưới ạ!",
+                    "Dạ hiện tại các món đồ uống trên hệ thống đang tạm hết ạ, mình có thể nhờ nhân viên phục vụ hỗ trợ trực tiếp tại bàn nhé ạ!",
                     List.of("Món bán chạy nhất", "Xem món tráng miệng", "Món thanh đạm")
             ),
             new FallbackIntentRule(
-                    new String[]{"trang mieng", "banh", "kem", "flan", "ngot", "che"},
-                    new String[]{"trang mieng", "banh", "kem", "flan", "che", "pudding", "tiramisu", "mousse"},
+                    new String[]{"trang mieng", "banh ngot", "banh flan", "flan", "tiramisu", "panna cotta", "mousse", "che"},
+                    new String[]{"trang mieng", "dessert", "banh ngot"},
+                    new String[]{"trang mieng", "flan", "banh flan", "tiramisu", "mousse", "panna cotta", "pudding", "cheesecake", "banh ngot", "kem tuoi", "kem vani", "kem socola", "che", "trai cay"},
+                    new String[]{"banh mi", "sup", "bo toi", "bo", "ga", "heo", "cuu", "vit", "ca", "tom", "muc", "mi", "mi y", "salad", "ham", "nuong", "tartare"},
                     false,
                     "Dạ sau bữa chính, mình dùng thêm các món tráng miệng ngọt dịu bên dưới để kết thúc bữa ăn thật trọn vẹn nhé ạ!",
+                    "Dạ hiện tại các món tráng miệng đang tạm hết hoặc chưa phục vụ trong thực đơn hôm nay ạ. Mình tham khảo thêm đồ uống hoặc món khác nhé ạ!",
                     List.of("Gợi ý đồ uống đi kèm", "Món bán chạy nhất")
             ),
             new FallbackIntentRule(
                     new String[]{"chay", "thanh dam", "it dau", "salad", "rau", "healthy", "nhe bung"},
-                    new String[]{"chay", "thanh dam", "salad", "rau", "healthy", "sup", "nam", "dau hu"},
+                    new String[]{"chay", "thanh dam", "salad", "khai vi", "healthy"},
+                    new String[]{"chay", "thanh dam", "salad", "rau", "healthy", "nam", "dau hu", "sup bi do", "bi do"},
+                    new String[]{"bo", "ga", "heo", "cuu", "vit", "ca hoi", "tom", "muc", "tartare", "steak", "bit tet"},
                     false,
                     "Dạ nếu mình ưu tiên vị thanh đạm, ít dầu mỡ và nhẹ bụng, em xin gợi ý các món tươi ngon phù hợp bên dưới ạ!",
+                    "Dạ hiện tại các món chay/thanh đạm đang tạm hết trên menu ạ. Mình có thể báo trực tiếp nhân viên để bếp điều chỉnh riêng nhé ạ!",
                     List.of("Gợi ý đồ uống thanh mát", "Xem món tráng miệng", "Món bán chạy nhất")
             ),
             new FallbackIntentRule(
                     new String[]{"hai san", "tom", "ca hoi", "ca ngu", "muc", "cua", "oc", "so", "seafood"},
+                    new String[]{"hai san", "seafood"},
                     new String[]{"hai san", "tom", "ca hoi", "ca ngu", "muc", "cua", "oc", "so", "tartare", "seafood"},
+                    new String[]{"bo", "ga", "heo", "cuu", "vit", "flan"},
                     false,
                     "Dạ hải sản tươi ngon bên em chế biến trong ngày rất được ưa chuộng. Mình xem thử các món hải sản nổi bật bên dưới nhé ạ!",
+                    "Dạ các món hải sản hiện đang tạm hết ạ, mời mình tham khảo các món thịt bò hoặc món bán chạy khác nhé ạ!",
                     List.of("Gợi ý đồ uống đi kèm", "Có món salad khai vị không?", "Xem món tráng miệng")
             ),
             new FallbackIntentRule(
                     new String[]{"bo", "wagyu", "steak", "bit tet", "beef"},
-                    new String[]{"bo", "wagyu", "steak", "bit tet", "than bo", "thit bo", "beef"},
+                    new String[]{"thit bo", "steak", "bit tet"},
+                    new String[]{"bo", "wagyu", "steak", "bit tet", "than bo", "than ngoai bo", "thit bo", "beef"},
+                    new String[]{"banh mi bo toi", "bo toi"},
                     false,
                     "Dạ các món thịt bò nướng và sốt đậm vị là điểm nhấn tại ROMS Bistro, mời mình tham khảo những phần ngon nhất bên dưới ạ!",
+                    "Dạ các món thịt bò hiện đang tạm hết ạ, mình tham khảo thử hải sản hoặc món khác nhé ạ!",
                     List.of("Gợi ý salad ăn kèm", "Gợi ý đồ uống đi kèm", "Xem món tráng miệng")
             ),
             new FallbackIntentRule(
                     new String[]{"tre em", "be", "tre nho", "khong cay", "gia dinh"},
+                    new String[]{"sup", "mi y", "trang mieng"},
                     new String[]{"sup", "mi y", "ga", "banh mi", "bo toi", "flan", "khoai", "chao"},
+                    new String[]{"ruou", "bia", "cocktail", "ot", "cay"},
                     false,
                     "Dạ với các bé và gia đình, em chọn những món vị dịu nhẹ, mềm dễ ăn và không cay bên dưới để cả nhà cùng thưởng thức ạ!",
+                    null,
                     List.of("Xem thêm đồ uống", "Xem món tráng miệng", "Món bán chạy nhất")
             )
     );

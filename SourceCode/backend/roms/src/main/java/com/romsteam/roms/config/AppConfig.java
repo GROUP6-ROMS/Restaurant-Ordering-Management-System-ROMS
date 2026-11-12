@@ -20,8 +20,8 @@ public class AppConfig {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         // Thời gian chờ kết nối tối đa: 5 giây
         factory.setConnectTimeout(5000);
-        // Thời gian chờ phản hồi tối đa từ Gemini: 20 giây
-        factory.setReadTimeout(20000);
+        // Thời gian chờ phản hồi tối đa: 10 giây (tránh treo request khi model bên ngoài chậm)
+        factory.setReadTimeout(10000);
         return new RestTemplate(factory);
     }
 }
