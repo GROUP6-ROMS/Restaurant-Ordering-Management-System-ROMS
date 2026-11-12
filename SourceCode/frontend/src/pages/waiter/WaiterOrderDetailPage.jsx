@@ -314,7 +314,7 @@ export default function WaiterOrderDetailPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
               <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: isMobile ? '1.25rem' : '1.65rem', color: '#1F1B1A', margin: 0 }}>
-                {tableData.code} • {tableData.name}
+                {tableData.code}{tableData.name && tableData.name.trim() !== tableData.code.trim() ? ` • ${tableData.name}` : ''}
               </h1>
               {allTables.length > 0 && (
                 <select
@@ -868,7 +868,7 @@ export default function WaiterOrderDetailPage() {
                     </span>
                   </div>
                   <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: isMobile ? '1.15rem' : '1.3rem', color: '#1F1B1A', margin: '3px 0 0' }}>
-                    Gọi Thêm Món Cho {tableData.code} ({tableData.name})
+                    Gọi Thêm Món Cho {tableData.code}{tableData.name && tableData.name.trim() !== tableData.code.trim() ? ` (${tableData.name})` : ''}
                   </h3>
                 </div>
                 <button

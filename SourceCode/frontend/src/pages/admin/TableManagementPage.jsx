@@ -3275,7 +3275,7 @@ export default function TableManagementPage() {
                   Cài Đặt Trạng Thái Bàn
                 </h3>
                 <span style={{ fontSize: '0.82rem', color: '#89726B' }}>
-                  {statusModalTable.code} — {statusModalTable.name} ({statusModalTable.zoneName})
+                  Bàn {statusModalTable.code}{statusModalTable.name && statusModalTable.name.trim() !== statusModalTable.code.trim() ? ` — ${statusModalTable.name}` : ''} ({statusModalTable.zoneName})
                 </span>
               </div>
             </div>
@@ -3664,7 +3664,7 @@ export default function TableManagementPage() {
             </h3>
 
             <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: '#56423D', lineHeight: 1.45 }}>
-              Bạn có chắc chắn muốn xóa <strong>{deletingTable.code}</strong> ({deletingTable.name}) khỏi hệ thống nhà hàng không?
+              Bạn có chắc chắn muốn xóa <strong>Bàn {deletingTable.code}</strong>{deletingTable.name && deletingTable.name.trim() !== deletingTable.code.trim() ? ` (${deletingTable.name})` : ''} khỏi hệ thống nhà hàng không?
             </p>
 
             <div style={{
@@ -3788,8 +3788,14 @@ export default function TableManagementPage() {
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF7F5' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>{orderDrawerTable.code}</span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1F1B1A' }}>{orderDrawerTable.name}</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#9D4124' }}>
+                    Bàn {orderDrawerTable.code}
+                  </span>
+                  {orderDrawerTable.name && orderDrawerTable.name.trim() !== orderDrawerTable.code.trim() && (
+                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1F1B1A' }}>
+                      ({orderDrawerTable.name})
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#89726B', marginTop: '3px' }}>
                   {orderDrawerTable.zoneName} • {activeOrdersData?.guestCount || orderDrawerTable.guests || orderDrawerTable.capacity} khách
@@ -4205,7 +4211,7 @@ export default function TableManagementPage() {
                     }}
                   >
                     <Icon name="add" size={16} />
-                    + Thêm Món
+                    Thêm Món
                   </button>
 
                   <button
@@ -7132,7 +7138,7 @@ export default function TableManagementPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9D4124' }}>
-                    {orderDrawerTable.code} - {orderDrawerTable.name}
+                    Bàn {orderDrawerTable.code}{orderDrawerTable.name && orderDrawerTable.name.trim() !== orderDrawerTable.code.trim() ? ` — ${orderDrawerTable.name}` : ''}
                   </span>
                   <span style={{
                     fontSize: '0.72rem',
@@ -7989,7 +7995,7 @@ export default function TableManagementPage() {
                   Xác Nhận Đón Khách Đặt Bàn
                 </h3>
                 <span style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700 }}>
-                  Bàn {checkInModalTable.code} — {checkInModalTable.name} ({checkInModalTable.zoneName})
+                  Bàn {checkInModalTable.code}{checkInModalTable.name && checkInModalTable.name.trim() !== checkInModalTable.code.trim() ? ` — ${checkInModalTable.name}` : ''} ({checkInModalTable.zoneName})
                 </span>
               </div>
             </div>
@@ -8187,7 +8193,7 @@ export default function TableManagementPage() {
                   Cảnh Báo: Mở Cưỡng Chế
                 </h3>
                 <span style={{ fontSize: '0.85rem', color: '#78350F', fontWeight: 600 }}>
-                  Bàn {forceModalTable.code} — {forceModalTable.name} ({forceModalTable.zoneName})
+                  Bàn {forceModalTable.code}{forceModalTable.name && forceModalTable.name.trim() !== forceModalTable.code.trim() ? ` — ${forceModalTable.name}` : ''} ({forceModalTable.zoneName})
                 </span>
               </div>
             </div>
