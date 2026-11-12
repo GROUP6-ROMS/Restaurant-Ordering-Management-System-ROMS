@@ -802,14 +802,19 @@ private Staff validateManagerPin(String pin) {
 
     private void restoreItemStock(OrderItem item) {
         if (item != null && item.getMenuItem() != null && item.getQuantity() != null && item.getQuantity() > 0) {
-            MenuItem menuItem = item.getMenuItem();
-            menuItem.increaseStock(item.getQuantity());
-            menuItemRepository.save(menuItem);
-            try {
-                realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), menuItem.getIsAvailable(), menuItem.getRemainingStock());
-            } catch (Exception ignored) {}
-            if (cacheManager != null && cacheManager.getCache("customerMenu") != null) {
-                cacheManager.getCache("customerMenu").clear();
+            Long menuItemId = item.getMenuItem().getId();
+            MenuItem menuItem = (menuItemId != null)
+                    ? menuItemRepository.findByIdForUpdate(menuItemId).orElse(item.getMenuItem())
+                    : item.getMenuItem();
+            if (menuItem != null && menuItem.getRemainingStock() != null) {
+                menuItem.increaseStock(item.getQuantity());
+                menuItemRepository.save(menuItem);
+                try {
+                    realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), menuItem.getIsAvailable(), menuItem.getRemainingStock());
+                } catch (Exception ignored) {}
+                if (cacheManager != null && cacheManager.getCache("customerMenu") != null) {
+                    cacheManager.getCache("customerMenu").clear();
+                }
             }
         }
     }

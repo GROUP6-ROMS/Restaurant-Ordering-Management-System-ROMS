@@ -65,6 +65,9 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
     private final com.romsteam.roms.security.JwtTokenProvider jwtTokenProvider;
     private final com.romsteam.roms.service.RealtimeService realtimeService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.cache.CacheManager cacheManager;
+
     @Value("${app.frontend.url:http://roms-restaurant.duckdns.org}")
     private String frontendBaseUrl;
 
@@ -786,6 +789,16 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             throw new AppException("Món ăn này đã bị hủy, không thể chỉnh sửa số lượng!", HttpStatus.BAD_REQUEST);
         }
 
+        int oldQuantity = item.getQuantity() != null ? item.getQuantity() : 0;
+        int diff = quantity - oldQuantity;
+        if (diff < 0) {
+            // Giảm số lượng -> hoàn lại vào kho (-diff phần) (Stock Restitution - Issue #60)
+            restoreStockForQuantity(item.getMenuItem() != null ? item.getMenuItem().getId() : null, -diff);
+        } else if (diff > 0) {
+            // Tăng số lượng -> kiểm tra tồn kho và trừ thêm diff phần
+            deductStockForQuantity(item.getMenuItem() != null ? item.getMenuItem().getId() : null, diff);
+        }
+
         item.setQuantity(quantity);
         item.setSubtotal(item.getUnitPrice().multiply(BigDecimal.valueOf(quantity)));
         orderItemRepository.save(item);
@@ -800,8 +813,9 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
             orderRepository.save(order);
         }
 
-        Long tableId = order.getSession().getTable().getId();
-        return getTableActiveOrders(tableId);
+        Long tableId = (order != null && order.getSession() != null && order.getSession().getTable() != null)
+                ? order.getSession().getTable().getId() : null;
+        return (tableId != null) ? getTableActiveOrders(tableId) : TableOrdersResponse.builder().build();
     }
 
     // ===================================================================
@@ -823,6 +837,9 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         item.setNote(existingNote + "[HỦY BỞI QUẢN LÝ: " + reasonStr + "]");
         orderItemRepository.save(item);
 
+        // Hoàn lại số lượng tồn kho cho món ăn bị hủy (Stock Restitution - Issue #60)
+        restoreItemStock(item);
+
         Order order = item.getOrder();
         if (order != null && order.getItems() != null) {
             BigDecimal recalculatedTotal = order.getItems().stream()
@@ -836,10 +853,19 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 order.setStatus(OrderStatus.CANCELLED);
             }
             orderRepository.save(order);
+
+            try {
+                Long tblId = (order.getSession() != null && order.getSession().getTable() != null)
+                        ? order.getSession().getTable().getId() : null;
+                String tblNum = (order.getSession() != null && order.getSession().getTable() != null)
+                        ? order.getSession().getTable().getTableNumber() : "Bàn";
+                realtimeService.notifyOrderStatus(order.getId(), tblId, tblNum, "CANCELLED", item.getId());
+            } catch (Exception ignored) {}
         }
 
-        Long tableId = order.getSession().getTable().getId();
-        return getTableActiveOrders(tableId);
+        Long tableId = (order != null && order.getSession() != null && order.getSession().getTable() != null)
+                ? order.getSession().getTable().getId() : null;
+        return (tableId != null) ? getTableActiveOrders(tableId) : TableOrdersResponse.builder().build();
     }
 
     // ===================================================================
@@ -1128,5 +1154,49 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         }
 
         return mapToTableResponse(updatedTargetTable);
+    }
+
+    private void restoreItemStock(OrderItem item) {
+        if (item == null || item.getMenuItem() == null || item.getQuantity() == null || item.getQuantity() <= 0) {
+            return;
+        }
+        restoreStockForQuantity(item.getMenuItem().getId(), item.getQuantity());
+    }
+
+    private void restoreStockForQuantity(Long menuItemId, int quantity) {
+        if (menuItemId == null || quantity <= 0) return;
+        MenuItem menuItem = menuItemRepository.findByIdForUpdate(menuItemId).orElse(null);
+        if (menuItem != null && menuItem.getRemainingStock() != null) {
+            menuItem.increaseStock(quantity);
+            menuItemRepository.save(menuItem);
+            try {
+                realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), menuItem.getIsAvailable(), menuItem.getRemainingStock());
+            } catch (Exception ignored) {}
+            if (cacheManager != null && cacheManager.getCache("customerMenu") != null) {
+                cacheManager.getCache("customerMenu").clear();
+            }
+        }
+    }
+
+    private void deductStockForQuantity(Long menuItemId, int quantity) {
+        if (menuItemId == null || quantity <= 0) return;
+        MenuItem menuItem = menuItemRepository.findByIdForUpdate(menuItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Món ăn không tồn tại với ID: " + menuItemId));
+        if (!Boolean.TRUE.equals(menuItem.getIsAvailable())) {
+            throw new AppException("Món '" + menuItem.getName() + "' hiện đã tạm hết hàng (86'd)!", HttpStatus.BAD_REQUEST);
+        }
+        if (menuItem.getRemainingStock() != null && menuItem.getRemainingStock() < quantity) {
+            throw new AppException("Món '" + menuItem.getName() + "' chỉ còn lại " + menuItem.getRemainingStock() + " phần! Không đủ để bổ sung.", HttpStatus.BAD_REQUEST);
+        }
+        menuItem.decreaseStock(quantity);
+        menuItemRepository.save(menuItem);
+        if (!Boolean.TRUE.equals(menuItem.getIsAvailable())) {
+            try {
+                realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), false, menuItem.getRemainingStock());
+            } catch (Exception ignored) {}
+            if (cacheManager != null && cacheManager.getCache("customerMenu") != null) {
+                cacheManager.getCache("customerMenu").clear();
+            }
+        }
     }
 }
