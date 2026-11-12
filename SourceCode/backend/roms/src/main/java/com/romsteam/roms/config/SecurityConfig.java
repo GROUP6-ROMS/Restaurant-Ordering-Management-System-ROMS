@@ -29,6 +29,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final com.romsteam.roms.security.TraceIdFilter traceIdFilter;
+    private final com.romsteam.roms.security.RateLimitingFilter rateLimitingFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -123,7 +124,9 @@ public class SecurityConfig {
 
                 // 1. Chạy TraceIdFilter ở đầu tiên để mọi request đều có Trace ID trong MDC
                 .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
-                // 2. Đặt bộ lọc JWT chạy trước UsernamePasswordAuthenticationFilter
+                // 2. Chạy RateLimitingFilter để kiểm soát tần suất và chống Brute-Force/Spam
+                .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
+                // 3. Đặt bộ lọc JWT chạy trước UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
