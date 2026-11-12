@@ -119,6 +119,36 @@ export default function ReservationPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [specialNote, setSpecialNote] = useState('');
+  const [touched, setTouched] = useState({ name: false, phone: false, email: false });
+  const [step1Error, setStep1Error] = useState('');
+
+  // Validation rules cho thông tin khách hàng
+  const phoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const getNameError = () => {
+    if (!customerName.trim()) return 'Vui lòng nhập họ và tên của bạn.';
+    if (customerName.trim().length < 2) return 'Họ và tên tối thiểu 2 ký tự.';
+    return '';
+  };
+
+  const getPhoneError = () => {
+    if (!customerPhone.trim()) return 'Vui lòng nhập số điện thoại để quản lý liên hệ xác nhận bàn.';
+    if (!phoneRegex.test(customerPhone.trim())) return 'Số điện thoại gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08 hoặc 09).';
+    return '';
+  };
+
+  const getEmailError = () => {
+    if (customerEmail.trim() && !emailRegex.test(customerEmail.trim())) {
+      return 'Địa chỉ email chưa đúng định dạng (ví dụ: ten@example.com).';
+    }
+    return '';
+  };
+
+  const nameError = touched.name ? getNameError() : '';
+  const phoneError = touched.phone ? getPhoneError() : '';
+  const emailError = touched.email ? getEmailError() : '';
+  const isStep4Valid = !getNameError() && !getPhoneError() && !getEmailError();
 
   // 8. Trạng thái gửi đơn đặt bàn
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,23 +249,22 @@ export default function ReservationPage() {
   const handleSelectPresetDate = (date) => {
     setIsCustomDate(false);
     setSelectedDate(date);
+    setStep1Error('');
   };
 
   const handleCustomDateChange = (date) => {
     setIsCustomDate(true);
     setSelectedDate(date || todayStr);
+    setStep1Error('');
   };
 
   // Xử lý chọn khung giờ
   const handleSelectPresetTime = (time) => {
     if (isTimeSlotInPast(time, selectedDate)) {
-      showAlert({
-        title: 'Khung giờ không khả dụng',
-        message: 'Khung giờ này đã trôi qua trong ngày hôm nay. Quý khách vui lòng chọn khung giờ trong tương lai!',
-        type: 'warning'
-      });
+      setStep1Error('Khung giờ này đã trôi qua trong ngày hôm nay. Quý khách vui lòng chọn khung giờ trong tương lai!');
       return;
     }
+    setStep1Error('');
     setIsCustomTime(false);
     setSelectedTime(time);
   };
@@ -244,16 +273,19 @@ export default function ReservationPage() {
     const timeVal = e.target.value;
     setCustomTimeInput(timeVal);
     setSelectedTime(timeVal);
+    setStep1Error('');
   };
 
   // Xử lý chọn số lượng khách
   const handleSelectPresetGuests = (guests) => {
     setIsCustomGuests(false);
     setSelectedGuests(guests);
+    setStep1Error('');
   };
 
   const handleApplyCustomGuests = (e) => {
     const raw = e.target.value;
+    setStep1Error('');
     if (raw === '') {
       setCustomGuestInput('');
       setSelectedGuests(0);
@@ -303,45 +335,26 @@ export default function ReservationPage() {
     if (e) e.preventDefault();
     if (currentStep === 1) {
       if (!selectedDate) {
-        showAlert({
-          title: 'Chưa chọn ngày',
-          message: 'Vui lòng chọn ngày dùng bữa trước khi tiếp tục!',
-          type: 'warning'
-        });
+        setStep1Error('Vui lòng chọn ngày dùng bữa trước khi tiếp tục!');
         return;
       }
       if (!selectedTime) {
-        showAlert({
-          title: 'Chưa chọn khung giờ',
-          message: 'Vui lòng chọn khung giờ dùng bữa trước khi tiếp tục!',
-          type: 'warning'
-        });
+        setStep1Error('Vui lòng chọn khung giờ dùng bữa trước khi tiếp tục!');
         return;
       }
       if (isTimeSlotInPast(selectedTime, selectedDate)) {
-        showAlert({
-          title: 'Khung giờ không hợp lệ',
-          message: 'Khung giờ dùng bữa đã chọn đã trôi qua so với thời gian thực. Quý khách vui lòng chọn một khung giờ trong tương lai!',
-          type: 'warning'
-        });
+        setStep1Error('Khung giờ dùng bữa đã chọn đã trôi qua so với thời gian thực. Quý khách vui lòng chọn một khung giờ trong tương lai!');
         return;
       }
       if (!selectedGuests || selectedGuests < 1) {
-        showAlert({
-          title: 'Số lượng khách không hợp lệ',
-          message: 'Số lượng khách đặt bàn trực tuyến tối thiểu là 1 người!',
-          type: 'warning'
-        });
+        setStep1Error('Số lượng khách đặt bàn trực tuyến tối thiểu là 1 người!');
         return;
       }
       if (selectedGuests > 20) {
-        showAlert({
-          title: 'Số lượng khách vượt quá quy định',
-          message: 'Số lượng khách đặt trực tuyến tối đa là 20 người. Quý khách vui lòng liên hệ hotline 1900-xxxx để được hỗ trợ sắp xếp phòng tiệc đoàn riêng!',
-          type: 'warning'
-        });
+        setStep1Error('Số lượng khách đặt trực tuyến tối đa là 20 người. Quý khách vui lòng liên hệ hotline 1900 8924 để được hỗ trợ sắp xếp phòng tiệc đoàn riêng!');
         return;
       }
+      setStep1Error('');
       setCurrentStep(2);
     } else if (currentStep === 2) {
       setCurrentStep(3);
@@ -365,22 +378,22 @@ export default function ReservationPage() {
         });
         return;
       }
-      // Xác thực form thông tin khách
-      if (!customerName.trim()) {
-        showAlert({
-          title: 'Thiếu thông tin liên hệ',
-          message: 'Vui lòng nhập Họ và tên của bạn!',
-          type: 'warning'
-        });
-        return;
-      }
-      const phoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
-      if (!customerPhone.trim() || !phoneRegex.test(customerPhone.trim())) {
-        showAlert({
-          title: 'Số điện thoại không hợp lệ',
-          message: 'Vui lòng nhập số điện thoại hợp lệ (gồm 10 chữ số, ví dụ: 0901234567)!',
-          type: 'warning'
-        });
+
+      // Kích hoạt hiển thị lỗi inline cho toàn bộ các trường
+      setTouched({ name: true, phone: true, email: true });
+
+      if (!isStep4Valid) {
+        // Tự động focus mượt mà vào trường đầu tiên chưa hợp lệ
+        if (getNameError()) {
+          const el = document.getElementById('reservation-customer-name');
+          if (el) el.focus();
+        } else if (getPhoneError()) {
+          const el = document.getElementById('reservation-customer-phone');
+          if (el) el.focus();
+        } else if (getEmailError()) {
+          const el = document.getElementById('reservation-customer-email');
+          if (el) el.focus();
+        }
         return;
       }
 
@@ -945,11 +958,20 @@ export default function ReservationPage() {
                   )}
                 </div>
 
+                {/* Banner cảnh báo inline Step 1 thay vì pop-up alert */}
+                {step1Error && (
+                  <div className="step1-inline-warning" role="alert">
+                    <Icon name="warning" size={18} style={{ color: '#DC2626', flexShrink: 0 }} />
+                    <span>{step1Error}</span>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={handleNextStep}
                   style={{
                     width: '100%',
+                    minHeight: 50,
                     padding: '15px',
                     borderRadius: '16px',
                     background: '#9D4124',
@@ -963,7 +985,8 @@ export default function ReservationPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 6px 18px rgba(157, 65, 36, 0.3)'
+                    boxShadow: '0 6px 18px rgba(157, 65, 36, 0.3)',
+                    transition: 'all 0.15s ease'
                   }}
                 >
                   <span>Tiếp tục chọn khu vực</span>
@@ -1521,78 +1544,105 @@ export default function ReservationPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', marginBottom: '28px' }}>
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '6px' }}>
-                      Họ và tên của bạn <span style={{ color: '#9D4124' }}>*</span>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                      <span>Họ và tên của bạn</span>
+                      <span style={{ color: '#9D4124' }}>*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: Nguyễn Văn A"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="touch-input"
-                      style={{
-                        width: '100%',
-                        padding: '13px 16px',
-                        borderRadius: '14px',
-                        border: '1.5px solid #EAE0DE',
-                        fontSize: '0.92rem',
-                        color: '#1F1B1A',
-                        background: '#FFF8F6',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                      }}
-                    />
+                    <div className="reservation-input-wrap">
+                      <Icon name="person" size={20} className="field-prefix-icon" />
+                      <input
+                        id="reservation-customer-name"
+                        type="text"
+                        placeholder="Ví dụ: Nguyễn Văn A"
+                        value={customerName}
+                        onChange={(e) => {
+                          setCustomerName(e.target.value);
+                          if (!touched.name) setTouched(prev => ({ ...prev, name: true }));
+                        }}
+                        onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
+                        className={`touch-input reservation-text-input ${nameError ? 'input-error' : (touched.name && !getNameError() ? 'input-valid' : '')}`}
+                      />
+                      {touched.name && !getNameError() && (
+                        <Icon name="check_circle" size={18} className="field-status-icon field-status-success" />
+                      )}
+                    </div>
+                    {nameError && (
+                      <div className="reservation-field-error" role="alert">
+                        <Icon name="error" size={14} />
+                        <span>{nameError}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="reservation-contact-grid">
                     <div>
-                      <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '6px' }}>
-                        Số điện thoại nhận cuộc gọi xác nhận <span style={{ color: '#9D4124' }}>*</span>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                        <span>Số điện thoại xác nhận</span>
+                        <span style={{ color: '#9D4124' }}>*</span>
                       </label>
-                      <input
-                        type="tel"
-                        placeholder="090xxxxxxx (10 số)"
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
-                        className="touch-input"
-                        style={{
-                          width: '100%',
-                          padding: '13px 16px',
-                          borderRadius: '14px',
-                          border: '1.5px solid #EAE0DE',
-                          fontSize: '0.92rem',
-                          color: '#1F1B1A',
-                          background: '#FFF8F6',
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
+                      <div className="reservation-input-wrap">
+                        <Icon name="call" size={20} className="field-prefix-icon" />
+                        <input
+                          id="reservation-customer-phone"
+                          type="tel"
+                          placeholder="090xxxxxxx (10 số)"
+                          value={customerPhone}
+                          onChange={(e) => {
+                            setCustomerPhone(e.target.value);
+                            if (!touched.phone) setTouched(prev => ({ ...prev, phone: true }));
+                          }}
+                          onBlur={() => setTouched(prev => ({ ...prev, phone: true }))}
+                          className={`touch-input reservation-text-input ${phoneError ? 'input-error' : (touched.phone && !getPhoneError() ? 'input-valid' : '')}`}
+                        />
+                        {touched.phone && !getPhoneError() && (
+                          <Icon name="check_circle" size={18} className="field-status-icon field-status-success" />
+                        )}
+                      </div>
+                      {phoneError ? (
+                        <div className="reservation-field-error" role="alert">
+                          <Icon name="error" size={14} />
+                          <span>{phoneError}</span>
+                        </div>
+                      ) : touched.phone && !getPhoneError() ? (
+                        <div className="reservation-field-success">
+                          <Icon name="check_circle" size={14} />
+                          <span>Số điện thoại hợp lệ để nhận cuộc gọi</span>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div>
                       <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '6px' }}>
                         Email nhận xác nhận (tùy chọn)
                       </label>
-                      <input
-                        type="email"
-                        placeholder="email@example.com"
-                        value={customerEmail}
-                        onChange={(e) => setCustomerEmail(e.target.value)}
-                        className="touch-input"
-                        style={{
-                          width: '100%',
-                          padding: '13px 16px',
-                          borderRadius: '14px',
-                          border: '1.5px solid #EAE0DE',
-                          fontSize: '0.92rem',
-                          color: '#1F1B1A',
-                          background: '#FFF8F6',
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
+                      <div className="reservation-input-wrap">
+                        <Icon name="mail" size={20} className="field-prefix-icon" />
+                        <input
+                          id="reservation-customer-email"
+                          type="email"
+                          placeholder="email@example.com"
+                          value={customerEmail}
+                          onChange={(e) => {
+                            setCustomerEmail(e.target.value);
+                            if (e.target.value && !touched.email) setTouched(prev => ({ ...prev, email: true }));
+                          }}
+                          onBlur={() => {
+                            if (customerEmail.trim()) setTouched(prev => ({ ...prev, email: true }));
+                          }}
+                          className={`touch-input reservation-text-input ${emailError ? 'input-error' : (touched.email && customerEmail && !getEmailError() ? 'input-valid' : '')}`}
+                        />
+                        {touched.email && customerEmail && !getEmailError() && (
+                          <Icon name="check_circle" size={18} className="field-status-icon field-status-success" />
+                        )}
+                      </div>
+                      {emailError && (
+                        <div className="reservation-field-error" role="alert">
+                          <Icon name="error" size={14} />
+                          <span>{emailError}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1616,7 +1666,8 @@ export default function ReservationPage() {
                         background: '#FFF8F6',
                         outline: 'none',
                         boxSizing: 'border-box',
-                        resize: 'none'
+                        resize: 'none',
+                        transition: 'border-color 0.15s ease'
                       }}
                     />
                   </div>
@@ -1628,6 +1679,7 @@ export default function ReservationPage() {
                     onClick={() => setCurrentStep(3)}
                     style={{
                       flex: 1,
+                      minHeight: 52,
                       padding: '14px',
                       borderRadius: '16px',
                       background: '#F0E6E4',
@@ -1635,10 +1687,16 @@ export default function ReservationPage() {
                       border: 'none',
                       fontWeight: 700,
                       fontSize: '0.95rem',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    Quay lại
+                    <Icon name="arrow_back" size={18} />
+                    <span>Quay lại</span>
                   </button>
                   <button
                     type="button"
@@ -1646,6 +1704,7 @@ export default function ReservationPage() {
                     onClick={handleNextStep}
                     style={{
                       flex: 2,
+                      minHeight: 52,
                       padding: '15px',
                       borderRadius: '16px',
                       background: isSubmitting ? '#C4B5B0' : '#9D4124',
@@ -1659,7 +1718,8 @@ export default function ReservationPage() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 8px 24px rgba(157, 65, 36, 0.35)'
+                      boxShadow: isSubmitting ? 'none' : '0 8px 24px rgba(157, 65, 36, 0.35)',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     {isSubmitting ? (
@@ -1672,6 +1732,14 @@ export default function ReservationPage() {
                     )}
                   </button>
                 </div>
+
+                {/* Gợi ý inline khi các trường bắt buộc chưa điền đủ */}
+                {!isStep4Valid && (touched.name || touched.phone || touched.email) && (
+                  <div style={{ marginTop: '12px', fontSize: '0.8rem', color: '#DC2626', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <Icon name="info" size={16} />
+                    <span>Vui lòng hoàn thiện đúng các trường thông tin có dấu (*) để hoàn tất đặt chỗ.</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
