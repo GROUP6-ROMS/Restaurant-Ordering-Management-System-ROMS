@@ -13,7 +13,7 @@ function formatVND(amount) {
  * Component Modal Trợ Lý Ẩm Thực AI cho Thực Khách
  */
 export default function CustomerAiChatModal({ isOpen, onClose }) {
-    const { tableInfo, addToCart } = useCart();
+    const { tableInfo, addToCart, cartItems } = useCart();
 
     // Danh sách các tin nhắn trong phiên chat hiện tại
     const [messages, setMessages] = useState([
@@ -76,12 +76,16 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                 text: m.text
             }));
 
+            // Lấy danh sách tên các món đang có trong giỏ hàng để AI tư vấn món ăn kèm
+            const currentCartNames = (cartItems || []).map((item) => `${item.name} (x${item.quantity})`);
+
             // Gọi API sang Backend
             const response = await customerAiApi.sendMessage({
                 message: text,
                 tableId: tableInfo?.tableId || 1,
                 tableNumber: tableInfo?.tableNumber || 'Bàn 01',
                 guestCount: tableInfo?.guestCount || 2,
+                cartItems: currentCartNames,
                 history: historyPayload
             });
 
