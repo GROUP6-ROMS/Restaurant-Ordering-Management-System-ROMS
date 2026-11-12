@@ -12,7 +12,9 @@ services:
       - MSSQL_PID=Developer
       - TZ=Asia/Ho_Chi_Minh
     ports:
-      - "1433:1433"
+      # Bảo mật CSDL: Chỉ mở cổng 1433 trên localhost nội bộ (127.0.0.1), đóng hoàn toàn trước Internet công khai
+      # Khi cần kết nối từ máy cá nhân bằng SSMS/Azure Data Studio: sử dụng SSH Tunnel `ssh -L 1433:localhost:1433 root@222.255.184.250`
+      - "127.0.0.1:1433:1433"
     volumes:
       - mssql-data:/var/opt/mssql
     healthcheck:
@@ -65,7 +67,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-sa}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
       - APP_FRONTEND_URL=${FRONTEND_URL:-http://roms-restaurant.duckdns.org}
-      - JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+      - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     depends_on:
       db-init:
         condition: service_completed_successfully

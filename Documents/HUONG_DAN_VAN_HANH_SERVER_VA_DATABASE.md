@@ -15,7 +15,7 @@
 | **Mật khẩu SSH** | `Romsswp391!@` | Dùng khi đăng nhập SSH Terminal |
 | **Thư mục dự án trên VPS** | `~/Restaurant-Ordering-Management-System-ROMS-` | Đường dẫn chứa mã nguồn và docker-compose |
 | **Cơ sở dữ liệu (DBMS)** | Microsoft SQL Server 2022 Developer | Chạy trong Docker Container `roms-database` |
-| **Cổng CSDL (DB Port)** | `1433` | Đã mở công khai ra Internet |
+| **Cổng CSDL (DB Port)** | `1433` | Chỉ mở nội bộ `127.0.0.1` (Đã đóng ra Internet công khai để bảo mật) |
 | **Tên CSDL (Database)** | `ROMS_DB` | Chứa toàn bộ bảng, khóa ngoại, dữ liệu seed |
 | **Tài khoản SA Database** | `sa` | Quản trị viên CSDL SQL Server |
 | **Mật khẩu SA Database** | `RomsPass123@2026` | Mật khẩu kết nối JDBC và SSMS |
@@ -136,31 +136,38 @@ docker exec -it roms-backend date
 
 ## 🗄️ PHẦN 4: KẾT NỐI & TRUY VẤN TRỰC TIẾP CƠ SỞ DỮ LIỆU (SQL SERVER)
 
-Bạn có thể tương tác với CSDL `ROMS_DB` theo 3 phương thức linh hoạt:
+> [!NOTE]
+> **Bảo mật CSDL (Issue #28):** Để ngăn chặn các cuộc tấn công Brute-force mật khẩu SA từ bot mạng Internet, cổng `1433` của SQL Server đã được đóng ra bên ngoài và chỉ lắng nghe trên `127.0.0.1` của VPS. Khi cần kết nối từ máy tính cá nhân bằng SSMS / DBeaver / DataGrip / sqlcmd, bạn chỉ cần mở **SSH Tunnel** an toàn.
 
 ---
 
-### PHƯƠNG THỨC 1: Kết nối bằng Giao diện trực quan (SSMS / DBeaver / DataGrip)
+### PHƯƠNG THỨC 1: Kết nối bằng Giao diện trực quan (SSMS / DBeaver / DataGrip) qua SSH Tunnel
 *Khuyên dùng khi bạn làm việc trên máy tính cá nhân để xem bảng, sửa dữ liệu bằng chuột.*
 
-Mở phần mềm **Microsoft SQL Server Management Studio (SSMS)**:
-1. **Server type:** `Database Engine`
-2. **Server name:** `222.255.184.250,1433` *(Lưu ý: dấu phẩy giữa IP và cổng 1433)*
-3. **Authentication:** `SQL Server Authentication`
-4. **Login:** `sa`
-5. **Password:** `RomsPass123@2026`
-6. Bấm vào nút **Options >>**:
-   - Tích chọn ô: **`Trust server certificate`** *(Bắt buộc để tránh lỗi chứng chỉ SSL)*
-   - Tab *Connection Properties* $\rightarrow$ Connect to database: chọn `ROMS_DB`.
-7. Nhấn **Connect**.
+1. **Bước 1: Mở SSH Tunnel từ máy tính cá nhân** (chạy trên PowerShell / Terminal):
+   ```bash
+   ssh -L 1433:localhost:1433 root@222.255.184.250
+   ```
+   *(Nhập mật khẩu `Romsswp391!@` và giữ cửa sổ terminal này chạy trong lúc làm việc).*
+
+2. **Bước 2: Mở phần mềm Microsoft SQL Server Management Studio (SSMS)**:
+   - **Server type:** `Database Engine`
+   - **Server name:** `localhost,1433` *(hoặc `127.0.0.1,1433`)*
+   - **Authentication:** `SQL Server Authentication`
+   - **Login:** `sa`
+   - **Password:** `RomsPass123@2026`
+   - Bấm vào nút **Options >>**:
+     - Tích chọn ô: **`Trust server certificate`** *(Bắt buộc để tránh lỗi chứng chỉ SSL)*
+     - Tab *Connection Properties* $\rightarrow$ Connect to database: chọn `ROMS_DB`.
+   - Nhấn **Connect**.
 
 ---
 
-### PHƯƠNG THỨC 2: Truy vấn trực tiếp từ PowerShell máy cá nhân qua `sqlcmd`
-Bạn không cần mở SSMS, có thể chạy lệnh trực tiếp từ máy trạm:
+### PHƯƠNG THỨC 2: Truy vấn qua `sqlcmd` (thông qua SSH Tunnel)
+Khi SSH Tunnel đang mở (`ssh -L 1433:localhost:1433 root@222.255.184.250`):
 
 ```powershell
-sqlcmd.exe -S 222.255.184.250,1433 -U sa -P "RomsPass123@2026" -d ROMS_DB -C -l 30 -Q "SELECT TOP 10 id, table_number, name, status FROM restaurant_tables;"
+sqlcmd.exe -S localhost,1433 -U sa -P "RomsPass123@2026" -d ROMS_DB -C -l 30 -Q "SELECT TOP 10 id, table_number, name, status FROM restaurant_tables;"
 ```
 
 ---

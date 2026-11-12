@@ -1,6 +1,10 @@
 # Scratch directory
 scratch/
 
+# Environment files
+.env
+.env.local
+
 # IDE files
 .idea/
 *.iml
