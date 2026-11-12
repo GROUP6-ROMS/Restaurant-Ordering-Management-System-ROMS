@@ -2,7 +2,9 @@ package com.romsteam.roms.repository;
 
 import com.romsteam.roms.entity.Bill;
 import com.romsteam.roms.entity.enums.BillStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,11 +20,25 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     // Tìm hóa đơn của một phiên ăn
     Optional<Bill> findBySessionId(Long sessionId);
 
+    /**
+     * Khóa dòng hóa đơn mức PESSIMISTIC_WRITE khi thanh toán phiên ăn hoặc xử lý webhook PayOS (Issue #31).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Bill b WHERE b.session.id = :sessionId")
+    Optional<Bill> findBySessionIdForUpdate(@Param("sessionId") Long sessionId);
+
     // Tìm hóa đơn theo mã số hóa đơn duy nhất
     Optional<Bill> findByBillCode(String billCode);
 
     // Tìm hóa đơn theo mã đơn hàng payOS
     Optional<Bill> findByPayosOrderCode(Long payosOrderCode);
+
+    /**
+     * Khóa dòng hóa đơn theo mã payOS bằng PESSIMISTIC_WRITE khi đối soát webhook PayOS (Issue #31).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Bill b WHERE b.payosOrderCode = :payosOrderCode")
+    Optional<Bill> findByPayosOrderCodeForUpdate(@Param("payosOrderCode") Long payosOrderCode);
 
     // Lấy danh sách hóa đơn theo trạng thái và khoảng thời gian thanh toán (PaymentTime)
     List<Bill> findByStatusAndPaymentTimeBetween(BillStatus status, LocalDateTime start, LocalDateTime end);

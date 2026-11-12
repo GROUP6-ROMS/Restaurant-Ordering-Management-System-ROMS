@@ -188,8 +188,8 @@ class CashierServiceTest {
         item1.setStatus(OrderItemStatus.COOKING);
 
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
+        when(sessionRepository.findByTableIdAndStatusForUpdate(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionIdForUpdate(50L)).thenReturn(Optional.empty());
         when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
 
         CashierCheckoutRequest request = new CashierCheckoutRequest();
@@ -208,8 +208,8 @@ class CashierServiceTest {
         item1.setStatus(OrderItemStatus.COOKING);
 
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
+        when(sessionRepository.findByTableIdAndStatusForUpdate(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionIdForUpdate(50L)).thenReturn(Optional.empty());
         when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
         when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -234,8 +234,8 @@ class CashierServiceTest {
         Bill paidBill = new Bill();
         paidBill.setStatus(BillStatus.PAID);
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.of(paidBill));
+        when(sessionRepository.findByTableIdAndStatusForUpdate(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionIdForUpdate(50L)).thenReturn(Optional.of(paidBill));
 
         CashierCheckoutRequest request = new CashierCheckoutRequest();
         request.setPaymentMethod("CASH");
@@ -250,8 +250,8 @@ class CashierServiceTest {
     @DisplayName("6. Thanh toán tiền mặt chính xác bằng tổng tiền món (Subtotal) -> Thành công")
     void checkout_WhenPaymentMethodCash_CalculatesExactSubtotalAndSucceeds() {
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
+        when(sessionRepository.findByTableIdAndStatusForUpdate(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionIdForUpdate(50L)).thenReturn(Optional.empty());
         when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
         when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -274,8 +274,8 @@ class CashierServiceTest {
     @DisplayName("7. Thanh toán chuyển khoản (BANK_TRANSFER) -> Thành công với đúng tổng tiền món")
     void checkout_WhenPaymentMethodBankTransfer_Succeeds() {
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
+        when(sessionRepository.findByTableIdAndStatusForUpdate(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionIdForUpdate(50L)).thenReturn(Optional.empty());
         when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
         when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -295,8 +295,8 @@ class CashierServiceTest {
     @DisplayName("8. Thanh toán tiền mặt mà khách đưa thiếu tiền -> Ném ngoại lệ BAD_REQUEST")
     void checkout_WhenCashGivenInsufficient_ThrowsException() {
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.empty());
+        when(sessionRepository.findByTableIdAndStatusForUpdate(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionIdForUpdate(50L)).thenReturn(Optional.empty());
         when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
 
         CashierCheckoutRequest request = new CashierCheckoutRequest();
@@ -317,8 +317,8 @@ class CashierServiceTest {
         draftBill.setBillCode("BILL-DRAFT-001");
 
         when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
-        when(sessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
-        when(billRepository.findBySessionId(50L)).thenReturn(Optional.of(draftBill));
+        when(sessionRepository.findByTableIdAndStatusForUpdate(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(billRepository.findBySessionIdForUpdate(50L)).thenReturn(Optional.of(draftBill));
         when(orderRepository.findBySessionId(50L)).thenReturn(List.of(order));
         when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
 

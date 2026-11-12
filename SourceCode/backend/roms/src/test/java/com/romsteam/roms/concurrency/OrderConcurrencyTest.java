@@ -51,6 +51,15 @@ class OrderConcurrencyTest {
     private OrderRepository orderRepository;
 
     @Autowired
+    private BillRepository billRepository;
+
+    @Autowired
+    private com.romsteam.roms.service.CashierService cashierService;
+
+    @Autowired
+    private com.romsteam.roms.service.serviceImpl.PayOsServiceImpl payOsService;
+
+    @Autowired
     private TransactionTemplate transactionTemplate;
 
     private RestaurantTable table;
@@ -275,5 +284,97 @@ class OrderConcurrencyTest {
         MenuItem finalItem = menuItemRepository.findById(itemGoiCuon.getId()).orElseThrow();
         assertThat(finalItem.getRemainingStock()).isEqualTo(0);
         assertThat(finalItem.getIsAvailable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Conflict Scenario 4 (Issue #31): Xung đột đồng thời giữa Thu ngân POS Checkout và Webhook PayOS")
+    void testConcurrentCheckout_PosAndPayOsWebhook() throws Exception {
+        // 1. Tạo 1 đơn hàng đã phục vụ xong (SERVED) cho bàn
+        CustomerPlaceOrderRequest orderReq = new CustomerPlaceOrderRequest();
+        orderReq.setTableId(table.getId());
+        orderReq.setTableNumber(table.getTableNumber());
+        CustomerOrderItemRequest itemReq = new CustomerOrderItemRequest();
+        itemReq.setMenuItemId(itemGoiCuon.getId());
+        itemReq.setQuantity(2);
+        orderReq.setItems(List.of(itemReq));
+        customerDiningService.placeOrder(orderReq);
+
+        // Đánh dấu OrderItem là SERVED để cho phép thanh toán
+        transactionTemplate.execute(status -> {
+            List<Order> orders = orderRepository.findBySessionId(session.getId());
+            for (Order o : orders) {
+                for (OrderItem i : o.getItems()) {
+                    i.setStatus(com.romsteam.roms.entity.enums.OrderItemStatus.SERVED);
+                }
+                orderRepository.save(o);
+            }
+            return null;
+        });
+
+        // Tạo hóa đơn PayOS chờ thanh toán
+        Bill bill = new Bill();
+        bill.setSession(session);
+        bill.setBillCode("HD-TEST-" + System.currentTimeMillis());
+        bill.setPayosOrderCode(888999L);
+        bill.setSubtotal(BigDecimal.valueOf(100000));
+        bill.setFinalAmount(BigDecimal.valueOf(100000));
+        bill.setStatus(com.romsteam.roms.entity.enums.BillStatus.UNPAID);
+        final Bill savedBill = billRepository.save(bill);
+
+        int numberOfThreads = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(numberOfThreads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch finishLatch = new CountDownLatch(numberOfThreads);
+
+        java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger conflictCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        // Thread 1: Thu ngân POS bấm thanh toán tiền mặt (CASH)
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                com.romsteam.roms.dto.request.CashierCheckoutRequest checkoutReq = new com.romsteam.roms.dto.request.CashierCheckoutRequest();
+                checkoutReq.setPaymentMethod("CASH");
+                checkoutReq.setCashGiven(BigDecimal.valueOf(500000));
+                checkoutReq.setForceCheckout(true);
+                cashierService.checkoutBill(table.getId(), checkoutReq, null);
+                successCount.incrementAndGet();
+            } catch (Exception e) {
+                conflictCount.incrementAndGet();
+            } finally {
+                finishLatch.countDown();
+            }
+        });
+
+        // Thread 2: Webhook PayOS bắn về xác nhận thanh toán chuyển khoản thành công
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                payOsService.finalizePaidBill(savedBill, "PAYOS_WEBHOOK");
+                successCount.incrementAndGet();
+            } catch (Exception e) {
+                conflictCount.incrementAndGet();
+            } finally {
+                finishLatch.countDown();
+            }
+        });
+
+        startLatch.countDown();
+        finishLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // Assert: Phiên ăn COMPLETED, bàn DIRTY, không bị corrupt hay crash
+        DiningSession finalSession = sessionRepository.findById(session.getId()).orElseThrow();
+        assertThat(finalSession.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+
+        RestaurantTable finalTable = tableRepository.findById(table.getId()).orElseThrow();
+        assertThat(finalTable.getStatus()).isEqualTo(TableStatus.DIRTY);
+
+        List<Bill> finalBills = billRepository.findByStatusAndPaymentTimeBetween(
+                com.romsteam.roms.entity.enums.BillStatus.PAID,
+                LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(5)
+        );
+        assertThat(finalBills).isNotEmpty();
     }
 }
