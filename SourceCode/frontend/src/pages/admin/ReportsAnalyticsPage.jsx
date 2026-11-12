@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Icon from '../../components/common/Icon';
 import reportApi from '../../api/reportApi';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
@@ -35,6 +35,32 @@ export default function ReportsAnalyticsPage() {
 
   // State lưu thông báo Toast tạm thời
   const [toastMessage, setToastMessage] = useState(null);
+
+  // State tìm kiếm và lọc cho Sổ Kiểm Toán Hóa Đơn
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [auditMethodFilter, setAuditMethodFilter] = useState('ALL');
+
+  // Helper đặt nhanh khoảng ngày tùy chỉnh
+  const setQuickCustomRange = (preset) => {
+    const today = new Date();
+    if (preset === 'THIS_WEEK') {
+      const day = today.getDay();
+      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(today.setDate(diff));
+      const sunday = new Date(today.setDate(diff + 6));
+      setCustomStartDate(monday.toISOString().split('T')[0]);
+      setCustomEndDate(sunday.toISOString().split('T')[0]);
+    } else if (preset === 'LAST_MONTH') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
+      setCustomStartDate(firstDay.toISOString().split('T')[0]);
+      setCustomEndDate(lastDay.toISOString().split('T')[0]);
+    } else if (preset === 'LAST_30_DAYS') {
+      const past30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      setCustomStartDate(past30.toISOString().split('T')[0]);
+      setCustomEndDate(new Date().toISOString().split('T')[0]);
+    }
+  };
 
   // Hàm hiển thị thông báo Toast trong 3 giây
   const showToast = (msg) => {
@@ -271,6 +297,35 @@ export default function ReportsAnalyticsPage() {
   ];
 
 
+
+  // Tính toán tỷ lệ thanh toán không tiền mặt (Cashless Ratio)
+  const cashlessStats = useMemo(() => {
+    if (!paymentMethods || paymentMethods.length === 0) return { percent: '0', total: 0 };
+    const total = paymentMethods.reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
+    const nonCash = paymentMethods
+      .filter(p => p.id !== 'CASH' && !p.label?.toLowerCase().includes('tiền mặt'))
+      .reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
+    const percent = total > 0 ? ((nonCash / total) * 100).toFixed(1) : '0';
+    return { percent, total, nonCash };
+  }, [paymentMethods]);
+
+  // Bộ lọc hóa đơn kiểm toán theo từ khóa và phương thức thanh toán
+  const filteredInvoiceAudit = useMemo(() => {
+    return invoiceAudit.filter(inv => {
+      const matchSearch = !auditSearchQuery.trim() ||
+        inv.invoiceCode?.toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
+        inv.tableNumber?.toLowerCase().includes(auditSearchQuery.toLowerCase()) ||
+        inv.cashierName?.toLowerCase().includes(auditSearchQuery.toLowerCase());
+
+      const matchMethod = auditMethodFilter === 'ALL' ||
+        inv.paymentMethod === auditMethodFilter ||
+        (auditMethodFilter === 'CASH' && inv.paymentMethod === 'CASH') ||
+        (auditMethodFilter === 'VIETQR' && (inv.paymentMethod === 'VIETQR' || inv.paymentMethod === 'BANK_TRANSFER')) ||
+        (auditMethodFilter === 'CARD' && (inv.paymentMethod === 'CARD' || inv.paymentMethod === 'CREDIT_CARD'));
+
+      return matchSearch && matchMethod;
+    });
+  }, [invoiceAudit, auditSearchQuery, auditMethodFilter]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -509,63 +564,99 @@ export default function ReportsAnalyticsPage() {
       {timeframe === 'CUSTOM' && (
         <div className="no-print" style={{
           background: '#FFFFFF',
-          padding: '14px 20px',
-          borderRadius: '14px',
-          border: '1px solid #EAE0DE',
+          padding: '16px 20px',
+          borderRadius: '16px',
+          border: '1px solid #F0E6E4',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '16px',
           flexWrap: 'wrap'
         }}>
-          <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1F1B1A' }}>
-            Khoảng ngày tùy chỉnh:
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.8rem', color: '#89726B' }}>Từ:</span>
-            <input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1F1B1A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icon name="date_range" size={18} style={{ color: '#9D4124' }} />
+              Khoảng ngày:
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', color: '#89726B', fontWeight: 600 }}>Từ</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '10px',
+                  border: '1.5px solid #EAE0DE',
+                  fontSize: '0.85rem',
+                  fontFamily: 'inherit',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', color: '#89726B', fontWeight: 600 }}>Đến</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '10px',
+                  border: '1.5px solid #EAE0DE',
+                  fontSize: '0.85rem',
+                  fontFamily: 'inherit',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={fetchReportData}
               style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: '1px solid #EAE0DE',
-                fontSize: '0.85rem',
-                fontFamily: 'inherit'
+                padding: '8px 18px',
+                borderRadius: '10px',
+                border: 'none',
+                background: '#9D4124',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(157, 65, 36, 0.25)'
               }}
-            />
+            >
+              Áp Dụng Lọc
+            </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.8rem', color: '#89726B' }}>Đến:</span>
-            <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: '1px solid #EAE0DE',
-                fontSize: '0.85rem',
-                fontFamily: 'inherit'
-              }}
-            />
+
+          {/* Quick Presets */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.74rem', color: '#89726B', fontWeight: 700 }}>Chọn nhanh:</span>
+            {[
+              { id: 'THIS_WEEK', label: 'Tuần Này' },
+              { id: 'LAST_30_DAYS', label: '30 Ngày Qua' },
+              { id: 'LAST_MONTH', label: 'Tháng Trước' }
+            ].map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setQuickCustomRange(p.id)}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid #EAE0DE',
+                  background: '#FFF8F6',
+                  color: '#56423D',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
-          <button
-            type="button"
-            onClick={fetchReportData}
-            style={{
-              padding: '7px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#9D4124',
-              color: '#FFFFFF',
-              fontWeight: 700,
-              fontSize: '0.82rem',
-              cursor: 'pointer'
-            }}
-          >
-            Áp Dụng Lọc
-          </button>
         </div>
       )}
 
@@ -725,86 +816,138 @@ export default function ReportsAnalyticsPage() {
       <div className="no-print" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-        gap: '16px'
+        gap: '16px',
+        opacity: loading ? 0.75 : 1,
+        transition: 'opacity 0.2s ease'
       }}>
         {/* KPI 1: Tổng Doanh Thu Thuần */}
-        <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '18px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B' }}>Doanh Thu Thuần</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#FFDBC9', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="payments" size={18} />
+        <div style={{
+          background: '#FFFFFF',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #F0E6E4',
+          borderTop: '3px solid #9D4124',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          transition: 'all 0.15s ease'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Doanh Thu Thuần
+            </span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FFDBC9', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="payments" size={20} />
             </div>
           </div>
-          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#1F1B1A' }}>
+          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.65rem', color: '#1F1B1A' }}>
             {Number(kpi.totalRevenue || 0).toLocaleString('vi-VN')}₫
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
             <Icon name="trending_up" size={16} />
             <span>{kpi.revenueTrend} so với kỳ trước</span>
           </div>
         </div>
 
         {/* KPI 2: Lợi Nhuận Gộp (Gross Profit) & Biên Margin % */}
-        <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '18px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B' }}>Lợi Nhuận Gộp</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#D1E7DD', color: '#0F5132', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="savings" size={18} />
+        <div style={{
+          background: '#FFFFFF',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #F0E6E4',
+          borderTop: '3px solid #059669',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          transition: 'all 0.15s ease'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Lợi Nhuận Gộp
+            </span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#D1E7DD', color: '#0F5132', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="savings" size={20} />
             </div>
           </div>
-          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#059669' }}>
+          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.65rem', color: '#059669' }}>
             {Number(kpi.grossProfit || 0).toLocaleString('vi-VN')}₫
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#0F5132', fontWeight: 700 }}>
-            <span style={{ background: '#D1E7DD', padding: '2px 6px', borderRadius: '6px' }}>Biên LN: {kpi.grossMarginPercent || 0}%</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.78rem', color: '#0F5132', fontWeight: 700 }}>
+            <span style={{ background: '#D1E7DD', padding: '2px 8px', borderRadius: '6px' }}>Biên LN: {kpi.grossMarginPercent || 0}%</span>
             <span>sau giá vốn</span>
           </div>
         </div>
 
         {/* KPI 3: Giá Vốn COGS & Chiết Khấu */}
-        <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '18px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B' }}>Giá Vốn (COGS)</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#FCE8E6', color: '#C5221F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="inventory_2" size={18} />
+        <div style={{
+          background: '#FFFFFF',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #F0E6E4',
+          borderTop: '3px solid #DC2626',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          transition: 'all 0.15s ease'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Giá Vốn (COGS)
+            </span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="inventory_2" size={20} />
             </div>
           </div>
-          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#C5221F' }}>
+          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.65rem', color: '#DC2626' }}>
             {Number(kpi.totalCost || 0).toLocaleString('vi-VN')}₫
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#89726B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.78rem', color: '#89726B' }}>
             <span>Giảm giá: {Number(kpi.totalDiscounts || 0).toLocaleString('vi-VN')}₫</span>
           </div>
         </div>
 
         {/* KPI 4: Lượt Phục Vụ (Bàn & Khách) */}
-        <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '18px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B' }}>Lượt Phục Vụ</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#DDE8AB', color: '#3E491A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="table_restaurant" size={18} />
+        <div style={{
+          background: '#FFFFFF',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #F0E6E4',
+          borderTop: '3px solid #7C3AED',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          transition: 'all 0.15s ease'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Lượt Phục Vụ
+            </span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EDE9FE', color: '#6D28D9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="table_restaurant" size={20} />
             </div>
           </div>
-          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#1F1B1A' }}>
-            {kpi.totalTables} lượt bàn
+          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.65rem', color: '#1F1B1A' }}>
+            {kpi.totalTables} <span style={{ fontSize: '1rem', fontWeight: 700, color: '#56423D' }}>lượt bàn</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#56423D' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.78rem', color: '#56423D' }}>
             <span>{kpi.totalGuests} lượt khách tại bàn</span>
           </div>
         </div>
 
         {/* KPI 5: Giá Trị Trung Bình / Bàn (AOV) */}
-        <div style={{ background: '#FFFFFF', borderRadius: '18px', padding: '18px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B' }}>Giá Trị TB / Bàn (AOV)</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#F6ECEA', color: '#56423D', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="receipt_long" size={18} />
+        <div style={{
+          background: '#FFFFFF',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          border: '1px solid #F0E6E4',
+          borderTop: '3px solid #2563EB',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          transition: 'all 0.15s ease'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Giá Trị TB / Bàn (AOV)
+            </span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#DBEAFE', color: '#1D4ED8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="receipt_long" size={20} />
             </div>
           </div>
-          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.6rem', color: '#1F1B1A' }}>
+          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.65rem', color: '#1F1B1A' }}>
             {Number(kpi.averageOrderValue || 0).toLocaleString('vi-VN')}₫
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
             <Icon name="trending_up" size={16} />
             <span>{kpi.aovTrend} so với kỳ trước</span>
           </div>
@@ -948,17 +1091,62 @@ export default function ReportsAnalyticsPage() {
                 ))}
               </div>
 
-              {/* Phân bổ cơ cấu phương thức thanh toán */}
+              {/* Phân bổ cơ cấu phương thức thanh toán & Stacked Cashless Ratio Bar */}
               <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px dashed #EAE0DE' }}>
-                <h4 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.95rem', color: '#1F1B1A', margin: '0 0 12px' }}>
-                  Cơ Cấu Phương Thức Thanh Toán
-                </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h4 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.95rem', color: '#1F1B1A', margin: 0 }}>
+                    Cơ Cấu Phương Thức Thanh Toán
+                  </h4>
+                  <span style={{
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    color: '#065F46',
+                    background: '#ECFDF5',
+                    padding: '3px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid #A7F3D0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <Icon name="check_circle" size={14} style={{ color: '#059669' }} />
+                    <span>Tỷ lệ không tiền mặt (Cashless): <strong>{cashlessStats.percent}%</strong></span>
+                  </span>
+                </div>
+
+                {/* Stacked Ratio Bar */}
+                <div style={{
+                  width: '100%',
+                  height: '8px',
+                  borderRadius: '9999px',
+                  background: '#F0E6E4',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  marginBottom: '14px'
+                }}>
+                  {paymentMethods.map((pm, idx) => {
+                    const colors = ['#059669', '#7C3AED', '#9D4124', '#2563EB'];
+                    return (
+                      <div
+                        key={idx}
+                        title={`${pm.label}: ${pm.percentage}%`}
+                        style={{
+                          width: `${pm.percentage}%`,
+                          height: '100%',
+                          background: colors[idx % colors.length],
+                          transition: 'width 0.4s ease'
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+
                 <div className="reports-payment-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                   {paymentMethods.map((pm, idx) => (
                     <div key={idx} style={{ background: '#FFF8F6', padding: '12px', borderRadius: '12px', border: '1px solid #F6ECEA' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#89726B', fontSize: '0.75rem', fontWeight: 600 }}>
                         <span>{pm.label}</span>
-                        <span style={{ color: idx === 0 ? '#9D4124' : idx === 1 ? '#059669' : '#78350F', fontWeight: 800 }}>
+                        <span style={{ color: idx === 0 ? '#059669' : idx === 1 ? '#7C3AED' : '#9D4124', fontWeight: 800 }}>
                           {pm.percentage}%
                         </span>
                       </div>
@@ -1095,19 +1283,68 @@ export default function ReportsAnalyticsPage() {
 
       {/* TAB 4: SỔ CHI TIẾT HÓA ĐƠN & KIỂM TOÁN (AUDIT TRAIL) */}
       {reportType === 'AUDIT' && (
-        <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', border: '1px solid #F0E6E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', border: '1px solid #F0E6E4', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#1F1B1A', margin: 0 }}>
                 Sổ Chi Tiết Hóa Đơn & Kiểm Toán Thu Ngân
               </h3>
               <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#89726B' }}>
-                Đối soát 50 hóa đơn thanh toán gần nhất, bao gồm tạm tính, chiết khấu và hình thức thanh toán
+                Đối soát các hóa đơn thanh toán gần nhất, bao gồm tạm tính, chiết khấu và hình thức thanh toán
               </p>
             </div>
             <span style={{ fontSize: '0.8rem', color: '#9D4124', fontWeight: 700, background: '#FFDBC9', padding: '4px 10px', borderRadius: '8px' }}>
-              {invoiceAudit.length} Hóa Đơn Đối Soát
+              Hiển thị {filteredInvoiceAudit.length}/{invoiceAudit.length} Hóa Đơn
             </span>
+          </div>
+
+          {/* Thanh Tìm Kiếm & Lọc Nhanh */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px', background: '#FFF8F6', padding: '10px 14px', borderRadius: '14px', border: '1px solid #F6ECEA' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px' }}>
+              <Icon name="search" size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#89726B' }} />
+              <input
+                type="text"
+                placeholder="Tìm theo mã HĐ, mã đơn, số bàn, thu ngân..."
+                value={auditSearchQuery}
+                onChange={(e) => setAuditSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 10px 7px 34px',
+                  borderRadius: '8px',
+                  border: '1px solid #EAE0DE',
+                  fontSize: '0.82rem',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { id: 'ALL', label: 'Tất cả' },
+                { id: 'VIETQR', label: 'VietQR' },
+                { id: 'CASH', label: 'Tiền mặt' },
+                { id: 'CARD', label: 'Thẻ POS' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setAuditMethodFilter(f.id)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    border: auditMethodFilter === f.id ? '1px solid #9D4124' : '1px solid #EAE0DE',
+                    background: auditMethodFilter === f.id ? '#9D4124' : '#FFFFFF',
+                    color: auditMethodFilter === f.id ? '#FFFFFF' : '#56423D',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -1126,7 +1363,14 @@ export default function ReportsAnalyticsPage() {
                 </tr>
               </thead>
               <tbody>
-                {invoiceAudit.map(inv => (
+                {filteredInvoiceAudit.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ padding: '30px', textAlign: 'center', color: '#89726B' }}>
+                      <Icon name="search_off" size={32} style={{ color: '#C4B5B0', marginBottom: '6px' }} />
+                      <div>Không tìm thấy hóa đơn nào khớp với điều kiện lọc.</div>
+                    </td>
+                  </tr>
+                ) : filteredInvoiceAudit.map(inv => (
                   <tr key={inv.billId} style={{ borderBottom: '1px solid #F0E6E4' }}>
                     <td style={{ padding: '10px', fontWeight: 800, color: '#1F1B1A' }}>{inv.invoiceCode}</td>
                     <td style={{ padding: '10px', fontWeight: 700, color: '#9D4124' }}>{inv.tableNumber}</td>
