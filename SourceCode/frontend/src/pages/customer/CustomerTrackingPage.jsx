@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { customerApi } from '../../api/customerApi';
@@ -151,6 +151,63 @@ export default function CustomerTrackingPage() {
   const totalFoodPrice = trackingData?.totalAmount || 0;
   const vat = 0;
   const finalTotal = totalFoodPrice;
+
+  // State bộ lọc và làm mới tiến độ
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'UNSERVED' | 'SERVED'
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    await fetchTracking(true);
+    setTimeout(() => setIsManualRefreshing(false), 600);
+    showToast('Đã cập nhật tiến độ món mới nhất!');
+  };
+
+  // Tổng hợp và phân loại món ăn trong toàn bộ các đợt gọi
+  const allItems = useMemo(() => {
+    return batches.flatMap(b => b.items || []);
+  }, [batches]);
+
+  const servedCount = useMemo(() => {
+    return allItems.filter(i => i.status === 'SERVED').length;
+  }, [allItems]);
+
+  const readyCount = useMemo(() => {
+    return allItems.filter(i => i.status === 'READY').length;
+  }, [allItems]);
+
+  const cookingCount = useMemo(() => {
+    return allItems.filter(i => i.status === 'COOKING').length;
+  }, [allItems]);
+
+  const pendingCount = useMemo(() => {
+    return allItems.filter(i => i.status === 'PENDING').length;
+  }, [allItems]);
+
+  const cancelledCount = useMemo(() => {
+    return allItems.filter(i => i.status === 'CANCELLED').length;
+  }, [allItems]);
+
+  const activeTotalItems = allItems.length - cancelledCount;
+  const unservedCount = readyCount + cookingCount + pendingCount;
+  const progressPercent = activeTotalItems > 0 ? Math.round((servedCount / activeTotalItems) * 100) : 0;
+
+  // Lọc các đợt gọi theo bộ lọc trạng thái
+  const filteredBatches = useMemo(() => {
+    if (statusFilter === 'ALL') return batches;
+    return batches.map(b => ({
+      ...b,
+      items: (b.items || []).filter(item => {
+        if (statusFilter === 'UNSERVED') {
+          return item.status !== 'SERVED' && item.status !== 'CANCELLED';
+        }
+        if (statusFilter === 'SERVED') {
+          return item.status === 'SERVED';
+        }
+        return true;
+      })
+    })).filter(b => b.items.length > 0);
+  }, [batches, statusFilter]);
 
   const diningToken = sessionStorage.getItem('roms_dining_token');
   const staffToken = sessionStorage.getItem('roms_token');
@@ -311,9 +368,33 @@ export default function CustomerTrackingPage() {
             }}>
               #{trackingData?.sessionId ? `SES-${trackingData.sessionId}` : 'ROMS-ONLINE'}
             </span>
-            <div style={{ fontSize: '0.78rem', color: '#56423D', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-              <Icon name="schedule" size={14} style={{ color: '#89726B' }} />
-              Từ {trackingData?.startTimeFormatted || '12:00'}
+            <div style={{ fontSize: '0.78rem', color: '#56423D', marginTop: '4px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Icon name="schedule" size={14} style={{ color: '#89726B' }} />
+                <span>Từ {trackingData?.startTimeFormatted || '12:00'}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleManualRefresh}
+                title="Làm mới tiến độ món ăn"
+                aria-label="Làm mới tiến độ món ăn"
+                style={{
+                  background: '#F6ECEA',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '26px',
+                  height: '26px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#C85A32',
+                  padding: 0,
+                  transition: 'background 0.15s ease'
+                }}
+              >
+                <Icon name="refresh" size={15} style={{ animation: isManualRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
+              </button>
             </div>
           </div>
         </div>
@@ -350,6 +431,225 @@ export default function CustomerTrackingPage() {
           </button>
         </div>
       </section>
+
+      {/* Pulse Animation Style Tag */}
+      <style>{`
+        @keyframes roms-pulse-ready {
+          0%, 100% { transform: scale(1); box-shadow: 0 1px 4px rgba(251, 146, 60, 0.25); }
+          50% { transform: scale(1.03); box-shadow: 0 2px 8px rgba(251, 146, 60, 0.45); }
+        }
+      `}</style>
+
+      {/* Visual Progression Stepper Card */}
+      {batches.length > 0 && (
+        <section style={{
+          background: '#FFFFFF',
+          borderRadius: '20px',
+          padding: '18px 20px',
+          boxShadow: '0 4px 20px -2px rgba(43,38,37,0.06)',
+          marginBottom: '16px',
+          border: '1px solid #F0E6E4'
+        }}>
+          {/* Header với tỷ lệ phần trăm */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#89726B', fontWeight: 800, display: 'block' }}>
+                TIẾN ĐỘ BỮA ĂN
+              </span>
+              <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#1F1B1A', margin: '2px 0 0' }}>
+                Đã lên bàn {servedCount}/{activeTotalItems} món
+              </h3>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              background: progressPercent === 100 ? '#ECFDF5' : '#FFF1EC',
+              color: progressPercent === 100 ? '#065F46' : '#9D4124',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: 800,
+              fontSize: '0.92rem'
+            }}>
+              {progressPercent}%
+            </div>
+          </div>
+
+          {/* Thanh Progress Bar */}
+          <div style={{
+            width: '100%',
+            height: '8px',
+            borderRadius: '9999px',
+            background: '#F4ECE9',
+            overflow: 'hidden',
+            marginBottom: '16px'
+          }}>
+            <div style={{
+              width: `${progressPercent}%`,
+              height: '100%',
+              borderRadius: '9999px',
+              background: progressPercent === 100
+                ? 'linear-gradient(90deg, #10B981, #059669)'
+                : 'linear-gradient(90deg, #C85A32, #FC934F)',
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
+
+          {/* 4 Bước Milestone Stepper */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', textAlign: 'center' }}>
+            {[
+              {
+                step: 1,
+                label: 'Đã nhận đơn',
+                icon: 'receipt',
+                isDone: activeTotalItems > 0,
+                isActive: activeTotalItems > 0 && servedCount === 0 && cookingCount === 0 && readyCount === 0
+              },
+              {
+                step: 2,
+                label: 'Bếp nấu',
+                icon: 'local_fire_department',
+                isDone: cookingCount > 0 || readyCount > 0 || servedCount > 0,
+                isActive: cookingCount > 0
+              },
+              {
+                step: 3,
+                label: 'Chờ bưng',
+                icon: 'directions_walk',
+                isDone: readyCount > 0 || servedCount > 0,
+                isActive: readyCount > 0
+              },
+              {
+                step: 4,
+                label: 'Đã lên bàn',
+                icon: 'dinner_dining',
+                isDone: progressPercent === 100 && activeTotalItems > 0,
+                isActive: progressPercent === 100 && activeTotalItems > 0
+              }
+            ].map(s => {
+              const isHighlighted = s.isDone || s.isActive;
+              return (
+                <div key={s.step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    background: s.isActive
+                      ? '#9D4124'
+                      : s.isDone
+                        ? (s.step === 4 ? '#059669' : '#FFDBC9')
+                        : '#F4ECE9',
+                    color: s.isActive
+                      ? '#FFFFFF'
+                      : s.isDone
+                        ? (s.step === 4 ? '#FFFFFF' : '#9D4124')
+                        : '#A89E9B',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '6px',
+                    boxShadow: s.isActive ? '0 2px 8px rgba(157, 65, 36, 0.3)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <Icon name={s.icon} size={18} fill={isHighlighted ? 1 : 0} />
+                  </div>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: isHighlighted ? 700 : 500,
+                    color: s.isActive ? '#9D4124' : isHighlighted ? '#1F1B1A' : '#89726B',
+                    lineHeight: 1.2
+                  }}>
+                    {s.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Thông điệp trạng thái thân thiện */}
+          <div style={{
+            marginTop: '14px',
+            paddingTop: '12px',
+            borderTop: '1px dashed #F0E6E4',
+            fontSize: '0.78rem',
+            color: progressPercent === 100 ? '#065F46' : '#56423D',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <Icon
+              name={progressPercent === 100 ? 'check_circle' : (readyCount > 0 ? 'notifications_active' : 'info')}
+              size={16}
+              style={{ color: progressPercent === 100 ? '#059669' : '#C85A32', flexShrink: 0 }}
+            />
+            <span>
+              {progressPercent === 100 && activeTotalItems > 0
+                ? 'Tất cả các món đã được phục vụ lên bàn. Chúc quý khách dùng bữa ngon miệng!'
+                : readyCount > 0
+                  ? `Có ${readyCount} món đã xong, nhân viên đang bưng ra bàn cho bạn!`
+                  : cookingCount > 0
+                    ? `Bếp đang chế biến ${cookingCount} món với nguyên liệu tươi ngon...`
+                    : 'Đơn hàng đã được ghi nhận vào hệ thống bếp.'}
+            </span>
+          </div>
+        </section>
+      )}
+
+      {/* Filter Tabs / Chips */}
+      {batches.length > 0 && activeTotalItems > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '4px',
+          marginBottom: '14px',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {[
+            { id: 'ALL', label: `Tất cả (${totalItemCount})` },
+            {
+              id: 'UNSERVED',
+              label: `Chờ lên bàn (${unservedCount})`
+            },
+            {
+              id: 'SERVED',
+              label: `Đã lên bàn (${servedCount})`,
+              icon: 'task_alt'
+            }
+          ].map(chip => {
+            const isActive = statusFilter === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => setStatusFilter(chip.id)}
+                style={{
+                  minHeight: '36px',
+                  padding: '6px 14px',
+                  borderRadius: '9999px',
+                  border: isActive ? '1.5px solid #9D4124' : '1px solid #EAE0DE',
+                  background: isActive ? '#9D4124' : '#FFFFFF',
+                  color: isActive ? '#FFFFFF' : '#56423D',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isActive ? '0 2px 6px rgba(157, 65, 36, 0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {chip.icon && <Icon name={chip.icon} size={14} />}
+                <span>{chip.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* 2. Order Batches List */}
       <section style={{ marginBottom: '20px' }}>
@@ -392,7 +692,29 @@ export default function CustomerTrackingPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {batches.map((batch, bIdx) => (
+            {filteredBatches.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 16px', background: '#FFFFFF', borderRadius: '18px', border: '1px solid #F0E6E4' }}>
+                <Icon name="filter_alt_off" size={36} style={{ color: '#C4B5B0', marginBottom: '6px' }} />
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#89726B', fontWeight: 600 }}>Không có món nào trong bộ lọc này</p>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('ALL')}
+                  style={{
+                    marginTop: '10px',
+                    padding: '6px 14px',
+                    borderRadius: '9999px',
+                    border: '1px solid #C85A32',
+                    background: '#FFF8F6',
+                    color: '#C85A32',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Xem tất cả món
+                </button>
+              </div>
+            ) : filteredBatches.map((batch, bIdx) => (
               <div
                 key={batch.orderId || bIdx}
                 style={{
@@ -491,64 +813,69 @@ export default function CustomerTrackingPage() {
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
+                              gap: '5px',
+                              padding: '4px 10px',
                               borderRadius: '9999px',
-                              background: '#DDE8AB',
-                              color: '#181E00',
-                              fontSize: '0.72rem',
-                              fontWeight: 700
+                              background: '#ECFDF5',
+                              border: '1px solid #A7F3D0',
+                              color: '#065F46',
+                              fontSize: '0.74rem',
+                              fontWeight: 800
                             }}>
-                              <Icon name="task_alt" size={13} style={{ color: '#596232' }} />
-                              {item.statusText || 'Đã phục vụ'}
+                              <Icon name="task_alt" size={14} style={{ color: '#059669' }} />
+                              <span>{item.statusText || 'Đã phục vụ'}</span>
                             </span>
                           )}
                           {item.status === 'READY' && (
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
+                              gap: '5px',
+                              padding: '4px 10px',
                               borderRadius: '9999px',
-                              background: '#FC934F25',
-                              color: '#994703',
-                              fontSize: '0.72rem',
-                              fontWeight: 700
+                              background: '#FFEDD5',
+                              border: '1px solid #FDBA74',
+                              color: '#9A3412',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              animation: 'roms-pulse-ready 2s infinite ease-in-out'
                             }}>
-                              <Icon name="directions_walk" size={13} style={{ color: '#994703' }} />
-                              {item.statusText || 'Đã nấu xong - Chờ bưng'}
+                              <Icon name="directions_walk" size={14} style={{ color: '#EA580C' }} />
+                              <span>{item.statusText || 'Đã nấu xong • Đang bưng ra'}</span>
                             </span>
                           )}
                           {item.status === 'COOKING' && (
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
+                              gap: '5px',
+                              padding: '4px 10px',
                               borderRadius: '9999px',
                               background: '#FFDBC9',
+                              border: '1px solid #FFCCB6',
                               color: '#753400',
-                              fontSize: '0.72rem',
-                              fontWeight: 700
+                              fontSize: '0.74rem',
+                              fontWeight: 800
                             }}>
-                              <Icon name="local_fire_department" size={13} fill={1} style={{ color: '#C85A32' }} />
-                              {item.statusText || 'Bếp đang nấu'}
+                              <Icon name="local_fire_department" size={14} fill={1} style={{ color: '#C85A32' }} />
+                              <span>{item.statusText || 'Bếp đang nấu'}</span>
                             </span>
                           )}
                           {item.status === 'PENDING' && (
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
+                              gap: '5px',
+                              padding: '4px 10px',
                               borderRadius: '9999px',
                               background: '#F6ECEA',
+                              border: '1px solid #EAE0DE',
                               color: '#56423D',
-                              fontSize: '0.72rem',
+                              fontSize: '0.74rem',
                               fontWeight: 700
                             }}>
-                              <Icon name="hourglass_top" size={13} style={{ color: '#89726B' }} />
-                              {item.statusText || 'Chờ bếp nhận'}
+                              <Icon name="hourglass_top" size={14} style={{ color: '#89726B' }} />
+                              <span>{item.statusText || 'Chờ bếp nhận đơn'}</span>
                             </span>
                           )}
                           {item.status === 'CANCELLED' && (
@@ -787,16 +1114,22 @@ export default function CustomerTrackingPage() {
                   justifyContent: 'space-between',
                   padding: '14px 16px',
                   borderRadius: '16px',
-                  background: '#FFF8F6',
-                  border: '1.5px solid #F0E6E4',
+                  background: '#FFF1EC',
+                  border: '1.5px solid #FFCCB6',
                   cursor: 'pointer',
-                  textAlign: 'left'
+                  textAlign: 'left',
+                  boxShadow: '0 2px 8px rgba(200, 90, 50, 0.08)'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Icon name="qr_code_2" size={26} style={{ color: '#C85A32' }} />
+                  <Icon name="qr_code_2" size={28} style={{ color: '#C85A32' }} />
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#1F1B1A' }}>Chuyển khoản VietQR</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#1F1B1A' }}>Chuyển khoản VietQR</span>
+                      <span style={{ padding: '2px 8px', borderRadius: '6px', background: '#FFDBC9', color: '#9D4124', fontSize: '0.68rem', fontWeight: 800 }}>
+                        Khuyên dùng
+                      </span>
+                    </div>
                     <div style={{ fontSize: '0.75rem', color: '#89726B' }}>Quét mã QR động, nhận tiền ngay lập tức</div>
                   </div>
                 </div>
