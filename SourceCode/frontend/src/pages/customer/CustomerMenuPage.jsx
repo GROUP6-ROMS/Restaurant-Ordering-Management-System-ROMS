@@ -177,11 +177,16 @@ function DishCard({ item, inCartCount, onAdd }) {
 }
 
 // --- Modal bottom sheet them mon ---
-function DishDetailModal({ item, onClose, onConfirm }) {
+function DishDetailModal({ item, onClose, onConfirm, showToast }) {
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
 
   if (!item) return null;
+
+  const maxAllowed = (item.remainingStock !== undefined && item.remainingStock !== null)
+    ? item.remainingStock
+    : 99;
+  const isMaxReached = qty >= maxAllowed;
 
   return (
     <div
@@ -268,6 +273,29 @@ function DishDetailModal({ item, onClose, onConfirm }) {
           />
         </div>
 
+        {/* Cảnh báo còn ít suất nếu có remainingStock */}
+        {item.remainingStock !== undefined && item.remainingStock !== null && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            borderRadius: 8,
+            background: item.remainingStock <= 5 ? '#FFDAD6' : '#E8F5E9',
+            color: item.remainingStock <= 5 ? '#BA1A1A' : '#2E7D32',
+            fontSize: 12,
+            fontWeight: 700,
+            marginBottom: 14
+          }}>
+            <Icon name={item.remainingStock <= 5 ? "warning" : "inventory_2"} size={16} />
+            <span>
+              {item.remainingStock <= 5
+                ? `Chỉ còn ${item.remainingStock} suất sẵn sàng phục vụ!`
+                : `Còn lại ${item.remainingStock} suất`}
+            </span>
+          </div>
+        )}
+
         {/* Chon so luong va xac nhan */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
@@ -289,11 +317,21 @@ function DishDetailModal({ item, onClose, onConfirm }) {
               {qty}
             </span>
             <button
-              onClick={() => setQty(qty + 1)}
+              onClick={() => {
+                if (isMaxReached) {
+                  if (showToast) showToast(`Món này chỉ còn tối đa ${maxAllowed} suất!`);
+                  return;
+                }
+                setQty(qty + 1);
+              }}
+              disabled={isMaxReached}
               style={{
                 width: 32, height: 32, borderRadius: '50%',
-                background: 'var(--surface-container-lowest)',
-                border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                background: isMaxReached ? 'var(--surface-container-high)' : 'var(--surface-container-lowest)',
+                color: isMaxReached ? 'var(--outline-variant)' : 'inherit',
+                border: 'none',
+                cursor: isMaxReached ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}
             >
               <Icon name="add" size={16} />
@@ -716,6 +754,7 @@ export default function CustomerMenuPage() {
           item={activeModal}
           onClose={() => setActiveModal(null)}
           onConfirm={handleConfirmAdd}
+          showToast={showToast}
         />
       )}
     </div>

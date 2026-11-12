@@ -803,7 +803,9 @@ export default function MenuManagementPage() {
                                 fontSize: '0.68rem',
                                 fontWeight: 700
                               }}>
-                                Còn: {dish.remainingStock}/{dish.dailyStock ?? dish.remainingStock} suất
+                                {dish.dailyStock
+                                  ? `Còn: ${dish.remainingStock}/${dish.dailyStock} suất`
+                                  : `Còn: ${dish.remainingStock} suất`}
                               </span>
                             )}
                             <span style={{ padding: '1px 6px', borderRadius: '4px', background: '#F6ECEA', fontSize: '0.68rem', color: '#56423D' }}>
@@ -1066,7 +1068,21 @@ export default function MenuManagementPage() {
                       value={selectedDish.remainingStock !== undefined && selectedDish.remainingStock !== null ? selectedDish.remainingStock : ''}
                       onChange={(e) => {
                         const val = e.target.value.trim();
-                        handleUpdateSelectedDishField('remainingStock', val === '' ? null : (parseInt(val) >= 0 ? parseInt(val) : null));
+                        const numVal = val === '' ? null : (parseInt(val) >= 0 ? parseInt(val) : null);
+                        setDishes(prev => prev.map(d => {
+                          if (d.id !== selectedDish.id) return d;
+                          const updated = { ...d, remainingStock: numVal };
+                          if (numVal === null || numVal > 0) {
+                            if (d.tag === 'Tạm Hết (86d)' || !d.isAvailable) {
+                              updated.isAvailable = true;
+                              if (d.tag === 'Tạm Hết (86d)') updated.tag = 'Đang Bán';
+                            }
+                          } else if (numVal === 0) {
+                            updated.isAvailable = false;
+                            updated.tag = 'Tạm Hết (86d)';
+                          }
+                          return updated;
+                        }));
                       }}
                       placeholder="Trống = Không giới hạn"
                       style={{
