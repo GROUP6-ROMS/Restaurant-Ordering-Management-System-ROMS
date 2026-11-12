@@ -3,6 +3,7 @@ package com.romsteam.roms.repository;
 import com.romsteam.roms.entity.DiningSession;
 import com.romsteam.roms.entity.enums.SessionStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +17,8 @@ import java.util.Optional;
 @Repository
 public interface DiningSessionRepository extends JpaRepository<DiningSession, Long> {
 
-    // Tìm phiên ăn ACTIVE duy nhất tại một bàn
+    // Tìm phiên ăn ACTIVE duy nhất tại một bàn (Fetch table để tránh N+1)
+    @EntityGraph(attributePaths = {"table"})
     Optional<DiningSession> findByTableIdAndStatus(Long tableId, SessionStatus status);
 
     /**
@@ -32,15 +34,19 @@ public interface DiningSessionRepository extends JpaRepository<DiningSession, Lo
     Optional<DiningSession> findByIdForUpdate(@Param("id") Long id);
 
     // Nhận diện phiên ăn qua token QR
+    @EntityGraph(attributePaths = {"table"})
     Optional<DiningSession> findBySessionToken(String sessionToken);
 
     // Lọc tất cả phiên ăn theo trạng thái
+    @EntityGraph(attributePaths = {"table"})
     List<DiningSession> findByStatus(SessionStatus status);
 
     // Lấy các phiên ăn đã hoàn thành (COMPLETED) trong khoảng thời gian kết thúc (endTime)
+    @EntityGraph(attributePaths = {"table"})
     List<DiningSession> findByStatusAndEndTimeBetween(SessionStatus status, LocalDateTime start, LocalDateTime end);
 
     // Lấy các phiên ăn được khởi tạo trong khoảng thời gian bắt đầu (startTime)
+    @EntityGraph(attributePaths = {"table"})
     List<DiningSession> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
 
     // Đếm số lượng phiên ăn theo trạng thái (ví dụ: ACTIVE)

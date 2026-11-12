@@ -3,6 +3,7 @@ package com.romsteam.roms.repository;
 import com.romsteam.roms.entity.Bill;
 import com.romsteam.roms.entity.enums.BillStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -17,7 +18,8 @@ import java.util.Optional;
 @Repository
 public interface BillRepository extends JpaRepository<Bill, Long> {
 
-    // Tìm hóa đơn của một phiên ăn
+    // Tìm hóa đơn của một phiên ăn (Fetch session, table, cashier tránh N+1)
+    @EntityGraph(attributePaths = {"session", "session.table", "cashier"})
     Optional<Bill> findBySessionId(Long sessionId);
 
     /**
@@ -28,9 +30,11 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     Optional<Bill> findBySessionIdForUpdate(@Param("sessionId") Long sessionId);
 
     // Tìm hóa đơn theo mã số hóa đơn duy nhất
+    @EntityGraph(attributePaths = {"session", "session.table", "cashier"})
     Optional<Bill> findByBillCode(String billCode);
 
     // Tìm hóa đơn theo mã đơn hàng payOS
+    @EntityGraph(attributePaths = {"session", "session.table", "cashier"})
     Optional<Bill> findByPayosOrderCode(Long payosOrderCode);
 
     /**
@@ -41,9 +45,11 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     Optional<Bill> findByPayosOrderCodeForUpdate(@Param("payosOrderCode") Long payosOrderCode);
 
     // Lấy danh sách hóa đơn theo trạng thái và khoảng thời gian thanh toán (PaymentTime)
+    @EntityGraph(attributePaths = {"session", "session.table", "cashier"})
     List<Bill> findByStatusAndPaymentTimeBetween(BillStatus status, LocalDateTime start, LocalDateTime end);
 
     // Lấy toàn bộ hóa đơn theo khoảng thời gian thanh toán
+    @EntityGraph(attributePaths = {"session", "session.table", "cashier"})
     List<Bill> findByPaymentTimeBetween(LocalDateTime start, LocalDateTime end);
 
     // Tính tổng doanh thu của các hóa đơn đã thanh toán trong khoảng thời gian
