@@ -244,4 +244,123 @@ class RestaurantTableServiceTest {
         assertThat(testOrder.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(testOrder.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    @Test
+    @DisplayName("7. Hủy món ăn có theo dõi tồn kho: hoàn trả số lượng còn lại và tự động mở lại bán (Issue #60)")
+    void cancelOrderItem_WhenItemHasStock_RestoresStockAndReenablesAvailability() {
+        Order testOrder = new Order();
+        testOrder.setId(31L);
+        testOrder.setSession(session);
+        testOrder.setStatus(OrderStatus.COOKING);
+
+        MenuItem steak = MenuItem.builder()
+                .id(99L)
+                .name("Bò Bít Tết Hảo Hạng")
+                .dailyStock(10)
+                .remainingStock(0)
+                .isAvailable(false)
+                .tag("Tạm Hết (86d)")
+                .build();
+
+        OrderItem dish = new OrderItem();
+        dish.setId(302L);
+        dish.setOrder(testOrder);
+        dish.setMenuItem(steak);
+        dish.setQuantity(2);
+        dish.setStatus(OrderItemStatus.PENDING);
+        dish.setUnitPrice(BigDecimal.valueOf(150000));
+        dish.setSubtotal(BigDecimal.valueOf(300000));
+        testOrder.setItems(List.of(dish));
+
+        when(orderItemRepository.findById(302L)).thenReturn(Optional.of(dish));
+        when(orderItemRepository.save(any(OrderItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(menuItemRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(steak));
+        when(menuItemRepository.save(any(MenuItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
+        when(diningSessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(orderRepository.findBySessionId(10L)).thenReturn(List.of(testOrder));
+
+        // Act
+        tableService.cancelOrderItem(302L, "Khách không ăn nữa");
+
+        // Assert: 2 phần bò bít tết được hoàn trả, tồn kho về 2 và mở lại bán
+        assertThat(dish.getStatus()).isEqualTo(OrderItemStatus.CANCELLED);
+        assertThat(steak.getRemainingStock()).isEqualTo(2);
+        assertThat(steak.getIsAvailable()).isTrue();
+        assertThat(steak.getTag()).isEqualTo("Đang Bán");
+        verify(menuItemRepository).save(steak);
+    }
+
+    @Test
+    @DisplayName("8. Điều chỉnh giảm số lượng món tại bàn: tự động hoàn trả số suất chênh lệch về kho (Issue #60)")
+    void updateOrderItemQuantity_WhenDecreased_RestoresStockDifference() {
+        Order testOrder = new Order();
+        testOrder.setId(32L);
+        testOrder.setSession(session);
+        testOrder.setStatus(OrderStatus.COOKING);
+
+        MenuItem soup = MenuItem.builder()
+                .id(88L)
+                .name("Súp Hải Sản")
+                .dailyStock(10)
+                .remainingStock(5)
+                .isAvailable(true)
+                .build();
+
+        OrderItem dish = new OrderItem();
+        dish.setId(303L);
+        dish.setOrder(testOrder);
+        dish.setMenuItem(soup);
+        dish.setQuantity(3);
+        dish.setStatus(OrderItemStatus.PENDING);
+        dish.setUnitPrice(BigDecimal.valueOf(50000));
+        dish.setSubtotal(BigDecimal.valueOf(150000));
+        testOrder.setItems(List.of(dish));
+
+        when(orderItemRepository.findById(303L)).thenReturn(Optional.of(dish));
+        when(orderItemRepository.save(any(OrderItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(menuItemRepository.findByIdForUpdate(88L)).thenReturn(Optional.of(soup));
+        when(menuItemRepository.save(any(MenuItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tableRepository.findById(1L)).thenReturn(Optional.of(table));
+        when(diningSessionRepository.findByTableIdAndStatus(1L, SessionStatus.ACTIVE)).thenReturn(Optional.of(session));
+        when(orderRepository.findBySessionId(10L)).thenReturn(List.of(testOrder));
+
+        // Act: Giảm số lượng từ 3 xuống 1 (hoàn lại 2 phần)
+        tableService.updateOrderItemQuantity(303L, 1);
+
+        // Assert
+        assertThat(dish.getQuantity()).isEqualTo(1);
+        assertThat(dish.getSubtotal()).isEqualByComparingTo(BigDecimal.valueOf(50000));
+        assertThat(soup.getRemainingStock()).isEqualTo(7); // 5 + 2 = 7
+        verify(menuItemRepository).save(soup);
+    }
+
+    @Test
+    @DisplayName("9. Điều chỉnh tăng số lượng món vượt quá tồn kho còn lại: Ném ngoại lệ BAD_REQUEST (Issue #60)")
+    void updateOrderItemQuantity_WhenIncreasedBeyondStock_ThrowsException() {
+        MenuItem limitedItem = MenuItem.builder()
+                .id(77L)
+                .name("Cua Hoàng Đế")
+                .dailyStock(5)
+                .remainingStock(1) // Chỉ còn 1 phần
+                .isAvailable(true)
+                .build();
+
+        OrderItem dish = new OrderItem();
+        dish.setId(304L);
+        dish.setMenuItem(limitedItem);
+        dish.setQuantity(1);
+        dish.setStatus(OrderItemStatus.PENDING);
+        dish.setUnitPrice(BigDecimal.valueOf(500000));
+
+        when(orderItemRepository.findById(304L)).thenReturn(Optional.of(dish));
+        when(menuItemRepository.findByIdForUpdate(77L)).thenReturn(Optional.of(limitedItem));
+
+        // Act & Assert: Tăng từ 1 lên 3 (cần thêm 2 phần nhưng chỉ còn 1 phần tồn kho)
+        assertThatThrownBy(() -> tableService.updateOrderItemQuantity(304L, 3))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("chỉ còn lại 1 phần");
+    }
 }
