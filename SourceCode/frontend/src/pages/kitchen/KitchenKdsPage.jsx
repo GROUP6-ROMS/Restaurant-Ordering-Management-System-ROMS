@@ -381,12 +381,19 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
               type="button"
               onClick={toggleSelectAll}
               style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 11, fontWeight: 700, color: 'var(--primary)',
-                padding: '2px 6px', borderRadius: 4,
+                background: allSelected ? 'rgba(189, 89, 58, 0.15)' : 'var(--surface-container-high)',
+                border: `1px solid ${allSelected ? 'var(--primary)' : 'var(--outline-variant)'}`,
+                cursor: 'pointer',
+                fontSize: 11, fontWeight: 700,
+                color: allSelected ? 'var(--primary)' : 'var(--on-surface)',
+                padding: '4px 10px', borderRadius: 9999,
+                minHeight: 28,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                transition: 'all 0.15s ease'
               }}
             >
-              {allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+              <Icon name={allSelected ? "check_box" : "check_box_outline_blank"} size={14} />
+              <span>{allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}</span>
             </button>
           </div>
         )}
@@ -404,15 +411,17 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
                 if (!isServed && !isCancelled) toggleSelectItem(item.id);
               }}
               style={{
-                paddingBottom: idx < order.items.length - 1 ? 10 : 0,
+                paddingBottom: idx < order.items.length - 1 ? 8 : 4,
                 borderBottom: idx < order.items.length - 1 ? '1px solid var(--outline-variant)' : 'none',
-                display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
                 opacity: isServed ? 0.45 : isCancelled ? 0.55 : 1,
-                background: isSelected ? 'rgba(189, 89, 58, 0.08)' : 'transparent',
+                background: isSelected ? 'rgba(189, 89, 58, 0.15)' : 'transparent',
+                borderLeft: isSelected ? '4px solid var(--primary)' : '4px solid transparent',
                 borderRadius: 8,
-                padding: '6px 4px',
+                padding: '8px 8px',
                 cursor: isServed || isCancelled ? 'default' : 'pointer',
-                transition: 'background 0.15s ease',
+                transition: 'all 0.15s ease',
+                userSelect: 'none',
               }}
             >
               <div style={{ flex: 1 }}>
@@ -499,26 +508,38 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
                 )}
               </div>
 
-              {/* Checkbox item - Đánh dấu chọn món để thao tác */}
-              <input
-                type="checkbox"
-                checked={isSelected}
-                disabled={isServed || isCancelled}
-                onClick={(e) => e.stopPropagation()}
-                onChange={() => toggleSelectItem(item.id)}
-                title={
-                  isCancelled
-                    ? "Món đã bị hủy"
-                    : isServed
-                    ? "Món đã được phục vụ lên bàn"
-                    : "Tick để chọn món thực hiện Xong món hoặc Rush món"
-                }
+              {/* Checkbox item - Đánh dấu chọn món với Touch Target rộng 44x44px */}
+              <div
                 style={{
-                  width: 22, height: 22, marginTop: 2, accentColor: 'var(--primary)',
-                  cursor: isServed || isCancelled ? 'not-allowed' : 'pointer',
+                  minWidth: 44,
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   flexShrink: 0,
+                  margin: '-10px -4px -10px 0',
                 }}
-              />
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  disabled={isServed || isCancelled}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleSelectItem(item.id)}
+                  aria-label={`Chọn món ${item.name}`}
+                  title={
+                    isCancelled
+                      ? "Món đã bị hủy"
+                      : isServed
+                      ? "Món đã được phục vụ lên bàn"
+                      : "Tick để chọn món thực hiện Xong món hoặc Rush món"
+                  }
+                  style={{
+                    width: 24, height: 24, accentColor: 'var(--primary)',
+                    cursor: isServed || isCancelled ? 'not-allowed' : 'pointer',
+                  }}
+                />
+              </div>
             </div>
           );
         })}
@@ -538,19 +559,19 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
           onClick={handleMarkDoneSelected}
           title={selectedItemIds.size === 0 ? "Tick chọn ít nhất 1 món để xác nhận xong" : `Xác nhận xong ${selectedItemIds.size} món đã chọn (Chờ bưng)`}
           style={{
-            flex: 1, height: 42, borderRadius: 10,
+            flex: 1, minHeight: 46, borderRadius: 12,
             background: selectedItemIds.size > 0 ? 'var(--tertiary-container, #2e7d32)' : 'var(--surface-container-high)',
             color: selectedItemIds.size > 0 ? '#fff' : 'var(--outline)',
             border: 'none',
             cursor: selectedItemIds.size > 0 && !isOrderUpdating ? 'pointer' : 'not-allowed',
             opacity: isOrderUpdating ? 0.6 : 1,
-            fontFamily: 'Epilogue', fontWeight: 700, fontSize: 13,
+            fontFamily: 'Epilogue', fontWeight: 800, fontSize: 13,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             transition: 'all 0.15s ease',
-            boxShadow: selectedItemIds.size > 0 ? '0 2px 6px rgba(46, 125, 50, 0.25)' : 'none',
+            boxShadow: selectedItemIds.size > 0 ? '0 2px 8px rgba(46, 125, 50, 0.3)' : 'none',
           }}
         >
-          <Icon name="check_circle" size={17} fill={1} />
+          <Icon name="check_circle" size={18} fill={1} />
           {selectedItemIds.size > 0 ? `XONG MÓN (${selectedItemIds.size})` : 'XONG MÓN'}
         </button>
 
@@ -561,9 +582,9 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
           onClick={handleRushSelected}
           title={selectedItemIds.size === 0 ? "Tick chọn món để gắn/gỡ cờ Rush" : `Gắn/gỡ cờ Rush cho ${selectedItemIds.size} món đã chọn`}
           style={{
-            height: 42, padding: '0 12px', borderRadius: 10,
+            minHeight: 46, padding: '0 14px', borderRadius: 12,
             background: selectedItemIds.size > 0 ? '#fff' : 'var(--surface-container-lowest)',
-            border: `1px solid ${selectedItemIds.size > 0 ? '#ba1a1a' : 'var(--outline-variant)'}`,
+            border: `1.5px solid ${selectedItemIds.size > 0 ? '#ba1a1a' : 'var(--outline-variant)'}`,
             color: selectedItemIds.size > 0 ? '#ba1a1a' : 'var(--outline)',
             cursor: selectedItemIds.size > 0 && !isOrderUpdating ? 'pointer' : 'not-allowed',
             opacity: isOrderUpdating ? 0.6 : 1,
@@ -583,9 +604,9 @@ function KdsTicketCard({ order, actionLoadingId, onBatchUpdateItemStatus, onBatc
           onClick={() => onToggleRushOrder(order.id)}
           title={order.isRush ? "Hủy chế độ hỏa tốc cho cả đơn" : "Đánh dấu hỏa tốc cho toàn bộ đơn"}
           style={{
-            height: 42, padding: '0 12px', borderRadius: 10,
+            minHeight: 46, padding: '0 14px', borderRadius: 12,
             background: order.isRush ? 'var(--error, #ba1a1a)' : 'var(--surface-container-lowest)',
-            border: `1px solid ${order.isRush ? 'var(--error, #ba1a1a)' : 'var(--outline-variant)'}`,
+            border: `1.5px solid ${order.isRush ? 'var(--error, #ba1a1a)' : 'var(--outline-variant)'}`,
             color: order.isRush ? '#fff' : 'var(--primary)',
             cursor: isOrderUpdating ? 'not-allowed' : 'pointer',
             opacity: isOrderUpdating ? 0.6 : 1,
@@ -1283,17 +1304,17 @@ export default function KitchenKdsPage() {
               onClick={() => { setShow86Modal(true); load86MenuItems(); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '5px 12px', borderRadius: 8,
+                minHeight: 38, padding: '7px 14px', borderRadius: 10,
                 background: '#BA1A1A',
                 color: '#fff',
                 border: 'none', cursor: 'pointer',
-                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
+                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
                 boxShadow: '0 1px 3px rgba(186, 26, 26, 0.3)',
                 transition: 'all 0.15s ease',
               }}
               title="Bật/Tắt trạng thái Tạm Hết (86'd) cho từng món ăn ngay lập tức"
             >
-              <Icon name="block" size={15} />
+              <Icon name="block" size={16} />
               <span>Báo Hết Món (86'd)</span>
             </button>
 
@@ -1303,17 +1324,17 @@ export default function KitchenKdsPage() {
               title={soundEnabled ? "Bấm để tắt âm thanh chuông bếp" : "Bấm để bật âm thanh chuông bếp"}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '5px 10px', borderRadius: 8,
+                minHeight: 38, padding: '7px 14px', borderRadius: 10,
                 background: soundEnabled ? 'rgba(46, 125, 50, 0.1)' : 'var(--surface-container-low)',
                 border: `1px solid ${soundEnabled ? 'rgba(46, 125, 50, 0.3)' : 'var(--outline-variant)'}`,
                 color: soundEnabled ? '#2e7d32' : 'var(--on-surface-variant)',
                 cursor: 'pointer',
-                fontFamily: 'Plus Jakarta Sans', fontWeight: 600, fontSize: 11,
+                fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 12,
                 transition: 'all 0.15s ease',
               }}
             >
-              <Icon name={soundEnabled ? "volume_up" : "volume_off"} size={15} style={{ color: soundEnabled ? '#2e7d32' : 'var(--outline)' }} />
-              {soundEnabled ? 'Âm báo: BẬT' : 'Âm báo: TẮT'}
+              <Icon name={soundEnabled ? "volume_up" : "volume_off"} size={16} style={{ color: soundEnabled ? '#2e7d32' : 'var(--outline)' }} />
+              <span>{soundEnabled ? 'Âm báo: BẬT' : 'Âm báo: TẮT'}</span>
             </button>
 
             <button
@@ -1321,18 +1342,18 @@ export default function KitchenKdsPage() {
               onClick={toggleFullscreen}
               title={isFullscreen ? 'Thu nhỏ / Thoát toàn màn hình' : 'Mở toàn màn hình bếp'}
               style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '5px 12px', borderRadius: 8,
+                display: 'flex', alignItems: 'center', gap: 6,
+                minHeight: 38, padding: '7px 14px', borderRadius: 10,
                 background: isFullscreen ? 'var(--inverse-surface, #342F2E)' : 'var(--primary)',
                 color: '#fff',
                 border: 'none', cursor: 'pointer',
-                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 11,
+                fontFamily: 'Epilogue', fontWeight: 700, fontSize: 12,
                 boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
                 transition: 'all 0.15s ease',
               }}
             >
-              <Icon name={isFullscreen ? "fullscreen_exit" : "fullscreen"} size={15} />
-              {isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
+              <Icon name={isFullscreen ? "fullscreen_exit" : "fullscreen"} size={16} />
+              <span>{isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}</span>
             </button>
           </div>
         </div>
