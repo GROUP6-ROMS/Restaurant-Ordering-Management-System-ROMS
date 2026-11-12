@@ -2111,11 +2111,8 @@ export default function TableManagementPage() {
                         fontSize: '1.25rem',
                         color: '#1F1B1A'
                       }}>
-                        {t.code}
+                        {t.name || t.code}
                       </span>
-                      <h4 style={{ margin: '2px 0 0', fontSize: '0.85rem', fontWeight: 600, color: '#56423D' }}>
-                        {t.name}
-                      </h4>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
