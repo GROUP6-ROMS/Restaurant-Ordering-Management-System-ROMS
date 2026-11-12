@@ -251,8 +251,23 @@ export default function MenuManagementPage() {
     }
   };
 
-  // 3. Toggle trạng thái Hết món (86'd)
+  // 3. Toggle trạng thái Hết món (86'd) — chỉ xác nhận khi khóa (Ngưng Bán), mở lại thì không cần
   const handleToggleAvailable = async (dishId) => {
+    const dish = dishes.find(d => d.id === dishId);
+    const isCurrentlyAvailable = dish?.isAvailable;
+
+    // Chỉ hiện popup xác nhận khi thao tác là KHÓA (đang bán → ngưng bán)
+    // Mở lại (tạm hết → đang bán) thì không cần xác nhận, thực hiện ngay
+    if (isCurrentlyAvailable) {
+      const confirmed = await showConfirm({
+        title: 'Xác nhận Ngưng Bán món',
+        message: `Bạn có chắc chắn muốn ngưng bán "${dish?.name || 'món này'}" không?\n\nMón sẽ bị đánh dấu Tạm Hết (86'd) — Khách hàng và POS sẽ không thể gọi thêm món này cho đến khi bạn kích hoạt lại.`,
+        confirmText: 'Xác nhận Ngưng Bán',
+        type: 'danger'
+      });
+      if (!confirmed) return;
+    }
+
     try {
       const res = await menuApi.toggleAvailability(dishId);
       if (res.data?.data) {
