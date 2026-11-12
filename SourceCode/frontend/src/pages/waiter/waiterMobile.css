@@ -41,21 +41,28 @@
   }
 
   .waiter-card-table {
-    padding: 10px 12px !important;
+    padding: 12px !important;
     border-radius: 16px !important;
-    min-height: 165px !important;
+    min-height: 175px !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: space-between !important;
+    justifyContent: space-between !important;
     height: 100% !important;
     box-sizing: border-box !important;
     min-width: 0 !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+  }
+
+  .waiter-card-table:active {
+    transform: scale(0.985);
   }
 
   .waiter-card-btn-action {
-    padding: 8px 6px !important;
-    font-size: 0.74rem !important;
-    min-height: 38px !important;
+    padding: 9px 8px !important;
+    font-size: 0.8rem !important;
+    min-height: 42px !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
   }
 
   /* Tối ưu Header thanh điều khiển FOH */
@@ -108,7 +115,7 @@
     color: #56423D;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justifyContent: center;
     gap: 6px;
     transition: all 0.2s ease;
   }

@@ -574,20 +574,21 @@ export default function WaiterFloorPlanPage() {
     if (t.status === 'CALLING' || t.calling) {
       return (
         <span style={{
-          background: '#9D4124',
+          background: '#BA1A1A',
           color: '#FFF',
-          padding: '3px 8px',
+          padding: '3px 9px',
           borderRadius: '9999px',
-          fontWeight: 700,
-          fontSize: '0.72rem',
+          fontWeight: 800,
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           animation: 'pulse 1.5s infinite',
           whiteSpace: 'nowrap',
-          flexShrink: 0
+          flexShrink: 0,
+          boxShadow: '0 2px 6px rgba(186, 26, 26, 0.35)'
         }}>
-          <Icon name="campaign" size={14} /> CẦN PHỤC VỤ
+          <Icon name="campaign" size={15} /> CẦN PHỤC VỤ
         </span>
       );
     }
@@ -596,37 +597,38 @@ export default function WaiterFloorPlanPage() {
         <span style={{
           background: '#596232',
           color: '#FFF',
-          padding: '3px 8px',
+          padding: '3px 9px',
           borderRadius: '9999px',
-          fontWeight: 700,
-          fontSize: '0.72rem',
+          fontWeight: 800,
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           whiteSpace: 'nowrap',
-          flexShrink: 0
+          flexShrink: 0,
+          boxShadow: '0 2px 6px rgba(89, 98, 50, 0.25)'
         }}>
-          <Icon name="soup_kitchen" size={14} /> BẾP XONG MÓN
+          <Icon name="soup_kitchen" size={15} /> BẾP XONG MÓN
         </span>
       );
     }
     if (t.status === 'AWAITING_PAYMENT') {
       return (
         <span style={{
-          background: '#FFDBC9',
-          color: '#753400',
-          border: '1px solid #FFB68C',
-          padding: '3px 8px',
+          background: '#EFF6FF',
+          color: '#1E40AF',
+          border: '1.5px solid #93C5FD',
+          padding: '3px 9px',
           borderRadius: '9999px',
-          fontWeight: 700,
-          fontSize: '0.72rem',
+          fontWeight: 800,
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           whiteSpace: 'nowrap',
           flexShrink: 0
         }}>
-          <Icon name="receipt" size={14} /> CHỜ TÍNH TIỀN
+          <Icon name="receipt" size={15} style={{ color: '#1E40AF' }} /> CHỜ TÍNH TIỀN
         </span>
       );
     }
@@ -635,18 +637,18 @@ export default function WaiterFloorPlanPage() {
         <span style={{
           background: '#ECFDF5',
           color: '#065F46',
-          border: '1px solid #A7F3D0',
-          padding: '3px 8px',
+          border: '1.5px solid #A7F3D0',
+          padding: '3px 9px',
           borderRadius: '9999px',
           fontWeight: 700,
-          fontSize: '0.72rem',
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px',
+          gap: '5px',
           whiteSpace: 'nowrap',
           flexShrink: 0
         }}>
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669' }} />
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#059669' }} />
           SẴN SÀNG
         </span>
       );
@@ -654,19 +656,20 @@ export default function WaiterFloorPlanPage() {
     if (t.status === 'DIRTY') {
       return (
         <span style={{
-          background: '#EAE0DE',
-          color: '#56423D',
-          padding: '3px 8px',
+          background: '#F3F4F6',
+          color: '#374151',
+          border: '1px solid #D1D5DB',
+          padding: '3px 9px',
           borderRadius: '9999px',
           fontWeight: 700,
-          fontSize: '0.72rem',
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           whiteSpace: 'nowrap',
           flexShrink: 0
         }}>
-          <Icon name="cleaning_services" size={14} /> CHỜ DỌN BÀN
+          <Icon name="cleaning_services" size={15} /> CHỜ DỌN BÀN
         </span>
       );
     }
@@ -675,38 +678,38 @@ export default function WaiterFloorPlanPage() {
         <span style={{
           background: '#FEF3C7',
           color: '#78350F',
-          border: '1px solid #FDE68A',
-          padding: '3px 8px',
+          border: '1.5px solid #FDE68A',
+          padding: '3px 9px',
           borderRadius: '9999px',
           fontWeight: 700,
-          fontSize: '0.72rem',
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           whiteSpace: 'nowrap',
           flexShrink: 0
         }}>
-          <Icon name="bookmark" size={14} /> ĐÃ ĐẶT
+          <Icon name="bookmark" size={15} /> ĐÃ ĐẶT
         </span>
       );
     }
     if (t.status === 'OCCUPIED') {
       return (
         <span style={{
-          background: '#FFEBEE',
-          color: '#C62828',
-          border: '1px solid #FFCDD2',
-          padding: '3px 8px',
+          background: '#FFF1EC',
+          color: '#9D4124',
+          border: '1.5px solid #FFDBC9',
+          padding: '3px 9px',
           borderRadius: '9999px',
-          fontWeight: 700,
-          fontSize: '0.72rem',
+          fontWeight: 800,
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           whiteSpace: 'nowrap',
           flexShrink: 0
         }}>
-          <Icon name="restaurant" size={13} style={{ color: '#C62828' }} />
+          <Icon name="restaurant" size={14} style={{ color: '#9D4124' }} />
           ĐANG PHỤC VỤ
         </span>
       );
@@ -717,17 +720,17 @@ export default function WaiterFloorPlanPage() {
           background: '#F5F5F4',
           color: '#57534E',
           border: '1px solid #E7E5E4',
-          padding: '3px 8px',
+          padding: '3px 9px',
           borderRadius: '9999px',
           fontWeight: 700,
-          fontSize: '0.72rem',
+          fontSize: '0.74rem',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           whiteSpace: 'nowrap',
           flexShrink: 0
         }}>
-          <Icon name="lock" size={13} style={{ color: '#57534E' }} />
+          <Icon name="lock" size={14} style={{ color: '#57534E' }} />
           ĐÃ KHÓA
         </span>
       );
@@ -737,10 +740,10 @@ export default function WaiterFloorPlanPage() {
         background: '#FFFBEB',
         color: '#92400E',
         border: '1px solid #FDE68A',
-        padding: '3px 8px',
+        padding: '3px 9px',
         borderRadius: '9999px',
         fontWeight: 700,
-        fontSize: '0.72rem',
+        fontSize: '0.74rem',
         whiteSpace: 'nowrap',
         flexShrink: 0,
         display: 'inline-flex',
@@ -753,14 +756,14 @@ export default function WaiterFloorPlanPage() {
   };
 
   const getBorderColor = (t) => {
-    if (t.status === 'CALLING' || t.calling) return '#9D4124';
+    if (t.status === 'CALLING' || t.calling) return '#BA1A1A';
     if (t.status === 'FOOD_READY') return '#596232';
-    if (t.status === 'AWAITING_PAYMENT') return '#994703';
+    if (t.status === 'AWAITING_PAYMENT') return '#2563EB';
     if (t.status === 'AVAILABLE') return '#059669';
-    if (t.status === 'DIRTY') return '#89726B';
+    if (t.status === 'DIRTY') return '#6B7280';
     if (t.status === 'RESERVED') return '#D97706';
-    if (t.status === 'BLOCKED') return '#78716C';
-    if (t.status === 'OCCUPIED') return '#DC2626';
+    if (t.status === 'BLOCKED') return '#9CA3AF';
+    if (t.status === 'OCCUPIED') return '#9D4124';
     return '#9D4124';
   };
 
@@ -1499,10 +1502,10 @@ export default function WaiterFloorPlanPage() {
         <div className="waiter-filter-scroll-container">
           {[
             { id: 'ALL', label: 'Tất cả bàn', count: tables.length, color: '#9D4124' },
-            { id: 'OCCUPIED', label: 'Đang phục vụ', count: tables.filter(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'AWAITING_PAYMENT').length, color: '#994703' },
+            { id: 'OCCUPIED', label: 'Đang phục vụ', count: tables.filter(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'AWAITING_PAYMENT').length, color: '#9D4124' },
             { id: 'AVAILABLE', label: 'Bàn trống', count: tables.filter(t => t.status === 'AVAILABLE').length, color: '#059669' },
             { id: 'CALLING', label: 'Cần hỗ trợ', count: tables.filter(t => t.calling).length, color: '#BA1A1A' },
-            { id: 'DIRTY', label: 'Chờ dọn bàn', count: tables.filter(t => t.status === 'DIRTY').length, color: '#89726B' },
+            { id: 'DIRTY', label: 'Chờ dọn bàn', count: tables.filter(t => t.status === 'DIRTY').length, color: '#6B7280' },
             { id: 'RESERVED', label: 'Đã đặt trước', count: tables.filter(t => t.status === 'RESERVED').length, color: '#D97706' }
           ].map(f => {
             const isActive = activeFilter === f.id;
@@ -1515,24 +1518,27 @@ export default function WaiterFloorPlanPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '6px 12px',
+                  minHeight: 38,
+                  padding: '7px 14px',
                   borderRadius: '9999px',
                   border: isActive ? `1.5px solid ${f.color}` : '1px solid #EAE0DE',
                   background: isActive ? f.color : '#FFF8F6',
                   color: isActive ? '#FFFFFF' : '#56423D',
                   fontWeight: 700,
-                  fontSize: '0.8rem',
+                  fontSize: '0.82rem',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
                 }}
               >
                 <span>{f.label}</span>
                 <span style={{
-                  padding: '1px 6px',
+                  padding: '2px 8px',
                   borderRadius: '9999px',
                   background: isActive ? 'rgba(255,255,255,0.25)' : '#F0E6E4',
-                  fontSize: '0.72rem'
+                  fontSize: '0.74rem',
+                  fontWeight: 800
                 }}>
                   {f.count}
                 </span>
@@ -1720,9 +1726,9 @@ export default function WaiterFloorPlanPage() {
                     )}
                   </div>
 
-                  {/* Card Action footer */}
+                  {/* Card Action footer - Nâng cấp Touch Target công thái học tối thiểu 42-44px */}
                   <div style={{ paddingTop: '8px', borderTop: '1px solid #F6ECEA' }}>
-                    {t.status === 'CALLING' && (
+                    {(t.status === 'CALLING' || t.calling) && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1731,25 +1737,28 @@ export default function WaiterFloorPlanPage() {
                         }}
                         style={{
                           width: '100%',
-                          padding: '7px',
-                          borderRadius: '10px',
-                          background: '#9D4124',
+                          minHeight: 42,
+                          padding: '8px 12px',
+                          borderRadius: '12px',
+                          background: '#BA1A1A',
                           color: '#FFFFFF',
                           border: 'none',
-                          fontWeight: 700,
-                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          fontSize: '0.82rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(186, 26, 26, 0.35)',
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        <Icon name="touch_app" size={16} /> Đã Nhận Yêu Cầu
+                        <Icon name="touch_app" size={17} /> Đã Nhận Yêu Cầu
                       </button>
                     )}
 
-                    {t.status === 'FOOD_READY' && (
+                    {t.status === 'FOOD_READY' && !t.calling && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1758,21 +1767,24 @@ export default function WaiterFloorPlanPage() {
                         }}
                         style={{
                           width: '100%',
-                          padding: '7px',
-                          borderRadius: '10px',
+                          minHeight: 42,
+                          padding: '8px 12px',
+                          borderRadius: '12px',
                           background: '#596232',
                           color: '#FFFFFF',
                           border: 'none',
-                          fontWeight: 700,
-                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          fontSize: '0.82rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(89, 98, 50, 0.3)',
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        <Icon name="room_service" size={16} /> Xác Nhận Đã Bưng Món
+                        <Icon name="room_service" size={17} /> Xác Nhận Đã Bưng Món
                       </button>
                     )}
 
@@ -1786,21 +1798,23 @@ export default function WaiterFloorPlanPage() {
                           }}
                           style={{
                             flex: 1,
-                            padding: '7px',
-                            borderRadius: '10px',
+                            minHeight: 42,
+                            padding: '8px 12px',
+                            borderRadius: '12px',
                             background: '#ECFDF5',
                             color: '#065F46',
-                            border: '1px solid #A7F3D0',
-                            fontWeight: 700,
-                            fontSize: '0.78rem',
+                            border: '1.5px solid #A7F3D0',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '4px',
-                            cursor: 'pointer'
+                            gap: '6px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          <Icon name="add_circle" size={16} /> Mở Bàn Ngay
+                          <Icon name="add_circle" size={17} /> Mở Bàn Ngay
                         </button>
                       </div>
                     )}
@@ -1814,21 +1828,24 @@ export default function WaiterFloorPlanPage() {
                         }}
                         style={{
                           width: '100%',
-                          padding: '7px',
-                          borderRadius: '10px',
+                          minHeight: 42,
+                          padding: '8px 12px',
+                          borderRadius: '12px',
                           background: '#059669',
                           color: '#FFFFFF',
                           border: 'none',
-                          fontWeight: 700,
-                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          fontSize: '0.82rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        <Icon name="check_circle" size={16} /> Nhận Khách (Check-in)
+                        <Icon name="check_circle" size={17} /> Nhận Khách (Check-in)
                       </button>
                     )}
 
@@ -1841,25 +1858,27 @@ export default function WaiterFloorPlanPage() {
                         }}
                         style={{
                           width: '100%',
-                          padding: '7px',
-                          borderRadius: '10px',
-                          background: '#F0E6E4',
-                          color: '#1F1B1A',
-                          border: 'none',
+                          minHeight: 42,
+                          padding: '8px 12px',
+                          borderRadius: '12px',
+                          background: '#F3F4F6',
+                          color: '#1F2937',
+                          border: '1px solid #D1D5DB',
                           fontWeight: 700,
-                          fontSize: '0.78rem',
+                          fontSize: '0.82rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        <Icon name="mop" size={16} /> Đã Dọn Xong & Sẵn Sàng
+                        <Icon name="mop" size={17} /> Đã Dọn Xong & Sẵn Sàng
                       </button>
                     )}
 
-                    {t.status === 'AWAITING_PAYMENT' && (
+                    {t.status === 'AWAITING_PAYMENT' && !t.calling && (
                       (t.orderTotal === 0 || !t.items || t.items.length === 0) ? (
                         <button
                           type="button"
@@ -1869,21 +1888,23 @@ export default function WaiterFloorPlanPage() {
                           }}
                           style={{
                             width: '100%',
-                            padding: '7px',
-                            borderRadius: '10px',
+                            minHeight: 42,
+                            padding: '8px 12px',
+                            borderRadius: '12px',
                             background: '#FFDAD6',
                             color: '#93000A',
                             border: 'none',
-                            fontWeight: 700,
-                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '6px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          <Icon name="event_busy" size={16} /> Hủy Bàn Trống (0đ)
+                          <Icon name="event_busy" size={17} /> Hủy Bàn Trống (0đ)
                         </button>
                       ) : (
                         <button
@@ -1894,39 +1915,67 @@ export default function WaiterFloorPlanPage() {
                           }}
                           style={{
                             width: '100%',
-                            padding: '7px',
-                            borderRadius: '10px',
-                            background: '#FFDBC9',
-                            color: '#753400',
-                            border: 'none',
-                            fontWeight: 700,
-                            fontSize: '0.78rem',
+                            minHeight: 42,
+                            padding: '8px 12px',
+                            borderRadius: '12px',
+                            background: '#EFF6FF',
+                            color: '#1E40AF',
+                            border: '1.5px solid #93C5FD',
+                            fontWeight: 800,
+                            fontSize: '0.82rem',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '6px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          <Icon name="credit_card" size={16} /> Gọi POS Thu Ngân
+                          <Icon name="point_of_sale" size={17} style={{ color: '#1E40AF' }} /> Gọi POS Thu Ngân
                         </button>
                       )
                     )}
 
                     {t.status === 'BLOCKED' && (
-                      <div style={{ textAlign: 'center', fontSize: '0.74rem', color: '#78716C', padding: '4px', fontWeight: 600 }}>
+                      <div style={{ textAlign: 'center', fontSize: '0.74rem', color: '#78716C', padding: '6px', fontWeight: 600 }}>
                         <Icon name="lock" size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
                         {t.blockedReason || 'Bàn đang tạm khóa'}
                       </div>
                     )}
 
-                    {t.status === 'OCCUPIED' && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.74rem', color: '#89726B', fontWeight: 600 }}>
-                          {t.actualGuests ? `Khách ngồi: ${t.actualGuests} người` : 'Đang phục vụ'}
+                    {t.status === 'OCCUPIED' && !t.calling && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectTable(t);
+                        }}
+                        style={{
+                          width: '100%',
+                          minHeight: 42,
+                          padding: '8px 12px',
+                          borderRadius: '12px',
+                          background: '#FFF8F6',
+                          color: '#9D4124',
+                          border: '1.5px solid #FFDBC9',
+                          fontWeight: 800,
+                          fontSize: '0.82rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Icon name="restaurant_menu" size={16} />
+                          <span>{t.actualGuests ? `${t.actualGuests} khách` : 'Xem & Gọi món'}</span>
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#9D4124', fontWeight: 800 }}>Xem bàn &gt;</span>
-                      </div>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.78rem' }}>
+                          <span>Chi tiết</span>
+                          <Icon name="chevron_right" size={16} />
+                        </span>
+                      </button>
                     )}
                   </div>
                 </div>
