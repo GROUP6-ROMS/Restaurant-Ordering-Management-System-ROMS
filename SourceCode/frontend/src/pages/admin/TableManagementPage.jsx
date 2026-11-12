@@ -2357,39 +2357,38 @@ export default function TableManagementPage() {
                         <div style={{
                           fontSize: '0.78rem',
                           fontWeight: 800,
-                          color: alertConfig.badgeColor,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
+                          color: alertConfig.badgeColor
                         }}>
-                          <span>{alertConfig.title}</span>
-                          {t.pendingServiceRequestCount > 1 && (
-                            <span style={{
-                              fontSize: '0.62rem',
-                              fontWeight: 800,
-                              padding: '1px 5px',
-                              borderRadius: '8px',
-                              background: alertConfig.badgeColor,
-                              color: '#FFFFFF'
-                            }}>
-                              +{t.pendingServiceRequestCount - 1}
-                            </span>
-                          )}
+                          {alertConfig.title}
                         </div>
-                        <div style={{
-                          fontSize: '0.72rem',
-                          color: '#4B5563',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          marginTop: '1px'
-                        }}>
-                          {t.pendingServiceRequestNote
-                            ? t.pendingServiceRequestNote
-                            : (t.pendingServiceRequestElapsedMinutes > 0
-                                ? `${t.pendingServiceRequestElapsedMinutes} phút trước`
-                                : (t.pendingServiceRequestCreatedAt ? `Lúc ${t.pendingServiceRequestCreatedAt}` : 'Vừa gọi'))
-                          }
+                        <div
+                          title={t.pendingServiceRequestNote || alertConfig.title}
+                          style={{
+                            fontSize: '0.72rem',
+                            color: '#4B5563',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginTop: '1px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Icon name="schedule" size={12} style={{ flexShrink: 0, opacity: 0.7 }} />
+                          <span>
+                            {t.pendingServiceRequestElapsedMinutes > 0
+                              ? `${t.pendingServiceRequestElapsedMinutes} phút trước`
+                              : (t.pendingServiceRequestCreatedAt ? `Lúc ${t.pendingServiceRequestCreatedAt}` : 'Vừa gọi')}
+                          </span>
+                          {(() => {
+                            const note = t.pendingServiceRequestNote || '';
+                            const isGeneric = !note ||
+                              note.toLowerCase().includes('khách tại') ||
+                              note.toLowerCase().includes('yêu cầu hỗ trợ tại bàn') ||
+                              note.toLowerCase().includes('yêu cầu tính tiền');
+                            return !isGeneric ? <span>• {note}</span> : null;
+                          })()}
                         </div>
                       </div>
                     </div>
