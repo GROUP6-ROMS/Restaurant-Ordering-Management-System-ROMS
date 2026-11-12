@@ -120,7 +120,8 @@ public class MenuServiceImpl implements MenuService {
             displayOrder = (int) menuItemRepository.count() + 1;
         }
 
-        Integer dailyStock = request.getDailyStock() != null && request.getDailyStock() > 0 ? request.getDailyStock() : 100;
+        // Định mức mở bán trong ngày: Nếu để trống hoặc <= 0 thì mang giá trị null (Không giới hạn số suất)
+        Integer dailyStock = (request.getDailyStock() != null && request.getDailyStock() > 0) ? request.getDailyStock() : null;
 
         MenuItem menuItem = MenuItem.builder()
                 .category(category)
@@ -186,16 +187,15 @@ public class MenuServiceImpl implements MenuService {
         if (request.getDisplayOrder() != null) {
             item.setDisplayOrder(request.getDisplayOrder());
         }
-        if (request.getDailyStock() != null) {
-            item.setDailyStock(request.getDailyStock());
+
+        // Cập nhật hoặc xóa định mức ngày về null (Không giới hạn)
+        item.setDailyStock(request.getDailyStock() != null && request.getDailyStock() > 0 ? request.getDailyStock() : null);
+        item.setRemainingStock(request.getRemainingStock() != null && request.getRemainingStock() >= 0 ? request.getRemainingStock() : null);
+        if (item.getRemainingStock() != null && item.getRemainingStock() <= 0) {
+            item.setIsAvailable(false);
+            item.setTag("Tạm Hết (86d)");
         }
-        if (request.getRemainingStock() != null) {
-            item.setRemainingStock(request.getRemainingStock());
-            if (request.getRemainingStock() <= 0) {
-                item.setIsAvailable(false);
-                item.setTag("Tạm Hết (86d)");
-            }
-        }
+
         if (request.getIsAvailable() != null) {
             item.setIsAvailable(request.getIsAvailable());
         }

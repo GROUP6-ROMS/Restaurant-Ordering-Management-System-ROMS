@@ -56,7 +56,7 @@ export default function MenuManagementPage() {
     station: 'KITCHEN',
     price: 85000,
     costPrice: 30000,
-    dailyStock: 50,
+    dailyStock: null,
     tag: 'Món Mới',
     description: '',
     imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500'
@@ -295,7 +295,13 @@ export default function MenuManagementPage() {
       return;
     }
     try {
-      const res = await menuApi.createItem(newDish);
+      const payload = {
+        ...newDish,
+        dailyStock: (newDish.dailyStock !== '' && newDish.dailyStock !== null && newDish.dailyStock !== undefined && Number(newDish.dailyStock) > 0)
+          ? Number(newDish.dailyStock)
+          : null
+      };
+      const res = await menuApi.createItem(payload);
       if (res.data?.data) {
         const created = res.data.data;
         setDishes(prev => [created, ...prev]);
@@ -309,7 +315,7 @@ export default function MenuManagementPage() {
           station: 'KITCHEN',
           price: 85000,
           costPrice: 30000,
-          dailyStock: 50,
+          dailyStock: null,
           tag: 'Món Mới',
           description: '',
           imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500'
@@ -1032,8 +1038,11 @@ export default function MenuManagementPage() {
                       type="number"
                       min="0"
                       value={selectedDish.dailyStock !== undefined && selectedDish.dailyStock !== null ? selectedDish.dailyStock : ''}
-                      onChange={(e) => handleUpdateSelectedDishField('dailyStock', e.target.value === '' ? null : parseInt(e.target.value) || 0)}
-                      placeholder="VD: 50"
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        handleUpdateSelectedDishField('dailyStock', val === '' ? null : (parseInt(val) > 0 ? parseInt(val) : null));
+                      }}
+                      placeholder="Trống = Không giới hạn"
                       style={{
                         width: '100%',
                         padding: '9px 12px',
@@ -1055,8 +1064,11 @@ export default function MenuManagementPage() {
                       type="number"
                       min="0"
                       value={selectedDish.remainingStock !== undefined && selectedDish.remainingStock !== null ? selectedDish.remainingStock : ''}
-                      onChange={(e) => handleUpdateSelectedDishField('remainingStock', e.target.value === '' ? null : parseInt(e.target.value) || 0)}
-                      placeholder="VD: 30"
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        handleUpdateSelectedDishField('remainingStock', val === '' ? null : (parseInt(val) >= 0 ? parseInt(val) : null));
+                      }}
+                      placeholder="Trống = Không giới hạn"
                       style={{
                         width: '100%',
                         padding: '9px 12px',
@@ -1450,21 +1462,37 @@ export default function MenuManagementPage() {
                 </div>
               </div>
 
-              {/* Định mức mở bán trong ngày (Suất) */}
+              {/* Định mức mở bán trong ngày (Suất) - Tùy chọn (Optional) */}
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A', display: 'block', marginBottom: '4px' }}>
-                  Định mức mở bán trong ngày (Số suất) <span style={{ color: '#9D4124' }}>*</span>
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A' }}>
+                    Định mức mở bán trong ngày (Số suất) <span style={{ fontSize: '0.72rem', fontWeight: 500, color: '#89726B' }}>(Tùy chọn)</span>
+                  </label>
+                  {newDish.dailyStock && (
+                    <button
+                      type="button"
+                      onClick={() => setNewDish({ ...newDish, dailyStock: null })}
+                      style={{ background: 'none', border: 'none', color: '#9D4124', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                    >
+                      Bỏ giới hạn
+                    </button>
+                  )}
+                </div>
                 <input
                   type="number"
                   min="1"
-                  placeholder="Ví dụ: 30, 50, 100..."
-                  value={newDish.dailyStock !== undefined ? newDish.dailyStock : 50}
-                  onChange={(e) => setNewDish({ ...newDish, dailyStock: parseInt(e.target.value) || 0 })}
+                  placeholder="Để trống = Không giới hạn (Bán theo kho thông thường)"
+                  value={newDish.dailyStock !== null && newDish.dailyStock !== undefined ? newDish.dailyStock : ''}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    setNewDish({ ...newDish, dailyStock: val === '' ? null : (parseInt(val) > 0 ? parseInt(val) : null) });
+                  }}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #EAE0DE', outline: 'none', boxSizing: 'border-box' }}
                 />
                 <span style={{ fontSize: '0.68rem', color: '#89726B', marginTop: '3px', display: 'block' }}>
-                  Số suất sẵn sàng bán. Hệ thống tự động trừ tồn kho khi khách đặt và ngắt bán (86'd) khi về 0.
+                  {newDish.dailyStock
+                    ? `Giới hạn ${newDish.dailyStock} suất/ngày. Hệ thống tự động trừ tồn kho khi khách đặt và ngắt bán (86'd) khi về 0.`
+                    : 'Không giới hạn số suất. Món được mở bán liên tục theo khả năng kho thông thường.'}
                 </span>
               </div>
 
