@@ -18,6 +18,10 @@ const connectionStateSubscribers = new Set();
 // Bàn ăn cụ thể đang được subscribe riêng (/topic/dining/{tableId})
 const diningTableSubscribers = new Map(); // tableId -> Set of callbacks
 
+// Quản lý các subscription STOMP đang hoạt động để tránh duplicate và rò rỉ bộ nhớ
+const coreStompSubscriptions = new Map(); // topic -> StompSubscription
+const activeStompSubscriptions = new Map(); // topic -> StompSubscription
+
 let broadcastChannelInstance = null;
 let stompClientInstance = null;
 let isConnected = false;
@@ -160,19 +164,28 @@ const initStompClient = () => {
       console.log('[WebSocket STOMP] Đã kết nối thành công tới máy chủ ROMS!');
       notifyConnectionState(true);
 
-      // 1. Subscribe 6 topic nghiệp vụ cốt lõi
+      // 1. Subscribe 6 topic nghiệp vụ cốt lõi (hủy subscription cũ trước nếu là lần reconnect)
+      coreStompSubscriptions.forEach((sub) => {
+        try {
+          sub.unsubscribe();
+        } catch (e) {
+          // Safe catch
+        }
+      });
+      coreStompSubscriptions.clear();
+
       const topics = [
         '/topic/tables',
         '/topic/kitchen',
         '/topic/service-requests',
         '/topic/orders',
         '/topic/pos',
-        '/topic/staff' // <-- THÊM DÒNG NÀY ĐỂ NHẬN SỰ KIỆN LOGIN / LOGOUT TỨC THÌ
+        '/topic/staff' // Nhận sự kiện LOGIN / LOGOUT ca trực tức thì
       ];
 
       topics.forEach((topic) => {
         try {
-          stompClientInstance.subscribe(topic, (message) => {
+          const sub = stompClientInstance.subscribe(topic, (message) => {
             try {
               const body = JSON.parse(message.body);
               dispatchToSubscribers(body, `WS:${topic}`);
@@ -180,14 +193,26 @@ const initStompClient = () => {
               console.warn(`[WebSocket STOMP] Lỗi parse JSON từ topic ${topic}:`, jsonErr);
             }
           });
+          coreStompSubscriptions.set(topic, sub);
         } catch (subErr) {
           console.warn(`[WebSocket STOMP] Lỗi subscribe ${topic}:`, subErr);
         }
       });
 
-      // 2. Tự động subscribe lại các bàn ăn đang được quan sát
+      // 2. Tự động subscribe lại các bàn ăn đang được quan sát (dọn dẹp subscription cũ trước)
+      activeStompSubscriptions.forEach((sub) => {
+        try {
+          sub.unsubscribe();
+        } catch (e) {
+          // Safe catch
+        }
+      });
+      activeStompSubscriptions.clear();
+
       diningTableSubscribers.forEach((callbacks, tableId) => {
-        subscribeStompDiningTopic(tableId);
+        if (callbacks && callbacks.size > 0) {
+          subscribeStompDiningTopic(tableId);
+        }
       });
     },
     onDisconnect: () => {
@@ -216,8 +241,6 @@ const initStompClient = () => {
 };
 
 // Helper subscribe topic riêng theo từng bàn /topic/dining/{tableId}
-const activeStompSubscriptions = new Map();
-
 const subscribeStompDiningTopic = (tableId) => {
   if (!stompClientInstance || !isConnected) return;
   const topic = `/topic/dining/${tableId}`;
@@ -386,3 +409,69 @@ export const subscribeDiningTableEvents = (tableId, callback) => {
     }
   };
 };
+
+/**
+ * Ngắt toàn bộ kết nối WebSocket STOMP, hủy mọi subscriptions và giải phóng tài nguyên.
+ * Thường được gọi khi nhân viên đăng xuất (logout) hoặc khi ứng dụng cần dọn dẹp bộ nhớ.
+ */
+export const disconnectRealtime = async () => {
+  // 1. Hủy toàn bộ subscriptions bàn ăn
+  activeStompSubscriptions.forEach((sub) => {
+    try {
+      sub.unsubscribe();
+    } catch (e) {
+      // Safe catch
+    }
+  });
+  activeStompSubscriptions.clear();
+  diningTableSubscribers.clear();
+
+  // 2. Hủy toàn bộ subscriptions 6 core topics
+  coreStompSubscriptions.forEach((sub) => {
+    try {
+      sub.unsubscribe();
+    } catch (e) {
+      // Safe catch
+    }
+  });
+  coreStompSubscriptions.clear();
+
+  // 3. Xóa các danh sách callbacks lắng nghe
+  globalSubscribers.clear();
+  connectionStateSubscribers.clear();
+
+  // 4. Deactivate và hủy instance STOMP Client
+  if (stompClientInstance) {
+    const client = stompClientInstance;
+    stompClientInstance = null;
+    isConnected = false;
+    notifyConnectionState(false);
+    try {
+      await client.deactivate();
+      console.log('[WebSocket STOMP] Đã ngắt kết nối và giải phóng tài nguyên thành công.');
+    } catch (err) {
+      console.warn('[WebSocket STOMP] Lỗi khi deactivate client:', err);
+    }
+  }
+
+  // 5. Đóng BroadcastChannel nếu có
+  if (broadcastChannelInstance) {
+    try {
+      broadcastChannelInstance.close();
+    } catch (err) {
+      console.warn('[RealtimeSync] Lỗi khi đóng BroadcastChannel:', err);
+    }
+    broadcastChannelInstance = null;
+  }
+};
+
+/**
+ * Lấy số lượng listener và trạng thái kết nối STOMP hiện tại (phục vụ giám sát và kiểm thử)
+ */
+export const getActiveRealtimeStats = () => ({
+  isConnected,
+  globalSubscribersCount: globalSubscribers.size,
+  diningSubscribersCount: diningTableSubscribers.size,
+  coreSubscriptionsCount: coreStompSubscriptions.size,
+  activeDiningSubscriptionsCount: activeStompSubscriptions.size
+});

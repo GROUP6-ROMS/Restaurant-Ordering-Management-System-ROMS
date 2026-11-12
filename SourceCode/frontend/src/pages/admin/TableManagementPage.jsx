@@ -747,7 +747,9 @@ export default function TableManagementPage() {
         loadData(true);
       }
     });
-    return unsubscribe;
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   // Danh sách các bàn đang có chuông gọi phục vụ hoặc yêu cầu thanh toán PENDING
