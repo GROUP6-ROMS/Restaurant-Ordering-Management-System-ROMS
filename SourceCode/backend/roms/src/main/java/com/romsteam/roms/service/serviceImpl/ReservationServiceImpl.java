@@ -21,6 +21,7 @@ import com.romsteam.roms.repository.MenuItemRepository;
 import com.romsteam.roms.repository.ReservationRepository;
 import com.romsteam.roms.repository.RestaurantTableRepository;
 import com.romsteam.roms.repository.ZoneRepository;
+import com.romsteam.roms.service.EmailService;
 import com.romsteam.roms.service.ReservationService;
 import com.romsteam.roms.service.RestaurantTableService;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final MenuItemRepository menuItemRepository;
     private final RestaurantTableService tableService;
     private final ZoneRepository zoneRepository;
+    private final EmailService emailService;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -137,6 +139,12 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         Reservation saved = reservationRepository.save(reservation);
+
+        // Gửi email tiếp nhận đơn đặt bàn tới khách hàng (nếu có email)
+        if (saved.getCustomerEmail() != null && !saved.getCustomerEmail().trim().isEmpty()) {
+            emailService.sendReservationCreatedEmail(saved);
+        }
+
         return mapToResponse(saved);
     }
 
@@ -272,8 +280,36 @@ public class ReservationServiceImpl implements ReservationService {
         Reservation res = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt bàn #" + reservationId));
 
-        // Lấy toàn bộ các bàn đang trống (AVAILABLE) đang hoạt động trong nhà hàng
-        List<RestaurantTable> tables = tableRepository.findByStatusAndIsActiveTrue(TableStatus.AVAILABLE);
+        // Lấy toàn bộ các bàn đang hoạt động trong nhà hàng (không bị khóa bảo trì BLOCKED)
+        List<RestaurantTable> allActiveTables = tableRepository.findAll().stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsActive()) && t.getStatus() != TableStatus.BLOCKED)
+                .collect(Collectors.toList());
+
+        // Nghiệp vụ đa đặt bàn (Trùng giờ & Không trùng giờ):
+        // Lọc bàn khả dụng: Loại bỏ các bàn đã có đơn đặt CONFIRMED bị trùng khung giờ an toàn (cách nhau dưới 120 phút trên cùng ngày)
+        LocalDate targetDate = res.getReservationTime().toLocalDate();
+
+        List<RestaurantTable> availableTables = allActiveTables.stream()
+                .filter(table -> {
+                    List<Reservation> existingList = reservationRepository
+                            .findByTableIdAndStatusOrderByReservationTimeAsc(table.getId(), ReservationStatus.CONFIRMED);
+                    if (existingList == null || existingList.isEmpty()) return true;
+
+                    for (Reservation existing : existingList) {
+                        if (existing.getId().equals(res.getId())) continue;
+                        if (existing.getReservationTime() == null) continue;
+                        if (existing.getReservationTime().toLocalDate().equals(targetDate)) {
+                            long diffMinutes = Math.abs(java.time.Duration.between(
+                                    res.getReservationTime(), existing.getReservationTime()).toMinutes());
+                            if (diffMinutes < 120) {
+                                // Xung đột lịch đặt bàn trong vòng 2 tiếng
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
 
         final String reqZone = res.getRequestedZone();
         final int guests = res.getGuestCount() != null ? res.getGuestCount() : 1;
@@ -282,7 +318,7 @@ public class ReservationServiceImpl implements ReservationService {
         // 1. Các bàn thuộc đúng phân khu khách yêu cầu lên đầu
         // 2. Bàn có sức chứa phù hợp (capacity >= số khách)
         // 3. Sắp xếp tự nhiên theo số bàn (tableNumber)
-        tables.sort((t1, t2) -> {
+        availableTables.sort((t1, t2) -> {
             boolean t1Zone = reqZone != null && reqZone.equalsIgnoreCase(t1.getZone());
             boolean t2Zone = reqZone != null && reqZone.equalsIgnoreCase(t2.getZone());
             if (t1Zone != t2Zone) {
@@ -300,10 +336,8 @@ public class ReservationServiceImpl implements ReservationService {
             return num1.compareToIgnoreCase(num2);
         });
 
-        return tables.stream().map(t -> {
-            String zName = "Sảnh Chính";
-            if ("ZONE_2".equals(t.getZone())) zName = "Ban Công";
-            else if ("VIP".equals(t.getZone())) zName = "Phòng VIP";
+        return availableTables.stream().map(t -> {
+            String zName = resolveZoneName(t.getZone());
 
             return TableResponse.builder()
                     .id(t.getId())
@@ -335,21 +369,72 @@ public class ReservationServiceImpl implements ReservationService {
         RestaurantTable table = tableRepository.findById(request.getTableId())
                 .orElseThrow(() -> new AppException("Không tìm thấy bàn ăn mang ID #" + request.getTableId()));
 
-        if (table.getStatus() != TableStatus.AVAILABLE) {
-            throw new AppException("Bàn " + table.getTableNumber() + " hiện không ở trạng thái trống (Đang là " + table.getStatus() + ")!");
+        if (table.getStatus() == TableStatus.BLOCKED) {
+            throw new AppException("Bàn " + table.getTableNumber() + " đang tạm khóa bảo trì thiết bị, không thể xếp bàn!", HttpStatus.BAD_REQUEST);
+        }
+
+        // KIỂM TRA XUNG ĐỘT KHUNG GIỜ VỚI CÁC ĐƠN ĐẶT BÀN KHÁC TRÊN CÙNG BÀN (TRÙNG GIỜ & KHÔNG TRÙNG GIỜ)
+        List<Reservation> existingConfirmed = reservationRepository
+                .findByTableIdAndStatusOrderByReservationTimeAsc(table.getId(), ReservationStatus.CONFIRMED);
+
+        if (existingConfirmed != null && !existingConfirmed.isEmpty()) {
+            LocalDate targetDate = reservation.getReservationTime().toLocalDate();
+            for (Reservation existing : existingConfirmed) {
+                if (existing.getId().equals(reservation.getId())) continue;
+                if (existing.getReservationTime() == null) continue;
+                if (existing.getReservationTime().toLocalDate().equals(targetDate)) {
+                    long diffMinutes = Math.abs(java.time.Duration.between(
+                            reservation.getReservationTime(), existing.getReservationTime()).toMinutes());
+                    if (diffMinutes < 120) {
+                        String timeStr = existing.getReservationTime().format(TIME_FORMATTER);
+                        throw new AppException(
+                                "Xung đột lịch đặt bàn! Bàn " + table.getTableNumber() + " đã có đơn đặt của khách " +
+                                existing.getCustomerName() + " (" + existing.getCustomerPhone() + ") lúc " + timeStr +
+                                " (cách giờ hẹn dưới 120 phút). Vui lòng chọn bàn khác hoặc khung giờ cách nhau tối thiểu 2 tiếng!",
+                                HttpStatus.BAD_REQUEST
+                        );
+                    }
+                }
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime lockStart = reservation.getReservationTime().minusMinutes(60);
+        LocalDateTime lockEnd = reservation.getReservationTime().plusMinutes(45);
+        boolean isNowInLockWindow = (now.isEqual(lockStart) || now.isAfter(lockStart))
+                && (now.isEqual(lockEnd) || now.isBefore(lockEnd));
+
+        // Nếu giờ hẹn nằm ngay trong khung khóa đón khách hiện tại mà bàn đang có khách ngồi ăn (OCCUPIED):
+        if (isNowInLockWindow && table.getStatus() == TableStatus.OCCUPIED) {
+            throw new AppException("Bàn " + table.getTableNumber() + " hiện đang có khách ngồi ăn, không thể nhận khách đặt ngay lúc này!", HttpStatus.BAD_REQUEST);
         }
 
         // 1. Cập nhật thông tin phiếu đặt
         reservation.setTable(table);
         reservation.setStatus(ReservationStatus.CONFIRMED);
 
-        // 2. Cập nhật thông tin bàn ăn thành RESERVED
-        table.setStatus(TableStatus.RESERVED);
+        // 2. Cập nhật thông tin bàn ăn:
         table.setReservationInfo(reservation.getCustomerName() + " (" + reservation.getCustomerPhone() + ")");
         table.setReservedTime(reservation.getReservationTime().format(TIME_FORMATTER) + " ngày " + reservation.getReservationTime().format(DATE_FORMATTER));
 
+        if (isNowInLockWindow) {
+            table.setStatus(TableStatus.RESERVED);
+        } else {
+            // Nếu chưa tới khung giờ khóa an toàn (> 60 phút):
+            // Bàn giữ nguyên trạng thái hiện tại (AVAILABLE) để tiếp tục đón khách vãng lai các ca trước
+            if (table.getStatus() == null) {
+                table.setStatus(TableStatus.AVAILABLE);
+            }
+        }
+
         tableRepository.save(table);
         Reservation updated = reservationRepository.save(reservation);
+
+        // 3. Gửi email xác nhận kèm số bàn và hướng dẫn cho khách hàng (nếu có email)
+        if (updated.getCustomerEmail() != null && !updated.getCustomerEmail().trim().isEmpty()) {
+            String zoneName = resolveZoneName(table.getZone());
+            emailService.sendReservationConfirmedEmail(updated, table.getTableNumber(), zoneName);
+        }
 
         return mapToResponse(updated);
     }
@@ -366,18 +451,36 @@ public class ReservationServiceImpl implements ReservationService {
         // Giải phóng bàn nếu trước đó đã được xếp bàn
         if (reservation.getTable() != null) {
             RestaurantTable table = reservation.getTable();
-            if (table.getStatus() == TableStatus.RESERVED) {
-                table.setStatus(TableStatus.AVAILABLE);
+            List<Reservation> remainingConfirmed = reservationRepository
+                    .findByTableIdAndStatusOrderByReservationTimeAsc(table.getId(), ReservationStatus.CONFIRMED)
+                    .stream()
+                    .filter(r -> !r.getId().equals(reservation.getId()))
+                    .collect(Collectors.toList());
+
+            if (remainingConfirmed.isEmpty()) {
+                if (table.getStatus() == TableStatus.RESERVED) {
+                    table.setStatus(TableStatus.AVAILABLE);
+                }
                 table.setReservationInfo(null);
                 table.setReservedTime(null);
-                tableRepository.save(table);
+            } else {
+                Reservation next = remainingConfirmed.get(0);
+                table.setReservationInfo(next.getCustomerName() + " (" + next.getCustomerPhone() + ")");
+                table.setReservedTime(next.getReservationTime().format(TIME_FORMATTER) + " ngày " + next.getReservationTime().format(DATE_FORMATTER));
             }
+            tableRepository.save(table);
         }
 
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservation.setCancelReason(request.getCancelReason());
 
         Reservation saved = reservationRepository.save(reservation);
+
+        // Gửi email thông báo hủy bàn cho khách hàng (nếu có email)
+        if (saved.getCustomerEmail() != null && !saved.getCustomerEmail().trim().isEmpty()) {
+            emailService.sendReservationCancelledEmail(saved, request.getCancelReason());
+        }
+
         return mapToResponse(saved);
     }
 
@@ -432,6 +535,12 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         Reservation saved = reservationRepository.save(reservation);
+
+        // Gửi email tiếp nhận đơn đặt bàn tới khách hàng (nếu có email)
+        if (saved.getCustomerEmail() != null && !saved.getCustomerEmail().trim().isEmpty()) {
+            emailService.sendReservationCreatedEmail(saved);
+        }
+
         return mapToResponse(saved);
     }
 
@@ -554,5 +663,46 @@ public class ReservationServiceImpl implements ReservationService {
                 .preOrderItemsCount(preOrderCount)
                 .createdAt(r.getCreatedAt())
                 .build();
+    }
+
+    // ===================================================================
+    // 10. THỰC KHÁCH TRA CỨU TIẾN ĐỘ ĐƠN ĐẶT BÀN THEO MÃ ĐẶT CHỖ HOẶC SĐT
+    // ===================================================================
+    @Override
+    @Transactional(readOnly = true)
+    public ReservationResponse lookupReservation(String bookingCode, String phone) {
+        if ((bookingCode == null || bookingCode.trim().isEmpty()) && (phone == null || phone.trim().isEmpty())) {
+            throw new AppException("Vui lòng cung cấp Mã đặt chỗ hoặc Số điện thoại để tra cứu!", HttpStatus.BAD_REQUEST);
+        }
+
+        Optional<Reservation> resOpt = Optional.empty();
+        if (bookingCode != null && !bookingCode.trim().isEmpty()) {
+            resOpt = reservationRepository.findByBookingCode(bookingCode.trim().toUpperCase());
+        }
+
+        if (resOpt.isEmpty() && phone != null && !phone.trim().isEmpty()) {
+            List<Reservation> byPhone = reservationRepository.findByCustomerPhoneOrderByReservationTimeDesc(phone.trim());
+            if (!byPhone.isEmpty()) {
+                resOpt = Optional.of(byPhone.get(0));
+            }
+        }
+
+        Reservation res = resOpt.orElseThrow(() -> new AppException("Không tìm thấy thông tin đơn đặt bàn với thông tin cung cấp!", HttpStatus.NOT_FOUND));
+        return mapToResponse(res);
+    }
+
+    // ===================================================================
+    // HELPER: PHÂN GIẢI TÊN PHÂN KHU TỪ MÃ KHU VỰC
+    // ===================================================================
+    private String resolveZoneName(String zoneCode) {
+        if (zoneCode == null) return "Khu vực tiêu chuẩn";
+        return zoneRepository.findByZoneCode(zoneCode)
+                .map(Zone::getName)
+                .orElse(switch (zoneCode.trim().toUpperCase()) {
+                    case "ZONE_1" -> "Tầng 1 - Sảnh Chính";
+                    case "ZONE_2" -> "Tầng 2 - Ban Công";
+                    case "VIP" -> "Phòng VIP";
+                    default -> zoneCode;
+                });
     }
 }

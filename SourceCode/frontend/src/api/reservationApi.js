@@ -50,6 +50,12 @@ export const reservationApi = {
   checkIn: async (reservationId) => {
     const res = await axiosClient.post(`/admin/reservations/${reservationId}/check-in`);
     return res.data;
+  },
+
+  // 9. Khách hàng tra cứu trạng thái đơn đặt bàn bằng Mã đặt chỗ hoặc Số điện thoại
+  lookupReservation: async (params) => {
+    const res = await axiosClient.get('/customer/reservations/lookup', { params });
+    return res.data;
   }
 };
 

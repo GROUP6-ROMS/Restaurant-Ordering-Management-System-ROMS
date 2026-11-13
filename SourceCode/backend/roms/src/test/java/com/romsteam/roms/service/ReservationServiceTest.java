@@ -53,6 +53,9 @@ class ReservationServiceTest {
     @Mock
     private ZoneRepository zoneRepository;
 
+    @Mock
+    private EmailService emailService;
+
     @InjectMocks
     private ReservationServiceImpl reservationService;
 
@@ -241,7 +244,7 @@ class ReservationServiceTest {
     }
 
     @Test
-    @DisplayName("3. Quản lý xếp bàn cho đơn đặt: chuyển Reservation sang CONFIRMED và Table sang RESERVED")
+    @DisplayName("3. Quản lý xếp bàn cho đơn đặt trong khung giờ khóa an toàn (30 phút nữa): chuyển Table sang RESERVED")
     void assignTableToReservation_WhenTableAvailable_ConfirmsReservation() {
         Reservation reservation = Reservation.builder()
                 .id(10L)
@@ -249,7 +252,7 @@ class ReservationServiceTest {
                 .customerName("Lê Văn B")
                 .customerPhone("0912345678")
                 .guestCount(6)
-                .reservationTime(LocalDateTime.now().plusDays(1))
+                .reservationTime(LocalDateTime.now().plusMinutes(30)) // Nằm trong khung khóa an toàn 60 phút
                 .status(ReservationStatus.PENDING)
                 .build();
 
@@ -274,12 +277,13 @@ class ReservationServiceTest {
     }
 
     @Test
-    @DisplayName("4. Xếp bàn bị từ chối nếu bàn không ở trạng thái trống (AVAILABLE)")
-    void assignTableToReservation_WhenTableNotAvailable_ThrowsException() {
-        table.setStatus(TableStatus.OCCUPIED); // Bàn đang có khách
+    @DisplayName("4. Xếp bàn bị từ chối nếu bàn đang tạm khóa bảo trì (BLOCKED)")
+    void assignTableToReservation_WhenTableBlocked_ThrowsException() {
+        table.setStatus(TableStatus.BLOCKED);
 
         Reservation reservation = Reservation.builder()
                 .id(10L)
+                .reservationTime(LocalDateTime.now().plusDays(1))
                 .status(ReservationStatus.PENDING)
                 .build();
 
@@ -292,7 +296,85 @@ class ReservationServiceTest {
         // Act & Assert
         assertThatThrownBy(() -> reservationService.assignTableToReservation(10L, request))
                 .isInstanceOf(AppException.class)
-                .hasMessageContaining("hiện không ở trạng thái trống");
+                .hasMessageContaining("tạm khóa bảo trì");
+    }
+
+    @Test
+    @DisplayName("4b. Xếp bàn bị từ chối nếu bị trùng giờ với đơn đặt khác trên cùng bàn (< 120 phút)")
+    void assignTableToReservation_WhenOverlappingTime_ThrowsConflictException() {
+        LocalDateTime baseTime = LocalDateTime.of(2026, 11, 20, 18, 30);
+        Reservation existingRes = Reservation.builder()
+                .id(101L)
+                .customerName("Trần Văn Khách Cũ")
+                .customerPhone("0988888888")
+                .reservationTime(baseTime)
+                .status(ReservationStatus.CONFIRMED)
+                .build();
+
+        // Đơn mới đặt lúc 19:15 cùng ngày (cách nhau 45 phút < 120 phút)
+        Reservation newRes = Reservation.builder()
+                .id(10L)
+                .customerName("Lê Văn Khách Mới")
+                .customerPhone("0912345678")
+                .reservationTime(baseTime.plusMinutes(45))
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        AssignTableReservationRequest request = new AssignTableReservationRequest();
+        request.setTableId(5L);
+
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(newRes));
+        when(tableRepository.findById(5L)).thenReturn(Optional.of(table));
+        when(reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(5L, ReservationStatus.CONFIRMED))
+                .thenReturn(List.of(existingRes));
+
+        // Act & Assert
+        assertThatThrownBy(() -> reservationService.assignTableToReservation(10L, request))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("Xung đột lịch đặt bàn")
+                .hasMessageContaining("Trần Văn Khách Cũ");
+    }
+
+    @Test
+    @DisplayName("4c. Cho phép xếp cùng 1 bàn nếu 2 đơn KHÔNG trùng giờ (ví dụ Ca trưa 11:30 và Ca tối 18:30)")
+    void assignTableToReservation_WhenNonOverlappingTime_Succeeds() {
+        LocalDateTime lunchTime = LocalDateTime.of(2026, 11, 20, 11, 30);
+        LocalDateTime dinnerTime = LocalDateTime.of(2026, 11, 20, 18, 30); // Cách 7 tiếng > 120 phút
+
+        Reservation existingLunchRes = Reservation.builder()
+                .id(101L)
+                .customerName("Khách Ăn Trưa")
+                .customerPhone("0988888888")
+                .reservationTime(lunchTime)
+                .status(ReservationStatus.CONFIRMED)
+                .build();
+
+        Reservation newDinnerRes = Reservation.builder()
+                .id(10L)
+                .customerName("Khách Ăn Tối")
+                .customerPhone("0912345678")
+                .customerEmail("customer@gmail.com")
+                .reservationTime(dinnerTime)
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        AssignTableReservationRequest request = new AssignTableReservationRequest();
+        request.setTableId(5L);
+
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(newDinnerRes));
+        when(tableRepository.findById(5L)).thenReturn(Optional.of(table));
+        when(reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(5L, ReservationStatus.CONFIRMED))
+                .thenReturn(List.of(existingLunchRes));
+        when(tableRepository.save(any(RestaurantTable.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        ReservationResponse response = reservationService.assignTableToReservation(10L, request);
+
+        // Assert
+        assertThat(response).isNotNull();
+        assertThat(newDinnerRes.getStatus()).isEqualTo(ReservationStatus.CONFIRMED);
+        verify(emailService).sendReservationConfirmedEmail(eq(newDinnerRes), eq(table.getTableNumber()), anyString());
     }
 
     @Test
@@ -303,6 +385,7 @@ class ReservationServiceTest {
                 .id(10L)
                 .requestedZone("VIP")
                 .guestCount(4)
+                .reservationTime(LocalDateTime.of(2026, 11, 20, 19, 0))
                 .build();
 
         // 3 bàn trống ở các khu vực khác nhau
@@ -314,8 +397,7 @@ class ReservationServiceTest {
                 .id(3L).tableNumber("VIP-02").name("Phòng VIP 2").zone("VIP").capacity(6).status(TableStatus.AVAILABLE).isActive(true).build();
 
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
-        when(tableRepository.findByStatusAndIsActiveTrue(TableStatus.AVAILABLE))
-                .thenReturn(new ArrayList<>(List.of(t1, t2, t3)));
+        when(tableRepository.findAll()).thenReturn(List.of(t1, t2, t3));
 
         // Act
         List<TableResponse> results = reservationService.getAvailableTablesForReservation(10L);
@@ -326,6 +408,28 @@ class ReservationServiceTest {
         assertThat(results.get(0).getZone()).isEqualTo("VIP");
         assertThat(results.get(1).getCode()).isEqualTo("VIP-01");
         assertThat(results.get(2).getCode()).isEqualTo("T-01");
+    }
+
+    @Test
+    @DisplayName("6. Thực khách tra cứu đơn đặt bàn bằng Mã đặt chỗ thành công")
+    void lookupReservation_ByBookingCode_ReturnsReservation() {
+        Reservation reservation = Reservation.builder()
+                .id(10L)
+                .bookingCode("RES-20261120-1234")
+                .customerName("Nguyễn Văn A")
+                .customerPhone("0901234567")
+                .guestCount(4)
+                .reservationTime(LocalDateTime.of(2026, 11, 20, 19, 0))
+                .status(ReservationStatus.CONFIRMED)
+                .build();
+
+        when(reservationRepository.findByBookingCode("RES-20261120-1234")).thenReturn(Optional.of(reservation));
+
+        ReservationResponse response = reservationService.lookupReservation("RES-20261120-1234", null);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getBookingCode()).isEqualTo("RES-20261120-1234");
+        assertThat(response.getCustomerName()).isEqualTo("Nguyễn Văn A");
     }
 }
 

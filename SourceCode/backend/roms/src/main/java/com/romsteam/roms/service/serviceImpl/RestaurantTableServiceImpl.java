@@ -480,36 +480,69 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         List<Reservation> confirmedReservations = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(table.getId(), ReservationStatus.CONFIRMED);
         if (confirmedReservations != null && !confirmedReservations.isEmpty()) {
             LocalDateTime nowTime = LocalDateTime.now();
+            Reservation activeBufferRes = null;
+            Reservation nextUpcomingRes = null;
+
             for (Reservation r : confirmedReservations) {
                 if (r.getReservationTime() == null) continue;
                 LocalDateTime startLock = r.getReservationTime().minusMinutes(60);
                 LocalDateTime endLock = r.getReservationTime().plusMinutes(45);
 
-                boolean inBufferWindow = nowTime.isAfter(startLock) && nowTime.isBefore(endLock);
-                boolean isReservedState = (table.getStatus() == TableStatus.RESERVED);
+                boolean inBufferWindow = (nowTime.isEqual(startLock) || nowTime.isAfter(startLock))
+                        && (nowTime.isEqual(endLock) || nowTime.isBefore(endLock));
 
-                if (inBufferWindow || isReservedState) {
-                    isBufferLocked = true;
-                    bufferLockReservationId = r.getId();
-                    bufferLockBookingCode = r.getBookingCode();
-                    bufferLockMinutesRemaining = java.time.Duration.between(nowTime, r.getReservationTime()).toMinutes();
-                    bufferLockTargetTime = r.getReservationTime().format(DateTimeFormatter.ofPattern("HH:mm"));
-                    bufferLockCustomer = r.getCustomerName() + " (" + r.getCustomerPhone() + ")";
-                    bufferLockGuestCount = r.getGuestCount();
-                    if (r.getItems() != null) {
-                        bufferLockPreOrderCount = r.getItems().stream()
-                                .mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0)
-                                .sum();
-                    }
+                if (inBufferWindow) {
+                    activeBufferRes = r;
                     break;
+                } else if (r.getReservationTime().isAfter(nowTime) && nextUpcomingRes == null) {
+                    nextUpcomingRes = r;
+                }
+            }
+
+            if (activeBufferRes != null) {
+                isBufferLocked = true;
+                bufferLockReservationId = activeBufferRes.getId();
+                bufferLockBookingCode = activeBufferRes.getBookingCode();
+                bufferLockMinutesRemaining = java.time.Duration.between(nowTime, activeBufferRes.getReservationTime()).toMinutes();
+                bufferLockTargetTime = activeBufferRes.getReservationTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+                bufferLockCustomer = activeBufferRes.getCustomerName() + " (" + activeBufferRes.getCustomerPhone() + ")";
+                bufferLockGuestCount = activeBufferRes.getGuestCount();
+                if (activeBufferRes.getItems() != null) {
+                    bufferLockPreOrderCount = activeBufferRes.getItems().stream()
+                            .mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0)
+                            .sum();
+                }
+            } else if (nextUpcomingRes != null) {
+                // Đơn đặt tiếp theo trong tương lai (> 60 phút). Bàn CHƯA khóa đón khách để tiếp tục phục vụ khách khác
+                isBufferLocked = false;
+                bufferLockMinutesRemaining = java.time.Duration.between(nowTime, nextUpcomingRes.getReservationTime()).toMinutes();
+                bufferLockTargetTime = nextUpcomingRes.getReservationTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+                bufferLockCustomer = nextUpcomingRes.getCustomerName() + " (" + nextUpcomingRes.getCustomerPhone() + ")";
+                bufferLockReservationId = nextUpcomingRes.getId();
+                bufferLockBookingCode = nextUpcomingRes.getBookingCode();
+                bufferLockGuestCount = nextUpcomingRes.getGuestCount();
+                if (nextUpcomingRes.getItems() != null) {
+                    bufferLockPreOrderCount = nextUpcomingRes.getItems().stream()
+                            .mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0)
+                            .sum();
                 }
             }
         }
 
-        if (!isBufferLocked && table.getStatus() == TableStatus.RESERVED) {
+        // Trường hợp bàn được Quản lý set RESERVED thủ công qua modal (không qua đơn đặt bàn)
+        if (!isBufferLocked && table.getStatus() == TableStatus.RESERVED && bufferLockTargetTime == null) {
             isBufferLocked = true;
             bufferLockTargetTime = table.getReservedTime();
             bufferLockCustomer = table.getReservationInfo();
+        }
+
+        // Xác định trạng thái phản hồi hiệu lực:
+        // Nếu bàn đang trong khung khóa an toàn (isBufferLocked) mà bàn đang AVAILABLE thì hiển thị RESERVED
+        TableStatus responseStatus = table.getStatus();
+        String responseStatusText = statusText;
+        if (isBufferLocked && responseStatus == TableStatus.AVAILABLE) {
+            responseStatus = TableStatus.RESERVED;
+            responseStatusText = "Đã Đặt";
         }
 
         // Tạo link gọi món thực tế dẫn tới màn hình chào bàn của khách (ưu tiên domain công khai)
@@ -529,8 +562,8 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                 .zone(table.getZone())
                 .zoneName(zoneName)
                 .capacity(table.getCapacity())
-                .status(table.getStatus())
-                .statusText(statusText)
+                .status(responseStatus)
+                .statusText(responseStatusText)
                 .guests(guests)
                 .currentBill(currentBill)
                 .timeIn(timeIn)

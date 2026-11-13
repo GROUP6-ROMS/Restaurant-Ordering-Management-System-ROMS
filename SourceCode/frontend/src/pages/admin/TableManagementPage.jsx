@@ -2523,6 +2523,50 @@ export default function TableManagementPage() {
                   </div>
                 )}
 
+                {/* Banner Thông Tin Lịch Hẹn Đặt Bàn Tiếp Theo Trong Ngày (Khi chưa tới khung giờ khóa 60') */}
+                {!isBufferLocked && t.bufferLockTargetTime && (
+                  <div
+                    style={{
+                      background: '#EFF6FF',
+                      border: '1.2px solid #BFDBFE',
+                      borderRadius: '12px',
+                      padding: '8px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 1px 4px rgba(59, 130, 246, 0.06)'
+                    }}
+                  >
+                    <div style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '8px',
+                      background: '#DBEAFE',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#1D4ED8',
+                      flexShrink: 0
+                    }}>
+                      <Icon name="event" size={17} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1E40AF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Lịch hẹn: {t.bufferLockTargetTime}</span>
+                        {t.bufferLockPreOrderCount > 0 && (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: '6px', background: '#3B82F6', color: '#FFFFFF' }}>
+                            {t.bufferLockPreOrderCount} món
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.70rem', color: '#2563EB', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Khách: <strong>{formatCustomerReservation(t.bufferLockCustomer)}</strong>
+                        {t.bufferLockMinutesRemaining !== null && ` • Còn ${t.bufferLockMinutesRemaining} phút`}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Table Stats (Đã bỏ shape) */}
                 <div style={{
                   background: '#FFF8F6',
