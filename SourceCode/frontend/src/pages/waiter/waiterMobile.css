@@ -115,7 +115,7 @@
     color: #56423D;
     display: flex;
     align-items: center;
-    justifyContent: center;
+    justify-content: center;
     gap: 6px;
     transition: all 0.2s ease;
   }
