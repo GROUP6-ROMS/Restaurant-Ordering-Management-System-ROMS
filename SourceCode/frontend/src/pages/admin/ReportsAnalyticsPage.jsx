@@ -12,14 +12,21 @@ const TIMEFRAMES = [
   { id: 'CUSTOM', label: 'Tùy Chỉnh' },
 ];
 
+const formatLocalDateISO = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export default function ReportsAnalyticsPage() {
   const restaurantProfile = useRestaurantProfile();
   // State lưu khoảng thời gian lọc hiện tại
   const [timeframe, setTimeframe] = useState('TODAY');
 
   // State lưu ngày bắt đầu và kết thúc khi chọn tùy chỉnh (CUSTOM)
-  const [customStartDate, setCustomStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customStartDate, setCustomStartDate] = useState(() => formatLocalDateISO());
+  const [customEndDate, setCustomEndDate] = useState(() => formatLocalDateISO());
 
   // State chuyển đổi giữa 3 góc nhìn báo cáo: REVENUE, OPERATIONS, AUDIT
   const [reportType, setReportType] = useState('REVENUE');
@@ -45,20 +52,20 @@ export default function ReportsAnalyticsPage() {
     const today = new Date();
     if (preset === 'THIS_WEEK') {
       const day = today.getDay();
-      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(today.setDate(diff));
-      const sunday = new Date(today.setDate(diff + 6));
-      setCustomStartDate(monday.toISOString().split('T')[0]);
-      setCustomEndDate(sunday.toISOString().split('T')[0]);
+      const diffToMonday = day === 0 ? -6 : 1 - day;
+      const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday);
+      const sunday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday + 6);
+      setCustomStartDate(formatLocalDateISO(monday));
+      setCustomEndDate(formatLocalDateISO(sunday));
     } else if (preset === 'LAST_MONTH') {
       const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
-      setCustomStartDate(firstDay.toISOString().split('T')[0]);
-      setCustomEndDate(lastDay.toISOString().split('T')[0]);
+      setCustomStartDate(formatLocalDateISO(firstDay));
+      setCustomEndDate(formatLocalDateISO(lastDay));
     } else if (preset === 'LAST_30_DAYS') {
-      const past30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      setCustomStartDate(past30.toISOString().split('T')[0]);
-      setCustomEndDate(new Date().toISOString().split('T')[0]);
+      const past30 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30);
+      setCustomStartDate(formatLocalDateISO(past30));
+      setCustomEndDate(formatLocalDateISO(today));
     }
   };
 
@@ -118,7 +125,7 @@ export default function ReportsAnalyticsPage() {
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = downloadUrl;
-        link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.xls`);
+        link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${formatLocalDateISO()}.xls`);
         document.body.appendChild(link);
         link.click();
         link.parentNode.removeChild(link);
@@ -206,7 +213,7 @@ export default function ReportsAnalyticsPage() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${new Date().toISOString().slice(0, 10)}.xls`);
+      link.setAttribute('download', `ROMS_BaoCao_${timeframe}_${formatLocalDateISO()}.xls`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
