@@ -19,7 +19,7 @@ function formatVND(amount) {
 // ====================================================
 export default function CustomerCartPage() {
   const {
-    cartItems, updateQuantity, removeFromCart, clearCart,
+    cartItems, updateQuantity, removeFromCart, syncItemStock, clearCart,
     totalCount, totalPrice, tableInfo
   } = useCart();
   const navigate = useNavigate();
@@ -35,6 +35,11 @@ export default function CustomerCartPage() {
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable, remainingStock } = event.payload;
+        syncItemStock(id, isAvailable, remainingStock);
+        return;
+      }
       if (
         (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED', 'BILL_PAID', 'SESSION_CLOSED'].includes(event.type)) &&
         (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
@@ -392,21 +397,44 @@ export default function CustomerCartPage() {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {/* Stepper */}
-                <div className="stepper">
-                  <button
-                    className="stepper-btn"
-                    onClick={() => updateQuantity(item.id, item.note, -1)}
-                  >
-                    <Icon name="remove" size={15} />
-                  </button>
-                  <span className="stepper-count">{item.quantity}</span>
-                  <button
-                    className="stepper-btn"
-                    onClick={() => updateQuantity(item.id, item.note, 1)}
-                  >
-                    <Icon name="add" size={15} />
-                  </button>
-                </div>
+                {(() => {
+                  const totalForDish = cartItems
+                    .filter(i => Number(i.id) === Number(item.id))
+                    .reduce((s, i) => s + i.quantity, 0);
+                  const hasFinite = item.remainingStock !== null && item.remainingStock !== undefined;
+                  const atStockLimit = item.isAvailable === false || (hasFinite && totalForDish >= Number(item.remainingStock));
+                  return (
+                    <div className="stepper">
+                      <button
+                        className="stepper-btn"
+                        onClick={() => updateQuantity(item.id, item.note, -1)}
+                      >
+                        <Icon name="remove" size={15} />
+                      </button>
+                      <span className="stepper-count">{item.quantity}</span>
+                      <button
+                        className="stepper-btn"
+                        style={{
+                          opacity: atStockLimit ? 0.45 : 1,
+                          cursor: atStockLimit ? 'not-allowed' : 'pointer',
+                        }}
+                        onClick={() => {
+                          if (item.isAvailable === false) {
+                            showToast(`Món "${item.name}" hiện đã tạm ngưng phục vụ!`);
+                            return;
+                          }
+                          if (hasFinite && totalForDish >= Number(item.remainingStock)) {
+                            showToast(`Món "${item.name}" chỉ còn tối đa ${item.remainingStock} suất!`);
+                            return;
+                          }
+                          updateQuantity(item.id, item.note, 1);
+                        }}
+                      >
+                        <Icon name="add" size={15} />
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Nut xoa mon */}
                 <button

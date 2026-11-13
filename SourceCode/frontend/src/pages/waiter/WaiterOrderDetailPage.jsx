@@ -110,17 +110,18 @@ export default function WaiterOrderDetailPage() {
   }, [tableCodeParam]);
 
   // Tải danh mục thực đơn thật từ CSDL
-  useEffect(() => {
-    const fetchRealMenu = async () => {
-      try {
-        const res = await waiterApi.getMenu();
-        if (res.data && res.data.success) {
-          setMenuCatalog(res.data.data || []);
-        }
-      } catch (err) {
-        console.error('Lỗi tải thực đơn món:', err);
+  const fetchRealMenu = async () => {
+    try {
+      const res = await waiterApi.getMenu();
+      if (res.data && res.data.success) {
+        setMenuCatalog(res.data.data || []);
       }
-    };
+    } catch (err) {
+      console.error('Lỗi tải thực đơn món:', err);
+    }
+  };
+
+  useEffect(() => {
     fetchRealMenu();
   }, []);
 
@@ -187,22 +188,62 @@ export default function WaiterOrderDetailPage() {
   const vat = 0;
   const total = subtotal;
 
-  // Add dish to temporary order cart
+  const handleOpenAddDishModal = () => {
+    const activeStatuses = ['OCCUPIED', 'FOOD_READY', 'CALLING', 'AWAITING_PAYMENT'];
+    if (!tableData?.id || !activeStatuses.includes(tableData.status)) {
+      showToast('Bàn chưa mở phiên phục vụ, vui lòng Mở Bàn trước khi gọi món!');
+      return;
+    }
+    fetchRealMenu();
+    setShowAddDishModal(true);
+  };
+
+  // Add dish to temporary order cart (kiểm tra trạng thái bán & giới hạn tồn kho)
   const handleSelectDish = (dish) => {
+    const catalogDish = menuCatalog.find(m => m.id === dish.id) || dish;
+    if (!isDishUnlocked(catalogDish)) {
+      showToast(`Món "${catalogDish.name}" hiện đã tạm hết!`);
+      return;
+    }
+    const existing = cartToAdd.find(i => i.id === dish.id);
+    const hasFinite = catalogDish.remainingStock !== null && catalogDish.remainingStock !== undefined;
+    if (hasFinite && (existing?.qty || 0) >= Number(catalogDish.remainingStock)) {
+      showToast(`Món "${catalogDish.name}" chỉ còn lại ${catalogDish.remainingStock} phần!`);
+      return;
+    }
     setCartToAdd(prev => {
-      const existing = prev.find(i => i.id === dish.id);
-      if (existing) {
-        return prev.map(i => i.id === dish.id ? { ...i, qty: i.qty + 1 } : i);
+      const prevExisting = prev.find(i => i.id === dish.id);
+      if (prevExisting) {
+        if (hasFinite && prevExisting.qty >= Number(catalogDish.remainingStock)) {
+          return prev;
+        }
+        return prev.map(i => i.id === dish.id ? { ...i, qty: i.qty + 1, remainingStock: catalogDish.remainingStock, isAvailable: catalogDish.isAvailable } : i);
       }
-      return [...prev, { ...dish, qty: 1, note: '' }];
+      return [...prev, { ...catalogDish, qty: 1, note: '' }];
     });
   };
 
   const handleUpdateCartQty = (id, delta) => {
+    const catalogDish = menuCatalog.find(m => m.id === id) || cartToAdd.find(i => i.id === id);
+    if (delta > 0 && catalogDish) {
+      if (!isDishUnlocked(catalogDish)) {
+        showToast(`Món "${catalogDish.name}" hiện đã tạm hết!`);
+        return;
+      }
+      const current = cartToAdd.find(i => i.id === id);
+      const hasFinite = catalogDish.remainingStock !== null && catalogDish.remainingStock !== undefined;
+      if (hasFinite && ((current?.qty || 0) + delta) > Number(catalogDish.remainingStock)) {
+        showToast(`Món "${catalogDish.name}" chỉ còn lại ${catalogDish.remainingStock} phần!`);
+        return;
+      }
+    }
     setCartToAdd(prev => {
       return prev.map(i => {
         if (i.id === id) {
           const next = i.qty + delta;
+          if (delta > 0 && catalogDish && catalogDish.remainingStock !== null && catalogDish.remainingStock !== undefined && next > Number(catalogDish.remainingStock)) {
+            return i;
+          }
           return next > 0 ? { ...i, qty: next } : null;
         }
         return i;
@@ -234,7 +275,7 @@ export default function WaiterOrderDetailPage() {
         setCartToAdd([]);
         setShowAddDishModal(false);
         showToast(`Đã gửi thành công ${count} món gọi thêm vào Bếp cho Bàn ${tableData.code}!`);
-        await fetchTablesAndDetails();
+        await Promise.all([fetchTablesAndDetails(), fetchRealMenu()]);
       }
     } catch (err) {
       showToast(err.response?.data?.message || 'Lỗi khi gửi đợt gọi món');
@@ -402,7 +443,7 @@ export default function WaiterOrderDetailPage() {
 
             <button
               type="button"
-              onClick={() => setShowAddDishModal(true)}
+              onClick={handleOpenAddDishModal}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -518,7 +559,7 @@ export default function WaiterOrderDetailPage() {
             </h3>
             <button
               type="button"
-              onClick={() => setShowAddDishModal(true)}
+              onClick={handleOpenAddDishModal}
               style={{
                 background: '#FCF1EF',
                 color: '#9D4124',
@@ -686,7 +727,7 @@ export default function WaiterOrderDetailPage() {
             <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 type="button"
-                onClick={() => setShowAddDishModal(true)}
+                onClick={handleOpenAddDishModal}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -804,7 +845,7 @@ export default function WaiterOrderDetailPage() {
 
             <button
               type="button"
-              onClick={() => setShowAddDishModal(true)}
+              onClick={handleOpenAddDishModal}
               style={{
                 padding: '9px 16px',
                 borderRadius: '10px',
@@ -1010,16 +1051,20 @@ export default function WaiterOrderDetailPage() {
                         <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Không tìm thấy món ăn nào</div>
                       </div>
                     ) : (
-                      filteredCatalog.map(dish => (
+                      filteredCatalog.map(dish => {
+                        const unlocked = isDishUnlocked(dish);
+                        const hasFiniteStock = dish.remainingStock !== null && dish.remainingStock !== undefined;
+                        return (
                         <div
                           key={dish.id}
                           onClick={() => handleSelectDish(dish)}
                           style={{
-                            background: '#FFF8F6',
+                            background: unlocked ? '#FFF8F6' : '#F5F5F4',
                             border: '1px solid #F0E6E4',
                             borderRadius: '12px',
                             padding: isMobile ? '8px 10px' : '10px',
-                            cursor: 'pointer',
+                            cursor: unlocked ? 'pointer' : 'not-allowed',
+                            opacity: unlocked ? 1 : 0.5,
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
@@ -1031,21 +1076,29 @@ export default function WaiterOrderDetailPage() {
                             <div style={{ fontWeight: 800, fontSize: isMobile ? '0.8rem' : '0.85rem', color: '#1F1B1A', lineHeight: 1.25 }}>
                               {dish.name}
                             </div>
-                            <span style={{ fontSize: '0.7rem', color: '#89726B' }}>
-                              {dish.category}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.7rem', color: '#89726B' }}>
+                                {dish.category}
+                              </span>
+                              {unlocked && hasFiniteStock && (
+                                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: Number(dish.remainingStock) <= 5 ? '#BA1A1A' : '#2E7D32', background: Number(dish.remainingStock) <= 5 ? '#FFDAD6' : '#E8F5E9', padding: '1px 5px', borderRadius: '4px' }}>
+                                  Còn {dish.remainingStock}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                            <span style={{ fontWeight: 800, fontSize: isMobile ? '0.8rem' : '0.85rem', color: '#9D4124' }}>
+                            <span style={{ fontWeight: 800, fontSize: isMobile ? '0.8rem' : '0.85rem', color: unlocked ? '#9D4124' : '#89726B' }}>
                               {dish.price.toLocaleString('vi-VN')}₫
                             </span>
-                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#9D4124', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Icon name="add" size={16} />
+                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: unlocked ? '#9D4124' : '#D1C2BE', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Icon name={unlocked ? "add" : "lock"} size={unlocked ? 16 : 14} />
                             </div>
                           </div>
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 

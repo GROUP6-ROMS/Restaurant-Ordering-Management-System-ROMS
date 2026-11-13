@@ -103,6 +103,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         // 4. Đính kèm các món ăn đặt trước (nếu có)
         if (request.getPreOrderItems() != null && !request.getPreOrderItems().isEmpty()) {
+            java.util.Map<Long, Integer> requestedQtyByDish = new java.util.HashMap<>();
             for (ReservationItemRequest itemReq : request.getPreOrderItems()) {
                 if (itemReq.getMenuItemId() == null || itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
                     continue;
@@ -115,6 +116,10 @@ public class ReservationServiceImpl implements ReservationService {
                 if (!Boolean.TRUE.equals(menuItem.getIsAvailable()) ||
                         (menuItem.getRemainingStock() != null && menuItem.getRemainingStock() <= 0)) {
                     throw new AppException("Món '" + menuItem.getName() + "' hiện đã tạm ngưng phục vụ hoặc hết hàng, vui lòng chọn món khác!", HttpStatus.BAD_REQUEST);
+                }
+                int totalRequested = requestedQtyByDish.merge(itemReq.getMenuItemId(), itemReq.getQuantity(), Integer::sum);
+                if (menuItem.getRemainingStock() != null && totalRequested > menuItem.getRemainingStock()) {
+                    throw new AppException("Món '" + menuItem.getName() + "' hiện chỉ còn lại " + menuItem.getRemainingStock() + " phần, vui lòng giảm số lượng đặt trước!", HttpStatus.BAD_REQUEST);
                 }
                 BigDecimal unitPrice = menuItem.getPrice();
                 BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));

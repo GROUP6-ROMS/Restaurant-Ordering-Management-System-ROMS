@@ -177,15 +177,17 @@ function DishCard({ item, inCartCount, onAdd }) {
 }
 
 // --- Modal bottom sheet them mon ---
-function DishDetailModal({ item, onClose, onConfirm, showToast }) {
+function DishDetailModal({ item, inCartCount = 0, onClose, onConfirm, showToast }) {
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
 
   if (!item) return null;
 
-  const maxAllowed = (item.remainingStock !== undefined && item.remainingStock !== null)
-    ? item.remainingStock
+  const hasFiniteStock = item.remainingStock !== undefined && item.remainingStock !== null;
+  const maxAllowed = hasFiniteStock
+    ? Math.max(0, Number(item.remainingStock) - inCartCount)
     : 99;
+  const isExhaustedInCart = hasFiniteStock && maxAllowed <= 0;
   const isMaxReached = qty >= maxAllowed;
 
   return (
@@ -292,6 +294,7 @@ function DishDetailModal({ item, onClose, onConfirm, showToast }) {
               {item.remainingStock <= 5
                 ? `Chỉ còn ${item.remainingStock} suất sẵn sàng phục vụ!`
                 : `Còn lại ${item.remainingStock} suất`}
+              {inCartCount > 0 ? ` (đã có ${inCartCount} trong giỏ)` : ''}
             </span>
           </div>
         )}
@@ -319,7 +322,13 @@ function DishDetailModal({ item, onClose, onConfirm, showToast }) {
             <button
               onClick={() => {
                 if (isMaxReached) {
-                  if (showToast) showToast(`Món này chỉ còn tối đa ${maxAllowed} suất!`);
+                  if (showToast) {
+                    showToast(
+                      isExhaustedInCart
+                        ? `Món này chỉ còn ${item.remainingStock} suất (đã có đủ trong giỏ)!`
+                        : `Chỉ có thể thêm tối đa ${maxAllowed} suất nữa (tổng kho còn ${item.remainingStock})!`
+                    );
+                  }
                   return;
                 }
                 setQty(qty + 1);
@@ -340,22 +349,32 @@ function DishDetailModal({ item, onClose, onConfirm, showToast }) {
 
           {/* Nut confirm */}
           <button
-            onClick={() => { onConfirm(item, qty, note); onClose(); }}
+            onClick={() => {
+              if (isExhaustedInCart) {
+                if (showToast) showToast(`Món này chỉ còn ${item.remainingStock} suất (đã có đủ trong giỏ)!`);
+                return;
+              }
+              onConfirm(item, qty, note);
+              onClose();
+            }}
+            disabled={isExhaustedInCart}
             style={{
               flex: 1, height: 48, borderRadius: '9999px',
-              background: 'var(--primary-container)',
-              color: 'var(--on-primary)',
-              border: 'none', cursor: 'pointer',
+              background: isExhaustedInCart ? '#E5E7EB' : 'var(--primary-container)',
+              color: isExhaustedInCart ? '#6B7280' : 'var(--on-primary)',
+              border: 'none', cursor: isExhaustedInCart ? 'not-allowed' : 'pointer',
               fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 14,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              boxShadow: 'var(--shadow-primary)',
+              boxShadow: isExhaustedInCart ? 'none' : 'var(--shadow-primary)',
               transition: 'background 0.15s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--primary-container)'; }}
+            onMouseEnter={e => { if (!isExhaustedInCart) e.currentTarget.style.background = 'var(--primary)'; }}
+            onMouseLeave={e => { if (!isExhaustedInCart) e.currentTarget.style.background = 'var(--primary-container)'; }}
           >
-            <Icon name="local_fire_department" size={18} fill={1} />
-            Thêm vào Giỏ — {formatVND(item.price * qty)}
+            <Icon name={isExhaustedInCart ? "block" : "local_fire_department"} size={18} fill={1} />
+            {isExhaustedInCart
+              ? 'Đã chọn tối đa suất còn lại'
+              : `Thêm vào Giỏ — ${formatVND(item.price * qty)}`}
           </button>
         </div>
       </div>
@@ -550,7 +569,27 @@ export default function CustomerMenuPage() {
   };
 
   const handleConfirmAdd = (item, qty, note) => {
-    addToCart(item, qty, note);
+    const inCart = getCountInCart(item.id);
+    const hasFiniteStock = item.remainingStock !== undefined && item.remainingStock !== null;
+    if (item.isAvailable === false || (hasFiniteStock && Number(item.remainingStock) <= 0)) {
+      showToast(`Món "${item.name}" hiện đã tạm hết!`);
+      return;
+    }
+    if (hasFiniteStock) {
+      const maxCanAdd = Math.max(0, Number(item.remainingStock) - inCart);
+      if (maxCanAdd <= 0) {
+        showToast(`Món "${item.name}" chỉ còn ${item.remainingStock} suất (đã có đủ trong giỏ)!`);
+        return;
+      }
+      const addQty = Math.min(qty, maxCanAdd);
+      addToCart(item, addQty, note);
+      if (addQty < qty) {
+        showToast(`Chỉ thêm được ${addQty} suất "${item.name}" (đạt giới hạn ${item.remainingStock} suất còn lại)`);
+        return;
+      }
+    } else {
+      addToCart(item, qty, note);
+    }
     showToast(`Đã thêm ${item.name}`);
   };
 
@@ -752,6 +791,7 @@ export default function CustomerMenuPage() {
       {activeModal && (
         <DishDetailModal
           item={activeModal}
+          inCartCount={getCountInCart(activeModal.id)}
           onClose={() => setActiveModal(null)}
           onConfirm={handleConfirmAdd}
           showToast={showToast}

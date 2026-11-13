@@ -207,6 +207,40 @@ class ReservationServiceTest {
     }
 
     @Test
+    @DisplayName("2.1b Tạo đơn đặt bàn thất bại khi tổng số lượng món đặt trước vượt tồn kho")
+    void createCustomerReservation_WhenQuantityExceedsRemainingStock_ThrowsException() {
+        MenuItem limitedDish = MenuItem.builder()
+                .id(3L)
+                .name("Sườn nướng")
+                .price(BigDecimal.valueOf(150000))
+                .isActive(true)
+                .isAvailable(true)
+                .remainingStock(3)
+                .build();
+
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        ReservationItemRequest itemReq = new ReservationItemRequest();
+        itemReq.setMenuItemId(3L);
+        itemReq.setQuantity(5);
+
+        CreateReservationRequest request = CreateReservationRequest.builder()
+                .customerName("Trần Thị B")
+                .customerPhone("0909888777")
+                .guestCount(4)
+                .reservationDate(tomorrow.toString())
+                .reservationTime("18:30")
+                .preOrderItems(List.of(itemReq))
+                .build();
+
+        when(reservationRepository.existsByBookingCode(anyString())).thenReturn(false);
+        when(menuItemRepository.findById(3L)).thenReturn(Optional.of(limitedDish));
+
+        assertThatThrownBy(() -> reservationService.createCustomerReservation(request))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("chỉ còn lại 3 phần");
+    }
+
+    @Test
     @DisplayName("3. Quản lý xếp bàn cho đơn đặt: chuyển Reservation sang CONFIRMED và Table sang RESERVED")
     void assignTableToReservation_WhenTableAvailable_ConfirmsReservation() {
         Reservation reservation = Reservation.builder()
