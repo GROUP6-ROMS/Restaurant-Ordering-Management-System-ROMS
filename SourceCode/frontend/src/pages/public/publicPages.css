@@ -279,8 +279,11 @@
 
   .public-hero-right {
     grid-column: span 1;
+    flex-direction: column;
+    align-items: center;
     width: 100%;
-    margin-top: 10px;
+    max-width: 680px;
+    margin: 10px auto 0;
   }
 
   .public-hero-order-card {
