@@ -44,16 +44,4 @@ public class CustomerReservationController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "Yêu cầu đặt bàn của bạn đã được tiếp nhận! Quản lý sẽ gọi điện xác nhận trong ít phút."));
     }
-
-    /**
-     * 3. Thực khách tra cứu tiến độ / trạng thái đơn đặt bàn bằng Mã đặt chỗ hoặc Số điện thoại
-     * GET /api/customer/reservations/lookup?code=RES-...&phone=0912...
-     */
-    @GetMapping("/lookup")
-    public ResponseEntity<ApiResponse<ReservationResponse>> lookupReservation(
-            @RequestParam(required = false) String code,
-            @RequestParam(required = false) String phone) {
-        ReservationResponse response = reservationService.lookupReservation(code, phone);
-        return ResponseEntity.ok(ApiResponse.success(response, "Tra cứu thông tin đơn đặt bàn thành công"));
-    }
 }

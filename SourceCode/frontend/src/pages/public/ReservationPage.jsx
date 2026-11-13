@@ -522,22 +522,6 @@ export default function ReservationPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <Link
-              to="/reservation/tracking"
-              style={{
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: '#9D4124',
-                fontWeight: 700,
-                fontSize: '0.88rem'
-              }}
-            >
-              <Icon name="radar" size={18} />
-              <span>Tra Cứu Đặt Bàn</span>
-            </Link>
-
-            <Link
               to="/"
               style={{
                 textDecoration: 'none',
@@ -2007,35 +1991,10 @@ export default function ReservationPage() {
               }}>
                 <Icon name="mail" size={20} style={{ color: '#2563EB', flexShrink: 0 }} />
                 <span>
-                  Hệ thống đã tự động gửi email tiếp nhận đơn kèm link theo dõi trực tiếp tới: <strong>{customerEmail}</strong>
+                  Hệ thống đã gửi email tiếp nhận đơn đặt bàn tới: <strong>{customerEmail}</strong>. Quý khách vui lòng kiểm tra hộp thư!
                 </span>
               </div>
             )}
-
-            {/* Nút hành động chính: Theo dõi đơn đặt bàn */}
-            <Link
-              to={`/reservation/tracking?code=${bookingCode}`}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '14px',
-                borderRadius: '16px',
-                background: '#9D4124',
-                color: '#FFFFFF',
-                textDecoration: 'none',
-                fontWeight: 800,
-                fontSize: '0.94rem',
-                marginBottom: '12px',
-                boxShadow: '0 4px 14px rgba(157, 65, 36, 0.28)',
-                boxSizing: 'border-box'
-              }}
-            >
-              <Icon name="radar" size={20} />
-              <span>Theo Dõi Tiến Độ Đơn Đặt Bàn</span>
-            </Link>
 
             <div className="reservation-actions-group">
               <Link
