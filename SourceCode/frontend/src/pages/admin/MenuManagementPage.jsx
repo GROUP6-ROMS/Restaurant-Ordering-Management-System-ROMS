@@ -536,7 +536,7 @@ export default function MenuManagementPage() {
             }}
           >
             <Icon name="add_circle" size={18} />
-            <span>+ Thêm Món Ăn Mới</span>
+            <span>Thêm Món Ăn Mới</span>
           </button>
         </div>
       </div>
@@ -1672,7 +1672,7 @@ export default function MenuManagementPage() {
             {/* Form thêm mới danh mục */}
             <div style={{ background: '#FCF1EF', padding: '14px', borderRadius: '14px', marginBottom: '18px', border: '1px solid #FFDBC9' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#9D4124', display: 'block', marginBottom: '8px' }}>
-                + Thêm Nhóm Danh Mục Mới
+                Thêm Nhóm Danh Mục Mới
               </span>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                 <input

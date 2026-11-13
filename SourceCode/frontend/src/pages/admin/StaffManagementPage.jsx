@@ -1117,7 +1117,7 @@ export default function StaffManagementPage() {
             }}
           >
             <Icon name="person_add" size={18} />
-            <span>+ Thêm Nhân Viên Mới</span>
+            <span>Thêm Nhân Viên Mới</span>
           </button>
         </div>
       </div>
@@ -1514,7 +1514,7 @@ export default function StaffManagementPage() {
                       title="Mở pop-up phân ca cho Ca Sáng"
                     >
                       <Icon name="person_add" size={15} />
-                      <span>+ Phân ca sáng</span>
+                      <span>Phân ca sáng</span>
                     </button>
                   </div>
                 </div>
@@ -1774,7 +1774,7 @@ export default function StaffManagementPage() {
                       title="Mở pop-up phân ca cho Ca Tối"
                     >
                       <Icon name="person_add" size={15} />
-                      <span>+ Phân ca tối</span>
+                      <span>Phân ca tối</span>
                     </button>
                   </div>
                 </div>
