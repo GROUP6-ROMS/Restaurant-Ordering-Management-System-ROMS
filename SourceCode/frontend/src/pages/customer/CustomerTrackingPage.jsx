@@ -254,7 +254,7 @@ export default function CustomerTrackingPage() {
   }
 
   return (
-    <div style={{ padding: '16px 16px 100px', width: '100%', margin: '0 auto' }}>
+    <div style={{ padding: '16px 16px 24px', width: '100%', margin: '0 auto' }}>
       {/* Toast Notification */}
       {toastMessage && (
         <div style={{
@@ -371,7 +371,7 @@ export default function CustomerTrackingPage() {
             <div style={{ fontSize: '0.78rem', color: '#56423D', marginTop: '4px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Icon name="schedule" size={14} style={{ color: '#89726B' }} />
-                <span>Từ {trackingData?.startTimeFormatted || '12:00'}</span>
+                <span>{trackingData?.startTimeFormatted ? `Từ ${trackingData.startTimeFormatted}` : 'Đang phục vụ'}</span>
               </div>
               <button
                 type="button"
@@ -1042,27 +1042,31 @@ export default function CustomerTrackingPage() {
 
       {/* Payment Selection Modal Dialog */}
       {showPaymentModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '460px',
-            borderTopLeftRadius: '24px',
-            borderTopRightRadius: '24px',
-            padding: '24px 20px',
-            boxShadow: '0 -8px 30px rgba(0,0,0,0.2)',
-            animation: 'slideUp 0.3s ease-out'
+        <div
+          onClick={() => setShowPaymentModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            animation: 'fadeIn 0.2s ease-out'
           }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '460px',
+              borderTopLeftRadius: '24px',
+              borderTopRightRadius: '24px',
+              padding: '24px 20px',
+              boxShadow: '0 -8px 30px rgba(0,0,0,0.2)',
+              animation: 'slideUp 0.3s ease-out'
+            }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#FFDBC9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C85A32' }}>

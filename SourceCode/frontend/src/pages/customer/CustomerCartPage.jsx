@@ -236,51 +236,6 @@ export default function CustomerCartPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 24 }}>
 
-      {/* --- Cảnh báo bàn chưa mở phiên --- */}
-      {!(tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED' || sessionStorage.getItem('roms_token')) && (
-        <div style={{ padding: '12px 16px 0' }}>
-          <div style={{
-            background: '#FFF3E0',
-            borderRadius: 16,
-            padding: '12px 14px',
-            border: '1px solid #FFE0B2',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 10
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Icon name="hourglass_top" size={24} style={{ color: '#E65100' }} />
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 13, color: '#BF360C', fontFamily: 'Plus Jakarta Sans' }}>
-                  Chờ nhân viên mở bàn
-                </div>
-                <div style={{ fontSize: 11, color: '#E65100', fontFamily: 'Plus Jakarta Sans' }}>
-                  Nhân viên cần mở bàn trước khi bạn gửi đơn
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleCallStaff}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 8,
-                background: '#E65100',
-                color: '#FFFFFF',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Gọi mở bàn
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* --- Card thong tin ban an --- */}
       <div style={{ padding: '12px 16px 0' }}>
         <div style={{
