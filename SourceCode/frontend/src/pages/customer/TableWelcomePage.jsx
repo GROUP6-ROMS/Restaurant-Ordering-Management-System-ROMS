@@ -703,7 +703,7 @@ export default function TableWelcomePage() {
         gap: '4px',
         textAlign: 'center'
       }}>
-        <div>Giờ phục vụ: 10:00 AM – 10:00 PM</div>
+        <div>Giờ phục vụ: {restaurantProfile.openingHours || '07:00 - 22:00'}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#2E7D32' }} />
           <span style={{ fontWeight: 600, color: '#1F1B1A' }}>ROMS Table Terminal v2.4 • Online</span>

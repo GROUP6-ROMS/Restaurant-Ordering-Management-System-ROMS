@@ -5,6 +5,7 @@ import { reservationApi } from '../../api/reservationApi';
 import { customerApi } from '../../api/customerApi';
 import Icon from '../../components/common/Icon';
 import { useDialog } from '../../context/DialogContext';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import './publicPages.css';
 
 // Helper tính toán ngày theo múi giờ địa phương chuẩn định dạng YYYY-MM-DD (tránh lệch timezone UTC)
@@ -57,6 +58,8 @@ const isTimeSlotInPast = (timeStr, dateStr) => {
 
 export default function ReservationPage() {
   const { showAlert } = useDialog();
+  const restaurantProfile = useRestaurantProfile();
+  const hotline = restaurantProfile.phone || '0901.234.567';
   // Lấy ngày hôm nay, ngày mai, ngày kia theo giờ địa phương (YYYY-MM-DD)
   const todayStr = getLocalDateString(0);
   const tomorrowStr = getLocalDateString(1);
@@ -65,34 +68,26 @@ export default function ReservationPage() {
   // 1. Quản lý trạng thái bước đặt chỗ (1 -> 4)
   const [currentStep, setCurrentStep] = useState(1);
 
-  // 2. Ngày dùng bữa: Chọn ngày cụ thể (mặc định hôm nay - ngày đặt bàn)
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  // 3. Khung giờ đại diện & helper tìm khung giờ hợp lệ trong giới hạn phục vụ (07:00 - 21:30)
+  const representativeTimes = ['11:30', '12:00', '18:00', '19:00', '20:00'];
+  const getValidTimeForDate = (dateStr) => {
+    for (const t of representativeTimes) {
+      if (!isTimeSlotInPast(t, dateStr)) return { time: t, isCustom: false };
+    }
+    for (const lateSlot of ['20:30', '21:00', '21:30']) {
+      if (!isTimeSlotInPast(lateSlot, dateStr)) return { time: lateSlot, isCustom: true };
+    }
+    return null;
+  };
+  const initialTodaySlot = getValidTimeForDate(todayStr);
+
+  // 2. Ngày dùng bữa: Nếu đã qua 21:30 hôm nay thì tự động chuyển sang ngày mai
+  const [selectedDate, setSelectedDate] = useState(() => (initialTodaySlot ? todayStr : tomorrowStr));
   const [isCustomDate, setIsCustomDate] = useState(false);
 
-  // 3. Khung giờ: Giờ đại diện + chế độ nhập giờ khác
-  const representativeTimes = ['11:30', '12:00', '18:00', '19:00', '20:00'];
-  const [selectedTime, setSelectedTime] = useState(() => {
-    const today = getLocalDateString(0);
-    for (const t of representativeTimes) {
-      if (!isTimeSlotInPast(t, today)) return t;
-    }
-    const now = new Date();
-    const nextH = Math.min(22, now.getHours() + 1);
-    return `${String(nextH).padStart(2, '0')}:00`;
-  });
-  const [isCustomTime, setIsCustomTime] = useState(() => {
-    const today = getLocalDateString(0);
-    return representativeTimes.every(t => isTimeSlotInPast(t, today));
-  });
-  const [customTimeInput, setCustomTimeInput] = useState(() => {
-    const today = getLocalDateString(0);
-    for (const t of representativeTimes) {
-      if (!isTimeSlotInPast(t, today)) return t;
-    }
-    const now = new Date();
-    const nextH = Math.min(22, now.getHours() + 1);
-    return `${String(nextH).padStart(2, '0')}:00`;
-  });
+  const [selectedTime, setSelectedTime] = useState(() => (initialTodaySlot ? initialTodaySlot.time : '11:30'));
+  const [isCustomTime, setIsCustomTime] = useState(() => (initialTodaySlot ? initialTodaySlot.isCustom : false));
+  const [customTimeInput, setCustomTimeInput] = useState(() => (initialTodaySlot ? initialTodaySlot.time : '11:30'));
 
   // 4. Số lượng khách: Số đại diện + chế độ nhập số khác
   const representativeGuests = [2, 4, 6, 8, 10];
@@ -230,17 +225,16 @@ export default function ReservationPage() {
   // Tự động điều chỉnh khung giờ hợp lệ khi ngày dùng bữa thay đổi
   useEffect(() => {
     if (isTimeSlotInPast(selectedTime, selectedDate)) {
-      const validPreset = representativeTimes.find(t => !isTimeSlotInPast(t, selectedDate));
-      if (validPreset) {
-        setSelectedTime(validPreset);
-        setIsCustomTime(false);
+      const nextValid = getValidTimeForDate(selectedDate);
+      if (nextValid) {
+        setSelectedTime(nextValid.time);
+        setIsCustomTime(nextValid.isCustom);
+        if (nextValid.isCustom) setCustomTimeInput(nextValid.time);
       } else {
         setIsCustomTime(true);
-        const now = new Date();
-        const nextH = Math.min(22, now.getHours() + 1);
-        const fallbackTime = `${String(nextH).padStart(2, '0')}:00`;
-        setCustomTimeInput(fallbackTime);
-        setSelectedTime(fallbackTime);
+        setCustomTimeInput('21:30');
+        setSelectedTime('21:30');
+        setStep1Error('Khung giờ nhận đặt bàn hôm nay (đến 21:30) đã kết thúc. Quý khách vui lòng chọn ngày dùng bữa từ ngày mai!');
       }
     }
   }, [selectedDate]);
@@ -360,7 +354,7 @@ export default function ReservationPage() {
         return;
       }
       if (selectedGuests > 20) {
-        setStep1Error('Số lượng khách đặt trực tuyến tối đa là 20 người. Quý khách vui lòng liên hệ hotline 1900 8924 để được hỗ trợ sắp xếp phòng tiệc đoàn riêng!');
+        setStep1Error(`Số lượng khách đặt trực tuyến tối đa là 20 người. Quý khách vui lòng liên hệ hotline ${hotline} để được hỗ trợ sắp xếp phòng tiệc đoàn riêng!`);
         return;
       }
       setStep1Error('');
@@ -921,7 +915,7 @@ export default function ReservationPage() {
 
                       {/* Thông báo hướng dẫn quy định số lượng khách trực tuyến in trực tiếp trên giao diện */}
                       <div style={{ fontSize: '0.78rem', color: '#89726B', lineHeight: '1.4' }}>
-                        * Hệ thống trực tuyến hỗ trợ tối đa <strong>20 khách/đoàn</strong> (theo quy định nhà hàng). Quý khách đặt tiệc đoàn từ 21 khách trở lên vui lòng liên hệ hotline <strong>1900-xxxx</strong> để được sắp xếp phòng tiệc riêng.
+                        * Hệ thống trực tuyến hỗ trợ tối đa <strong>20 khách/đoàn</strong> (theo quy định nhà hàng). Quý khách đặt tiệc đoàn từ 21 khách trở lên vui lòng liên hệ hotline <strong>{hotline}</strong> để được sắp xếp phòng tiệc riêng.
                       </div>
 
                       {/* Cảnh báo lỗi in trực tiếp trên giao diện khi số khách vượt quá 20 */}
@@ -944,7 +938,7 @@ export default function ReservationPage() {
                         >
                           <Icon name="error" size={18} style={{ color: '#DC2626', flexShrink: 0 }} />
                           <span>
-                            Số lượng khách vượt quá quy định đặt bàn trực tuyến (tối đa 20 người). Quý khách vui lòng nhập lại hoặc gọi hotline 1900-xxxx để được hỗ trợ tiệc đoàn!
+                            Số lượng khách vượt quá quy định đặt bàn trực tuyến (tối đa 20 người). Quý khách vui lòng nhập lại hoặc gọi hotline {hotline} để được hỗ trợ tiệc đoàn!
                           </span>
                         </div>
                       )}
@@ -1834,7 +1828,7 @@ export default function ReservationPage() {
               </div>
 
               <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.78rem', color: '#89726B' }}>
-                Hotline hỗ trợ trực tiếp: <strong style={{ color: '#9D4124' }}>1900 8924</strong>
+                Hotline hỗ trợ trực tiếp: <strong style={{ color: '#9D4124' }}>{hotline}</strong>
               </div>
             </div>
           </div>

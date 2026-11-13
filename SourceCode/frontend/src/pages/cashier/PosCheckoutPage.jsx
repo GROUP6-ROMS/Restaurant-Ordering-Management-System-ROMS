@@ -3389,8 +3389,8 @@ export default function PosCheckoutPage() {
                 </div>
               ) : (
                 <img
-                  src={`https://img.vietqr.io/image/970422-${payOsData?.accountNumber || '0905982428'}-compact2.png?amount=${payOsData?.amount || finalCalculatedAmount}&addInfo=${encodeURIComponent(payOsData?.description || (payOsData?.orderCode ? String(payOsData.orderCode) : ''))}&accountName=${encodeURIComponent(payOsData?.accountName || 'NGO VIET BAO HUY')}`}
-                  alt="VietQR MB Bank"
+                  src={`https://img.vietqr.io/image/${restaurantProfile?.bankBin || '970422'}-${payOsData?.accountNumber || restaurantProfile?.bankAccountNumber || '0905982428'}-compact2.png?amount=${payOsData?.amount || finalCalculatedAmount}&addInfo=${encodeURIComponent(payOsData?.description || (payOsData?.orderCode ? String(payOsData.orderCode) : ''))}&accountName=${encodeURIComponent(payOsData?.accountName || restaurantProfile?.bankAccountName || restaurantProfile?.name || 'NHA HANG ROMS')}`}
+                  alt="VietQR"
                   style={{ width: '220px', height: '220px', display: 'block', borderRadius: '12px' }}
                 />
               )}
@@ -3416,18 +3416,18 @@ export default function PosCheckoutPage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ color: '#64748B' }}>Ngân hàng:</span>
-                <span style={{ fontWeight: 700, color: '#0F172A' }}>MB Bank (Quân Đội)</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{restaurantProfile?.bankName || 'MB Bank (Quân Đội)'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <span style={{ color: '#64748B' }}>Số tài khoản:</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontWeight: 800, color: '#0F172A', fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                    {payOsData?.accountNumber || '0905 982 428'}
+                    {payOsData?.accountNumber || restaurantProfile?.bankAccountNumber || '0905 982 428'}
                   </span>
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(payOsData?.accountNumber || '0905982428');
+                      navigator.clipboard.writeText(payOsData?.accountNumber || restaurantProfile?.bankAccountNumber || '0905982428');
                       showToast('Đã sao chép số tài khoản!');
                     }}
                     style={{ background: 'none', border: 'none', color: '#0284C7', cursor: 'pointer', padding: 0 }}
@@ -3439,7 +3439,7 @@ export default function PosCheckoutPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ color: '#64748B' }}>Chủ tài khoản:</span>
-                <span style={{ fontWeight: 700, color: '#0F172A' }}>{payOsData?.accountName || 'NGO VIET BAO HUY'}</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{payOsData?.accountName || restaurantProfile?.bankAccountName || restaurantProfile?.name || 'NHA HANG ROMS'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: payOsData?.checkoutUrl ? '6px' : '0' }}>
                 <span style={{ color: '#64748B' }}>Nội dung CK:</span>

@@ -22,6 +22,7 @@ export function generateStandeeCanvas({ table, restaurantProfile, qrCanvas }) {
   const brandName = restaurantProfile?.brandName || restaurantProfile?.name || 'ROMS RESTAURANT';
   const wifiName = restaurantProfile?.wifiName || 'ROMS-GUEST';
   const wifiPass = restaurantProfile?.wifiPassword || 'roms-welcome';
+  const hotline = restaurantProfile?.phone || '0901.234.567';
 
   // 1. Nền thẻ mica / decal (Màu kem ngà ấm sang trọng)
   ctx.fillStyle = isVip ? '#FFFDF8' : '#FFFDFB';
@@ -172,7 +173,7 @@ export function generateStandeeCanvas({ table, restaurantProfile, qrCanvas }) {
   // 11. Chân trang (Footer)
   ctx.fillStyle = '#89726B';
   ctx.font = '600 18px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('Hotline hỗ trợ: 1900 8924  •  ROMS Smart Table Terminal  •  Cần hỗ trợ vui lòng gọi nhân viên', 500, 1395);
+  ctx.fillText(`Hotline hỗ trợ: ${hotline}  •  ROMS Smart Table Terminal  •  Cần hỗ trợ vui lòng gọi nhân viên`, 500, 1395);
 
   return canvas;
 }
