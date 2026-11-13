@@ -520,21 +520,39 @@ export default function ReservationPage() {
             <RomsLogo size={42} showText={true} textSubtitle="Culinary Experience" />
           </Link>
 
-          <Link
-            to="/"
-            style={{
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: '#56423D',
-              fontWeight: 700,
-              fontSize: '0.88rem'
-            }}
-          >
-            <Icon name="arrow_back" size={18} />
-            <span>Về Trang Chủ</span>
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <Link
+              to="/reservation/tracking"
+              style={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#9D4124',
+                fontWeight: 700,
+                fontSize: '0.88rem'
+              }}
+            >
+              <Icon name="radar" size={18} />
+              <span>Tra Cứu Đặt Bàn</span>
+            </Link>
+
+            <Link
+              to="/"
+              style={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#56423D',
+                fontWeight: 700,
+                fontSize: '0.88rem'
+              }}
+            >
+              <Icon name="arrow_back" size={18} />
+              <span>Về Trang Chủ</span>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -1972,18 +1990,65 @@ export default function ReservationPage() {
               )}
             </div>
 
+            {/* Thông báo gửi email xác nhận */}
+            {customerEmail && (
+              <div style={{
+                background: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                borderRadius: '14px',
+                padding: '10px 14px',
+                marginBottom: '16px',
+                fontSize: '0.82rem',
+                color: '#1E40AF',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                textAlign: 'left'
+              }}>
+                <Icon name="mail" size={20} style={{ color: '#2563EB', flexShrink: 0 }} />
+                <span>
+                  Hệ thống đã tự động gửi email tiếp nhận đơn kèm link theo dõi trực tiếp tới: <strong>{customerEmail}</strong>
+                </span>
+              </div>
+            )}
+
+            {/* Nút hành động chính: Theo dõi đơn đặt bàn */}
+            <Link
+              to={`/reservation/tracking?code=${bookingCode}`}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '14px',
+                borderRadius: '16px',
+                background: '#9D4124',
+                color: '#FFFFFF',
+                textDecoration: 'none',
+                fontWeight: 800,
+                fontSize: '0.94rem',
+                marginBottom: '12px',
+                boxShadow: '0 4px 14px rgba(157, 65, 36, 0.28)',
+                boxSizing: 'border-box'
+              }}
+            >
+              <Icon name="radar" size={20} />
+              <span>Theo Dõi Tiến Độ Đơn Đặt Bàn</span>
+            </Link>
+
             <div className="reservation-actions-group">
               <Link
                 to="/"
                 style={{
                   flex: 1,
-                  padding: '14px',
-                  borderRadius: '16px',
+                  padding: '13px',
+                  borderRadius: '14px',
                   background: '#F0E6E4',
                   color: '#56423D',
                   textDecoration: 'none',
                   fontWeight: 700,
-                  fontSize: '0.92rem',
+                  fontSize: '0.90rem',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -2001,16 +2066,15 @@ export default function ReservationPage() {
                 }}
                 style={{
                   flex: 1,
-                  padding: '14px',
-                  borderRadius: '16px',
-                  background: '#9D4124',
+                  padding: '13px',
+                  borderRadius: '14px',
+                  background: '#56423D',
                   color: '#FFFFFF',
                   border: 'none',
                   fontFamily: "'Epilogue', sans-serif",
-                  fontWeight: 800,
-                  fontSize: '0.92rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(157, 65, 36, 0.3)'
+                  fontWeight: 700,
+                  fontSize: '0.90rem',
+                  cursor: 'pointer'
                 }}
               >
                 Đặt Thêm Bàn Khác

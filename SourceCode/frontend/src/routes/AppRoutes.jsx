@@ -11,6 +11,7 @@ import RouteLoadingFallback from '../components/common/RouteLoadingFallback';
 // Lazy-loaded Pages (Code-splitting by User Persona / Operational Role)
 const LandingPage = lazy(() => import('../pages/public/LandingPage'));
 const ReservationPage = lazy(() => import('../pages/public/ReservationPage'));
+const ReservationTrackingPage = lazy(() => import('../pages/public/ReservationTrackingPage'));
 
 const StaffLoginPage = lazy(() => import('../pages/auth/StaffLoginPage'));
 
@@ -36,6 +37,7 @@ export default function AppRoutes() {
         {/* 1. Cong cong & Dat ban */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/reservation" element={<ReservationPage />} />
+        <Route path="/reservation/tracking" element={<ReservationTrackingPage />} />
 
         {/* 2. Cong Dang Nhap Nhan Vien Phan Quyen (SCR-01) */}
         <Route path="/login" element={<StaffLoginPage />} />
