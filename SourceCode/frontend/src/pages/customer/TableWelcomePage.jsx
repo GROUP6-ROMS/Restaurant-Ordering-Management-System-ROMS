@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { tableApi } from '../../api/tableApi';
 import Icon from '../../components/common/Icon';
-import RomsLogo from '../../components/common/RomsLogo';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
@@ -367,7 +366,7 @@ export default function TableWelcomePage() {
 
   return (
     <div style={{
-      minHeight: '100dvh',
+      minHeight: 'calc(100dvh - 80px)',
       background: '#FAFAF8',
       display: 'flex',
       flexDirection: 'column',
@@ -405,28 +404,7 @@ export default function TableWelcomePage() {
       )}
 
       {/* TOP BRAND & TABLE IDENTIFICATION (SCR-09) */}
-      <header style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', paddingTop: '8px' }}>
-        {/* Centered ROMS Logo Brand Anchor */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 14px',
-          borderRadius: '9999px',
-          background: '#FFFFFF',
-          border: '1px solid #EAE0DE',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-        }}>
-          <RomsLogo size={24} />
-          <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '0.95rem', color: '#9D4124', letterSpacing: '-0.01em' }}>
-            ROMS
-          </span>
-          <span style={{ color: '#EAE0DE' }}>|</span>
-          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#89726B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Smart Table Terminal
-          </span>
-        </div>
-
+      <header style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', paddingTop: '4px' }}>
         {/* Restaurant Headline */}
         <div>
           <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: '1.45rem', color: '#1F1B1A', margin: '4px 0 2px', letterSpacing: '-0.02em' }}>
@@ -725,7 +703,7 @@ export default function TableWelcomePage() {
         gap: '4px',
         textAlign: 'center'
       }}>
-        <div>Giờ phục vụ: 10:00 AM – 10:00 PM</div>
+        <div>Giờ phục vụ: {restaurantProfile.openingHours || '07:00 - 22:00'}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#2E7D32' }} />
           <span style={{ fontWeight: 600, color: '#1F1B1A' }}>ROMS Table Terminal v2.4 • Online</span>

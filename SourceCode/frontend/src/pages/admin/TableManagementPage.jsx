@@ -2950,7 +2950,7 @@ export default function TableManagementPage() {
 
                   {/* Footer Hotline */}
                   <div style={{ fontSize: '0.62rem', color: '#89726B', fontWeight: 600 }}>
-                    Hotline hỗ trợ: 1900 8924 • ROMS Smart Table Terminal
+                    Hotline hỗ trợ: {restaurantProfile.phone || '0901.234.567'} • ROMS Smart Table Terminal
                   </div>
                 </div>
               );
@@ -4601,7 +4601,7 @@ export default function TableManagementPage() {
 
                     {/* Footer Hotline */}
                     <div style={{ fontSize: '0.62rem', color: '#89726B', fontWeight: 600 }}>
-                      Hotline hỗ trợ: 1900 8924 • ROMS Smart Table Terminal
+                      Hotline hỗ trợ: {restaurantProfile.phone || '0901.234.567'} • ROMS Smart Table Terminal
                     </div>
                   </div>
                 );

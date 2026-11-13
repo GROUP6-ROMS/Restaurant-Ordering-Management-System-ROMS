@@ -427,12 +427,14 @@ export default function CustomerLayout() {
           >
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="table_restaurant" size={22} fill={isTracking ? 1 : 0} />
-              {/* Dot indicator neu co mon dang nau */}
-              <span style={{
-                position: 'absolute', top: -2, right: -8,
-                width: 8, height: 8, borderRadius: '50%',
-                background: 'var(--primary)',
-              }} />
+              {/* Dot indicator chi hien khi ban dang mo phien phuc vu */}
+              {isTableOccupied && !isTracking && (
+                <span style={{
+                  position: 'absolute', top: -2, right: -8,
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: 'var(--primary)',
+                }} />
+              )}
             </div>
             Bàn ăn
           </Link>

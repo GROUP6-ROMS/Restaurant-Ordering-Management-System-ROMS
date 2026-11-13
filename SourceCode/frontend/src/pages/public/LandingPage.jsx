@@ -357,11 +357,11 @@ export default function LandingPage() {
         <div style={{ paddingTop: '16px', borderTop: '1px solid #F0E6E4', fontSize: '0.78rem', color: '#89726B', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Icon name="call" size={15} style={{ color: '#9D4124' }} />
-            <span>Hotline: {restaurantProfile.phone || '1900-xxxx'}</span>
+            <span>Hotline: {restaurantProfile.phone || '0901.234.567'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Icon name="schedule" size={15} style={{ color: '#596232' }} />
-            <span>Giờ mở cửa: {restaurantProfile.openingHours || '08:00 - 22:30'}</span>
+            <span>Giờ mở cửa: {restaurantProfile.openingHours || '07:00 - 22:00'}</span>
           </div>
         </div>
       </aside>
@@ -902,8 +902,8 @@ export default function LandingPage() {
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ fontSize: '0.85rem', color: '#56423D', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div>Mở cửa: <strong>08:00 - 23:00</strong> (Tất cả các ngày)</div>
-                <div style={{ fontSize: '0.76rem', color: '#89726B' }}>Bếp nhận đơn đến 22:30</div>
+                <div>Mở cửa: <strong>{restaurantProfile.openingHours || '07:00 - 22:00'}</strong> (Tất cả các ngày)</div>
+                <div style={{ fontSize: '0.76rem', color: '#89726B' }}>Nhận đặt bàn & gọi món đến 21:30</div>
               </div>
 
               {/* WiFi card */}
@@ -924,7 +924,7 @@ export default function LandingPage() {
         <div style={{ maxWidth: '1280px', margin: '20px auto 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#89726B', flexWrap: 'wrap', gap: '10px' }}>
           <div>© {new Date().getFullYear()} {restaurantProfile.name}. Vận hành trên nền tảng ROMS Hospitality.</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span>Phục vụ từ 08:00 - 23:00 hàng ngày</span>
+            <span>Phục vụ từ {restaurantProfile.openingHours || '07:00 - 22:00'} hàng ngày</span>
             <span>•</span>
             <Link to="/login" style={{ color: '#9D4124', textDecoration: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <Icon name="badge" size={15} />
