@@ -14,7 +14,7 @@ const PRESET_ACCOUNTS = [
 ];
 
 export default function StaffLoginPage() {
-  const { login, user, isAuthenticated } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -281,45 +281,6 @@ export default function StaffLoginPage() {
         <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: '#89726B', lineHeight: 1.45 }}>
           Chọn nhanh vị trí trực hoặc nhập Mã Thẻ Nhân Viên để tiến hành xác thực vào ca.
         </p>
-
-        {/* Thông báo nếu tab hiện tại đã có ca trực */}
-        {isAuthenticated && user?.role && (
-          <div style={{
-            background: '#FDF7F5',
-            border: '1px solid #EAE0DE',
-            borderRadius: '12px',
-            padding: '10px 14px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '10px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Icon name="verified_user" size={18} style={{ color: '#9D4124' }} />
-              <span style={{ fontSize: '0.78rem', color: '#56423D' }}>
-                Đang trực: <b>{user.fullName || user.username}</b> ({user.role})
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate(getRoleHome(user.role), { replace: true })}
-              style={{
-                background: '#9D4124',
-                color: '#FFF',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '4px 10px',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Vào ca →
-            </button>
-          </div>
-        )}
 
         {/* Error Message */}
         {errorMessage && (
