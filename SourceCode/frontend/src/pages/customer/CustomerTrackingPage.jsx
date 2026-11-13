@@ -219,6 +219,39 @@ export default function CustomerTrackingPage() {
   const staffToken = sessionStorage.getItem('roms_token');
   const isTableOccupied = (tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
 
+  const toastNode = toastMessage && (
+    <div className="no-print" style={{
+      position: 'fixed',
+      top: '80px',
+      left: '16px',
+      right: '16px',
+      maxWidth: '430px',
+      margin: '0 auto',
+      zIndex: 100001,
+      background: '#1F1B1A',
+      color: '#FFF8F6',
+      padding: '12px 16px',
+      borderRadius: '16px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '10px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+      animation: 'slideDown 0.3s ease-out'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem', fontWeight: 600 }}>
+        <Icon name="check_circle" size={20} fill={1} style={{ color: '#FFB68C' }} />
+        <span>{toastMessage}</span>
+      </div>
+      <button
+        onClick={() => setToastMessage(null)}
+        style={{ background: 'none', border: 'none', color: '#FFF8F6', opacity: 0.7, cursor: 'pointer', padding: 0 }}
+      >
+        <Icon name="close" size={18} />
+      </button>
+    </div>
+  );
+
   // Chờ nhân viên mở bàn - Chặn truy cập theo dõi bàn ăn nếu bàn chưa mở
   if (!isTableOccupied) {
     return (
@@ -228,6 +261,7 @@ export default function CustomerTrackingPage() {
         minHeight: 'calc(100dvh - 120px)', padding: '40px 20px',
         textAlign: 'center',
       }}>
+        {toastNode}
         <div style={{
           width: 80, height: 80, borderRadius: '50%',
           background: 'rgba(239, 68, 68, 0.1)',
@@ -262,38 +296,7 @@ export default function CustomerTrackingPage() {
   return (
     <div style={{ padding: '16px 16px 24px', width: '100%', margin: '0 auto' }}>
       {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '80px',
-          left: '16px',
-          right: '16px',
-          maxWidth: '430px',
-          margin: '0 auto',
-          zIndex: 1000,
-          background: '#1F1B1A',
-          color: '#FFF8F6',
-          padding: '12px 16px',
-          borderRadius: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '10px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          animation: 'slideDown 0.3s ease-out'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem', fontWeight: 600 }}>
-            <Icon name="check_circle" size={20} fill={1} style={{ color: '#FFB68C' }} />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            onClick={() => setToastMessage(null)}
-            style={{ background: 'none', border: 'none', color: '#FFF8F6', opacity: 0.7, cursor: 'pointer', padding: 0 }}
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-      )}
+      {toastNode}
 
       {/* 1. Table Identity & Status Card */}
       <section style={{
