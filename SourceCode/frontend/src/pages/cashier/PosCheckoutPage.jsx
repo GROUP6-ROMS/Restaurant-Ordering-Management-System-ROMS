@@ -2823,7 +2823,7 @@ export default function PosCheckoutPage() {
               </span>
               {[
                 { key: 'MORNING', label: '🌅 Ca Sáng (06:00 - 14:00)' },
-                { key: 'EVENING', label: '🌙 Ca Tối (14:00 - 24:00)' },
+                { key: 'EVENING', label: '🌙 Ca Tối (14:00 - 22:00)' },
                 { key: 'ALL', label: '📊 Cả Ngày' }
               ].map(item => (
                 <button

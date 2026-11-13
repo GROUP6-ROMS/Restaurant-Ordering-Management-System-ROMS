@@ -342,6 +342,15 @@ export default function ReservationPage() {
         setStep1Error('Vui lòng chọn khung giờ dùng bữa trước khi tiếp tục!');
         return;
       }
+      if (selectedTime < '07:00' || selectedTime > '21:30') {
+        setStep1Error('Nhà hàng chỉ phục vụ đặt bàn trong khung giờ từ 07:00 đến 21:30 hàng ngày. Quý khách vui lòng chọn lại khung giờ!');
+        showAlert({
+          title: 'Khung giờ không hợp lệ',
+          message: 'Nhà hàng chỉ phục vụ đặt bàn trong khung giờ từ 07:00 đến 21:30 hàng ngày. Quý khách vui lòng chọn lại khung giờ!',
+          type: 'warning'
+        });
+        return;
+      }
       if (isTimeSlotInPast(selectedTime, selectedDate)) {
         setStep1Error('Khung giờ dùng bữa đã chọn đã trôi qua so với thời gian thực. Quý khách vui lòng chọn một khung giờ trong tương lai!');
         return;
@@ -361,6 +370,15 @@ export default function ReservationPage() {
     } else if (currentStep === 3) {
       setCurrentStep(4);
     } else if (currentStep === 4) {
+      if (selectedTime < '07:00' || selectedTime > '21:30') {
+        setStep1Error('Nhà hàng chỉ phục vụ đặt bàn trong khung giờ từ 07:00 đến 21:30 hàng ngày. Quý khách vui lòng chọn lại khung giờ!');
+        showAlert({
+          title: 'Khung giờ không hợp lệ',
+          message: 'Nhà hàng chỉ phục vụ đặt bàn trong khung giờ từ 07:00 đến 21:30 hàng ngày. Quý khách vui lòng chọn lại khung giờ!',
+          type: 'warning'
+        });
+        return;
+      }
       if (isTimeSlotInPast(selectedTime, selectedDate)) {
         showAlert({
           title: 'Khung giờ không hợp lệ',
@@ -762,7 +780,8 @@ export default function ReservationPage() {
                         <input
                           type="time"
                           value={customTimeInput}
-                          min={selectedDate === todayStr ? `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}` : undefined}
+                          min={selectedDate === todayStr ? `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}` : '07:00'}
+                          max="21:30"
                           onChange={handleApplyCustomTime}
                           className="touch-input"
                           style={{
@@ -777,7 +796,7 @@ export default function ReservationPage() {
                           }}
                         />
                         <span style={{ fontSize: '0.78rem', color: '#89726B' }}>
-                          (Nhà hàng mở cửa phục vụ từ 10:00 đến 22:30 mỗi ngày)
+                          (Nhà hàng nhận đặt bàn từ 07:00 đến 21:30 mỗi ngày)
                         </span>
                       </div>
                       {isTimeSlotInPast(customTimeInput, selectedDate) && (

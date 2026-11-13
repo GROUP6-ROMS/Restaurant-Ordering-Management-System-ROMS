@@ -494,7 +494,7 @@ public class ReportServiceImpl implements ReportService {
 
         list.add(ShiftRevenueResponse.builder()
                 .shiftType("EVENING")
-                .shiftName("Ca Tối (14:00 - 24:00)")
+                .shiftName("Ca Tối (14:00 - 22:00)")
                 .billsCount(eveningBills)
                 .revenue(eveningRev)
                 .cashRevenue(eveningCash)

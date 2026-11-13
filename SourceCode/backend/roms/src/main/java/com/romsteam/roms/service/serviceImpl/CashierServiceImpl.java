@@ -392,9 +392,9 @@ public class CashierServiceImpl implements CashierService {
             shiftName = "Ca Sáng (06:00 - 14:00)";
         } else if ("EVENING".equalsIgnoreCase(shift)) {
             start = queryDate.atTime(14, 0, 0);
-            // Nới rộng đến 05:59:59 sáng hôm sau để bao quát các đơn thanh toán ăn khuya
+            // Nới rộng đến 05:59:59 sáng hôm sau để bao quát các đơn thanh toán ăn khuya (Night Settlement Grace Window)
             end = queryDate.plusDays(1).atTime(5, 59, 59);
-            shiftName = "Ca Tối (14:00 - 24:00)";
+            shiftName = "Ca Tối (14:00 - 22:00)";
         } else {
             // FULL_DAY / ALL
             start = queryDate.atTime(0, 0, 0);

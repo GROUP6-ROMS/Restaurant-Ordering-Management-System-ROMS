@@ -10,6 +10,16 @@ import { useDialog } from '../../context/DialogContext';
  */
 const playNotificationChime = () => {
   try {
+    // 1. Kiểm tra nếu Quản lý đã chủ động Tắt chuông âm thanh (Muted)
+    if (localStorage.getItem('roms_manager_bell_muted') === 'true') {
+      return;
+    }
+    // 2. Tự động ngắt chuông âm thanh ngoài giờ hoạt động (22:00 - 06:00 sáng)
+    const currentH = new Date().getHours();
+    if (currentH >= 22 || currentH < 6) {
+      return;
+    }
+
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
@@ -55,6 +65,17 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [isRinging, setIsRinging] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => {
+    return localStorage.getItem('roms_manager_bell_muted') === 'true';
+  });
+
+  const toggleMute = () => {
+    setIsMuted(prev => {
+      const next = !prev;
+      localStorage.setItem('roms_manager_bell_muted', String(next));
+      return next;
+    });
+  };
 
   const [summary, setSummary] = useState({
     totalCount: 0,
@@ -348,6 +369,29 @@ export default function NotificationBell() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
+              {/* Nút Bật/Tắt chuông âm thanh */}
+              <button
+                type="button"
+                onClick={toggleMute}
+                title={isMuted ? "Đang tắt chuông âm thanh • Bấm để bật lại" : "Đang bật chuông âm thanh • Bấm để tắt tiếng (Mute)"}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  borderRadius: '8px',
+                  border: isMuted ? '1px solid #FFDBC9' : '1px solid #EAE0DE',
+                  background: isMuted ? '#FFF0ED' : '#FFFFFF',
+                  color: isMuted ? '#BA1A1A' : '#56423D',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name={isMuted ? "volume_off" : "volume_up"} size={16} />
+                <span>{isMuted ? "Tắt chuông" : "Chuông"}</span>
+              </button>
 
               {/* Nút làm mới */}
               <button
