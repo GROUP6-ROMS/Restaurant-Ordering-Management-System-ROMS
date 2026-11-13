@@ -19,7 +19,7 @@ public class ShiftRevenueResponse {
     // Loại ca: "MORNING" hoặc "EVENING"
     private String shiftType;
 
-    // Tên ca hiển thị: "Ca Sáng (06:00 - 14:00)" hoặc "Ca Tối (14:00 - 24:00)"
+    // Tên ca hiển thị: "Ca Sáng (06:00 - 14:00)" hoặc "Ca Tối (14:00 - 22:00)"
     private String shiftName;
 
     // Tổng số lượng hóa đơn hoàn tất thanh toán trong ca

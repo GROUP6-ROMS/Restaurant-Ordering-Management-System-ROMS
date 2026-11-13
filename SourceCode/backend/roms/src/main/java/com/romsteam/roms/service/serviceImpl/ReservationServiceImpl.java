@@ -65,6 +65,13 @@ public class ReservationServiceImpl implements ReservationService {
             throw new AppException("Thời gian đặt bàn không hợp lệ! Vui lòng chọn thời gian từ hiện tại trở đi.");
         }
 
+        // Kiểm tra khung giờ mở cửa nhận khách đặt bàn (RULE-RESV-03: 07:00 - 21:30)
+        LocalTime openingTime = LocalTime.of(7, 0);
+        LocalTime closingTime = LocalTime.of(21, 30);
+        if (time.isBefore(openingTime) || time.isAfter(closingTime)) {
+            throw new AppException("Nhà hàng chỉ phục vụ đặt bàn trong khung giờ từ 07:00 đến 21:30 hàng ngày. Quý khách vui lòng chọn khung giờ trong khoảng này!");
+        }
+
         // Kiểm tra số lượng khách đặt bàn trực tuyến theo RULE-RESV-01 & RULE-RESV-02: từ 1 đến 20 khách
         if (request.getGuestCount() == null || request.getGuestCount() < 1 || request.getGuestCount() > 20) {
             throw new AppException("Số lượng khách đặt trực tuyến phải từ 1 đến 20 người. Với đoàn từ 21 khách trở lên, quý khách vui lòng liên hệ hotline để được phục vụ tiệc riêng!");

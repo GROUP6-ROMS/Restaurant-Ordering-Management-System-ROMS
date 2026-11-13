@@ -250,7 +250,7 @@ export default function ReportsAnalyticsPage() {
       posCardRevenue: 2000000
     },
     {
-      shiftName: 'Ca Tối (14:00 - 24:00)',
+      shiftName: 'Ca Tối (14:00 - 22:00)',
       revenue: 41020000,
       percentage: 65.0,
       billCount: 54,
@@ -973,7 +973,7 @@ export default function ReportsAnalyticsPage() {
                   Phân Tích Cơ Cấu Doanh Thu Theo Ca (Shift Breakdown)
                 </h3>
                 <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#89726B' }}>
-                  So sánh hiệu suất giữa Ca Sáng (06:00 - 14:00) và Ca Tối (14:00 - 24:00)
+                  So sánh hiệu suất giữa Ca Sáng (06:00 - 14:00) và Ca Tối (14:00 - 22:00)
                 </p>
               </div>
             </div>
