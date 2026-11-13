@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Icon from '../../components/common/Icon';
 import reportApi from '../../api/reportApi';
 import { useRestaurantProfile } from '../../utils/restaurantConfig';
+import { useDialog } from '../../context/DialogContext';
 
 // Danh sách các tùy chọn mốc thời gian lọc báo cáo
 const TIMEFRAMES = [
@@ -21,6 +22,7 @@ const formatLocalDateISO = (date = new Date()) => {
 
 export default function ReportsAnalyticsPage() {
   const restaurantProfile = useRestaurantProfile();
+  const { showToast } = useDialog();
   // State lưu khoảng thời gian lọc hiện tại
   const [timeframe, setTimeframe] = useState('TODAY');
 
@@ -40,8 +42,6 @@ export default function ReportsAnalyticsPage() {
   // State lưu thông báo lỗi nếu gọi API thất bại
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // State lưu thông báo Toast tạm thời
-  const [toastMessage, setToastMessage] = useState(null);
 
   // State tìm kiếm và lọc cho Sổ Kiểm Toán Hóa Đơn
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
@@ -69,11 +69,6 @@ export default function ReportsAnalyticsPage() {
     }
   };
 
-  // Hàm hiển thị thông báo Toast trong 3 giây
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
 
   // Hàm gọi API lấy dữ liệu báo cáo từ Backend Spring Boot
   const fetchReportData = async () => {
@@ -428,29 +423,6 @@ export default function ReportsAnalyticsPage() {
         }
       `}</style>
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '24px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFFFFF',
-          padding: '12px 20px',
-          borderRadius: '12px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 600,
-          fontSize: '0.9rem',
-          borderLeft: '4px solid #9D4124'
-        }}>
-          <Icon name="check_circle" size={20} style={{ color: '#E8C3BA' }} />
-          <span>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Header & Export Actions (Màn hình thường) */}
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
