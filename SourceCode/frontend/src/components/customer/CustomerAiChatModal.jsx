@@ -122,6 +122,26 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
         }
     };
 
+    // Kiem tra ton kho cua mon goi y truoc khi them vao gio hang
+    const getInCartQty = (dishId) =>
+        cartItems.filter((i) => Number(i.id) === Number(dishId)).reduce((s, i) => s + i.quantity, 0);
+
+    const getDishStockStatus = (dish) => {
+        if (dish.isAvailable === false) {
+            return { canAdd: false, label: 'Tạm hết', reason: `Món "${dish.name}" hiện đã tạm ngưng phục vụ!` };
+        }
+        if (dish.remainingStock !== null && dish.remainingStock !== undefined) {
+            const stock = Number(dish.remainingStock);
+            if (stock <= 0) {
+                return { canAdd: false, label: 'Hết món', reason: `Món "${dish.name}" hiện đã hết suất trong ngày!` };
+            }
+            if (getInCartQty(dish.id) >= stock) {
+                return { canAdd: false, label: 'Đủ tối đa', reason: `Giỏ hàng đã có đủ ${stock} suất "${dish.name}" còn lại!` };
+            }
+        }
+        return { canAdd: true, label: 'Thêm', reason: '' };
+    };
+
     // Thêm món vào giỏ hàng kèm thông báo mượt mà trên giao diện
     const handleAddToCart = (dish) => {
         const diningToken = sessionStorage.getItem('roms_dining_token');
@@ -129,6 +149,15 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
         const isTableOccupied = (tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
         if (!isTableOccupied) {
             setToastMessage('Chờ nhân viên mở bàn! Vui lòng đợi nhân viên mở bàn.');
+            setTimeout(() => {
+                setToastMessage(null);
+            }, 2500);
+            return;
+        }
+
+        const stockCheck = getDishStockStatus(dish);
+        if (!stockCheck.canAdd) {
+            setToastMessage(stockCheck.reason);
             setTimeout(() => {
                 setToastMessage(null);
             }, 2500);
@@ -284,14 +313,18 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                                         width: '100%', marginTop: 8,
                                         display: 'flex', flexDirection: 'column', gap: 8
                                     }}>
-                                        {msg.suggestedDishes.map((dish) => (
+                                        {msg.suggestedDishes.map((dish) => {
+                                            const stockCheck = getDishStockStatus(dish);
+                                            const isAdded = justAddedId === dish.id;
+                                            return (
                                             <div
                                                 key={dish.id}
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: 10,
                                                     background: '#FFFFFF', padding: 8, borderRadius: 12,
                                                     border: '1px solid rgba(220,192,185,0.4)',
-                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                                    opacity: stockCheck.canAdd ? 1 : 0.72
                                                 }}
                                             >
                                                 <img
@@ -316,21 +349,24 @@ export default function CustomerAiChatModal({ isOpen, onClose }) {
                                                 {/* Nút thêm vào giỏ hàng tương tác 1-chạm */}
                                                 <button
                                                     onClick={() => handleAddToCart(dish)}
+                                                    disabled={!stockCheck.canAdd}
                                                     style={{
-                                                        background: justAddedId === dish.id ? '#16A34A' : 'var(--primary, #A04020)',
-                                                        color: '#FFF',
+                                                        background: !stockCheck.canAdd ? '#E5E7EB' : (isAdded ? '#16A34A' : 'var(--primary, #A04020)'),
+                                                        color: !stockCheck.canAdd ? '#6B7280' : '#FFF',
                                                         border: 'none', borderRadius: 8,
                                                         padding: '6px 10px', fontSize: 11, fontWeight: 700,
-                                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                                                        cursor: !stockCheck.canAdd ? 'not-allowed' : 'pointer',
+                                                        display: 'flex', alignItems: 'center', gap: 4,
                                                         transition: 'all 0.2s ease',
                                                         flexShrink: 0
                                                     }}
                                                 >
-                                                    <Icon name={justAddedId === dish.id ? "check" : "add"} size={14} />
-                                                    {justAddedId === dish.id ? 'Đã thêm' : 'Thêm'}
+                                                    <Icon name={!stockCheck.canAdd ? "block" : (isAdded ? "check" : "add")} size={14} />
+                                                    {!stockCheck.canAdd ? stockCheck.label : (isAdded ? 'Đã thêm' : 'Thêm')}
                                                 </button>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
