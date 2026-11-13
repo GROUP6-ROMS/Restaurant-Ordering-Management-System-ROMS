@@ -332,7 +332,3 @@ Hệ thống tích hợp quy trình **Continuous Integration & Continuous Deploy
 
 ---
 
-<p align="center">
-  <b>Developed with dedication by Team ROMS — Fall 2026</b><br>
-  <sub>FPT University Can Tho Campus</sub>
-</p>
