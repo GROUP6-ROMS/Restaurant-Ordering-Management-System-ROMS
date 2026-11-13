@@ -453,6 +453,9 @@ export default function PosCheckoutPage() {
           fetchBillPreview(event.tableId, false);
         }
         fetchPosTables(true);
+      } else if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable, remainingStock } = event.payload;
+        setMenuCatalog(prev => prev.map(m => m.id === id ? { ...m, isAvailable, remainingStock } : m));
       } else if (event?.type === 'TABLE_UPDATE' || event?.type === 'ORDER_UPDATE') {
         fetchPosTables(true);
         if (selectedTableIdRef.current) {
@@ -636,6 +639,15 @@ export default function PosCheckoutPage() {
       showToast('Vui lòng chọn một bàn ăn trước!');
       return;
     }
+    const openStatuses = ['OCCUPIED', 'DINING', 'PAYMENT_REQUEST', 'DRAFT_PRINTED', 'AWAITING_PAYMENT', 'FOOD_READY', 'CALLING'];
+    if (!currentTable.isCallingBill && !openStatuses.includes(currentTable.status)) {
+      showToast(`Bàn ${currentTable.code || currentTable.name} chưa mở phiên phục vụ, không thể thêm món!`);
+      return;
+    }
+    if (!isPosItemUnlocked(dish)) {
+      showToast(`Món "${dish.name}" hiện đã tạm hết hàng!`);
+      return;
+    }
     try {
       await waiterApi.addOrder(currentTable.id, {
         items: [
@@ -649,6 +661,7 @@ export default function PosCheckoutPage() {
       showToast(`Đã thêm [${dish.name}] vào ${currentTable.name}`);
       await fetchBillPreview(currentTable.id);
       await fetchPosTables(true);
+      waiterApi.getMenu().then(r => { if (r.data?.data) setMenuCatalog(r.data.data); }).catch(() => {});
       broadcastRealtimeEvent({ type: 'ORDER_UPDATE', tableId: currentTable.id });
       broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: currentTable.id, status: 'OCCUPIED' });
     } catch (err) {
@@ -1647,16 +1660,19 @@ export default function PosCheckoutPage() {
 
                 {/* Grid món ăn */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', maxHeight: '280px', overflowY: 'auto' }}>
-                  {filteredCatalog.slice(0, 12).map(dish => (
+                  {filteredCatalog.slice(0, 12).map(dish => {
+                    const unlocked = isPosItemUnlocked(dish);
+                    return (
                     <div
                       key={dish.id}
                       onClick={() => handleQuickAddDish(dish)}
                       style={{
-                        background: '#FFF8F6',
+                        background: unlocked ? '#FFF8F6' : '#F5F5F4',
                         border: '1px solid #F0E6E4',
                         borderRadius: '12px',
                         padding: '8px',
-                        cursor: 'pointer',
+                        cursor: unlocked ? 'pointer' : 'not-allowed',
+                        opacity: unlocked ? 1 : 0.55,
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
@@ -1671,34 +1687,37 @@ export default function PosCheckoutPage() {
                           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {dish.name}
                           </div>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#9D4124' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: unlocked ? '#9D4124' : '#89726B' }}>
                             {Number(dish.price).toLocaleString('vi-VN')}₫
                           </div>
                         </div>
                       </div>
                       <button
                         type="button"
+                        disabled={!unlocked}
                         style={{
                           width: '100%',
                           marginTop: '6px',
                           padding: '4px',
                           borderRadius: '6px',
-                          background: '#FFFFFF',
+                          background: unlocked ? '#FFFFFF' : '#EAE0DE',
                           border: '1px solid #EAE0DE',
-                          color: '#9D4124',
+                          color: unlocked ? '#9D4124' : '#89726B',
                           fontWeight: 700,
                           fontSize: '0.72rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '4px',
-                          cursor: 'pointer'
+                          cursor: unlocked ? 'pointer' : 'not-allowed'
                         }}
                       >
-                        <Icon name="add" size={14} /> Thêm vào {currentTable ? currentTable.code : 'Bàn'}
+                        <Icon name={unlocked ? "add" : "block"} size={14} />
+                        {unlocked ? `Thêm vào ${currentTable ? currentTable.code : 'Bàn'}` : 'Tạm hết'}
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

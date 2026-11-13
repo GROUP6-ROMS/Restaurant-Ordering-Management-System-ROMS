@@ -134,6 +134,12 @@ export default function WaiterFloorPlanPage() {
         return;
       }
 
+      if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable, remainingStock } = event.payload;
+        setMenuCatalog(prev => prev.map(m => m.id === id ? { ...m, isAvailable, remainingStock } : m));
+        return;
+      }
+
       if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE' || event?.type === 'NEW_ORDER_CREATED' || event?.type === 'CALL_WAITER') {
         loadFloorPlan();
       }
@@ -346,35 +352,60 @@ export default function WaiterFloorPlanPage() {
 
   // Mở modal gọi món và khởi tạo giỏ hàng
   const handleOpenOrderModal = () => {
+    const activeStatuses = ['OCCUPIED', 'FOOD_READY', 'CALLING', 'AWAITING_PAYMENT'];
+    if (!selectedTable || !activeStatuses.includes(selectedTable.status)) {
+      showToast('Vui lòng Mở Bàn đón khách trước khi gọi món!');
+      return;
+    }
     setOrderCart([]);
     setOrderGeneralNote('');
     setMenuSearchQuery('');
     setSelectedCategory('ALL');
-    if (!menuCatalog || menuCatalog.length === 0) {
-      fetchMenu();
-    }
+    fetchMenu();
     setShowOrderModal(true);
   };
 
-  // Thêm món vào giỏ hàng hoặc tăng số lượng
+  // Thêm món vào giỏ hàng hoặc tăng số lượng (kiểm tra trạng thái bán & tồn kho)
   const handleAddToCart = (dish) => {
+    const catalogDish = menuCatalog.find(m => m.id === dish.id) || dish;
+    const hasFinite = catalogDish.remainingStock !== null && catalogDish.remainingStock !== undefined;
+    if (catalogDish.isAvailable === false || (hasFinite && Number(catalogDish.remainingStock) <= 0)) {
+      showToast(`Món "${catalogDish.name}" hiện đã tạm hết!`);
+      return;
+    }
+    const existingInCart = orderCart.find(item => item.menuItemId === dish.id);
+    if (hasFinite && (existingInCart?.quantity || 0) >= Number(catalogDish.remainingStock)) {
+      showToast(`Món "${catalogDish.name}" chỉ còn lại ${catalogDish.remainingStock} phần!`);
+      return;
+    }
+
     setOrderCart(prev => {
       const existing = prev.find(item => item.menuItemId === dish.id);
       if (existing) {
+        if (hasFinite && existing.quantity >= Number(catalogDish.remainingStock)) {
+          return prev;
+        }
         return prev.map(item =>
           item.menuItemId === dish.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? {
+                ...item,
+                quantity: item.quantity + 1,
+                remainingStock: catalogDish.remainingStock,
+                isAvailable: catalogDish.isAvailable
+              }
             : item
         );
       }
       return [
         ...prev,
         {
-          menuItemId: dish.id,
-          name: dish.name,
-          price: dish.price,
-          imageUrl: dish.imageUrl,
-          category: dish.category,
+          menuItemId: catalogDish.id,
+          name: catalogDish.name,
+          price: catalogDish.price,
+          imageUrl: catalogDish.imageUrl,
+          category: catalogDish.category,
+          remainingStock: catalogDish.remainingStock,
+          isAvailable: catalogDish.isAvailable,
           quantity: 1,
           note: ''
         }
@@ -441,7 +472,7 @@ export default function WaiterFloorPlanPage() {
         setShowOrderModal(false);
         setOrderCart([]);
         setOrderGeneralNote('');
-        await loadFloorPlan();
+        await Promise.all([loadFloorPlan(), fetchMenu()]);
       }
     } catch (err) {
       console.error('Lỗi khi gửi đơn vào bếp:', err);
@@ -1999,7 +2030,8 @@ export default function WaiterFloorPlanPage() {
       {showOrderModal && selectedTable && (() => {
         const orderCategories = ['ALL', ...new Set(menuCatalog.map(item => item.category).filter(Boolean))];
         const filteredOrderMenu = menuCatalog.filter(item => {
-          if (!item.isAvailable) return false;
+          if (item.isAvailable === false) return false;
+          if (item.remainingStock !== null && item.remainingStock !== undefined && Number(item.remainingStock) <= 0) return false;
           if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
           if (menuSearchQuery.trim()) {
             const q = menuSearchQuery.trim().toLowerCase();
@@ -2192,6 +2224,8 @@ export default function WaiterFloorPlanPage() {
                     ) : (
                       filteredOrderMenu.map(dish => {
                         const inCartItem = orderCart.find(ci => ci.menuItemId === dish.id);
+                        const hasFiniteStock = dish.remainingStock !== null && dish.remainingStock !== undefined;
+                        const atMaxStock = hasFiniteStock && (inCartItem?.quantity || 0) >= Number(dish.remainingStock);
                         return (
                           <div
                             key={dish.id}
@@ -2212,13 +2246,18 @@ export default function WaiterFloorPlanPage() {
                                 <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {dish.name}
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
                                   <span style={{ fontSize: '0.8rem', color: '#9D4124', fontWeight: 800 }}>
                                     {dish.price.toLocaleString('vi-VN')}₫
                                   </span>
                                   {dish.category && (
                                     <span style={{ fontSize: '0.68rem', color: '#89726B', background: '#F6ECEA', padding: '1px 5px', borderRadius: '4px' }}>
                                       {dish.category}
+                                    </span>
+                                  )}
+                                  {hasFiniteStock && (
+                                    <span style={{ fontSize: '0.66rem', color: Number(dish.remainingStock) <= 5 ? '#BA1A1A' : '#2E7D32', background: Number(dish.remainingStock) <= 5 ? '#FFDAD6' : '#E8F5E9', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                      Còn {dish.remainingStock}
                                     </span>
                                   )}
                                 </div>
@@ -2248,9 +2287,9 @@ export default function WaiterFloorPlanPage() {
                                   onClick={() => handleAddToCart(dish)}
                                   style={{
                                     width: '28px', height: '28px', borderRadius: '6px',
-                                    background: '#9D4124', border: 'none',
+                                    background: atMaxStock ? '#D1C2BE' : '#9D4124', border: 'none',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    cursor: 'pointer', color: '#FFF', fontWeight: 700
+                                    cursor: atMaxStock ? 'not-allowed' : 'pointer', color: '#FFF', fontWeight: 700
                                   }}
                                 >
                                   +
@@ -2437,18 +2476,25 @@ export default function WaiterFloorPlanPage() {
                               <span style={{ minWidth: '16px', textAlign: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
                                 {item.quantity}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => handleAddToCart({ id: item.menuItemId, name: item.name, price: item.price, imageUrl: item.imageUrl, category: item.category })}
-                                style={{
-                                  width: '24px', height: '24px', borderRadius: '4px',
-                                  background: '#9D4124', color: '#FFF', border: 'none',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem'
-                                }}
-                              >
-                                +
-                              </button>
+                              {(() => {
+                                const catalogMatch = menuCatalog.find(m => m.id === item.menuItemId);
+                                const stockLimit = catalogMatch ? catalogMatch.remainingStock : item.remainingStock;
+                                const isCartItemMax = stockLimit !== null && stockLimit !== undefined && item.quantity >= Number(stockLimit);
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddToCart({ id: item.menuItemId, name: item.name, price: item.price, imageUrl: item.imageUrl, category: item.category })}
+                                    style={{
+                                      width: '24px', height: '24px', borderRadius: '4px',
+                                      background: isCartItemMax ? '#D1C2BE' : '#9D4124', color: '#FFF', border: 'none',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      cursor: isCartItemMax ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '0.8rem'
+                                    }}
+                                  >
+                                    +
+                                  </button>
+                                );
+                              })()}
                               <button
                                 type="button"
                                 onClick={() => handleRemoveFromCart(item.menuItemId)}
