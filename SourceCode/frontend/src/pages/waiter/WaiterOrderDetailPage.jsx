@@ -139,6 +139,27 @@ export default function WaiterOrderDetailPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng Modal Gọi thêm món
+  useEffect(() => {
+    if (showAddDishModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showAddDishModal) {
+        setShowAddDishModal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAddDishModal]);
+
 
   const handleRequestPayment = async () => {
     if (!tableData.id) return;
@@ -842,32 +863,40 @@ export default function WaiterOrderDetailPage() {
 
       {/* MODAL / DRAWER: GỌI THÊM MÓN TẠI BÀN (SCR-06) */}
       {showAddDishModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: isMobile ? 'flex-end' : 'center',
-          justifyContent: 'center',
-          zIndex: 1100,
-          padding: isMobile ? '0' : '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: isMobile ? '24px 24px 0 0' : '24px',
-            maxWidth: '920px',
-            width: '100%',
-            maxHeight: isMobile ? '92vh' : '90vh',
-            height: isMobile ? '92vh' : 'auto',
+        <div
+          onClick={() => setShowAddDishModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
-            overflow: 'hidden'
-          }}>
+            alignItems: isMobile ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: isMobile ? '0' : '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: isMobile ? '24px 24px 0 0' : '24px',
+              maxWidth: '920px',
+              width: '100%',
+              maxHeight: isMobile ? '92vh' : '90vh',
+              height: isMobile ? '92vh' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Modal Header */}
             <div style={{
               padding: isMobile ? '14px 16px 10px' : '20px 24px',

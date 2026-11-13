@@ -56,6 +56,27 @@ export default function CustomerTrackingPage() {
     if (tableInfo?.status) setTableStatus(tableInfo.status);
   }, [tableInfo?.status]);
 
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng Modal Thanh toán
+  useEffect(() => {
+    if (showPaymentModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showPaymentModal) {
+        setShowPaymentModal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showPaymentModal]);
+
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
       if (
@@ -1070,6 +1091,8 @@ export default function CustomerTrackingPage() {
               background: '#FFFFFF',
               width: '100%',
               maxWidth: '460px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
               borderTopLeftRadius: '24px',
               borderTopRightRadius: '24px',
               padding: '24px 20px',

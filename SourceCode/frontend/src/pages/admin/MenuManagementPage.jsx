@@ -195,6 +195,32 @@ export default function MenuManagementPage() {
     loadInitialData();
   }, []);
 
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng modal (Công thái học UX)
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(showAddDishModal || showCategoryModal);
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showAddDishModal) {
+          setShowAddDishModal(false);
+        } else if (showCategoryModal) {
+          setShowCategoryModal(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAddDishModal, showCategoryModal]);
+
   // Món đang chọn hiển thị trên panel chi tiết
   const selectedDish = useMemo(() => {
     return dishes.find(d => d.id === selectedDishId) || dishes[0] || null;
@@ -1314,25 +1340,35 @@ export default function MenuManagementPage() {
 
       {/* MODAL 1: Thêm Món Ăn Mới */}
       {showAddDishModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '540px',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.25)'
-          }}>
+        <div
+          onClick={() => setShowAddDishModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '540px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              padding: '24px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Icon name="add_circle" size={24} style={{ color: '#9D4124' }} />
@@ -1634,25 +1670,35 @@ export default function MenuManagementPage() {
 
       {/* MODAL 2: Quản Lý Nhóm Danh Mục Món Ăn */}
       {showCategoryModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '560px',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.25)'
-          }}>
+        <div
+          onClick={() => setShowCategoryModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              padding: '24px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Icon name="category" size={24} style={{ color: '#9D4124' }} />

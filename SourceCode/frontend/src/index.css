@@ -962,3 +962,16 @@ html {
   }
 }
 
+/* ==========================================================================
+   ROMS Global Modal & Popup Ergonomics Animations
+   ========================================================================== */
+@keyframes romsOverlayFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes romsModalPopIn {
+  0% { opacity: 0; transform: scale(0.96) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+

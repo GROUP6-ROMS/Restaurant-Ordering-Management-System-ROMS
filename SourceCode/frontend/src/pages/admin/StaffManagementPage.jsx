@@ -344,6 +344,47 @@ export default function StaffManagementPage() {
     };
   }, [activeStaffMenuId]);
 
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng modal (Công thái học UX)
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(
+      showAddStaffModal ||
+      showEditStaffModal ||
+      showPinModal ||
+      showAssignModal ||
+      showWeeklyPrintModal
+    );
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showPinModal) {
+          setShowPinModal(false);
+          setSelectedStaffForPin(null);
+          setNewPinCode('');
+        } else if (showAssignModal) {
+          setShowAssignModal(false);
+        } else if (showWeeklyPrintModal) {
+          setShowWeeklyPrintModal(false);
+        } else if (showEditStaffModal) {
+          setShowEditStaffModal(false);
+          setSelectedStaffForEdit(null);
+        } else if (showAddStaffModal) {
+          setShowAddStaffModal(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAddStaffModal, showEditStaffModal, showPinModal, showAssignModal, showWeeklyPrintModal]);
+
   // ===================================================================
   // ACTIONS & HANDLERS
   // ===================================================================
@@ -2382,25 +2423,35 @@ export default function StaffManagementPage() {
 
       {/* MODAL 1: Thêm Nhân Viên Mới */}
       {showAddStaffModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '500px',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.25)'
-          }}>
+        <div
+          onClick={() => setShowAddStaffModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              padding: '24px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Icon name="person_add" size={24} style={{ color: '#9D4124' }} />
@@ -2527,25 +2578,38 @@ export default function StaffManagementPage() {
 
       {/* MODAL 2: Chỉnh Sửa Hồ Sơ Nhân Viên */}
       {showEditStaffModal && selectedStaffForEdit && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '500px',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.25)'
-          }}>
+        <div
+          onClick={() => {
+            setShowEditStaffModal(false);
+            setSelectedStaffForEdit(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              padding: '24px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Icon name="edit" size={24} style={{ color: '#9D4124' }} />
@@ -2666,26 +2730,40 @@ export default function StaffManagementPage() {
 
       {/* MODAL 3: Đổi Mã PIN */}
       {showPinModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '380px',
-            borderRadius: '24px',
-            padding: '24px',
-            textAlign: 'center',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.25)'
-          }}>
+        <div
+          onClick={() => {
+            setShowPinModal(false);
+            setSelectedStaffForPin(null);
+            setNewPinCode('');
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '380px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              padding: '24px',
+              textAlign: 'center',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#FFDBC9', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
               <Icon name="dialpad" size={26} />
             </div>
@@ -2743,29 +2821,37 @@ export default function StaffManagementPage() {
 
       {/* MODAL 5: POP-UP PHÂN CA CHO NHÂN VIÊN (TÌM KIẾM THEO TÊN, DROPDOWN, NÚT THÊM VÀO CA) */}
       {showAssignModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9995,
-          background: 'rgba(31, 27, 26, 0.7)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '20px',
-            width: '100%',
-            maxWidth: '560px',
-            boxShadow: '0 20px 40px rgba(31, 27, 26, 0.25)',
-            border: '1px solid #EAE0DE',
-            overflow: 'hidden',
+        <div
+          onClick={() => setShowAssignModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9995,
+            background: 'rgba(31, 27, 26, 0.7)',
+            backdropFilter: 'blur(5px)',
             display: 'flex',
-            flexDirection: 'column',
-            maxHeight: '90vh'
-          }}>
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '560px',
+              boxShadow: '0 20px 40px rgba(31, 27, 26, 0.25)',
+              border: '1px solid #EAE0DE',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '92vh',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Modal Header */}
             <div style={{
               padding: '18px 24px',
@@ -3310,18 +3396,22 @@ export default function StaffManagementPage() {
 
       {/* MODAL 4: IN LỊCH PHÂN CA THEO TUẦN (A4 LANDSCAPE) */}
       {showWeeklyPrintModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.75)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-          overflowY: 'auto'
-        }}>
+        <div
+          onClick={() => setShowWeeklyPrintModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            overflowY: 'auto',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
           {/* Style tag điều khiển in ấn của trình duyệt */}
           <style>{`
             @media print {
@@ -3367,17 +3457,21 @@ export default function StaffManagementPage() {
             }
           `}</style>
 
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '1240px',
-            maxHeight: '92vh',
-            borderRadius: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.35)',
-            overflow: 'hidden'
-          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '1240px',
+              maxHeight: '92vh',
+              borderRadius: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.35)',
+              overflow: 'hidden',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Modal Header Controls (no-print) */}
             <div className="no-print" style={{
               padding: '18px 24px',

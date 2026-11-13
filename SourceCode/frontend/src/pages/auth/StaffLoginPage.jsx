@@ -134,12 +134,25 @@ export default function StaffLoginPage() {
     setPin('');
   }, [isSubmitting]);
 
-  // Bắt phím bàn phím vật lý trên Desktop khi Popup PIN đang mở
+  // Bắt phím bàn phím vật lý trên Desktop & Khóa cuộn trang nền (Công thái học UX)
   useEffect(() => {
-    if (!showPinModal) return;
+    const isAnyModalOpen = Boolean(showPinModal || showForgotPinModal);
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
 
     const handleKeyDown = (e) => {
-      if (isSubmitting) return;
+      if (showForgotPinModal) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowForgotPinModal(false);
+        }
+        return;
+      }
+
+      if (!showPinModal || isSubmitting) return;
       if (e.key >= '0' && e.key <= '9') {
         e.preventDefault();
         handleNumpadPress(e.key);
@@ -156,8 +169,11 @@ export default function StaffLoginPage() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPinModal, isSubmitting, handleNumpadPress, handleNumpadBackspace, handleNumpadClear]);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showPinModal, showForgotPinModal, isSubmitting, handleNumpadPress, handleNumpadBackspace, handleNumpadClear]);
 
   // Mở modal Khôi phục mã PIN Quản lý
   const handleOpenForgotPin = () => {
@@ -600,26 +616,36 @@ export default function StaffLoginPage() {
 
       {/* Modal Khôi Phục Mã PIN Quản Lý (Giữ nguyên chính sách bảo mật) */}
       {showForgotPinModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          zIndex: 9999
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '24px',
-            maxWidth: '460px',
-            width: '100%',
-            padding: '28px',
-            boxShadow: '0 25px 60px -15px rgba(0,0,0,0.5)',
-            position: 'relative'
-          }}>
+        <div
+          onClick={() => !isSubmittingForgot && setShowForgotPinModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            zIndex: 9999,
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '24px',
+              maxWidth: '460px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              width: '100%',
+              padding: '28px',
+              boxShadow: '0 25px 60px -15px rgba(0,0,0,0.5)',
+              position: 'relative',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

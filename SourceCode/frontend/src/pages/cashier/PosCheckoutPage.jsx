@@ -298,6 +298,59 @@ export default function PosCheckoutPage() {
     selectedTableIdRef.current = selectedTableId;
   }, [selectedTableId]);
 
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng modal (Công thái học UX)
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(
+      showVietQrModal ||
+      showReceiptModal ||
+      showVoidModal ||
+      showShiftApprovalModal ||
+      showDiningWarningModal ||
+      showCloseEmptyModal
+    );
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showVietQrModal) {
+          setShowVietQrModal(false);
+          setPayOsPollingActive(false);
+        } else if (showReceiptModal) {
+          setShowReceiptModal(false);
+          setReceiptData(null);
+        } else if (showVoidModal) {
+          setShowVoidModal(false);
+          setItemToVoid(null);
+          setVoidManagerPin('');
+        } else if (showShiftApprovalModal) {
+          setShowShiftApprovalModal(false);
+          setShiftManagerPin('');
+        } else if (showDiningWarningModal) {
+          setShowDiningWarningModal(false);
+        } else if (showCloseEmptyModal) {
+          setShowCloseEmptyModal(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    showVietQrModal,
+    showReceiptModal,
+    showVoidModal,
+    showShiftApprovalModal,
+    showDiningWarningModal,
+    showCloseEmptyModal
+  ]);
+
 
   // 1. Tải danh mục Khu vực & Menu món ăn từ CSDL
   useEffect(() => {
@@ -3291,28 +3344,40 @@ export default function PosCheckoutPage() {
 
       {/* MODAL 1: VIETQR CHUYỂN KHOẢN ĐỘNG CHUẨN NAPAS 24/7 (PAYOS OPEN BANKING) */}
       {showVietQrModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.75)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '430px',
-            borderRadius: '28px',
-            padding: '24px',
-            textAlign: 'center',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
+        <div
+          onClick={() => {
+            setShowVietQrModal(false);
+            setPayOsPollingActive(false);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '430px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '28px',
+              padding: '24px',
+              textAlign: 'center',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+              position: 'relative',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3591,28 +3656,39 @@ export default function PosCheckoutPage() {
 
       {/* MODAL 2: XEM VÀ IN HÓA ĐƠN NHIỆT KHỔ K80 (80mm) */}
       {showReceiptModal && receiptData && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '440px',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
-            maxHeight: '90vh',
+        <div
+          onClick={() => {
+            setShowReceiptModal(false);
+            setReceiptData(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.65)',
+            backdropFilter: 'blur(5px)',
             display: 'flex',
-            flexDirection: 'column'
-          }}>
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '440px',
+              borderRadius: '24px',
+              padding: '24px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.25)',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Vùng in ấn nhiệt chuẩn khổ 80mm */}
             <div id="thermal-receipt-print" style={{ overflowY: 'auto', flex: 1 }}>
               {receiptData.isReprint && (
@@ -3720,25 +3796,39 @@ export default function PosCheckoutPage() {
 
       {/* MODAL 3: QUẢN LÝ DUYỆT HỦY MÓN (PIN 6 SỐ) */}
       {showVoidModal && itemToVoid && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '24px',
-            maxWidth: '440px',
-            width: '100%',
-            padding: '28px',
-            border: '2px solid #BA1A1A'
-          }}>
+        <div
+          onClick={() => {
+            setShowVoidModal(false);
+            setItemToVoid(null);
+            setVoidManagerPin('');
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '24px',
+              maxWidth: '440px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              width: '100%',
+              padding: '28px',
+              border: '2px solid #BA1A1A',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#FFDAD6', color: '#BA1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="verified_user" size={26} />
@@ -3838,25 +3928,38 @@ export default function PosCheckoutPage() {
 
       {/* MODAL 4: QUẢN LÝ DUYỆT CHỐT CA VÀ BÀN GIAO KÉT (PIN 6 SỐ) */}
       {showShiftApprovalModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '24px',
-            maxWidth: '520px',
-            width: '100%',
-            padding: '26px',
-            border: '2px solid #9D4124'
-          }}>
+        <div
+          onClick={() => {
+            setShowShiftApprovalModal(false);
+            setShiftManagerPin('');
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '24px',
+              maxWidth: '520px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              width: '100%',
+              padding: '26px',
+              border: '2px solid #9D4124',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#FFDBC9', color: '#9D4124', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="shield_person" size={26} />
@@ -4012,26 +4115,36 @@ export default function PosCheckoutPage() {
 
       {/* MODAL 5: CẢNH BÁO THANH TOÁN BÀN ĐANG PHỤC VỤ / CÒN MÓN CHƯA XONG */}
       {showDiningWarningModal && billPreview && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(31, 27, 26, 0.7)',
-          backdropFilter: 'blur(5px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1200,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '24px',
-            maxWidth: '520px',
-            width: '100%',
-            padding: '28px',
-            border: '2px solid #D97706',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.3)'
-          }}>
+        <div
+          onClick={() => setShowDiningWarningModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(31, 27, 26, 0.7)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '24px',
+              maxWidth: '520px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              width: '100%',
+              padding: '28px',
+              border: '2px solid #D97706',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.3)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon name="warning" size={28} />
@@ -4118,26 +4231,36 @@ export default function PosCheckoutPage() {
 
       {/* MODAL 6: XÁC NHẬN ĐÓNG PHIÊN BÀN TRỐNG (0đ) */}
       {showCloseEmptyModal && currentTable && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '24px',
-            maxWidth: '460px',
-            width: '100%',
-            padding: '28px',
-            border: '2px solid #BA1A1A',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-          }}>
+        <div
+          onClick={() => setShowCloseEmptyModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '24px',
+              maxWidth: '460px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              width: '100%',
+              padding: '28px',
+              border: '2px solid #BA1A1A',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: '#FFDAD6', color: '#BA1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="event_busy" size={26} />

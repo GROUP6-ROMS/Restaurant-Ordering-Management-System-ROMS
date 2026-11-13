@@ -183,6 +183,41 @@ export default function WaiterFloorPlanPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng modal (Công thái học UX)
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(
+      showQrModal ||
+      showTransferModal ||
+      showOrderModal ||
+      showTableModal
+    );
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showQrModal) {
+          setShowQrModal(false);
+        } else if (showTransferModal) {
+          setShowTransferModal(false);
+        } else if (showOrderModal) {
+          setShowOrderModal(false);
+        } else if (showTableModal) {
+          setShowTableModal(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showQrModal, showTransferModal, showOrderModal, showTableModal]);
+
   useEffect(() => {
     const urlFilter = searchParams.get('filter');
     setActiveFilter(urlFilter || 'ALL');
@@ -2014,29 +2049,37 @@ export default function WaiterFloorPlanPage() {
         const cartTotalAmount = orderCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
         return (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(31, 27, 26, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: isMobile ? '10px' : '20px'
-          }}>
-            <div style={{
-              background: '#FFFFFF',
-              width: '100%',
-              maxWidth: isMobile ? '100%' : '940px',
-              borderRadius: '24px',
-              padding: isMobile ? '16px' : '22px',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-              maxHeight: isMobile ? '94vh' : '88vh',
+          <div
+            onClick={() => setShowOrderModal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              background: 'rgba(31, 27, 26, 0.65)',
+              backdropFilter: 'blur(4px)',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: isMobile ? '10px' : '20px',
+              animation: 'romsOverlayFadeIn 0.2s ease-out'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#FFFFFF',
+                width: '100%',
+                maxWidth: isMobile ? '100%' : '940px',
+                borderRadius: '24px',
+                padding: isMobile ? '16px' : '22px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                maxHeight: isMobile ? '94vh' : '88vh',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+            >
               {/* Modal Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F0E6E4', paddingBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2567,25 +2610,35 @@ export default function WaiterFloorPlanPage() {
 
       {/* MODAL 2: Transfer Table (theo SCR-07) */}
       {showTransferModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '480px',
-            borderRadius: '20px',
-            padding: '24px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
-          }}>
+        <div
+          onClick={() => setShowTransferModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '480px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '20px',
+              padding: '24px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Icon name="swap_horiz" size={24} style={{ color: '#9D4124' }} />
@@ -2679,26 +2732,36 @@ export default function WaiterFloorPlanPage() {
 
       {/* MODAL 3: Table QR Code */}
       {showQrModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(31, 27, 26, 0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            width: '100%',
-            maxWidth: '380px',
-            borderRadius: '24px',
-            padding: '24px',
-            textAlign: 'center',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
-          }}>
+        <div
+          onClick={() => setShowQrModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(31, 27, 26, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              width: '100%',
+              maxWidth: '380px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              padding: '24px',
+              textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.25rem', color: '#1F1B1A', margin: '0 0 4px' }}>
               Mã QR Bàn {selectedTable.tableNumber}
             </h3>

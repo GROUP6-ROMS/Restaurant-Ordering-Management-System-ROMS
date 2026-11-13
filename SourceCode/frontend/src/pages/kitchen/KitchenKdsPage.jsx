@@ -985,6 +985,27 @@ export default function KitchenKdsPage() {
     };
   }, [soundEnabled]);
 
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng Drawer 86'd
+  useEffect(() => {
+    if (show86Modal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && show86Modal) {
+        setShow86Modal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [show86Modal]);
+
   // Tải danh sách thực đơn để Bếp quản lý trạng thái Tạm Hết (86'd)
   const load86MenuItems = async () => {
     try {
@@ -1418,6 +1439,7 @@ export default function KitchenKdsPage() {
           position: 'fixed', inset: 0, zIndex: 10000,
           background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(3px)',
           display: 'flex', justifyContent: 'flex-end',
+          animation: 'romsOverlayFadeIn 0.2s ease-out'
         }} onClick={() => setShow86Modal(false)}>
           <div style={{
             width: '100%', maxWidth: '540px', height: '100%',
