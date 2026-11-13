@@ -1,6 +1,8 @@
 package com.romsteam.roms.controller;
 
 import com.romsteam.roms.dto.request.LoginRequest;
+import com.romsteam.roms.dto.request.RequestOtpRequest;
+import com.romsteam.roms.dto.request.ResetPinRequest;
 import com.romsteam.roms.dto.request.VerifyManagerPinRequest;
 import com.romsteam.roms.dto.response.ApiResponse;
 import com.romsteam.roms.dto.response.LoginResponse;
@@ -38,18 +40,41 @@ public class AuthController {
 
     // POST /api/auth/logout - Dang xuat ca truc (Cap nhat isOnShift = false)
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@RequestBody(required = false) Map<String, String> body,
-                                                    Authentication authentication) {
-        String username = null;
-        if (body != null && body.containsKey("username")) {
-            username = body.get("username");
-        } else if (authentication != null) {
-            username = authentication.getName();
+    public ResponseEntity<ApiResponse<Void>> logout(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Yêu cầu xác thực tài khoản trước khi đăng xuất", org.springframework.http.HttpStatus.UNAUTHORIZED.value()));
         }
 
-        if (username != null) {
-            authService.logout(username);
-        }
+        String username = authentication.getName();
+        authService.logout(username);
         return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất ca làm việc thành công!"));
+    }
+
+    // POST /api/auth/heartbeat - Duy trì phiên làm việc và tự động đồng bộ trạng thái ca trực (isOnShift = true)
+    @PostMapping("/heartbeat")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> heartbeat(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Không tìm thấy thông tin phiên làm việc", org.springframework.http.HttpStatus.UNAUTHORIZED.value()));
+        }
+
+        String username = authentication.getName();
+        Map<String, Object> response = authService.heartbeat(username);
+        return ResponseEntity.ok(ApiResponse.success(response, "Duy trì phiên làm việc thành công!"));
+    }
+
+    // POST /api/auth/forgot-pin/request-otp - Yeu cau ma OTP dat lai ma PIN Quan ly
+    @PostMapping("/forgot-pin/request-otp")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> requestPinResetOtp(@Valid @RequestBody RequestOtpRequest request) {
+        Map<String, Object> result = authService.requestPinResetOtp(request);
+        return ResponseEntity.ok(ApiResponse.success(result, "Yêu cầu mã xác thực OTP thành công!"));
+    }
+
+    // POST /api/auth/forgot-pin/reset - Dat lai ma PIN bang OTP hoac Master Recovery Key
+    @PostMapping("/forgot-pin/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPinWithOtpOrRecoveryKey(@Valid @RequestBody ResetPinRequest request) {
+        authService.resetPinWithOtpOrRecoveryKey(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mã PIN thành công! Bạn có thể sử dụng mã PIN mới để đăng nhập."));
     }
 }

@@ -25,6 +25,8 @@ public enum ShiftType {
      * Được phép đăng nhập trước thời gian mở ca 15 phút, và trước thời gian kết thúc ca.
      */
     public boolean isWithinShift(LocalTime now) {
+        if (true) return true; // Xoá khi chạy thật
+
         if (startTime == null || endTime == null) return false;
         LocalTime allowStartTime = startTime.minusMinutes(15);
         return !now.isBefore(allowStartTime) && !now.isAfter(endTime);

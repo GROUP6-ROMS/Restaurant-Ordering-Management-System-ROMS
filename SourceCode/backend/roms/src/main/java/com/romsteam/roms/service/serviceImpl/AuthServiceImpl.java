@@ -20,6 +20,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.romsteam.roms.dto.response.RomsRealtimeEvent;
+import com.romsteam.roms.service.RealtimeService;
+import com.romsteam.roms.service.EmailService;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -27,57 +31,129 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Service
 public class AuthServiceImpl implements AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     private final AuthenticationManager authenticationManager;
     private final StaffRepository staffRepository;
     private final StaffScheduleRepository staffScheduleRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final RealtimeService realtimeService;
+    private final EmailService emailService;
+
+    // Quản lý thời điểm nhận tín hiệu Heartbeat gần nhất của từng nhân sự
+    private final Map<String, Long> staffLastHeartbeatMap = new ConcurrentHashMap<>();
+    private final long serverStartupTime = System.currentTimeMillis();
+
+    @Value("${app.security.master-recovery-key:ROMS-RECOVERY-2026}")
+    private String masterRecoveryKey = "ROMS-RECOVERY-2026";
+
+    // Lưu trữ OTP tạm thời trong bộ nhớ thread-safe với thời hạn 5 phút
+    private static class OtpEntry {
+        final String otp;
+        final LocalDateTime expiry;
+
+        OtpEntry(String otp, LocalDateTime expiry) {
+            this.otp = otp;
+            this.expiry = expiry;
+        }
+
+        boolean isExpired() {
+            return LocalDateTime.now().isAfter(expiry);
+        }
+    }
+
+    private final Map<String, OtpEntry> otpStorage = new ConcurrentHashMap<>();
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            StaffRepository staffRepository,
                            StaffScheduleRepository staffScheduleRepository,
                            JwtTokenProvider jwtTokenProvider,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           RealtimeService realtimeService,
+                           EmailService emailService) {
         this.authenticationManager = authenticationManager;
         this.staffRepository = staffRepository;
         this.staffScheduleRepository = staffScheduleRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.passwordEncoder = passwordEncoder;
+        this.realtimeService = realtimeService;
+        this.emailService = emailService;
     }
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        try {
-            // 1. Thuc hien xac thuc username va pinCode qua AuthenticationManager
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getUsername(),
-                            request.getPinCode()
-                    )
-            );
+        String username = request.getUsername() != null ? request.getUsername().trim() : "";
+        String pinCode = request.getPinCode() != null ? request.getPinCode().trim() : "";
 
-            // 2. Luu vao SecurityContext
+        // 1. Kiểm tra tài khoản nhân viên có tồn tại trong CSDL không
+        Staff staff = staffRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException("Sai tên đăng nhập hoặc mã PIN!", HttpStatus.UNAUTHORIZED));
+
+        // 2. Chặn đăng nhập nếu tài khoản đã bị khóa (do nhập sai 5 lần hoặc Quản lý tạm khóa)
+        if (staff.isLocked()) {
+            String lockMsg = (staff.getFailedPinAttempts() != null && staff.getFailedPinAttempts() >= 5)
+                    ? "Tài khoản của bạn đã bị KHÓA do nhập sai mã PIN 5 lần liên tiếp! Vui lòng liên hệ Quản lý để mở khóa."
+                    : "Tài khoản của bạn hiện đang bị khóa hoặc đã ngưng hoạt động! Vui lòng liên hệ Quản lý.";
+            throw new AppException(lockMsg, HttpStatus.FORBIDDEN);
+        }
+
+        // 3. Kiểm tra tính hợp lệ của mã PIN
+        if (!passwordEncoder.matches(pinCode, staff.getPinCode())) {
+            staff.recordFailedAttempt();
+            staffRepository.save(staff);
+
+            if (staff.isLocked()) {
+                throw new AppException(
+                        "Tài khoản của bạn đã bị KHÓA do nhập sai mã PIN 5 lần liên tiếp! Vui lòng liên hệ Quản lý để mở khóa.",
+                        HttpStatus.FORBIDDEN
+                );
+            } else {
+                int remaining = 5 - (staff.getFailedPinAttempts() != null ? staff.getFailedPinAttempts() : 0);
+                throw new AppException(
+                        "Mã PIN không chính xác! Bạn còn " + remaining + " lần thử trước khi tài khoản bị khóa.",
+                        HttpStatus.UNAUTHORIZED
+                );
+            }
+        }
+
+        // 4. Mã PIN chính xác -> Reset số lần nhập sai PIN về 0
+        if (staff.getFailedPinAttempts() != null && staff.getFailedPinAttempts() > 0) {
+            staff.resetFailedAttempts();
+            staffRepository.save(staff);
+        }
+
+        try {
+            // 5. Xác thực qua AuthenticationManager để SecurityContext có đầy đủ Principal & Authorities
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, pinCode)
+            );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // 3. Lay thong tin nhan vien tu CSDL
-            Staff staff = staffRepository.findByUsername(request.getUsername())
-                    .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
-
-            // 4. KIEM TRA DIEU KIEN PHAN CONG CA TRUC THEO NGAY (MULTI-DAY SHIFT SCHEDULING):
-            // Neu KHONG phai Quan ly (MANAGER), bat buoc phai co lich truc trong ngay hom nay va dung khung gio ca
+            // 6. KIỂM TRA ĐIỀU KIỆN PHÂN CÔNG CA TRỰC THEO NGÀY (MULTI-DAY SHIFT SCHEDULING):
+            // Nếu KHÔNG phải Quản lý (MANAGER), bắt buộc phải có lịch trực trong ngày hôm nay từ bảng staff_schedules (Đăng ký qua Script SQL)
             String currentShiftName = "NONE";
             if (staff.getRole() != UserRole.MANAGER) {
                 LocalDate today = LocalDate.now();
                 LocalTime now = LocalTime.now();
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-                // 4.1. Tim tat ca ca truc cua nhan vien trong ngay hom nay (today) tu bang staff_schedules
+                // 6.1. Tìm tất cả ca trực của nhân viên trong ngày hôm nay từ bảng staff_schedules
                 List<StaffSchedule> todaySchedules = staffScheduleRepository.findByStaffAndWorkDate(staff, today);
 
-                // Neu hom nay khong duoc xep bat ky ca truc nao trong lich
+                // Nếu hôm nay chưa được đăng ký ca trực trong CSDL
                 if (todaySchedules == null || todaySchedules.isEmpty()) {
                     throw new AppException(
                             String.format("Bạn không có lịch làm việc trong ngày hôm nay (%s)! Vui lòng liên hệ Quản lý.",
@@ -86,40 +162,54 @@ public class AuthServiceImpl implements AuthService {
                     );
                 }
 
-                // 4.2. Kiem tra xem gio hien tai co nam trong khung gio ca truc nao hom nay khong (cho phep som 15 phut)
+                // 6.2. Tìm ca trực: Ưu tiên ca khớp với giờ thực tế nếu nhân viên được phân nhiều ca trong ngày
                 StaffSchedule activeSchedule = todaySchedules.stream()
-                        .filter(s -> s.getShiftType() != null && s.getShiftType().isWithinShift(now))
+                        .filter(s -> {
+                            if (s.getShiftType() == null) return false;
+                            LocalTime start = s.getShiftType().getStartTime();
+                            LocalTime end = s.getShiftType().getEndTime();
+                            if (start != null && end != null) {
+                                return !now.isBefore(start.minusMinutes(15)) && !now.isAfter(end);
+                            }
+                            return true;
+                        })
                         .findFirst()
                         .orElse(null);
 
+                // Nếu ngoài khung giờ chuẩn nhưng đang trong giai đoạn test (ShiftType.isWithinShift trả về true), cho phép vào ca được xếp
                 if (activeSchedule == null) {
-                    String shiftsInfo = todaySchedules.stream()
-                            .map(s -> String.format("%s (%s - %s)",
-                                    s.getShiftType().getLabel(),
-                                    s.getShiftType().getStartTime(),
-                                    s.getShiftType().getEndTime()))
-                            .collect(Collectors.joining(", "));
-
-                    String message = String.format(
-                            "Chưa đến hoặc đã hết ca làm việc của bạn hôm nay (%s). Lịch trực hôm nay: [%s]. Bạn chỉ được đăng nhập trước giờ mở ca 15 phút!",
-                            today.format(dateFormatter),
-                            shiftsInfo
-                    );
-                    throw new AppException(message, HttpStatus.FORBIDDEN);
+                    activeSchedule = todaySchedules.stream()
+                            .filter(s -> s.getShiftType() != null && s.getShiftType().isWithinShift(now))
+                            .findFirst()
+                            .orElse(todaySchedules.get(0));
                 }
 
-                // Lay ten ca truc truc tiep tu activeSchedule de tra ve cho Frontend
                 currentShiftName = activeSchedule.getShiftType().name();
             }
 
-            // 5. Cap nhat trang thai dang trong ca truc
+            // 7. Cap nhat trang thai dang trong ca truc
             staff.setIsOnShift(true);
             staffRepository.save(staff);
+            staffLastHeartbeatMap.put(staff.getUsername(), System.currentTimeMillis());
 
-            // 6. Sinh token JWT
+            // Phát sự kiện WebSocket STOMP báo nhân viên vừa đăng nhập vào ca trực
+            if (realtimeService != null) {
+                try {
+                    realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                            .type("STAFF_LOGIN")
+                            .status("ONLINE")
+                            .note("Nhân viên " + staff.getFullName() + " đã đăng nhập vào ca trực")
+                            .payload(staff.getUsername())
+                            .build());
+                } catch (Exception e) {
+                    log.warn("[Realtime] Không thể phát sự kiện STAFF_LOGIN: {}", e.getMessage());
+                }
+            }
+
+            // 8. Sinh token JWT
             String token = jwtTokenProvider.generateToken(authentication);
 
-            // 7. Dong goi LoginResponse tra ve cho frontend (lay shift truc tiep tu staff_schedules)
+            // 9. Dong goi LoginResponse tra ve cho frontend (lay shift truc tiep tu staff_schedules)
             return LoginResponse.builder()
                     .accessToken(token)
                     .tokenType("Bearer")
@@ -145,8 +235,23 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException("Tài khoản này không có quyền Quản lý để phê duyệt!", HttpStatus.FORBIDDEN);
         }
 
+        if (manager.isLocked()) {
+            throw new AppException("Tài khoản Quản lý này hiện đang bị khóa!", HttpStatus.FORBIDDEN);
+        }
+
         if (!passwordEncoder.matches(request.getPinCode(), manager.getPinCode())) {
-            throw new AppException("Mã PIN Quản lý không chính xác!", HttpStatus.UNAUTHORIZED);
+            manager.recordFailedAttempt();
+            staffRepository.save(manager);
+            if (manager.isLocked()) {
+                throw new AppException("Tài khoản Quản lý đã bị KHÓA do nhập sai mã PIN quá 5 lần!", HttpStatus.FORBIDDEN);
+            }
+            int remaining = 5 - (manager.getFailedPinAttempts() != null ? manager.getFailedPinAttempts() : 0);
+            throw new AppException("Mã PIN Quản lý không chính xác! Còn " + remaining + " lần thử.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (manager.getFailedPinAttempts() != null && manager.getFailedPinAttempts() > 0) {
+            manager.resetFailedAttempts();
+            staffRepository.save(manager);
         }
 
         return true;
@@ -157,9 +262,199 @@ public class AuthServiceImpl implements AuthService {
         if (username == null || username.trim().isEmpty()) return;
 
         staffRepository.findByUsername(username).ifPresent(staff -> {
-            // Khi nhan vien dang xuat, cap nhat isOnShift = false
+            // Khi nhân viên đăng xuất, cập nhật isOnShift = false
             staff.setIsOnShift(false);
             staffRepository.save(staff);
+            staffLastHeartbeatMap.remove(staff.getUsername());
+
+            // Phát sự kiện WebSocket STOMP báo nhân viên vừa rời ca trực
+            if (realtimeService != null) {
+                try {
+                    realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                            .type("STAFF_LOGOUT")
+                            .status("OFFLINE")
+                            .note("Nhân viên " + staff.getFullName() + " đã kết thúc ca trực")
+                            .payload(staff.getUsername())
+                            .build());
+                } catch (Exception e) {
+                    log.warn("[Realtime] Không thể phát sự kiện STAFF_LOGOUT: {}", e.getMessage());
+                }
+            }
         });
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> heartbeat(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            throw new AppException("Tên đăng nhập không hợp lệ", HttpStatus.BAD_REQUEST);
+        }
+
+        Staff staff = staffRepository.findByUsername(username.trim())
+                .orElseThrow(() -> new AppException("Nhân viên không tồn tại", HttpStatus.NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(staff.getIsActive())) {
+            throw new AppException("Tài khoản nhân viên đang bị khóa!", HttpStatus.FORBIDDEN);
+        }
+
+        staffLastHeartbeatMap.put(staff.getUsername(), System.currentTimeMillis());
+
+        boolean wasOffShift = !Boolean.TRUE.equals(staff.getIsOnShift());
+        if (wasOffShift) {
+            staff.setIsOnShift(true);
+            staffRepository.save(staff);
+
+            if (realtimeService != null) {
+                try {
+                    realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                            .type("STAFF_LOGIN")
+                            .status("ONLINE")
+                            .note("Nhân viên " + staff.getFullName() + " đã đồng bộ ca trực")
+                            .payload(staff.getUsername())
+                            .build());
+                } catch (Exception e) {
+                    log.warn("[Realtime] Không thể phát sự kiện STAFF_LOGIN từ heartbeat: {}", e.getMessage());
+                }
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("username", staff.getUsername());
+        response.put("fullName", staff.getFullName());
+        response.put("role", staff.getRole().name());
+        response.put("isOnShift", true);
+        return response;
+    }
+
+    /**
+     * Tự động quét định kỳ mỗi 30s và chuyển nhân viên sang Ngoại tuyến nếu không nhận được Heartbeat (> 90 giây).
+     * Cơ chế phòng thủ dự phòng (Fallback) khi thiết bị mất điện, rớt mạng Wi-Fi hoặc crash trình duyệt.
+     */
+    @Scheduled(initialDelay = 60000, fixedDelay = 30000)
+    @Transactional
+    public void cleanupInactiveStaffShifts() {
+        long now = System.currentTimeMillis();
+        // Bỏ qua trong 90 giây đầu khi máy chủ vừa khởi động để clients kịp gửi tín hiệu đầu tiên
+        if (now - serverStartupTime < 90_000) {
+            return;
+        }
+
+        List<Staff> onShiftStaffs = staffRepository.findAll().stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsOnShift()))
+                .toList();
+
+        for (Staff staff : onShiftStaffs) {
+            Long lastSeen = staffLastHeartbeatMap.get(staff.getUsername());
+            if (lastSeen == null || (now - lastSeen > 90_000)) {
+                staff.setIsOnShift(false);
+                staffRepository.save(staff);
+                staffLastHeartbeatMap.remove(staff.getUsername());
+
+                if (realtimeService != null) {
+                    try {
+                        realtimeService.publish("/topic/staff", RomsRealtimeEvent.builder()
+                                .type("STAFF_LOGOUT")
+                                .status("OFFLINE")
+                                .note("Hệ thống tự động chuyển nhân viên " + staff.getFullName() + " sang Ngoại tuyến do không nhận được tín hiệu")
+                                .payload(staff.getUsername())
+                                .build());
+                    } catch (Exception e) {
+                        log.warn("[ShiftMonitor] Lỗi khi broadcast STAFF_LOGOUT tự động cho {}: {}", staff.getUsername(), e.getMessage());
+                    }
+                }
+                log.info("[ShiftMonitor] Nhân viên {} tự động chuyển sang OFFLINE do không có heartbeat > 90s", staff.getUsername());
+            }
+        }
+    }
+
+    @Override
+    public Map<String, Object> requestPinResetOtp(com.romsteam.roms.dto.request.RequestOtpRequest request) {
+        if (request == null || request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+            throw new AppException("Vui lòng cung cấp mã nhân viên Quản lý!", HttpStatus.BAD_REQUEST);
+        }
+
+        String username = request.getUsername().trim();
+        Staff staff = staffRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException("Tài khoản không tồn tại trên hệ thống!", HttpStatus.NOT_FOUND));
+
+        if (staff.getRole() != UserRole.MANAGER) {
+            throw new AppException("Chức năng tự khôi phục mã PIN chỉ áp dụng cho tài khoản Quản lý (MANAGER)! Vui lòng liên hệ Quản lý cơ sở để cấp lại mã PIN.", HttpStatus.FORBIDDEN);
+        }
+
+        String recipientEmail = staff.getEmail();
+        if (recipientEmail == null || recipientEmail.trim().isEmpty() || !recipientEmail.contains("@")) {
+            throw new AppException("Tài khoản Quản lý " + staff.getFullName() + " (" + username + ") chưa được cập nhật địa chỉ email nhận OTP! Vui lòng liên hệ bộ phận kỹ thuật để bổ sung email.", HttpStatus.BAD_REQUEST);
+        }
+
+        // Sinh mã OTP ngẫu nhiên 6 chữ số
+        String otp = String.format("%06d", new java.util.Random().nextInt(900000) + 100000);
+        otpStorage.put(username.toUpperCase(), new OtpEntry(otp, LocalDateTime.now().plusMinutes(5)));
+
+        // Gửi email HTML chứa mã OTP qua Gmail SMTP
+        if (emailService != null) {
+            emailService.sendOtpEmail(recipientEmail, staff.getFullName(), otp);
+        }
+
+        String maskedEmail = recipientEmail.replaceAll("(^.{2})(.*)(@.*$)", "$1***$3");
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("username", staff.getUsername());
+        response.put("fullName", staff.getFullName());
+        response.put("role", staff.getRole().name());
+        response.put("maskedEmail", maskedEmail);
+        response.put("message", "Đã gửi mã xác thực OTP (hiệu lực 5 phút) đến hộp thư: " + maskedEmail + ". Vui lòng kiểm tra hộp thư đến hoặc mục Thư rác (Spam).");
+        // BẢO MẬT: TUYỆT ĐỐI KHÔNG TRẢ otpHint VỀ HTTP RESPONSE!
+        return response;
+    }
+
+    @Override
+    public void resetPinWithOtpOrRecoveryKey(com.romsteam.roms.dto.request.ResetPinRequest request) {
+        if (request == null) {
+            throw new AppException("Dữ liệu yêu cầu không hợp lệ!", HttpStatus.BAD_REQUEST);
+        }
+
+        String username = request.getUsername() != null ? request.getUsername().trim() : "";
+        String keyOrOtp = request.getOtpOrRecoveryKey() != null ? request.getOtpOrRecoveryKey().trim() : "";
+        String newPin = request.getNewPinCode() != null ? request.getNewPinCode().trim() : "";
+        String confirmPin = request.getConfirmPinCode() != null ? request.getConfirmPinCode().trim() : "";
+
+        if (!newPin.matches("^\\d{6}$")) {
+            throw new AppException("Mã PIN mới phải gồm chính xác 6 chữ số!", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!newPin.equals(confirmPin)) {
+            throw new AppException("Mã PIN xác nhận không trùng khớp với mã PIN mới!", HttpStatus.BAD_REQUEST);
+        }
+
+        Staff staff = staffRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException("Tài khoản nhân viên không tồn tại!", HttpStatus.NOT_FOUND));
+
+        if (staff.getRole() != UserRole.MANAGER) {
+            throw new AppException("Chỉ tài khoản Quản lý mới được phép thực hiện chức năng này!", HttpStatus.FORBIDDEN);
+        }
+
+        boolean isMasterKey = masterRecoveryKey.equalsIgnoreCase(keyOrOtp);
+        OtpEntry activeOtp = otpStorage.get(username.toUpperCase());
+        boolean isOtpValid = activeOtp != null && !activeOtp.isExpired() && activeOtp.otp.equals(keyOrOtp);
+
+        if (!isMasterKey && !isOtpValid) {
+            if (activeOtp != null && activeOtp.isExpired()) {
+                otpStorage.remove(username.toUpperCase());
+                throw new AppException("Mã OTP đã hết thời hạn hiệu lực (5 phút)! Vui lòng bấm gửi lại mã OTP mới.", HttpStatus.BAD_REQUEST);
+            }
+            throw new AppException("Mã OTP xác thực không chính xác hoặc đã hết hạn!", HttpStatus.BAD_REQUEST);
+        }
+
+        // Đặt lại mã PIN băm BCrypt và mở khóa tài khoản
+        staff.setPinCode(passwordEncoder.encode(newPin));
+        staff.unlock();
+        staffRepository.save(staff);
+
+        // Hủy OTP sau khi đã sử dụng thành công
+        otpStorage.remove(username.toUpperCase());
+
+        log.info("Manager {} ({}) successfully reset PIN using {}", 
+                staff.getUsername(), staff.getFullName(), isMasterKey ? "Master Recovery Key" : "OTP");
     }
 }

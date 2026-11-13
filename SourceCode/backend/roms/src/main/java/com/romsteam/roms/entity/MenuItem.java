@@ -1,76 +1,153 @@
 package com.romsteam.roms.entity;
 
 import jakarta.persistence.*;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-// Khai bao Entity dai dien cho bang mon an
+/**
+ * Entity đại diện cho một món ăn hoặc đồ uống trong thực đơn nhà hàng (Bảng: menu_items).
+ * Áp dụng Project Lombok nhằm loại bỏ mã thừa Boilerplate (constructors, getters, setters).
+ */
 @Entity
-@Table(name = "menu_items") // Ten bang trong SQL Server
+@Table(name = "menu_items")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class MenuItem {
 
-    // Khoa chinh tu tang
+    // Khóa chính tự tăng (IDENTITY) trong SQL Server
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Khoa ngoai tro den danh muc (Mot danh muc co nhieu mon an -> @ManyToOne)
-    // FetchType.LAZY: Toi uu hieu nang, chi load Category khi goi menuItem.getCategory()
+    // Khóa ngoại trỏ đến danh mục món ăn (FetchType.LAZY để tối ưu truy vấn hiệu năng)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    // Ten mon an (vi du: "Bo bit tet sot tieu den", "Tra dao cam sa")
-    @Column(name = "name", nullable = false, length = 150)
+    // Mã quản lý kho/sản phẩm SKU (duy nhất, ví dụ: "DISH-001", "DRK-001")
+    @Column(name = "sku", nullable = false, unique = true, length = 50)
+    private String sku;
+
+    // Tên món ăn (hỗ trợ tiếng Việt có dấu Unicode qua NVARCHAR)
+    @Column(name = "name", nullable = false, columnDefinition = "NVARCHAR(150)")
     private String name;
 
-    // Mo ta chi tiet mon an (thanh phan, huong vi...)
-    @Column(name = "description", length = 500)
+    // Mô tả chi tiết món ăn (thành phần dinh dưỡng, hương vị, hướng dẫn thưởng thức)
+    @Column(name = "description", columnDefinition = "NVARCHAR(500)")
     private String description;
 
-    // Gia ban niem yet (Dung BigDecimal de tranh loi sai so lam tron so thuc trong thanh toan)
-    // precision = 12, scale = 2 ho tro so tien toi hang tram ty, kem 2 chu so thap phan
+    // Giá bán niêm yết cho khách (Dùng BigDecimal để đảm bảo chính xác tuyệt đối trong tài chính)
     @Column(name = "price", nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
-    // Duong dan hinh anh mon an (URL CDN hoac duong dan file anh upload)
+    // Giá vốn nguyên liệu / giá nhập hàng (Dùng để tính Lợi nhuận gộp và Tỷ suất Margin mà không cần Recipe BOM)
+    @Builder.Default
+    @Column(name = "cost_price", nullable = false, precision = 12, scale = 2, columnDefinition = "DECIMAL(12,2) DEFAULT 0")
+    private BigDecimal costPrice = BigDecimal.ZERO;
+
+    // Trạm điều phối xử lý món: "KITCHEN" (nấu tại bếp) hoặc "WAITER" (nước đóng lon/chai do phục vụ lấy từ tủ mát)
+    @Builder.Default
+    @Column(name = "station", nullable = false, length = 20, columnDefinition = "NVARCHAR(20) DEFAULT 'KITCHEN'")
+    private String station = "KITCHEN";
+
+    // Nhãn nổi bật hiển thị trên giao diện (Ví dụ: "Bestseller", "Chef's Choice", "Món Mới", "Healthy")
+    @Column(name = "tag", length = 50)
+    private String tag;
+
+    // Đường dẫn ảnh món ăn (URL hình ảnh CDN hoặc đường dẫn máy chủ)
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
-    // Trang thai con mon hay het mon: true = con hang phuc vu, false = het hang (hien thi sold-out tren menu)
+    // Trạng thái còn hàng hay hết hàng (true = đang bán, false = 86'd / tạm hết hàng)
+    @Builder.Default
     @Column(name = "is_available", nullable = false)
     private Boolean isAvailable = true;
 
-    // Thu tu hien thi mon an trong danh muc
+    // Định mức suất ăn phục vụ tối đa trong ngày (null = không giới hạn)
+    @Column(name = "daily_stock")
+    private Integer dailyStock;
+
+    // Số suất ăn còn lại thực tế trong ngày (null = không giới hạn)
+    @Column(name = "remaining_stock")
+    private Integer remainingStock;
+
+    /**
+     * Giảm số lượng tồn kho còn lại khi khách gọi món
+     * @param quantity số lượng đặt
+     */
+    public void decreaseStock(int quantity) {
+        if (remainingStock != null) {
+            this.remainingStock = Math.max(0, this.remainingStock - quantity);
+            if (this.remainingStock <= 0) {
+                this.isAvailable = false;
+                this.tag = "Tạm Hết (86d)";
+            }
+        }
+    }
+
+    /**
+     * Bổ sung hoặc cài đặt lại tồn kho trong ngày
+     */
+    public void replenishStock(Integer newStock) {
+        this.dailyStock = newStock;
+        this.remainingStock = newStock;
+        if (newStock != null && newStock > 0) {
+            this.isAvailable = true;
+            if (this.tag != null && this.tag.contains("86d")) {
+                this.tag = "Đang Bán";
+            }
+        }
+    }
+
+    /**
+     * Hoàn lại số lượng tồn kho khi món bị hủy (Stock Restitution)
+     * @param quantity số lượng cần hoàn trả
+     */
+    public void increaseStock(int quantity) {
+        if (this.remainingStock != null) {
+            this.remainingStock += quantity;
+            if (this.dailyStock != null && this.remainingStock > this.dailyStock) {
+                this.remainingStock = this.dailyStock;
+            }
+            if (this.remainingStock > 0) {
+                this.isAvailable = true;
+                if (this.tag != null && this.tag.contains("86d")) {
+                    this.tag = "Đang Bán";
+                }
+            }
+        }
+    }
+
+    // Thứ tự hiển thị sắp xếp trên thực đơn (số nhỏ đứng trước)
+    @Builder.Default
     @Column(name = "display_order")
     private Integer displayOrder = 0;
 
-    // Mon an co dang duoc kinh doanh khong (false = ngung kinh doanh vinh vien, an hoan toan)
+    // Trạng thái xóa mềm: true = món đang kinh doanh, false = đã xóa khỏi thực đơn
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    // Thoi diem tao mon an
+    // Thời điểm tạo món ăn (tự động điền lúc INSERT)
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Thoi diem sua doi mon an gan nhat
+    // Thời điểm cập nhật món ăn gần nhất (tự động cập nhật lúc UPDATE)
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ===================================================================
-    // CONSTRUCTORS (HAM KHOI TAO)
-    // ===================================================================
 
-    // Constructor mac dinh khong tham so (bat buoc cho Hibernate/JPA)
-    public MenuItem() {
-    }
 
-    // Constructor day du tham so
+    // Constructor hỗ trợ tương thích ngược cho code cũ (11 tham số)
     public MenuItem(Long id, Category category, String name, String description, BigDecimal price, String imageUrl, Boolean isAvailable, Integer displayOrder, Boolean isActive, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.category = category;
@@ -83,97 +160,36 @@ public class MenuItem {
         this.isActive = isActive != null ? isActive : true;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.sku = "DISH-" + (id != null ? id : System.currentTimeMillis());
+        this.costPrice = BigDecimal.ZERO;
+        this.station = "KITCHEN";
+        this.tag = "Món Ăn";
     }
 
     // ===================================================================
-    // GETTERS & SETTERS (PHUONG THUC DOC VA GHI DU LIEU)
+    // HÀM TIỆN ÍCH NGHIỆP VỤ (BUSINESS LOGIC HELPERS)
     // ===================================================================
 
-    public Long getId() {
-        return id;
+    /**
+     * Tính lợi nhuận gộp trên mỗi đơn vị món bán ra: Profit = Price - CostPrice
+     */
+    public BigDecimal calculateProfit() {
+        if (price != null && costPrice != null) {
+            return price.subtract(costPrice);
+        }
+        return BigDecimal.ZERO;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Category getCategory() {
-        return category;
-    }
-
-    public void setCategory(Category category) {
-        this.category = category;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public BigDecimal getPrice() {
-        return price;
-    }
-
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
-
-    public String getImageUrl() {
-        return imageUrl;
-    }
-
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
-
-    public Boolean getIsAvailable() {
-        return isAvailable;
-    }
-
-    public void setIsAvailable(Boolean isAvailable) {
-        this.isAvailable = isAvailable;
-    }
-
-    public Integer getDisplayOrder() {
-        return displayOrder;
-    }
-
-    public void setDisplayOrder(Integer displayOrder) {
-        this.displayOrder = displayOrder;
-    }
-
-    public Boolean getIsActive() {
-        return isActive;
-    }
-
-    public void setIsActive(Boolean isActive) {
-        this.isActive = isActive;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    /**
+     * Tính tỷ suất lợi nhuận gộp phần trăm: Margin % = ((Price - CostPrice) / Price) * 100
+     */
+    public Double calculateMarginPercent() {
+        if (price != null && costPrice != null && price.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal profit = price.subtract(costPrice);
+            return profit.divide(price, 4, java.math.RoundingMode.HALF_UP)
+                         .multiply(BigDecimal.valueOf(100))
+                         .doubleValue();
+        }
+        return 0.0;
     }
 }

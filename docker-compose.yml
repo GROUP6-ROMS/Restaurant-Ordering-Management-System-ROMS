@@ -1,0 +1,121 @@
+services:
+  # ===================================================================
+  # 1. CƠ SỞ DỮ LIỆU: MICROSOFT SQL SERVER 2022 (CHÍNH THỨC)
+  # ===================================================================
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: roms-database
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
+      - MSSQL_PID=Developer
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      # Bảo mật CSDL: Ánh xạ vào localhost 14333 trên máy host để tránh xung đột với SQL Server cài sẵn trên Windows (1433)
+      # Khi cần kết nối từ máy cá nhân bằng SSMS/Azure Data Studio: kết nối localhost,14333
+      - "127.0.0.1:14333:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+    networks:
+      - roms-net
+
+  # ===================================================================
+  # 2. KHỞI TẠO CƠ SỞ DỮ LIỆU: TỰ ĐỘNG TẠO ROMS_DB
+  # ===================================================================
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: roms-db-init
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      - DB_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
+      - TZ=Asia/Ho_Chi_Minh
+    entrypoint:
+      - bash
+      - -c
+      - >
+        echo 'Dang kiem tra va khoi tao database ROMS_DB...' &&
+        /opt/mssql-tools18/bin/sqlcmd -S database -U sa -P "$${DB_PASSWORD}" -C -Q "IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = 'ROMS_DB') CREATE DATABASE ROMS_DB;" &&
+        echo 'Database ROMS_DB da san sang!'
+    networks:
+      - roms-net
+
+  # ===================================================================
+  # 3. DỊCH VỤ BACKEND: SPRING BOOT 3 (JAVA 21 LTS)
+  # ===================================================================
+  backend:
+    build:
+      context: ./SourceCode/backend/roms
+      dockerfile: Dockerfile
+    image: roms-backend:latest
+    container_name: roms-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      # Kết nối trực tiếp tới container database nội bộ qua cổng 1433
+      - SPRING_DATASOURCE_URL=jdbc:sqlserver://${DB_HOST:-database}:1433;databaseName=ROMS_DB;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true;
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-sa}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
+      - APP_FRONTEND_URL=${FRONTEND_URL:-http://roms-restaurant.duckdns.org}
+      - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_API_MODEL=${GEMINI_API_MODEL:-gemini-flash-lite-latest}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    volumes:
+      - roms-uploads:/app/uploads
+    networks:
+      - roms-net
+
+  # ===================================================================
+  # 4. DỊCH VỤ FRONTEND: REACT VITE + PRODUCTION NGINX REVERSE PROXY
+  # ===================================================================
+  frontend:
+    build:
+      context: ./SourceCode/frontend
+      dockerfile: Dockerfile
+    image: roms-frontend:latest
+    container_name: roms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"     # Cổng HTTP chuẩn
+      - "5173:80"   # Ánh xạ thêm cổng 5173 để tương thích với cấu hình dev
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - roms-net
+
+# ===================================================================
+# LƯU TRỮ VĨNH VIỄN CƠ SỞ DỮ LIỆU VÀ TẬP TIN UPLOAD (DOCKER VOLUME)
+# ===================================================================
+volumes:
+  mssql-data:
+    name: roms-mssql-data
+  roms-uploads:
+    name: roms-uploads
+
+# ===================================================================
+# MẠNG NỘI BỘ DOCKER (ISOLATED NETWORK)
+# ===================================================================
+networks:
+  roms-net:
+    driver: bridge

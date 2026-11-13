@@ -4,9 +4,7 @@
    Primary: #9d4124 | Surface: #fff8f6 | Secondary: #994703 | Tertiary: #596232
    ========================================================================== */
 
-/* --- Import Fonts: Inter, JetBrains Mono & Material Symbols (Hỗ trợ 100% tiếng Việt mượt mà, thanh thoát) --- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+/* Note: Fonts & Material Symbols are loaded via <link> in index.html for non-blocking parallel fetch */
 
 /* --- Map font-family Epilogue and Plus Jakarta Sans sang Inter để nét chữ thanh mảnh, cân đối --- */
 @font-face {
@@ -555,7 +553,7 @@ body {
   gap: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
-  z-index: 9999;
+  z-index: 100001;
   transition: opacity 0.3s ease, transform 0.3s ease;
   white-space: nowrap;
 }
@@ -796,6 +794,34 @@ html {
   100% { background-position: 200% 0; }
 }
 
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
 .animate-float {
   animation: float 4s ease-in-out infinite;
 }
@@ -819,5 +845,133 @@ html {
 .card-hover-float:hover {
   transform: translateY(-5px);
   box-shadow: 0 12px 28px rgba(157, 65, 36, 0.12);
+}
+
+/* ============================================================
+   CUSTOMER DINING RESPONSIVE & TABLET UX
+   ============================================================ */
+.customer-layout-shell {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 0 40px rgba(44, 34, 30, 0.06);
+  transition: max-width 0.25s ease;
+}
+
+.customer-fixed-shell {
+  width: 100%;
+  max-width: 430px;
+  transition: max-width 0.25s ease;
+}
+
+.customer-ai-floating-btn {
+  position: fixed;
+  right: max(16px, calc(50% - 200px));
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.customer-ai-floating-btn:hover {
+  transform: scale(1.08);
+}
+
+.customer-ai-floating-btn:active {
+  transform: scale(0.92);
+}
+
+.customer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(53, 47, 46, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.customer-modal-sheet {
+  width: 100%;
+  max-width: 430px;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  transition: max-width 0.25s ease, border-radius 0.25s ease;
+}
+
+.dish-responsive-grid {
+  padding: 0 var(--gutter);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+/* Tablet & iPad Viewports (>= 768px) */
+@media (min-width: 768px) {
+  .customer-layout-shell {
+    max-width: 880px !important;
+    box-shadow: 0 0 50px rgba(44, 34, 30, 0.1) !important;
+  }
+
+  .customer-fixed-shell {
+    max-width: 880px !important;
+  }
+
+  .customer-ai-floating-btn {
+    right: max(24px, calc(50% - 425px)) !important;
+  }
+
+  .customer-modal-overlay {
+    align-items: center !important;
+    padding: 24px !important;
+  }
+
+  .customer-modal-sheet {
+    max-width: 560px !important;
+    border-radius: 24px !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .dish-responsive-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+  }
+}
+
+/* Large Tablet / Desktop Viewports (>= 1024px) */
+@media (min-width: 1024px) {
+  .customer-layout-shell {
+    max-width: 960px !important;
+  }
+
+  .customer-fixed-shell {
+    max-width: 960px !important;
+  }
+
+  .customer-ai-floating-btn {
+    right: max(28px, calc(50% - 465px)) !important;
+  }
+
+  .dish-responsive-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 18px !important;
+  }
+}
+
+/* ==========================================================================
+   ROMS Global Modal & Popup Ergonomics Animations
+   ========================================================================== */
+@keyframes romsOverlayFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes romsModalPopIn {
+  0% { opacity: 0; transform: scale(0.96) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 

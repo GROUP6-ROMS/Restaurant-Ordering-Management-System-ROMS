@@ -1,0 +1,140 @@
+<mxfile host="Electron" agent="ROMS SWP391 Team" pages="1">
+  <diagram id="sq_f2" name="WF2 - Table QR &amp; Dining Gate">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1550" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="sq_200" value="&lt;div style=&quot;text-align:center;font-family:Helvetica,Arial,sans-serif;&quot;&gt;
+            &lt;div style=&quot;font-size:17px;font-weight:bold;color:#000000;&quot;&gt;Sequence Diagram: Table QR Scan &amp;amp; Dining Gate Verification&lt;/div&gt;&lt;/div&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="100" y="15" width="1350" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_201" value="Customer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontFamily=Helvetica;fontSize=12;fontStyle=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontColor=#000000;" vertex="1" parent="1">
+            <mxGeometry x="60" y="70" width="40" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_202" edge="1" parent="1" source="sq_201" style="endArrow=none;dashed=1;html=1;strokeColor=#000000;strokeWidth=1.2;" value="">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="80" y="920" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_203" value="&lt;b&gt;Browser / App&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Client Device&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="180" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_204" value="&lt;b&gt;CustomerTableCtrl&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;REST Controller&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="390" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_205" value="&lt;b&gt;RestaurantTableSrv&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Business Logic&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="610" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_206" value="&lt;b&gt;DiningSessionRepo&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Session Data&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="840" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_207" value="&lt;b&gt;TableRepository&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;Table Data&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1060" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_208" value="&lt;b&gt;Database&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;MySQL 8.0&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1260" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_209" value="&lt;b&gt;RealtimeService&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:10px;color:#333333;&quot;&gt;STOMP Broker&lt;/span&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=50;fontFamily=Helvetica;fontSize=12;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="1420" y="70" width="150" height="850" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_210" value="1. Scans physical QR code standee on table" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="80" y="140" as="sourcePoint"/>
+                <mxPoint x="255" y="140" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_211" value="2. GET /api/customer/tables/verify?token={qrToken}" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="255" y="190" as="sourcePoint"/>
+                <mxPoint x="465" y="190" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_212" value="3. verifyQrTokenAndGetSession(token)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="465" y="240" as="sourcePoint"/>
+                <mxPoint x="685" y="240" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_213" value="4. findByQrTokenAndStatus(token, ACTIVE)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="685" y="290" as="sourcePoint"/>
+                <mxPoint x="915" y="290" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_214" value="5. SELECT * FROM dining_sessions WHERE qr_token=?" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="915" y="340" as="sourcePoint"/>
+                <mxPoint x="1335" y="340" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_215" value="6. Returns active DiningSession record" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1335" y="380" as="sourcePoint"/>
+                <mxPoint x="915" y="380" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_216" value="7. Optional&lt;DiningSession&gt;" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="915" y="420" as="sourcePoint"/>
+                <mxPoint x="685" y="420" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_217" value="alt [Table Session Status Check]" style="shape=umlFrame;whiteSpace=wrap;html=1;width=80;height=22;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;fontFamily=Helvetica;fontSize=11;fontStyle=1;align=left;spacingLeft=6;fontColor=#000000;rounded=0;" vertex="1" parent="1">
+            <mxGeometry x="450" y="460" width="950" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="sq_218" value="[Condition: Active session found]" style="html=1;rounded=0;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=1.2;fontSize=10.5;fontFamily=Helvetica;fontColor=#000000;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="685" y="480" as="sourcePoint"/>
+                <mxPoint x="745" y="495" as="targetPoint"/>
+                <Array as="points">
+                    <mxPoint x="730" y="480"/>
+                    <mxPoint x="730" y="510"/>
+                </Array>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_219" value="8. updateStatus(tableId, OCCUPIED)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="685" y="520" as="sourcePoint"/>
+                <mxPoint x="1135" y="520" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_220" value="9. UPDATE restaurant_tables SET status=&apos;OCCUPIED&apos;" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1135" y="560" as="sourcePoint"/>
+                <mxPoint x="1335" y="560" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_221" value="10. broadcastTableStatus(tableId, OCCUPIED)" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=block;endFill=1;strokeWidth=1.3;fontStyle=1;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="685" y="610" as="sourcePoint"/>
+                <mxPoint x="1495" y="610" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_222" value="11. Pushes update to /topic/tables" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="1495" y="650" as="sourcePoint"/>
+                <mxPoint x="255" y="650" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_223" value="12. TableSessionResponse { sessionId, tableNum, zone }" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="685" y="705" as="sourcePoint"/>
+                <mxPoint x="465" y="705" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_224" value="13. HTTP 200 OK with session credentials" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="465" y="755" as="sourcePoint"/>
+                <mxPoint x="255" y="755" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="sq_225" value="14. Stores sessionId into SessionStorage; displays Digital Menu" style="html=1;rounded=0;fontSize=11;fontFamily=Helvetica;verticalAlign=bottom;strokeColor=#000000;fontColor=#000000;endArrow=open;endFill=0;dashed=1;strokeWidth=1.2;" edge="1" parent="1">
+            <mxGeometry relative="1" as="geometry">
+                <mxPoint x="255" y="800" as="sourcePoint"/>
+                <mxPoint x="80" y="800" as="targetPoint"/>
+            </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

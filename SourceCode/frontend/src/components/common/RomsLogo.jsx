@@ -1,19 +1,42 @@
-import React from 'react';
+import React, { useState } from 'react';
 import logoSvg from '../../assets/roms-logo.svg';
+import { useRestaurantProfile } from '../../utils/restaurantConfig';
 
-export default function RomsLogo({ size = 36, showText = false, textSubtitle = null, style = {} }) {
+export default function RomsLogo({ size = 36, showText = false, textSubtitle = null, customLogo = null, style = {} }) {
+  const profile = useRestaurantProfile();
+  const [imageError, setImageError] = useState(false);
+
+  // Ưu tiên Logo tùy chỉnh của quán nếu có cấu hình
+  const activeLogoUrl = !imageError && (customLogo || profile?.logoUrl);
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', ...style }}>
-      <img
-        src={logoSvg}
-        alt="ROMS Logo"
-        style={{
-          width: `${size}px`,
-          height: `${size}px`,
-          objectFit: 'contain',
-          filter: 'drop-shadow(0 2px 6px rgba(189, 89, 58, 0.25))'
-        }}
-      />
+      {activeLogoUrl ? (
+        <img
+          src={activeLogoUrl}
+          alt={profile?.brandName || 'Restaurant Logo'}
+          onError={() => setImageError(true)}
+          style={{
+            width: `${size}px`,
+            height: `${size}px`,
+            objectFit: 'cover',
+            borderRadius: '8px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+          }}
+        />
+      ) : (
+        <img
+          src={logoSvg}
+          alt="ROMS Logo"
+          style={{
+            width: `${size}px`,
+            height: `${size}px`,
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 2px 6px rgba(189, 89, 58, 0.25))'
+          }}
+        />
+      )}
+
       {showText && (
         <div>
           <div style={{
@@ -24,7 +47,7 @@ export default function RomsLogo({ size = 36, showText = false, textSubtitle = n
             letterSpacing: '-0.02em',
             lineHeight: 1
           }}>
-            ROMS
+            {profile?.brandName || 'ROMS'}
           </div>
           {textSubtitle && (
             <div style={{

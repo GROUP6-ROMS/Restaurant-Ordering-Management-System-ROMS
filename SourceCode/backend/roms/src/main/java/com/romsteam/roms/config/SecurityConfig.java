@@ -28,6 +28,8 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final com.romsteam.roms.security.TraceIdFilter traceIdFilter;
+    private final com.romsteam.roms.security.RateLimitingFilter rateLimitingFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -46,15 +48,17 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Cho phép nguồn từ Vite Frontend (port 5173) và Preview (port 4173)
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173"));
+        // Cho phép nguồn từ Vite Frontend (port 5173, 4173), DuckDNS VPS và mọi clients
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
 
         // Cho phép toàn bộ các phương thức HTTP
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // Cho phép gửi kèm các Header xác thực (Bearer Token, Content-Type)
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept"));
+        // Cho phép gửi kèm các Header xác thực (Bearer Token, Content-Type, X-Trace-Id)
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "X-Trace-Id"));
+
+        // Công khai các Header phản hồi để Frontend Axios có thể đọc được (nhất là X-Trace-Id khi đối soát lỗi)
+        configuration.setExposedHeaders(Arrays.asList("X-Trace-Id", "Authorization"));
 
         // Cho phép nhận Cookie/Credentials nếu có
         configuration.setAllowCredentials(true);
@@ -85,17 +89,44 @@ public class SecurityConfig {
 
                 // Phân quyền endpoints
                 .authorizeHttpRequests(auth -> auth
+                        // 1. Cổng mở công khai: Đăng nhập nhân viên, Quét mã QR, Đặt bàn từ xa, Thực đơn công khai, Swagger Docs, WebSocket, Actuator, Webhook payOS
                         .requestMatchers(
-                                "/api/auth/**",
-                                "/api/customer/**",
+                                "/api/auth/login",
+                                "/api/auth/verify-manager-pin",
+                                "/api/auth/forgot-pin/**",
+                                "/api/customer/tables/**",
+                                "/api/customer/reservations/**",
+                                "/api/customer/dining/menu",
+                                "/api/customer/ai/**",
                                 "/api/reservations/book",
+                                "/api/payment/payos/webhook",
+                                "/api/public/restaurant/**",
+                                "/api/uploads/**",
+                                "/uploads/**",
+                                "/ws-roms/**",
+                                "/ws-roms-native/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html")
+                                "/swagger-ui.html",
+                                "/actuator/**")
                         .permitAll()
+
+                        // 2. Nghiệp vụ gọi món và vận hành tại bàn: Bắt buộc phải có Dining Token (ROLE_CUSTOMER) hoặc tài khoản Nhân viên
+                        .requestMatchers("/api/customer/dining/**")
+                        .hasAnyRole("CUSTOMER", "WAITER", "MANAGER")
+
+                        // 3. Đăng xuất và heartbeat ca trực: Bắt buộc phải có Token đăng nhập hợp lệ
+                        .requestMatchers("/api/auth/logout", "/api/auth/heartbeat")
+                        .authenticated()
+
+                        // 4. Các request còn lại bắt buộc phải xác thực
                         .anyRequest().authenticated())
 
-                // Đặt bộ lọc JWT chạy trước UsernamePasswordAuthenticationFilter
+                // 1. Chạy TraceIdFilter ở đầu tiên để mọi request đều có Trace ID trong MDC
+                .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
+                // 2. Chạy RateLimitingFilter để kiểm soát tần suất và chống Brute-Force/Spam
+                .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
+                // 3. Đặt bộ lọc JWT chạy trước UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -110,6 +110,40 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- 11. Spring WebSocket: Ho tro giao thuc WebSocket STOMP real-time cho Nha hang -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <!-- 12. Spring Cache & Caffeine: Bo nho dem in-memory sieu toc giam tai CSDL cho thuc don va danh muc -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- 13. Spring Boot Actuator: Giam sat chi so van hanh (Health, Metrics, Readiness/Liveness) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+            <!-- 14. JavaMailSender: Gui email OTP khoi phuc ma PIN qua Gmail SMTP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- 15. Bucket4j: Gioi han tan suat goi API (Rate Limiting) chong Brute-Force va Spam -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -1,0 +1,68 @@
+package com.romsteam.roms.service;
+
+import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.MergeTableRequest;
+import com.romsteam.roms.dto.request.TransferTableRequest;
+import com.romsteam.roms.dto.request.UpdateTableRequest;
+import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
+import com.romsteam.roms.dto.response.TableOrdersResponse;
+import com.romsteam.roms.dto.response.TableResponse;
+import com.romsteam.roms.dto.response.TableSummaryResponse;
+import com.romsteam.roms.entity.enums.TableStatus;
+
+import java.util.List;
+
+public interface RestaurantTableService {
+
+    // 1. Lấy dữ liệu 5 thẻ KPI thống kê
+    TableSummaryResponse getTableSummary();
+
+    // 2. Lấy danh sách bàn kèm bộ lọc phân khu, trạng thái và tìm kiếm
+    List<TableResponse> getTables(String zone, TableStatus status, String keyword);
+
+    // 3. Lấy thông tin chi tiết một bàn
+    TableResponse getTableById(Long id);
+
+    // 4. Thêm bàn mới
+    TableResponse createTable(CreateTableRequest request);
+
+    // 4.1. Chỉnh sửa thông tin bàn (Mã bàn, Tên hiển thị, Khu vực, Sức chứa)
+    TableResponse updateTable(Long id, UpdateTableRequest request);
+
+    // 5. Cập nhật trạng thái bàn (Khóa, Mở, Đặt chỗ, Dọn dẹp)
+    TableResponse updateTableStatus(Long id, UpdateTableStatusRequest request);
+
+    // 6. Tái tạo mã QR Token mới cho bàn
+    TableResponse refreshQrToken(Long id);
+
+    // 7. Xác thực mã QR Token khi khách quét điện thoại
+    TableResponse verifyQrToken(String qrToken);
+
+    // 8. Xóa bàn (chặn xóa nếu bàn đang có khách)
+    void deleteTable(Long id);
+    TableOrdersResponse getTableActiveOrders(Long tableId);
+
+    // 9. Quản lý xác nhận đã xử lý chuông gọi phục vụ
+    void resolveServiceRequest(Long requestId);
+
+    // 10. Quản lý xác nhận đã xử lý toàn bộ chuông gọi của 1 bàn
+    void resolveAllRequestsForTable(Long tableId);
+
+    // 11. Quản lý thêm món trực tiếp vào bàn ăn
+    TableOrdersResponse addItemsToTable(Long tableId, com.romsteam.roms.dto.request.WaiterAddOrderRequest request);
+
+    // 12. Quản lý điều chỉnh số lượng món ăn tại bàn
+    TableOrdersResponse updateOrderItemQuantity(Long orderItemId, Integer quantity);
+
+    // 13. Quản lý hủy món ăn tại bàn kèm lý do
+    TableOrdersResponse cancelOrderItem(Long orderItemId, String reason);
+
+    // 14. Quản lý check-in đón khách đặt bàn trực tiếp từ sơ đồ bàn (1-Click Check-in)
+    TableResponse checkInReservationForTable(Long tableId, Long reservationId);
+
+    // 15. Quản lý chuyển bàn (Table Transfer)
+    TableResponse transferTable(TransferTableRequest request);
+
+    // 16. Quản lý gộp bàn (Table Merge)
+    TableResponse mergeTables(MergeTableRequest request);
+}

@@ -2,191 +2,91 @@ package com.romsteam.roms.entity;
 
 import com.romsteam.roms.entity.enums.ReservationStatus;
 import jakarta.persistence.*;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-// Khai bao Entity dai dien cho bang dat ban truoc
+/**
+ * Entity đại diện cho bảng phiếu đặt bàn trước (reservations).
+ * Áp dụng đầy đủ annotation Lombok để tự động sinh Getter, Setter, Builder và Constructor.
+ */
 @Entity
-@Table(name = "reservations") // Ten bang reservations trong CSDL
+@Table(name = "reservations")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Reservation {
 
-    // Khoa chinh phieu dat ban
+    // Khóa chính tự tăng của phiếu đặt bàn
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Ban an duoc chi dinh giu cho truoc cho khach (co the de null luc khach moi gui don PENDING)
+    // Mã đặt chỗ duy nhất hiển thị cho khách và quản lý tra cứu (Ví dụ: "RES-20261009-8821")
+    @Column(name = "booking_code", unique = true, length = 50)
+    private String bookingCode;
+
+    // Bàn ăn được chỉ định giữ chỗ (để NULL khi khách mới gửi đơn PENDING chờ quản lý xếp bàn)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "table_id")
     private RestaurantTable table;
 
-    // Ho ten cua nguoi lien he dat ban
-    @Column(name = "customer_name", nullable = false, length = 100)
+    // Phân khu khách mong muốn ngồi (lấy từ danh sách Zone trong CSDL: ZONE_1, ZONE_2, VIP...)
+    @Column(name = "requested_zone", length = 50)
+    private String requestedZone;
+
+    // Họ tên người liên hệ đặt bàn
+    @Column(name = "customer_name", nullable = false, columnDefinition = "NVARCHAR(100)")
     private String customerName;
 
-    // So dien thoai lien he xac nhan dat ban
+    // Số điện thoại liên hệ xác nhận đặt bàn (Quản lý sẽ bấm gọi số này)
     @Column(name = "customer_phone", nullable = false, length = 15)
     private String customerPhone;
 
-    // Email nhan thong tin xac nhan dat ban (tuy chon)
+    // Email nhận thông tin xác nhận đặt bàn (tùy chọn)
     @Column(name = "customer_email", length = 100)
     private String customerEmail;
 
-    // So luong nguoi di cung trong nhom khach
+    // Số lượng khách trong đoàn
     @Column(name = "guest_count", nullable = false)
     private Integer guestCount;
 
-    // Ngay va gio khach hen den nha hang an uong
+    // Thời điểm khách hẹn đến dùng bữa tại nhà hàng
     @Column(name = "reservation_time", nullable = false)
     private LocalDateTime reservationTime;
 
-    // Trang thai phieu dat ban: PENDING, CONFIRMED, COMPLETED, CANCELLED
+    // Trạng thái phiếu đặt bàn: PENDING, CONFIRMED, COMPLETED, CANCELLED
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ReservationStatus status = ReservationStatus.PENDING;
 
-    // Ghi chu cua khach hang khi dat ban (vi du: "Can ghe tre em", "To chuc sinh nhat")
-    @Column(name = "note", length = 255)
+    // Ghi chú đặc biệt của khách (Ví dụ: "Ghế em bé", "Tiệc sinh nhật", "Bàn gần cửa sổ"...)
+    @Column(name = "note", columnDefinition = "NVARCHAR(255)")
     private String note;
 
-    // Ly do huy ban (neu khach huy hoac quan tu choi nhan)
-    @Column(name = "cancel_reason", length = 255)
+    // Lý do hủy đặt bàn (khi khách hủy hoặc quản lý từ chối)
+    @Column(name = "cancel_reason", columnDefinition = "NVARCHAR(255)")
     private String cancelReason;
 
-    // Thoi diem khach gui don dat ban len he thong
+    // Thời điểm khách gửi đơn đặt bàn lên hệ thống
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Thoi diem nhan vien cap nhat thong tin phieu hen gan nhat
+    // Thời điểm cập nhật trạng thái phiếu đặt gần nhất
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ===================================================================
-    // CONSTRUCTORS (HAM KHOI TAO)
-    // ===================================================================
-
-    // Constructor mac dinh khong tham so (bat buoc cho Hibernate/JPA)
-    public Reservation() {
-        this.status = ReservationStatus.PENDING;
-    }
-
-    // Constructor day du tham so
-    public Reservation(Long id, RestaurantTable table, String customerName, String customerPhone, String customerEmail, Integer guestCount, LocalDateTime reservationTime, ReservationStatus status, String note, String cancelReason, LocalDateTime createdAt, LocalDateTime updatedAt) {
-        this.id = id;
-        this.table = table;
-        this.customerName = customerName;
-        this.customerPhone = customerPhone;
-        this.customerEmail = customerEmail;
-        this.guestCount = guestCount;
-        this.reservationTime = reservationTime;
-        this.status = status != null ? status : ReservationStatus.PENDING;
-        this.note = note;
-        this.cancelReason = cancelReason;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-    }
-
-    // ===================================================================
-    // GETTERS & SETTERS (PHUONG THUC DOC VA GHI DU LIEU)
-    // ===================================================================
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public RestaurantTable getTable() {
-        return table;
-    }
-
-    public void setTable(RestaurantTable table) {
-        this.table = table;
-    }
-
-    public String getCustomerName() {
-        return customerName;
-    }
-
-    public void setCustomerName(String customerName) {
-        this.customerName = customerName;
-    }
-
-    public String getCustomerPhone() {
-        return customerPhone;
-    }
-
-    public void setCustomerPhone(String customerPhone) {
-        this.customerPhone = customerPhone;
-    }
-
-    public String getCustomerEmail() {
-        return customerEmail;
-    }
-
-    public void setCustomerEmail(String customerEmail) {
-        this.customerEmail = customerEmail;
-    }
-
-    public Integer getGuestCount() {
-        return guestCount;
-    }
-
-    public void setGuestCount(Integer guestCount) {
-        this.guestCount = guestCount;
-    }
-
-    public LocalDateTime getReservationTime() {
-        return reservationTime;
-    }
-
-    public void setReservationTime(LocalDateTime reservationTime) {
-        this.reservationTime = reservationTime;
-    }
-
-    public ReservationStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(ReservationStatus status) {
-        this.status = status;
-    }
-
-    public String getNote() {
-        return note;
-    }
-
-    public void setNote(String note) {
-        this.note = note;
-    }
-
-    public String getCancelReason() {
-        return cancelReason;
-    }
-
-    public void setCancelReason(String cancelReason) {
-        this.cancelReason = cancelReason;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    // Danh sách các món ăn thực khách đặt trước (hoặc Quản lý thêm/sửa/xóa)
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ReservationItem> items = new ArrayList<>();
 }

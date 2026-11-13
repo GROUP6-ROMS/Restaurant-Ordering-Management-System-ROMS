@@ -1,0 +1,128 @@
+/* waiterMobile.css - Tối ưu Mobile Web cho Phân Hệ Phục Vụ (Waiter Floor Plan & Order Detail) */
+
+/* Thanh lọc khu vực & trạng thái trượt ngang mượt mà */
+.waiter-filter-scroll-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.waiter-filter-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Lưới sơ đồ bàn chuẩn Responsive */
+.waiter-floor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .waiter-floor-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .waiter-floor-grid {
+    /* minmax(0, 1fr) đảm bảo 2 cột chia đôi 50/50 chuẩn xác, không bị đẩy tràn mép */
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    grid-auto-rows: 1fr !important;
+    /* Khóa các bàn trong cùng 1 hàng có chiều cao bằng nhau */
+  }
+
+  .waiter-card-table {
+    padding: 12px !important;
+    border-radius: 16px !important;
+    min-height: 175px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+  }
+
+  .waiter-card-table:active {
+    transform: scale(0.985);
+  }
+
+  .waiter-card-btn-action {
+    padding: 9px 8px !important;
+    font-size: 0.8rem !important;
+    min-height: 42px !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+  }
+
+  /* Tối ưu Header thanh điều khiển FOH */
+  .waiter-foh-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .waiter-foh-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .waiter-floor-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Order Pad Modal Tabs trên Mobile */
+.waiter-modal-mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .waiter-modal-mobile-tabs {
+    display: flex;
+    background: #F0E6E4;
+    border-radius: 10px;
+    padding: 3px;
+    gap: 4px;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .waiter-modal-mobile-tab-btn {
+    flex: 1;
+    padding: 7px 10px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    background: transparent;
+    color: #56423D;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .waiter-modal-mobile-tab-btn.active {
+    background: #FFFFFF;
+    color: #9D4124;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+}

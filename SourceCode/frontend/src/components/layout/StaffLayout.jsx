@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { waiterApi } from '../../api/waiterApi';
+import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 import Icon from '../common/Icon';
 import RomsLogo from '../common/RomsLogo';
 
@@ -11,6 +13,7 @@ export default function StaffLayout() {
   const [time, setTime] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [waiterCallingCount, setWaiterCallingCount] = useState(0);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -33,11 +36,24 @@ export default function StaffLayout() {
     }
   };
 
-  // Modal Manager Approval Logout
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [managerPin, setManagerPin] = useState('');
-  const [handoverNote, setHandoverNote] = useState('');
-  const [logoutError, setLogoutError] = useState(null);
+  // Modal states for Logout:
+  // 1. Confirm dialog cho nhân viên (Waiter, Kitchen, Manager, Admin, hoặc Thu ngân đã chốt ca)
+  const [showConfirmLogoutModal, setShowConfirmLogoutModal] = useState(false);
+  // 2. Dialog cảnh báo cho Thu ngân khi chưa chốt sổ két tiền
+  const [showCashierShiftModal, setShowCashierShiftModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Accessibility: Lắng nghe phím Escape để đóng nhanh các modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showConfirmLogoutModal) setShowConfirmLogoutModal(false);
+        if (showCashierShiftModal) setShowCashierShiftModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showConfirmLogoutModal, showCashierShiftModal]);
 
   // Digital clock update
   useEffect(() => {
@@ -50,32 +66,97 @@ export default function StaffLayout() {
     return () => clearInterval(timer);
   }, []);
 
+  // Lấy số lượng chuông gọi phục vụ thời gian thực
+  useEffect(() => {
+    if (user?.role !== 'WAITER') return;
+
+    const fetchCallingCount = async () => {
+      try {
+        const res = await waiterApi.getTables();
+        if (res.data && res.data.success) {
+          const list = res.data.data || [];
+          const count = list.filter(t => t.calling || t.status === 'CALLING').length;
+          setWaiterCallingCount(count);
+        }
+      } catch (err) {
+        // bỏ qua lỗi nếu token chưa sẵn sàng
+      }
+    };
+
+    fetchCallingCount();
+    const interval = setInterval(fetchCallingCount, 4000);
+
+    const handleTabActive = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCallingCount();
+      }
+    };
+    window.addEventListener('focus', fetchCallingCount);
+    document.addEventListener('visibilitychange', handleTabActive);
+
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE') {
+        fetchCallingCount();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', fetchCallingCount);
+      document.removeEventListener('visibilitychange', handleTabActive);
+      unsubscribe();
+    };
+  }, [user?.role]);
+
   const handleTriggerLogout = () => {
-    // If manager or admin, logout directly
-    if (user?.role === 'MANAGER' || user?.role === 'ADMIN') {
-      logout();
-      navigate('/login');
-      return;
+    // Nếu là Thu Ngân (CASHIER): kiểm tra xem két tiền ca trực đã được chốt sổ chưa
+    if (user?.role === 'CASHIER') {
+      const isShiftClosed = sessionStorage.getItem('roms_cashier_shift_closed') === 'true';
+      if (!isShiftClosed) {
+        // Ca chưa chốt két -> mở dialog cảnh báo chốt ca két tiền & bàn giao
+        setShowCashierShiftModal(true);
+        return;
+      }
     }
 
-    // Non-manager staff requires Manager PIN approval
-    setManagerPin('');
-    setHandoverNote('');
-    setLogoutError(null);
-    setShowLogoutModal(true);
+    // Các vai trò thông thường (Waiter, Kitchen, Manager, Admin) hoặc Thu ngân đã chốt ca -> mở Confirm Dialog
+    setShowConfirmLogoutModal(true);
   };
 
-  const handleConfirmStaffLogout = (e) => {
-    if (e) e.preventDefault();
-    if (!managerPin || managerPin.trim().length !== 6 || !/^\d{6}$/.test(managerPin.trim())) {
-      setLogoutError('Vui lòng nhập chính xác mã PIN Quản Lý (6 chữ số)!');
-      return;
+  const handleConfirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      sessionStorage.removeItem('roms_cashier_shift_closed');
+      await logout();
+      setShowConfirmLogoutModal(false);
+      navigate('/login');
+    } catch (err) {
+      console.error('Lỗi khi đăng xuất:', err);
+      navigate('/login');
+    } finally {
+      setIsLoggingOut(false);
     }
+  };
 
-    // Manager approval successful
-    setShowLogoutModal(false);
-    logout();
-    navigate('/login');
+  // Thu ngân chọn Đăng xuất tạm thời (giữ ca, chưa chốt két)
+  const handleCashierTemporaryLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      setShowCashierShiftModal(false);
+      navigate('/login');
+    } catch (err) {
+      console.error('Lỗi khi đăng xuất tạm thời:', err);
+      navigate('/login');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // Thu ngân chọn Chốt ca két tiền -> điều hướng tới tab SHIFT trên POS
+  const handleGoToShiftClosure = () => {
+    setShowCashierShiftModal(false);
+    navigate('/pos/checkout?tab=SHIFT&trigger=approval');
   };
 
   // Station info based on role
@@ -274,13 +355,13 @@ export default function StaffLayout() {
         overflow: 'auto',
         background: '#FFF8F6',
         width: '100%',
-        paddingBottom: user?.role === 'WAITER' ? '70px' : '0'
+        paddingBottom: (isMobile && user?.role === 'WAITER') ? '70px' : '0'
       }}>
         <Outlet />
       </main>
 
-      {/* Mobile Bottom Navigation Bar exclusively for WAITER */}
-      {user?.role === 'WAITER' && (
+      {/* Mobile Bottom Navigation Bar exclusively for WAITER on Mobile Devices (< 768px) */}
+      {isMobile && user?.role === 'WAITER' && (
         <nav style={{
           position: 'fixed',
           bottom: 0,
@@ -294,16 +375,24 @@ export default function StaffLayout() {
           justifyContent: 'space-around',
           zIndex: 90,
           boxShadow: '0 -3px 12px rgba(0,0,0,0.06)',
-          padding: '0 6px'
+          padding: '0 12px'
         }}>
           {[
-            { path: '/waiter/floor-plan', label: 'Sơ Đồ Bàn', icon: 'table_restaurant' },
-            { path: '/waiter/floor-plan?filter=CALLING', label: 'Cần Hỗ Trợ', icon: 'notifications_active', badge: 2 },
-            { path: '/waiter/order?table=T-04', label: 'Gọi Thêm Món', icon: 'add_shopping_cart' },
+            {
+              path: '/waiter/floor-plan',
+              label: 'Sơ Đồ Bàn',
+              icon: 'table_restaurant',
+              isActive: location.pathname === '/waiter/floor-plan' && !location.search.includes('filter=CALLING')
+            },
+            {
+              path: '/waiter/floor-plan?filter=CALLING',
+              label: 'Cần Hỗ Trợ',
+              icon: 'notifications_active',
+              badge: waiterCallingCount > 0 ? waiterCallingCount : null,
+              isActive: location.pathname === '/waiter/floor-plan' && location.search.includes('filter=CALLING')
+            },
           ].map(tab => {
-            const isTabActive = tab.path.includes('filter')
-              ? location.search.includes('filter=CALLING')
-              : location.pathname === tab.path.split('?')[0] && !location.search.includes('filter=CALLING');
+            const isTabActive = tab.isActive;
 
             return (
               <button
@@ -320,9 +409,9 @@ export default function StaffLayout() {
                   border: isTabActive ? '1px solid #FFDBC9' : '1px solid transparent',
                   color: isTabActive ? '#9D4124' : '#89726B',
                   fontWeight: isTabActive ? 800 : 600,
-                  fontSize: '0.72rem',
+                  fontSize: '0.74rem',
                   cursor: 'pointer',
-                  padding: '5px 12px',
+                  padding: '6px 20px',
                   borderRadius: '12px',
                   position: 'relative',
                   transition: 'all 0.15s ease'
@@ -365,9 +454,9 @@ export default function StaffLayout() {
               border: '1px solid transparent',
               color: '#BA1A1A',
               fontWeight: 600,
-              fontSize: '0.72rem',
+              fontSize: '0.74rem',
               cursor: 'pointer',
-              padding: '5px 12px',
+              padding: '6px 20px',
               borderRadius: '12px'
             }}
           >
@@ -377,16 +466,16 @@ export default function StaffLayout() {
         </nav>
       )}
 
-      {/* MODAL: QUẢN LÝ XÁC NHẬN CHO PHÉP NHÂN VIÊN ĐĂNG XUẤT CA TRỰC */}
-      {showLogoutModal && (
+      {/* MODAL 1: CONFIRM DIALOG ĐĂNG XUẤT CHO NHÂN VIÊN (WAITER, KITCHEN, MANAGER, HOẶC THU NGÂN ĐÃ CHỐT CA) */}
+      {showConfirmLogoutModal && (
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(31, 27, 26, 0.65)',
+          backdropFilter: 'blur(5px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -398,9 +487,9 @@ export default function StaffLayout() {
             borderRadius: '24px',
             maxWidth: '440px',
             width: '100%',
-            padding: '28px',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
-            border: '2px solid #BA1A1A',
+            padding: '26px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
+            border: '1.5px solid #EAE0DE',
             animation: 'fadeIn 0.2s ease-out'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
@@ -414,103 +503,60 @@ export default function StaffLayout() {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <Icon name="verified_user" size={26} />
+                <Icon name="logout" size={24} />
               </div>
               <div>
                 <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#1F1B1A', margin: 0 }}>
-                  Xác Nhận Kết Thúc Ca Trực
+                  Xác Nhận Đăng Xuất
                 </h3>
-                <span style={{ fontSize: '0.78rem', color: '#BA1A1A', fontWeight: 700 }}>
-                  Cần Quản Lý duyệt trước khi rời trạm làm việc
+                <span style={{ fontSize: '0.78rem', color: '#89726B', fontWeight: 600 }}>
+                  Kết thúc phiên làm việc trên hệ thống ROMS
                 </span>
               </div>
             </div>
 
-            {/* Staff Card */}
+            {/* Staff Details Card */}
             <div style={{
               background: '#FFF8F6',
-              borderRadius: '12px',
-              padding: '12px 14px',
-              border: '1px dashed #EAE0DE',
-              marginBottom: '16px'
+              borderRadius: '14px',
+              padding: '14px',
+              border: '1px solid #F0E6E4',
+              marginBottom: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: '0.82rem'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 800, color: '#1F1B1A', fontSize: '0.9rem' }}>
-                  {user?.fullName || 'Nhân viên trực'}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#9D4124', background: '#FFDBC9', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                  {user?.username || '#STAFF'}
+                <span style={{ color: '#89726B' }}>Nhân viên:</span>
+                <strong style={{ color: '#1F1B1A' }}>{user?.fullName || 'Nhân viên trực'} ({user?.username})</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#89726B' }}>Vị trí trạm:</span>
+                <span style={{ fontWeight: 700, color: station.badgeColor, background: station.badgeBg, padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  {station.title}
                 </span>
               </div>
-              <span style={{ fontSize: '0.75rem', color: '#89726B', marginTop: '2px', display: 'block' }}>
-                Vị trí: <b>{station.title}</b> • Thời gian hiện tại: {time}
-              </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#89726B' }}>Ca làm việc:</span>
+                <strong style={{ color: '#9D4124' }}>{user?.assignedShift || 'Ca trực hiện tại'}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#89726B' }}>Thời gian:</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{time}</span>
+              </div>
             </div>
 
-            {/* Handover Note */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
-                Ghi Chú Bàn Giao Ca / Dụng Cụ (Tùy chọn)
-              </label>
-              <input
-                type="text"
-                placeholder="VD: Đã dọn sạch quầy, bàn giao lại 3 bàn cho ca sau..."
-                value={handoverNote}
-                onChange={(e) => setHandoverNote(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid #EAE0DE',
-                  fontSize: '0.82rem',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            {/* Manager PIN */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#56423D', marginBottom: '6px' }}>
-                Nhập Mã PIN Quản Lý Phê Duyệt (Demo: 123456) <span style={{ color: '#BA1A1A' }}>*</span>
-              </label>
-              <input
-                type="password"
-                maxLength={6}
-                placeholder="••••••"
-                value={managerPin}
-                onChange={(e) => {
-                  setManagerPin(e.target.value);
-                  setLogoutError(null);
-                }}
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  borderRadius: '12px',
-                  border: logoutError ? '2px solid #BA1A1A' : '1px solid #EAE0DE',
-                  background: '#FDF7F5',
-                  fontSize: '1.25rem',
-                  letterSpacing: '8px',
-                  textAlign: 'center',
-                  fontWeight: 800,
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-
-              {logoutError && (
-                <div style={{ color: '#BA1A1A', fontSize: '0.78rem', fontWeight: 700, marginTop: '6px', textAlign: 'center' }}>
-                  {logoutError}
-                </div>
-              )}
-            </div>
+            <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#56423D', lineHeight: 1.5 }}>
+              Bạn có chắc chắn muốn kết thúc ca làm việc và đăng xuất? Trạng thái trực của bạn sẽ được giải phóng an toàn.
+            </p>
 
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 type="button"
-                onClick={() => setShowLogoutModal(false)}
+                onClick={() => setShowConfirmLogoutModal(false)}
+                disabled={isLoggingOut}
                 style={{
                   flex: 1,
                   padding: '12px',
@@ -523,13 +569,14 @@ export default function StaffLayout() {
                   cursor: 'pointer'
                 }}
               >
-                Hủy Bỏ
+                Ở Lại Làm Việc
               </button>
               <button
                 type="button"
-                onClick={handleConfirmStaffLogout}
+                onClick={handleConfirmLogout}
+                disabled={isLoggingOut}
                 style={{
-                  flex: 1.4,
+                  flex: 1.3,
                   padding: '12px',
                   borderRadius: '12px',
                   background: '#BA1A1A',
@@ -544,9 +591,170 @@ export default function StaffLayout() {
                   gap: '6px'
                 }}
               >
-                <Icon name="check_circle" size={18} />
-                Quản Lý Duyệt Đăng Xuất
+                <Icon name="logout" size={18} />
+                {isLoggingOut ? 'Đang Đăng Xuất...' : 'Xác Nhận Đăng Xuất'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: CẢNH BÁO CHỐT CA KÉT TIỀN DÀNH RIÊNG CHO THU NGÂN (CASHIER) */}
+      {showCashierShiftModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(31, 27, 26, 0.7)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            maxWidth: '480px',
+            width: '100%',
+            padding: '26px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
+            border: '2px solid #BA1A1A',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '14px',
+                background: '#FFDAD6',
+                color: '#BA1A1A',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Icon name="point_of_sale" size={26} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#1F1B1A', margin: 0 }}>
+                  Chốt Ca Két Tiền & Bàn Giao
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#BA1A1A', fontWeight: 700 }}>
+                  ⚠️ Két tiền ca trực chưa được Quản lý duyệt chốt sổ!
+                </span>
+              </div>
+            </div>
+
+            {/* Warning Details Card */}
+            <div style={{
+              background: '#FFF5F5',
+              borderRadius: '14px',
+              padding: '14px',
+              border: '1.5px solid #FFCDD2',
+              marginBottom: '16px',
+              fontSize: '0.8rem',
+              color: '#842029',
+              lineHeight: 1.5
+            }}>
+              <strong>Quy định tài chính ROMS:</strong> Thu ngân đang giữ két tiền mặt vật lý của nhà hàng. Khi hết ca, bắt buộc phải <strong>kiểm đếm mệnh giá</strong> và yêu cầu <strong>Quản lý nhập mã PIN duyệt chốt ca / giải trình chênh lệch két</strong> trước khi bàn giao.
+            </div>
+
+            <div style={{
+              background: '#FFF8F6',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              border: '1px solid #F0E6E4',
+              marginBottom: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: '0.8rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#89726B' }}>Thu ngân phụ trách:</span>
+                <strong>{user?.fullName || 'Thu Ngân POS'} ({user?.username})</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#89726B' }}>Ca trực hiện tại:</span>
+                <strong style={{ color: '#9D4124' }}>{user?.assignedShift || 'Ca trực hiện tại'}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#89726B' }}>Trạng thái sổ két:</span>
+                <span style={{ color: '#BA1A1A', fontWeight: 800 }}>Chưa đối soát / Chưa chốt</span>
+              </div>
+            </div>
+
+            {/* 3 Clear Options */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleGoToShiftClosure}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#9D4124',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Icon name="verified_user" size={18} />
+                Kiểm Đếm & Chốt Ca Két Tiền Ngay
+              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCashierShiftModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '11px',
+                    borderRadius: '12px',
+                    background: '#F0E6E4',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    color: '#56423D',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ở Lại Thu Ngân
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCashierTemporaryLogout}
+                  disabled={isLoggingOut}
+                  title="Tạm rời quầy (ăn trưa, nghỉ ngắn). Ca làm việc và két tiền vẫn giữ nguyên."
+                  style={{
+                    flex: 1.4,
+                    padding: '11px',
+                    borderRadius: '12px',
+                    background: '#FCF1EF',
+                    border: '1px solid #EAE0DE',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    color: '#753400',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Icon name="lock" size={16} />
+                  {isLoggingOut ? 'Đang Xử Lý...' : 'Đăng Xuất Tạm (Giữ Ca)'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

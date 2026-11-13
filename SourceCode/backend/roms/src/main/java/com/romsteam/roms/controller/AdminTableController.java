@@ -1,0 +1,172 @@
+package com.romsteam.roms.controller;
+
+import com.romsteam.roms.dto.request.CreateTableRequest;
+import com.romsteam.roms.dto.request.MergeTableRequest;
+import com.romsteam.roms.dto.request.TransferTableRequest;
+import com.romsteam.roms.dto.request.UpdateTableRequest;
+import com.romsteam.roms.dto.request.UpdateTableStatusRequest;
+import com.romsteam.roms.dto.response.ApiResponse;
+import com.romsteam.roms.dto.response.TableOrdersResponse;
+import com.romsteam.roms.dto.response.TableResponse;
+import com.romsteam.roms.dto.response.TableSummaryResponse;
+import com.romsteam.roms.entity.enums.TableStatus;
+import com.romsteam.roms.service.RestaurantTableService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import com.romsteam.roms.dto.request.WaiterAddOrderRequest;
+
+@RestController
+@RequestMapping("/api/admin/tables")
+@RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('MANAGER', 'WAITER', 'CASHIER')")
+public class AdminTableController {
+
+    private final RestaurantTableService tableService;
+
+    // 1. GET /api/admin/tables/summary - Lấy 5 thẻ chỉ số KPI
+    @GetMapping("/summary")
+    public ResponseEntity<ApiResponse<TableSummaryResponse>> getTableSummary() {
+        TableSummaryResponse summary = tableService.getTableSummary();
+        return ResponseEntity.ok(ApiResponse.success(summary, "Lấy dữ liệu thống kê bàn thành công!"));
+    }
+
+    // 2. GET /api/admin/tables - Lấy danh sách bàn kèm bộ lọc và tìm kiếm
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<TableResponse>>> getTables(
+            @RequestParam(required = false) String zone,
+            @RequestParam(required = false) TableStatus status,
+            @RequestParam(required = false) String search) {
+        List<TableResponse> tables = tableService.getTables(zone, status, search);
+        return ResponseEntity.ok(ApiResponse.success(tables, "Lấy danh sách bàn thành công!"));
+    }
+
+    // 3. GET /api/admin/tables/{id} - Lấy chi tiết 1 bàn
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<TableResponse>> getTableById(@PathVariable Long id) {
+        TableResponse table = tableService.getTableById(id);
+        return ResponseEntity.ok(ApiResponse.success(table, "Lấy chi tiết bàn thành công!"));
+    }
+
+    // 4. POST /api/admin/tables - Thêm bàn mới (Chỉ Quản lý)
+    @PostMapping
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<TableResponse>> createTable(@Valid @RequestBody CreateTableRequest request) {
+        TableResponse newTable = tableService.createTable(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(newTable, "Thêm bàn mới thành công!"));
+    }
+
+    // 4.1. PUT /api/admin/tables/{id} - Chỉnh sửa thông tin bàn ăn (Chỉ Quản lý)
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<TableResponse>> updateTable(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTableRequest request) {
+        TableResponse updated = tableService.updateTable(id, request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật thông tin bàn thành công!"));
+    }
+
+    // 5. PATCH /api/admin/tables/{id}/status - Đổi trạng thái bàn (Khóa, Mở, Đặt chỗ)
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<TableResponse>> updateTableStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTableStatusRequest request) {
+        TableResponse updated = tableService.updateTableStatus(id, request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật trạng thái bàn thành công!"));
+    }
+
+    // 6. POST /api/admin/tables/{id}/refresh-qr - Đổi mã QR mới cho bàn
+    @PostMapping("/{id}/refresh-qr")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<TableResponse>> refreshQrToken(@PathVariable Long id) {
+        TableResponse updated = tableService.refreshQrToken(id);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Đã làm mới mã QR token cho bàn thành công!"));
+    }
+
+    // 7. DELETE /api/admin/tables/{id} - Xóa bàn ăn
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<Void>> deleteTable(@PathVariable Long id) {
+        tableService.deleteTable(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa bàn ăn thành công!"));
+    }
+    // 8. GET /api/admin/tables/{id}/orders - Xem nhanh toàn bộ món đang phục vụ tại bàn
+    @GetMapping("/{id}/orders")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> getTableOrders(@PathVariable Long id) {
+        TableOrdersResponse ordersResponse = tableService.getTableActiveOrders(id);
+        return ResponseEntity.ok(ApiResponse.success(ordersResponse, "Lấy danh sách món tại bàn thành công!"));
+    }
+
+    // 9. PATCH /api/admin/tables/requests/{id}/resolve - Quản lý xác nhận đã xử lý chuông gọi phục vụ
+    @PatchMapping("/requests/{id}/resolve")
+    public ResponseEntity<ApiResponse<Void>> resolveServiceRequest(@PathVariable Long id) {
+        tableService.resolveServiceRequest(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xử lý xong yêu cầu tại bàn!"));
+    }
+
+    // 10. PATCH /api/admin/tables/{tableId}/resolve-all-requests - Quản lý xác nhận xử lý toàn bộ yêu cầu của bàn
+    @PatchMapping("/{tableId}/resolve-all-requests")
+    public ResponseEntity<ApiResponse<Void>> resolveAllRequestsForTable(@PathVariable Long tableId) {
+        tableService.resolveAllRequestsForTable(tableId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xử lý xong toàn bộ yêu cầu của bàn!"));
+    }
+
+    // 11. POST /api/admin/tables/{tableId}/add-items - Quản lý gọi thêm món trực tiếp vào bàn
+    @PostMapping("/{tableId}/add-items")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> addItemsToTable(
+            @PathVariable Long tableId,
+            @Valid @RequestBody WaiterAddOrderRequest request) {
+        TableOrdersResponse response = tableService.addItemsToTable(tableId, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã thêm món vào bàn thành công!"));
+    }
+
+    // 12. PATCH /api/admin/tables/items/{orderItemId}/quantity - Quản lý điều chỉnh số lượng món ăn
+    @PatchMapping("/items/{orderItemId}/quantity")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> updateOrderItemQuantity(
+            @PathVariable Long orderItemId,
+            @RequestBody Map<String, Integer> payload) {
+        Integer quantity = payload != null ? payload.get("quantity") : 1;
+        TableOrdersResponse response = tableService.updateOrderItemQuantity(orderItemId, quantity);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã cập nhật số lượng món thành công!"));
+    }
+
+    // 13. POST /api/admin/tables/items/{orderItemId}/cancel - Quản lý hủy món ăn tại bàn kèm lý do
+    @PostMapping("/items/{orderItemId}/cancel")
+    public ResponseEntity<ApiResponse<TableOrdersResponse>> cancelOrderItem(
+            @PathVariable Long orderItemId,
+            @RequestBody(required = false) Map<String, String> payload) {
+        String reason = payload != null ? payload.get("reason") : "Quản lý hủy";
+        TableOrdersResponse response = tableService.cancelOrderItem(orderItemId, reason);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã hủy món ăn tại bàn thành công!"));
+    }
+
+    // 14. POST /api/admin/tables/{tableId}/check-in-reservation - Quản lý check-in đón khách đặt bàn
+    @PostMapping("/{tableId}/check-in-reservation")
+    public ResponseEntity<ApiResponse<TableResponse>> checkInReservation(
+            @PathVariable Long tableId,
+            @RequestParam(required = false) Long reservationId) {
+        TableResponse response = tableService.checkInReservationForTable(tableId, reservationId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Check-in đón khách đặt bàn thành công! Đã mở phiên ăn và nạp món đặt trước vào hệ thống."));
+    }
+
+    // 15. POST /api/admin/tables/transfer - Quản lý chuyển bàn
+    @PostMapping("/transfer")
+    public ResponseEntity<ApiResponse<TableResponse>> transferTable(@Valid @RequestBody TransferTableRequest request) {
+        TableResponse response = tableService.transferTable(request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Chuyển bàn thành công!"));
+    }
+
+    // 16. POST /api/admin/tables/merge - Quản lý gộp bàn
+    @PostMapping("/merge")
+    public ResponseEntity<ApiResponse<TableResponse>> mergeTables(@Valid @RequestBody MergeTableRequest request) {
+        TableResponse response = tableService.mergeTables(request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Gộp bàn thành công!"));
+    }
+}

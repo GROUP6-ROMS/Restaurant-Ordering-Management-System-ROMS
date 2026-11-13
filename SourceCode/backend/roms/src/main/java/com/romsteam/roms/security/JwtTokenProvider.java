@@ -27,7 +27,7 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 
-    // 1. Tao chuoi token JWT tu doi tuong xac thuc thanh cong (sau khi user dang nhap)
+    // 1. Tao chuoi token JWT tu doi tuong xac thuc thanh cong (sau khi nhan vien dang nhap)
     public String generateToken(Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         Date currentDate = new Date();
@@ -41,14 +41,69 @@ public class JwtTokenProvider {
                 .compact();                         // Dong goi thanh chuoi ky tu dang xxxxx.yyyyy.zzzzz
     }
 
+    // 1.1. Tao chuoi token JWT ngan han danh rieng cho Thuc khach quet ma QR tai ban an (Dining Token)
+    // Thoi gian song: 4 gio (du cho 1 bua an tai ban, tu dong het han chong lam dung)
+    public String generateDiningToken(Long tableId, String tableNumber) {
+        Date currentDate = new Date();
+        long diningExpiration = 4 * 60 * 60 * 1000L; // 4 gio
+        Date expireDate = new Date(currentDate.getTime() + diningExpiration);
+
+        return Jwts.builder()
+                .subject("CUSTOMER-" + tableNumber)
+                .claim("tableId", tableId)
+                .claim("tableNumber", tableNumber)
+                .claim("role", "ROLE_CUSTOMER")
+                .claim("tokenType", "DINING_TOKEN")
+                .issuedAt(currentDate)
+                .expiration(expireDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
     // 2. Trich xuat username tu ben trong chuoi token gui len
     public String getUsernameFromToken(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(getSigningKey()) // Kiem tra chu ky hop le truoc khi boc tach
+        Claims claims = getClaimsFromToken(token);
+        return claims.getSubject();
+    }
+
+    // 2.1. Trich xuat toan bo Claims tu token da duoc ky
+    public Claims getClaimsFromToken(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return claims.getSubject();
+    }
+
+    // 2.2. Kiem tra xem co phai la Dining Token cua Thuc khach hay khong
+    public boolean isCustomerDiningToken(String token) {
+        try {
+            Claims claims = getClaimsFromToken(token);
+            return "DINING_TOKEN".equals(claims.get("tokenType")) || "ROLE_CUSTOMER".equals(claims.get("role"));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // 2.3. Trich xuat tableId tu Dining Token
+    public Long getTableIdFromToken(String token) {
+        try {
+            Claims claims = getClaimsFromToken(token);
+            Object tableId = claims.get("tableId");
+            if (tableId instanceof Number) {
+                return ((Number) tableId).longValue();
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    // 2.4. Trich xuat tableNumber tu Dining Token
+    public String getTableNumberFromToken(String token) {
+        try {
+            Claims claims = getClaimsFromToken(token);
+            return claims.get("tableNumber", String.class);
+        } catch (Exception ignored) {}
+        return null;
     }
 
     // 3. Kiem tra token co hop le, nguyen ven va con han su dung hay khong

@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -14,6 +15,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 // Ke thua OncePerRequestFilter: Dam bao bo loc chi chay dung mot lan duy nhat cho moi yeu cau HTTP
@@ -38,33 +42,58 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 2. Neu co token va token hop le thi nap thong tin nguoi dung vao SecurityContext
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-            // Lay username tu token
-            String username = jwtTokenProvider.getUsernameFromToken(token);
+            if (jwtTokenProvider.isCustomerDiningToken(token)) {
+                // 2.1. Xử lý Dining Token của Thực khách ngồi tại bàn quét mã QR
+                Long tableId = jwtTokenProvider.getTableIdFromToken(token);
+                String tableNumber = jwtTokenProvider.getTableNumberFromToken(token);
+                SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_CUSTOMER");
 
-            // Nap chi tiet UserDetails tu database
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        "CUSTOMER_" + (tableNumber != null ? tableNumber : tableId),
+                        null,
+                        Collections.singletonList(authority)
+                );
 
-            // Tao doi tuong xac thuc danh tinh chinh thuc
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    userDetails,
-                    null,
-                    userDetails.getAuthorities()
-            );
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                Map<String, Object> details = new HashMap<>();
+                details.put("tableId", tableId);
+                details.put("tableNumber", tableNumber);
+                details.put("role", "ROLE_CUSTOMER");
+                authentication.setDetails(details);
 
-            // Luu thong tin xac thuc vao Security Context cua thread hien tai
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                // 2.2. Xử lý Staff Token của Nhân viên đăng nhập qua tài khoản
+                try {
+                    String username = jwtTokenProvider.getUsernameFromToken(token);
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } catch (Exception ex) {
+                    logger.warn("Không thể xác thực thông tin nhân viên từ token: " + ex.getMessage());
+                }
+            }
         }
 
         // 3. Cho phep request tiep tuc di qua cac filter ke tiep de vao Controller
         filterChain.doFilter(request, response);
     }
 
-    // Phuong thuc phu: Cat bo tien to "Bearer " de lay chuoi token thuan
+    // Phuong thuc phu: Cat bo tien to "Bearer " de lay chuoi token thuan, hoac query param token (cho beacon/websocket fallback)
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7); // Bo qua 7 ky tu "Bearer "
+        }
+        String tokenParam = request.getParameter("token");
+        if (StringUtils.hasText(tokenParam)) {
+            return tokenParam;
         }
         return null;
     }

@@ -1,79 +1,135 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Icon from '../../components/common/Icon';
-import { MOCK_MENU_ITEMS, MOCK_CATEGORIES } from '../../mock/mockData';
-
-const INITIAL_TABLE_ORDERS = {
-  'T-03': {
-    code: 'T-03',
-    name: 'Bàn T-03 (Sảnh Chính)',
-    orderCode: '#ORD-2026-088',
-    guests: 4,
-    waiter: 'Nguyễn Văn An (#EMP-8812)',
-    timeIn: '19:10',
-    status: 'DINING',
-    items: [
-      { id: 101, name: 'Bò Wagyu Nướng Đá Muối', category: 'Món Chính', price: 350000, qty: 2, status: 'SERVED', statusText: 'Đã lên món', note: 'Chín vừa (Medium Rare)' },
-      { id: 102, name: 'Súp Hải Sản Hoàng Kim', category: 'Khai Vị', price: 140000, qty: 3, status: 'SERVED', statusText: 'Đã lên món', note: 'Không tiêu' },
-      { id: 103, name: 'Salad Rong Biển Trứng Cua', category: 'Khai Vị', price: 95000, qty: 1, status: 'COOKING', statusText: 'Đang nấu', note: 'Sốt để riêng' },
-      { id: 104, name: 'Bia Tiger Crystal Lon 330ml', category: 'Đồ Uống Đóng Chai', price: 35000, qty: 2, status: 'WAITER_PREP', statusText: 'Waiter lấy nước', note: 'Ướp lạnh kèm ly đá' },
-    ]
-  },
-  'T-01': {
-    code: 'T-01',
-    name: 'Bàn T-01 (Sảnh Chính)',
-    orderCode: '#ORD-2026-079',
-    guests: 3,
-    waiter: 'Nguyễn Văn An (#EMP-8812)',
-    timeIn: '18:45',
-    status: 'DINING',
-    items: [
-      { id: 201, name: 'Cá Hồi Áp Chảo Sốt Bơ Tỏi', category: 'Món Chính', price: 290000, qty: 2, status: 'SERVED', statusText: 'Đã lên món', note: '' },
-      { id: 202, name: 'Rượu Vang Đỏ Bordeaux 2018', category: 'Đồ Uống', price: 450000, qty: 1, status: 'SERVED', statusText: 'Đã lên món', note: 'Ướp lạnh' },
-    ]
-  },
-  'VIP-01': {
-    code: 'VIP-01',
-    name: 'Phòng VIP Hoàng Gia',
-    orderCode: '#ORD-2026-065',
-    guests: 8,
-    waiter: 'Lê Hoàng Long (#EMP-8845)',
-    timeIn: '18:00',
-    status: 'DINING',
-    items: [
-      { id: 301, name: 'Tôm Hùm Nướng Phô Mai', category: 'Món Chính', price: 650000, qty: 4, status: 'COOKING', statusText: 'Đang nướng lò', note: 'Phô mai vàng óng' },
-      { id: 302, name: 'Bò Wagyu Nướng Đá Muối', category: 'Món Chính', price: 350000, qty: 6, status: 'SERVED', statusText: 'Đã lên món', note: '' },
-      { id: 303, name: 'Chai Champagne Dom Pérignon', category: 'Đồ Uống', price: 2800000, qty: 1, status: 'SERVED', statusText: 'Đã lên món', note: 'Mở nắp tại bàn' },
-    ]
-  }
-};
+import { waiterApi } from '../../api/waiterApi';
+import { broadcastRealtimeEvent, subscribeRealtimeEvents } from '../../utils/realtimeSync';
+import { useDialog } from '../../context/DialogContext';
+import './waiterMobile.css';
 
 export default function WaiterOrderDetailPage() {
   const navigate = useNavigate();
+  const { showConfirm, showAlert, showToast } = useDialog();
   const [searchParams] = useSearchParams();
-  const tableCodeParam = searchParams.get('table') || 'T-03';
+  const tableCodeParam = searchParams.get('table');
 
-  const [tableData, setTableData] = useState(() => {
-    return INITIAL_TABLE_ORDERS[tableCodeParam] || {
-      code: tableCodeParam,
-      name: `Bàn ${tableCodeParam}`,
-      orderCode: `#ORD-${Date.now().toString().slice(-4)}`,
-      guests: 2,
-      waiter: 'Nhân viên trực',
-      timeIn: '19:30',
-      status: 'DINING',
-      items: [
-        { id: 1, name: 'Súp Hải Sản Hoàng Kim', category: 'Khai Vị', price: 140000, qty: 2, status: 'SERVED', statusText: 'Đã lên món', note: '' }
-      ]
-    };
+  const [allTables, setAllTables] = useState([]);
+  const [tableData, setTableData] = useState({
+    code: tableCodeParam || '...',
+    name: tableCodeParam ? `Bàn ${tableCodeParam}` : 'Đang tải...',
+    orderCode: '#ORD-...',
+    guests: 0,
+    waiter: 'Nhân viên trực ca',
+    timeIn: 'Chưa có',
+    status: 'LOADING',
+    items: []
   });
+
+  const [menuCatalog, setMenuCatalog] = useState([]);
+
+  // Tải dữ liệu bàn thật từ Backend API
+  const fetchTablesAndDetails = async () => {
+    try {
+      const res = await waiterApi.getTables();
+      if (res.data && res.data.success) {
+        const list = res.data.data || [];
+        setAllTables(list);
+
+        let currentTable = null;
+        if (tableCodeParam) {
+          const normParam = tableCodeParam.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          currentTable = list.find(t => {
+            const normNum = (t.tableNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            const normName = (t.name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            return normNum === normParam || normName === normParam || normName.includes(normParam) || String(t.id) === String(tableCodeParam);
+          });
+        }
+        if (!currentTable) {
+          // Nếu không truyền param hoặc không tìm thấy, lấy bàn đang phục vụ đầu tiên
+          currentTable = list.find(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'CALLING' || t.status === 'AWAITING_PAYMENT') || list[0];
+        }
+
+        if (currentTable) {
+          setTableData({
+            id: currentTable.id,
+            code: currentTable.tableNumber,
+            name: currentTable.name || `Bàn ${currentTable.tableNumber}`,
+            orderCode: `#ORD-${currentTable.tableNumber}`,
+            guests: currentTable.actualGuests || currentTable.capacity || 2,
+            waiter: 'Nhân viên trực ca',
+            timeIn: (currentTable.duration && !currentTable.duration.startsWith('-')) ? currentTable.duration : 'Vừa vào',
+            status: currentTable.status,
+            statusNote: currentTable.statusNote,
+            items: (currentTable.items || []).map((item, idx) => ({
+              id: item.orderItemId || idx + 1,
+              name: item.name,
+              category: 'Món ăn',
+              price: typeof item.unitPrice === 'number' ? item.unitPrice : Number(item.unitPrice || 0),
+              qty: item.quantity || 1,
+              status: item.status,
+              statusText: item.status === 'READY' ? 'Quầy Pass' :
+                          item.status === 'COOKING' ? 'Bếp đang nấu' :
+                          item.status === 'PENDING' ? 'Chờ bếp nhận' : 'Đã lên món',
+              note: item.note || ''
+            }))
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi lấy dữ liệu bàn gọi món:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTablesAndDetails();
+    const interval = setInterval(fetchTablesAndDetails, 4000);
+
+    const handleTabActive = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTablesAndDetails();
+      }
+    };
+    window.addEventListener('focus', fetchTablesAndDetails);
+    document.addEventListener('visibilitychange', handleTabActive);
+
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'TABLE_UPDATE' || event?.type === 'PAYMENT_REQUEST' || event?.type === 'ORDER_UPDATE' || event?.type === 'NEW_ORDER_CREATED') {
+        fetchTablesAndDetails();
+      }
+      if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable, remainingStock } = event.payload;
+        setMenuCatalog(prev => prev.map(m => m.id === id ? { ...m, isAvailable, remainingStock } : m));
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', fetchTablesAndDetails);
+      document.removeEventListener('visibilitychange', handleTabActive);
+      unsubscribe();
+    };
+  }, [tableCodeParam]);
+
+  // Tải danh mục thực đơn thật từ CSDL
+  const fetchRealMenu = async () => {
+    try {
+      const res = await waiterApi.getMenu();
+      if (res.data && res.data.success) {
+        setMenuCatalog(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Lỗi tải thực đơn món:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRealMenu();
+  }, []);
 
   // Modal Gọi Thêm Món
   const [showAddDishModal, setShowAddDishModal] = useState(false);
   const [selectedCat, setSelectedCat] = useState('ALL');
   const [searchDish, setSearchDish] = useState('');
   const [cartToAdd, setCartToAdd] = useState([]);
-  const [toastMessage, setToastMessage] = useState(null);
   const [mobileModalTab, setMobileModalTab] = useState('CATALOG'); // 'CATALOG' | 'CART'
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
 
@@ -83,31 +139,127 @@ export default function WaiterOrderDetailPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  // Khóa cuộn trang nền & lắng nghe phím ESC để đóng Modal Gọi thêm món
+  useEffect(() => {
+    if (showAddDishModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showAddDishModal) {
+        setShowAddDishModal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAddDishModal]);
+
+
+  const handleRequestPayment = async () => {
+    if (!tableData.id) return;
+    if (tableData.items.length === 0) {
+      showToast('Bàn chưa gọi món ăn nào (0đ), không thể gửi yêu cầu tính tiền!');
+      return;
+    }
+    try {
+      await waiterApi.requestPayment(tableData.id);
+      showToast(`Đã gửi yêu cầu thanh toán bàn ${tableData.code} sang Quầy Thu Ngân POS!`);
+      await fetchTablesAndDetails();
+      broadcastRealtimeEvent({
+        type: 'PAYMENT_REQUEST',
+        tableId: tableData.id,
+        tableName: tableData.name || `Bàn ${tableData.code}`
+      });
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi gửi yêu cầu thanh toán');
+    }
+  };
+
+  const handleCloseEmptyTable = async () => {
+    if (!tableData.id) return;
+    const confirmed = await showConfirm({
+      title: 'Đóng phiên bàn trống',
+      message: `Xác nhận đóng phiên ăn 0đ và giải phóng bàn ${tableData.code}?\n(Dành cho trường hợp khách không dùng món hoặc mở nhầm bàn)`,
+      confirmText: 'Đóng bàn',
+      type: 'warning'
+    });
+    if (!confirmed) return;
+    try {
+      await waiterApi.closeEmptySession(tableData.id, { reason: 'Khách không dùng món / Hủy bàn trống', targetStatus: 'AVAILABLE' });
+      showToast(`Đã đóng phiên bàn trống thành công cho bàn ${tableData.code}!`);
+      broadcastRealtimeEvent({ type: 'TABLE_UPDATE', tableId: tableData.id, status: 'AVAILABLE' });
+      navigate('/waiter/floor-plan');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi đóng phiên bàn trống!');
+    }
   };
 
   const subtotal = tableData.items.reduce((s, i) => s + (i.price * i.qty), 0);
-  const vat = subtotal * 0.08;
-  const total = subtotal + vat;
+  const vat = 0;
+  const total = subtotal;
 
-  // Add dish to temporary order cart
+  const handleOpenAddDishModal = () => {
+    const activeStatuses = ['OCCUPIED', 'FOOD_READY', 'CALLING', 'AWAITING_PAYMENT'];
+    if (!tableData?.id || !activeStatuses.includes(tableData.status)) {
+      showToast('Bàn chưa mở phiên phục vụ, vui lòng Mở Bàn trước khi gọi món!');
+      return;
+    }
+    fetchRealMenu();
+    setShowAddDishModal(true);
+  };
+
+  // Add dish to temporary order cart (kiểm tra trạng thái bán & giới hạn tồn kho)
   const handleSelectDish = (dish) => {
+    const catalogDish = menuCatalog.find(m => m.id === dish.id) || dish;
+    if (!isDishUnlocked(catalogDish)) {
+      showToast(`Món "${catalogDish.name}" hiện đã tạm hết!`);
+      return;
+    }
+    const existing = cartToAdd.find(i => i.id === dish.id);
+    const hasFinite = catalogDish.remainingStock !== null && catalogDish.remainingStock !== undefined;
+    if (hasFinite && (existing?.qty || 0) >= Number(catalogDish.remainingStock)) {
+      showToast(`Món "${catalogDish.name}" chỉ còn lại ${catalogDish.remainingStock} phần!`);
+      return;
+    }
     setCartToAdd(prev => {
-      const existing = prev.find(i => i.id === dish.id);
-      if (existing) {
-        return prev.map(i => i.id === dish.id ? { ...i, qty: i.qty + 1 } : i);
+      const prevExisting = prev.find(i => i.id === dish.id);
+      if (prevExisting) {
+        if (hasFinite && prevExisting.qty >= Number(catalogDish.remainingStock)) {
+          return prev;
+        }
+        return prev.map(i => i.id === dish.id ? { ...i, qty: i.qty + 1, remainingStock: catalogDish.remainingStock, isAvailable: catalogDish.isAvailable } : i);
       }
-      return [...prev, { ...dish, qty: 1, note: '' }];
+      return [...prev, { ...catalogDish, qty: 1, note: '' }];
     });
   };
 
   const handleUpdateCartQty = (id, delta) => {
+    const catalogDish = menuCatalog.find(m => m.id === id) || cartToAdd.find(i => i.id === id);
+    if (delta > 0 && catalogDish) {
+      if (!isDishUnlocked(catalogDish)) {
+        showToast(`Món "${catalogDish.name}" hiện đã tạm hết!`);
+        return;
+      }
+      const current = cartToAdd.find(i => i.id === id);
+      const hasFinite = catalogDish.remainingStock !== null && catalogDish.remainingStock !== undefined;
+      if (hasFinite && ((current?.qty || 0) + delta) > Number(catalogDish.remainingStock)) {
+        showToast(`Món "${catalogDish.name}" chỉ còn lại ${catalogDish.remainingStock} phần!`);
+        return;
+      }
+    }
     setCartToAdd(prev => {
       return prev.map(i => {
         if (i.id === id) {
           const next = i.qty + delta;
+          if (delta > 0 && catalogDish && catalogDish.remainingStock !== null && catalogDish.remainingStock !== undefined && next > Number(catalogDish.remainingStock)) {
+            return i;
+          }
           return next > 0 ? { ...i, qty: next } : null;
         }
         return i;
@@ -119,66 +271,51 @@ export default function WaiterOrderDetailPage() {
     setCartToAdd(prev => prev.map(i => i.id === id ? { ...i, note } : i));
   };
 
-  // Submit additional dishes to table & kitchen
-  const handleConfirmAddDishes = () => {
-    if (cartToAdd.length === 0) return;
+  // Submit additional dishes to table & kitchen (Lưu thật Database)
+  const handleConfirmAddDishes = async () => {
+    if (cartToAdd.length === 0 || !tableData.id) return;
 
-    const isDrink = (cat) => cat === 'Đồ Uống' || cat === 'Đồ Uống Đóng Chai';
-    const newItems = cartToAdd.map(item => ({
-      id: Date.now() + Math.random(),
-      name: item.name,
-      category: item.category,
-      price: item.price,
-      qty: item.qty,
-      status: isDrink(item.category) ? 'WAITER_PREP' : 'COOKING',
-      statusText: isDrink(item.category) ? 'Waiter lấy nước' : 'Đang nấu (Bếp)',
-      note: item.note || ''
-    }));
+    try {
+      const payload = {
+        items: cartToAdd.map(item => ({
+          menuItemId: item.id,
+          quantity: item.qty,
+          note: item.note || ''
+        })),
+        note: 'Waiter gọi thêm tại bàn'
+      };
 
-    setTableData(prev => ({
-      ...prev,
-      items: [...prev.items, ...newItems]
-    }));
-
-    const count = cartToAdd.reduce((s, i) => s + i.qty, 0);
-    setCartToAdd([]);
-    setShowAddDishModal(false);
-    showToast(`Đã gửi ${count} món gọi thêm: Đồ ăn vào Bếp • Nước cho Waiter (${tableData.code})!`);
+      const res = await waiterApi.addOrder(tableData.id, payload);
+      if (res.data && res.data.success) {
+        const count = cartToAdd.reduce((s, i) => s + i.qty, 0);
+        setCartToAdd([]);
+        setShowAddDishModal(false);
+        showToast(`Đã gửi thành công ${count} món gọi thêm vào Bếp cho Bàn ${tableData.code}!`);
+        await Promise.all([fetchTablesAndDetails(), fetchRealMenu()]);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi gửi đợt gọi món');
+    }
   };
 
-  const filteredCatalog = MOCK_MENU_ITEMS.filter(d => {
+  const availableCategories = ['ALL', ...Array.from(new Set(menuCatalog.map(m => m.category).filter(Boolean)))];
+
+  const isDishUnlocked = (d) => Boolean(d.isAvailable) && (d.remainingStock === undefined || d.remainingStock === null || d.remainingStock > 0);
+
+  const filteredCatalog = menuCatalog.filter(d => {
     if (selectedCat !== 'ALL' && d.category !== selectedCat) return false;
     if (searchDish.trim() !== '') {
-      return d.name.toLowerCase().includes(searchDish.toLowerCase());
+      return d.name?.toLowerCase().includes(searchDish.toLowerCase());
     }
     return true;
+  }).sort((a, b) => {
+    const aUn = isDishUnlocked(a) ? 1 : 0;
+    const bUn = isDishUnlocked(b) ? 1 : 0;
+    return bUn - aUn;
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', paddingBottom: isMobile ? '80px' : '0' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '24px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFFFFF',
-          padding: '12px 20px',
-          borderRadius: '12px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 600,
-          fontSize: '0.9rem',
-          borderLeft: '4px solid #9D4124'
-        }}>
-          <Icon name="check_circle" size={20} style={{ color: '#E8C3BA' }} />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', paddingBottom: isMobile ? '135px' : '24px' }}>
 
       {/* Header with Back button and Table Title */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
@@ -209,39 +346,97 @@ export default function WaiterOrderDetailPage() {
               </span>
               <span style={{ fontSize: '0.8rem', color: '#89726B', fontWeight: 600 }}>Chi Tiết Đơn Đang Phục Vụ</span>
             </div>
-            <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: isMobile ? '1.25rem' : '1.65rem', color: '#1F1B1A', margin: '2px 0 0' }}>
-              {tableData.code} • {tableData.name}
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
+              <h1 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 900, fontSize: isMobile ? '1.25rem' : '1.65rem', color: '#1F1B1A', margin: 0 }}>
+                {tableData.code}{tableData.name && tableData.name.trim() !== tableData.code.trim() ? ` • ${tableData.name}` : ''}
+              </h1>
+              {allTables.length > 0 && (
+                <select
+                  value={tableData.code}
+                  onChange={(e) => navigate(`/waiter/order?table=${e.target.value}`)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid #EAE0DE',
+                    background: '#FFF8F6',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    color: '#9D4124',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                  title="Chọn bàn khác"
+                >
+                  <optgroup label="Bàn đang phục vụ">
+                    {allTables.filter(t => t.status === 'OCCUPIED' || t.status === 'FOOD_READY' || t.status === 'CALLING' || t.status === 'AWAITING_PAYMENT').map(t => (
+                      <option key={t.id} value={t.tableNumber}>
+                        {t.name || `Bàn ${t.tableNumber}`} ({t.status === 'FOOD_READY' ? 'Bếp xong' : t.status === 'AWAITING_PAYMENT' ? 'Chờ thanh toán' : 'Đang ăn'})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Các bàn khác">
+                    {allTables.filter(t => t.status !== 'OCCUPIED' && t.status !== 'FOOD_READY' && t.status !== 'CALLING' && t.status !== 'AWAITING_PAYMENT').map(t => (
+                      <option key={t.id} value={t.tableNumber}>
+                        {t.name || `Bàn ${t.tableNumber}`} ({t.status === 'AVAILABLE' ? 'Trống' : t.status === 'RESERVED' ? 'Đặt trước' : t.status})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Action Buttons (Desktop only - Mobile has sticky action bar) */}
         {!isMobile && (
           <div style={{ display: 'flex', gap: '10px' }}>
+            {tableData.items.length === 0 && (
+              <button
+                type="button"
+                onClick={handleCloseEmptyTable}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 16px',
+                  borderRadius: '12px',
+                  background: '#FFDAD6',
+                  border: '1px solid #FFB4AB',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  color: '#93000A',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="event_busy" size={18} />
+                Đóng Bàn 0đ (Khách Rời Đi)
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => showToast(`Đã gửi yêu cầu thanh toán cho ${tableData.code} tới Thu Ngân!`)}
+              disabled={tableData.status === 'AWAITING_PAYMENT'}
+              onClick={handleRequestPayment}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
                 padding: '10px 16px',
                 borderRadius: '12px',
-                background: '#FFFFFF',
-                border: '1px solid #EAE0DE',
+                background: tableData.status === 'AWAITING_PAYMENT' ? '#FFDBC9' : '#FFFFFF',
+                border: tableData.status === 'AWAITING_PAYMENT' ? '1.5px solid #FFB68C' : '1px solid #EAE0DE',
                 fontWeight: 700,
                 fontSize: '0.85rem',
-                color: '#BA1A1A',
-                cursor: 'pointer'
+                color: tableData.status === 'AWAITING_PAYMENT' ? '#753400' : '#BA1A1A',
+                cursor: tableData.status === 'AWAITING_PAYMENT' ? 'default' : 'pointer'
               }}
             >
               <Icon name="point_of_sale" size={18} />
-              Báo Thu Ngân Tính Tiền
+              {tableData.status === 'AWAITING_PAYMENT' ? 'Đã Báo Thu Ngân (Chờ POS)' : 'Báo Thu Ngân Tính Tiền'}
             </button>
 
             <button
               type="button"
-              onClick={() => setShowAddDishModal(true)}
+              onClick={handleOpenAddDishModal}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -264,6 +459,47 @@ export default function WaiterOrderDetailPage() {
         )}
       </div>
 
+      {/* Cảnh báo nếu bàn chưa mở phiên phục vụ */}
+      {tableData.status && tableData.status !== 'OCCUPIED' && tableData.status !== 'FOOD_READY' && tableData.status !== 'CALLING' && tableData.status !== 'AWAITING_PAYMENT' && tableData.status !== 'LOADING' && (
+        <div style={{
+          background: '#FFFBEB',
+          border: '1px solid #FDE68A',
+          padding: '14px 18px',
+          borderRadius: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#92400E', fontSize: '0.88rem' }}>
+            <Icon name="warning" size={22} style={{ color: '#D97706', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 800 }}>Bàn {tableData.code} hiện chưa mở phiên phục vụ!</div>
+              <div style={{ fontSize: '0.8rem', color: '#B45309' }}>
+                Trạng thái: <strong>{tableData.status === 'RESERVED' ? 'Đã đặt trước (Chưa check-in)' : tableData.status === 'AVAILABLE' ? 'Sẵn sàng (Trống)' : tableData.status}</strong>. Vui lòng mở bàn tại Sơ Đồ Bàn hoặc chọn bàn đang phục vụ khác ở ô chọn phía trên.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/waiter/floor-plan')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              background: '#D97706',
+              color: '#FFF',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            Về Sơ Đồ Bàn
+          </button>
+        </div>
+      )}
+
       {/* Table Information Strip */}
       <div style={{
         background: '#FFFFFF',
@@ -284,8 +520,8 @@ export default function WaiterOrderDetailPage() {
           <span style={{ fontWeight: 800, color: '#1F1B1A' }}>{tableData.guests} người lớn</span>
         </div>
         <div>
-          <span style={{ color: '#89726B', display: 'block', fontSize: '0.72rem' }}>Thời gian vào bàn:</span>
-          <span style={{ fontWeight: 800, color: '#1F1B1A' }}>{tableData.timeIn} (45 phút)</span>
+          <span style={{ color: '#89726B', display: 'block', fontSize: '0.72rem' }}>Thời gian phục vụ:</span>
+          <span style={{ fontWeight: 800, color: '#1F1B1A' }}>{tableData.timeIn}</span>
         </div>
         <div>
           <span style={{ color: '#89726B', display: 'block', fontSize: '0.72rem' }}>Nhân viên phục vụ:</span>
@@ -316,7 +552,7 @@ export default function WaiterOrderDetailPage() {
             </h3>
             <button
               type="button"
-              onClick={() => setShowAddDishModal(true)}
+              onClick={handleOpenAddDishModal}
               style={{
                 background: '#FCF1EF',
                 color: '#9D4124',
@@ -338,8 +574,11 @@ export default function WaiterOrderDetailPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {tableData.items.map((item, idx) => {
               let statusBadge = { bg: '#E8F5E9', color: '#2E7D32', text: 'Đã lên món' };
-              if (item.status === 'COOKING') statusBadge = { bg: '#FFF8E1', color: '#B45309', text: 'Đang nấu (Bếp)' };
+              if (item.status === 'PENDING') statusBadge = { bg: '#FEF3C7', color: '#B45309', text: 'Chờ tiếp nhận' };
+              else if (item.status === 'COOKING') statusBadge = { bg: '#FFF8E1', color: '#B45309', text: 'Đang nấu (Bếp)' };
+              else if (item.status === 'READY') statusBadge = { bg: '#DCFCE7', color: '#15803D', text: 'Quầy Pass (Sẵn sàng)' };
               else if (item.status === 'WAITER_PREP' || item.status === 'BREWING') statusBadge = { bg: '#DDE8AB', color: '#3B4800', text: 'Waiter lấy nước' };
+              else if (item.status === 'CANCELLED') statusBadge = { bg: '#FFDAD6', color: '#BA1A1A', text: 'Đã hủy' };
 
               return (
                 <div
@@ -386,7 +625,7 @@ export default function WaiterOrderDetailPage() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-end' : 'center', gap: isMobile ? '4px' : '16px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-end' : 'center', gap: isMobile ? '4px' : '12px', flexShrink: 0 }}>
                     <span style={{
                       fontSize: '0.72rem',
                       fontWeight: 700,
@@ -397,6 +636,32 @@ export default function WaiterOrderDetailPage() {
                     }}>
                       {statusBadge.text}
                     </span>
+
+                    {item.status === 'READY' && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await waiterApi.deliverSingleItem(tableData.id, item.id);
+                            fetchTablesAndDetails();
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }}
+                        style={{
+                          background: '#596232',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Bưng đĩa này
+                      </button>
+                    )}
 
                     <span style={{ fontWeight: 800, fontSize: isMobile ? '0.88rem' : '1rem', color: '#1F1B1A', minWidth: isMobile ? 'auto' : '90px', textAlign: 'right' }}>
                       {(item.price * item.qty).toLocaleString('vi-VN')}₫
@@ -426,9 +691,9 @@ export default function WaiterOrderDetailPage() {
                 <span>Tổng tiền món:</span>
                 <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{subtotal.toLocaleString('vi-VN')}₫</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
-                <span>Thuế VAT (8%):</span>
-                <span style={{ fontWeight: 700, color: '#1F1B1A' }}>{vat.toLocaleString('vi-VN')}₫</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#89726B', fontStyle: 'italic', fontSize: '0.8rem' }}>
+                <span>Thuế GTGT:</span>
+                <span>Đã gồm trong giá món</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#56423D' }}>
                 <span>Phí dịch vụ:</span>
@@ -455,7 +720,7 @@ export default function WaiterOrderDetailPage() {
             <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 type="button"
-                onClick={() => setShowAddDishModal(true)}
+                onClick={handleOpenAddDishModal}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -507,7 +772,7 @@ export default function WaiterOrderDetailPage() {
       {isMobile && (
         <div style={{
           position: 'fixed',
-          bottom: '56px',
+          bottom: '62px',
           left: 0,
           right: 0,
           background: '#FFFFFF',
@@ -527,30 +792,53 @@ export default function WaiterOrderDetailPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
+            {tableData.items.length === 0 && (
+              <button
+                type="button"
+                onClick={handleCloseEmptyTable}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  background: '#FFDAD6',
+                  border: '1px solid #FFB4AB',
+                  color: '#93000A',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Icon name="event_busy" size={16} />
+                Đóng 0đ
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => showToast(`Đã gửi yêu cầu thanh toán cho ${tableData.code} tới Thu Ngân!`)}
+              disabled={tableData.status === 'AWAITING_PAYMENT'}
+              onClick={handleRequestPayment}
               style={{
                 padding: '9px 12px',
                 borderRadius: '10px',
-                background: '#FFF8F6',
-                border: '1px solid #FFDBC9',
-                color: '#BA1A1A',
+                background: tableData.status === 'AWAITING_PAYMENT' ? '#FFDBC9' : '#FFF8F6',
+                border: tableData.status === 'AWAITING_PAYMENT' ? '1px solid #FFB68C' : '1px solid #FFDBC9',
+                color: tableData.status === 'AWAITING_PAYMENT' ? '#753400' : '#BA1A1A',
                 fontWeight: 700,
                 fontSize: '0.78rem',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                cursor: 'pointer'
+                cursor: tableData.status === 'AWAITING_PAYMENT' ? 'default' : 'pointer'
               }}
             >
               <Icon name="point_of_sale" size={16} />
-              Thu Ngân
+              {tableData.status === 'AWAITING_PAYMENT' ? 'Đã Báo POS' : 'Thu Ngân'}
             </button>
 
             <button
               type="button"
-              onClick={() => setShowAddDishModal(true)}
+              onClick={handleOpenAddDishModal}
               style={{
                 padding: '9px 16px',
                 borderRadius: '10px',
@@ -575,32 +863,40 @@ export default function WaiterOrderDetailPage() {
 
       {/* MODAL / DRAWER: GỌI THÊM MÓN TẠI BÀN (SCR-06) */}
       {showAddDishModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: isMobile ? 'flex-end' : 'center',
-          justifyContent: 'center',
-          zIndex: 1100,
-          padding: isMobile ? '0' : '20px'
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: isMobile ? '24px 24px 0 0' : '24px',
-            maxWidth: '920px',
-            width: '100%',
-            maxHeight: isMobile ? '92vh' : '90vh',
-            height: isMobile ? '92vh' : 'auto',
+        <div
+          onClick={() => setShowAddDishModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
-            overflow: 'hidden'
-          }}>
+            alignItems: isMobile ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: isMobile ? '0' : '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: isMobile ? '24px 24px 0 0' : '24px',
+              maxWidth: '920px',
+              width: '100%',
+              maxHeight: isMobile ? '92vh' : '90vh',
+              height: isMobile ? '92vh' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
+              animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Modal Header */}
             <div style={{
               padding: isMobile ? '14px 16px 10px' : '20px 24px',
@@ -614,7 +910,7 @@ export default function WaiterOrderDetailPage() {
                     </span>
                   </div>
                   <h3 style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: isMobile ? '1.15rem' : '1.3rem', color: '#1F1B1A', margin: '3px 0 0' }}>
-                    Gọi Thêm Món Cho {tableData.code} ({tableData.name})
+                    Gọi Thêm Món Cho {tableData.code}{tableData.name && tableData.name.trim() !== tableData.code.trim() ? ` (${tableData.name})` : ''}
                   </h3>
                 </div>
                 <button
@@ -720,72 +1016,91 @@ export default function WaiterOrderDetailPage() {
                     >
                       Tất cả
                     </button>
-                    {MOCK_CATEGORIES.map(cat => (
+                    {availableCategories.filter(cat => cat !== 'ALL').map(catName => (
                       <button
-                        key={cat.id}
+                        key={catName}
                         type="button"
-                        onClick={() => setSelectedCat(cat.name)}
+                        onClick={() => setSelectedCat(catName)}
                         style={{
                           padding: '6px 12px',
                           borderRadius: '8px',
                           border: 'none',
-                          background: selectedCat === cat.name ? '#9D4124' : '#F6ECEA',
-                          color: selectedCat === cat.name ? '#FFFFFF' : '#56423D',
+                          background: selectedCat === catName ? '#9D4124' : '#F6ECEA',
+                          color: selectedCat === catName ? '#FFFFFF' : '#56423D',
                           fontWeight: 700,
                           fontSize: '0.78rem',
                           cursor: 'pointer',
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        {cat.name}
+                        {catName}
                       </button>
                     ))}
                   </div>
 
                   {/* Dish Grid */}
                   <div style={{
-                    display: 'grid',
+                    display: filteredCatalog.length === 0 ? 'block' : 'grid',
                     gridTemplateColumns: 'repeat(2, 1fr)',
                     gap: isMobile ? '8px' : '10px',
                     maxHeight: isMobile ? 'none' : '380px',
                     overflowY: 'auto'
                   }}>
-                    {filteredCatalog.map(dish => (
-                      <div
-                        key={dish.id}
-                        onClick={() => handleSelectDish(dish)}
-                        style={{
-                          background: '#FFF8F6',
-                          border: '1px solid #F0E6E4',
-                          borderRadius: '12px',
-                          padding: isMobile ? '8px 10px' : '10px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          gap: '6px',
-                          transition: 'transform 0.15s ease'
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: isMobile ? '0.8rem' : '0.85rem', color: '#1F1B1A', lineHeight: 1.25 }}>
-                            {dish.name}
-                          </div>
-                          <span style={{ fontSize: '0.7rem', color: '#89726B' }}>
-                            {dish.category}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                          <span style={{ fontWeight: 800, fontSize: isMobile ? '0.8rem' : '0.85rem', color: '#9D4124' }}>
-                            {dish.price.toLocaleString('vi-VN')}₫
-                          </span>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#9D4124', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="add" size={16} />
-                          </div>
-                        </div>
+                    {filteredCatalog.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '36px 16px', color: '#89726B' }}>
+                        <Icon name="search_off" size={28} style={{ color: '#D1C2BE', marginBottom: '8px' }} />
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Không tìm thấy món ăn nào</div>
                       </div>
-                    ))}
+                    ) : (
+                      filteredCatalog.map(dish => {
+                        const unlocked = isDishUnlocked(dish);
+                        const hasFiniteStock = dish.remainingStock !== null && dish.remainingStock !== undefined;
+                        return (
+                        <div
+                          key={dish.id}
+                          onClick={() => handleSelectDish(dish)}
+                          style={{
+                            background: unlocked ? '#FFF8F6' : '#F5F5F4',
+                            border: '1px solid #F0E6E4',
+                            borderRadius: '12px',
+                            padding: isMobile ? '8px 10px' : '10px',
+                            cursor: unlocked ? 'pointer' : 'not-allowed',
+                            opacity: unlocked ? 1 : 0.5,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: '6px',
+                            transition: 'transform 0.15s ease'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: isMobile ? '0.8rem' : '0.85rem', color: '#1F1B1A', lineHeight: 1.25 }}>
+                              {dish.name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.7rem', color: '#89726B' }}>
+                                {dish.category}
+                              </span>
+                              {unlocked && hasFiniteStock && (
+                                <span style={{ fontSize: '0.66rem', fontWeight: 700, color: Number(dish.remainingStock) <= 5 ? '#BA1A1A' : '#2E7D32', background: Number(dish.remainingStock) <= 5 ? '#FFDAD6' : '#E8F5E9', padding: '1px 5px', borderRadius: '4px' }}>
+                                  Còn {dish.remainingStock}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                            <span style={{ fontWeight: 800, fontSize: isMobile ? '0.8rem' : '0.85rem', color: unlocked ? '#9D4124' : '#89726B' }}>
+                              {dish.price.toLocaleString('vi-VN')}₫
+                            </span>
+                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: unlocked ? '#9D4124' : '#D1C2BE', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Icon name={unlocked ? "add" : "lock"} size={unlocked ? 16 : 14} />
+                            </div>
+                          </div>
+                        </div>
+                        );
+                      })
+                    )}
                   </div>
 
                   {/* Mobile Quick Cart Bar when items are selected */}

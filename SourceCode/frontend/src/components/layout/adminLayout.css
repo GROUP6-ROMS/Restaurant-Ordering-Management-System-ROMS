@@ -1,0 +1,204 @@
+/* adminLayout.css - Tối ưu Mobile Web & Responsive Drawer cho Phân Hệ Quản Trị ROMS */
+
+.admin-layout-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #FFF8F6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.admin-header {
+  height: 64px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #EAE0DE;
+  position: sticky;
+  top: 0;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
+}
+
+/* Hamburger button on mobile */
+.admin-hamburger-btn {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #EAE0DE;
+  background: #FFF8F6;
+  color: #9D4124;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.admin-header-center-clock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FCF1EF;
+  border: 1px solid #EAE0DE;
+  padding: 6px 14px;
+  border-radius: 12px;
+}
+
+/* Sidebar Desktop */
+.admin-sidebar {
+  width: 260px;
+  background: #FCF1EF;
+  border-right: 1px solid #EAE0DE;
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.admin-main-content {
+  flex: 1;
+  padding: 24px;
+  overflow-x: auto;
+  background: #FFF8F6;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Drawer Backdrop & Mobile Header */
+.admin-drawer-overlay {
+  display: none;
+}
+
+/* Header riêng cho Drawer trên Mobile, ẩn hoàn toàn trên Desktop */
+.admin-drawer-mobile-header {
+  display: none !important;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1024px) {
+  .admin-drawer-mobile-header {
+    display: flex !important;
+  }
+
+  .admin-hamburger-btn {
+    display: flex;
+  }
+
+  .admin-header {
+    padding: 0 12px;
+    height: 58px;
+  }
+
+  .admin-header-center-clock {
+    display: none;
+  }
+
+  .admin-header-online-badge {
+    display: none !important;
+  }
+
+  /* Drawer Mobile Mode */
+  .admin-drawer-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .admin-drawer-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 1000;
+    background: #FFFFFF;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+  }
+
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .admin-main-content {
+    padding: 14px 10px;
+  }
+
+  /* Popover danh sách nhân sự ca trực: bung ngược lên trên widget, vừa vặn lọt lòng menu mobile */
+  .shift-status-popover {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: calc(100% + 8px) !important;
+    width: auto !important;
+    max-width: 100% !important;
+    max-height: 420px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+    border-radius: 16px !important;
+    z-index: 1050 !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-header {
+    height: 54px;
+    padding: 0 8px;
+  }
+
+  .admin-user-details {
+    display: none !important;
+  }
+
+  .admin-config-btn span {
+    display: none;
+  }
+
+  .admin-config-btn {
+    padding: 6px !important;
+    border-radius: 50% !important;
+  }
+
+  .admin-logout-btn span {
+    display: none;
+  }
+
+  .admin-logout-btn {
+    padding: 6px 10px !important;
+  }
+
+  .admin-main-content {
+    padding: 12px 8px;
+  }
+}
+
+/* Nút In ấn A4 lịch phân ca chỉ hiển thị trên Desktop, tự động ẩn trên màn hình điện thoại */
+.staff-print-btn-desktop-only {
+  display: flex !important;
+}
+
+@media (max-width: 768px) {
+  .staff-print-btn-desktop-only {
+    display: none !important;
+  }
+}

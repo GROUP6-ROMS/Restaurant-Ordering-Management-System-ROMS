@@ -1,27 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { customerApi } from '../../api/customerApi';
+import { tableApi } from '../../api/tableApi';
+import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
+import { broadcastRealtimeEvent } from '../../utils/realtimeSync';
 
-// Icon Material Symbols
-function Icon({ name, size = 22, fill = 0, style = {} }) {
-  return (
-    <span
-      className="material-icon"
-      style={{
-        fontSize: size,
-        fontVariationSettings: `'FILL' ${fill}, 'wght' 400, 'GRAD' 0, 'opsz' 24`,
-        lineHeight: 1, verticalAlign: 'middle',
-        ...style
-      }}
-    >
-      {name}
-    </span>
-  );
-}
+import Icon from '../../components/common/Icon';
 
 // Format tien VND
 function formatVND(amount) {
-  return amount.toLocaleString('vi-VN') + 'đ';
+  if (!amount && amount !== 0) return '0đ';
+  return Number(amount).toLocaleString('vi-VN') + 'đ';
 }
 
 // ====================================================
@@ -29,34 +19,193 @@ function formatVND(amount) {
 // ====================================================
 export default function CustomerCartPage() {
   const {
-    cartItems, updateQuantity, removeFromCart, clearCart,
+    cartItems, updateQuantity, removeFromCart, syncItemStock, clearCart,
     totalCount, totalPrice, tableInfo
   } = useCart();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderNote, setOrderNote] = useState('');
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [tableStatus, setTableStatus] = useState(tableInfo?.status || (sessionStorage.getItem('roms_dining_token') ? 'OCCUPIED' : 'AVAILABLE'));
+
+  useEffect(() => {
+    if (tableInfo?.status) setTableStatus(tableInfo.status);
+  }, [tableInfo?.status]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (event?.type === 'MENU_AVAILABILITY_CHANGED' && event?.payload) {
+        const { id, isAvailable, remainingStock } = event.payload;
+        syncItemStock(id, isAvailable, remainingStock);
+        return;
+      }
+      if (
+        (['TABLE_STATUS_CHANGED', 'TABLE_UPDATED', 'TABLE_UPDATE', 'DINING_SESSION_OPENED', 'BILL_PAID', 'SESSION_CLOSED'].includes(event.type)) &&
+        (Number(event.tableId) === Number(tableInfo?.tableId) || event.tableNumber === tableInfo?.tableNumber)
+      ) {
+        if (event.status === 'OCCUPIED') {
+          setTableStatus('OCCUPIED');
+          if (tableInfo?.token) {
+            tableApi.verifyQr(tableInfo.token).then(res => {
+              if (res.data?.success && res.data.data?.diningToken) {
+                sessionStorage.setItem('roms_dining_token', res.data.data.diningToken);
+              }
+            }).catch(console.error);
+          }
+          showToast('Bàn đã được nhân viên mở! Quý khách có thể gửi đơn đặt món.');
+        } else if (
+          event.type === 'BILL_PAID' ||
+          event.type === 'SESSION_CLOSED' ||
+          ['AVAILABLE', 'DIRTY', 'COMPLETED', 'CLOSED'].includes(event.status)
+        ) {
+          setTableStatus('AVAILABLE');
+          sessionStorage.removeItem('roms_dining_token');
+          clearCart();
+          const qrToken = tableInfo?.token || sessionStorage.getItem('roms_qr_token') || '';
+          showToast('Bữa ăn đã hoàn tất thanh toán. Cảm ơn quý khách!');
+          setTimeout(() => {
+            window.location.href = `/dining/welcome?table=${tableInfo?.tableId || ''}&token=${qrToken}`;
+          }, 1200);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [tableInfo?.tableId, tableInfo?.tableNumber, tableInfo?.token]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
     setToastVisible(true);
-    setTimeout(() => setToastVisible(false), 2000);
+    setTimeout(() => setToastVisible(false), 2500);
   };
 
-  // VAT 8%
-  const VAT_RATE = 0.08;
-  const vatAmount = Math.round(totalPrice * VAT_RATE);
-  const grandTotal = totalPrice + vatAmount;
+  // Giá niêm yết đã bao gồm thuế GTGT
+  const grandTotal = totalPrice;
 
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (cartItems.length === 0 || isSubmitting) return;
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+
+    const staffToken = sessionStorage.getItem('roms_token');
+    const isOccupied = tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED';
+
+    if (!isOccupied && !staffToken) {
+      showToast('Bàn ăn chưa được nhân viên phục vụ mở phiên (Check-in). Vui lòng nhấn "Gọi mở bàn" trước!');
+      return;
+    }
+
+    const diningToken = sessionStorage.getItem('roms_dining_token');
+    if (!diningToken && !staffToken) {
+      showToast('Vui lòng quét mã QR tại bàn để xác thực và gửi đơn gọi món!');
+      return;
+    }
+
+    if (!tableInfo?.tableId && !tableInfo?.tableNumber) {
+      showToast('Chưa xác định được thông tin bàn ăn. Vui lòng quét lại mã QR tại bàn!');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        tableId: tableInfo?.tableId,
+        tableNumber: tableInfo?.tableNumber,
+        guestCount: tableInfo?.guestCount || 2,
+        orderNote: orderNote.trim(),
+        items: cartItems.map(item => ({
+          menuItemId: item.id,
+          quantity: item.quantity,
+          note: item.note || ''
+        }))
+      };
+
+      const res = await customerApi.placeCustomerOrder(payload);
+
+      // Phát sự kiện liên thông thời gian thực sang Bếp KDS và Phục Vụ
+      broadcastRealtimeEvent({
+        type: 'NEW_ORDER_CREATED',
+        tableId: tableInfo?.tableId,
+        tableNumber: tableInfo?.tableNumber
+      });
+
       clearCart();
       navigate('/dining/orders/tracking?success=true');
-    }, 1200);
+    } catch (err) {
+      console.error('Lỗi khi gửi đơn đặt món:', err);
+      const msg = err.response?.data?.message || 'Không thể gửi đơn đặt món. Vui lòng thử lại hoặc gọi nhân viên!';
+      showToast(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const handleCallStaff = async () => {
+    try {
+      const tId = tableInfo?.tableId;
+      const tNum = tableInfo?.tableNumber || 'Bàn của bạn';
+      await customerApi.callWaiter({
+        tableId: tId,
+        tableNumber: tNum,
+        requestType: 'CALL_WAITER',
+        note: `Khách tại ${tNum} yêu cầu nhân viên hỗ trợ tại bàn`
+      });
+      broadcastRealtimeEvent({ type: 'CALL_WAITER', tableId: tId, tableNumber: tNum });
+      showToast(`Đã rung chuông gọi nhân viên cho ${tNum}!`);
+    } catch (err) {
+      showToast('Đã gửi yêu cầu hỗ trợ tới nhân viên phục vụ!');
+    }
+  };
+
+  const diningToken = sessionStorage.getItem('roms_dining_token');
+  const staffToken = sessionStorage.getItem('roms_token');
+  const isTableOccupied = (tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
+
+  const toastNode = (
+    <div className={`toast no-print ${toastVisible ? '' : 'hidden'}`}>
+      <Icon name="check_circle" size={18} style={{ color: 'var(--secondary-fixed-dim)' }} />
+      {toastMsg}
+    </div>
+  );
+
+  // Chờ nhân viên mở bàn - Chặn truy cập giỏ hàng nếu bàn chưa mở
+  if (!isTableOccupied) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        minHeight: 'calc(100dvh - 120px)', padding: '40px 20px',
+        textAlign: 'center',
+      }}>
+        {toastNode}
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%',
+          background: 'rgba(239, 68, 68, 0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 20,
+        }}>
+          <Icon name="lock" size={40} style={{ color: '#ef4444' }} />
+        </div>
+        <h2 style={{ fontFamily: 'Epilogue', fontWeight: 700, fontSize: 20, color: 'var(--on-surface)', marginBottom: 8 }}>
+          Chờ nhân viên mở bàn
+        </h2>
+        <p style={{ color: 'var(--on-surface-variant)', fontSize: 14, maxWidth: 320, marginBottom: 24, lineHeight: 1.5, fontFamily: 'Plus Jakarta Sans' }}>
+          Bàn của bạn hiện chưa được mở phiên phục vụ. Vui lòng liên hệ nhân viên hoặc bấm chuông gọi nhân viên để được hỗ trợ mở bàn trước khi xem và đặt món!
+        </p>
+        <button
+          onClick={handleCallStaff}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '14px 28px', borderRadius: '9999px',
+            background: 'var(--primary-container)', color: 'var(--on-primary)',
+            fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 14,
+            border: 'none', cursor: 'pointer', boxShadow: 'var(--shadow-primary)',
+          }}
+        >
+          <Icon name="notifications" size={18} />
+          Gọi nhân viên mở bàn
+        </button>
+      </div>
+    );
+  }
 
   // Trang gio hang trong
   if (cartItems.length === 0) {
@@ -67,6 +216,7 @@ export default function CustomerCartPage() {
         minHeight: 'calc(100dvh - 120px)', padding: '40px 16px',
         textAlign: 'center',
       }}>
+        {toastNode}
         <div style={{
           width: 80, height: 80, borderRadius: '50%',
           background: 'var(--surface-container)',
@@ -119,162 +269,181 @@ export default function CustomerCartPage() {
             marginRight: -32, marginTop: -32,
             pointerEvents: 'none',
           }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-            <div style={{
-              width: 48, height: 48, borderRadius: 14,
-              background: 'var(--primary)', color: 'var(--on-primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: 'var(--shadow-sm)', flexShrink: 0,
-            }}>
-              <Icon name="table_restaurant" size={26} fill={1} />
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <span style={{
+                fontFamily: 'Plus Jakarta Sans', fontWeight: 800, fontSize: 11,
+                color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
+                BÀN ĐANG PHỤC VỤ
+              </span>
+              <span className="pulse-dot" />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: 'var(--primary)',
-                  display: 'inline-block',
-                  animation: 'ping 1s cubic-bezier(0,0,0.2,1) infinite',
-                }} />
-                <span style={{
-                  fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 700,
-                  color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em',
-                }}>
-                  Đang dùng tại chỗ
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{
-                  fontFamily: 'Epilogue', fontWeight: 800, fontSize: 22,
-                  color: 'var(--primary)', letterSpacing: '-0.02em',
-                }}>
-                  {tableInfo?.tableNumber || 'Bàn T05'}
-                </span>
-                <span style={{
-                  fontSize: 13, fontWeight: 600,
-                  color: 'var(--on-surface-variant)',
-                  background: 'var(--surface-container)',
-                  padding: '2px 8px', borderRadius: 8,
-                  fontFamily: 'Plus Jakarta Sans',
-                }}>
-                  Tầng 1
-                </span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <h2 style={{
+                fontFamily: 'Epilogue', fontWeight: 800, fontSize: 24,
+                color: 'var(--on-surface)', lineHeight: 1.1,
+              }}>
+                {tableInfo?.isVip || tableInfo?.tableNumber?.toUpperCase().includes('VIP')
+                  ? `${tableInfo.tableNumber}${tableInfo?.tableName ? ` • ${tableInfo.tableName}` : ''}`
+                  : (tableInfo?.tableNumber || 'Bàn ăn')}
+              </h2>
+              <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 12, color: 'var(--on-surface-variant)' }}>
+                • {tableInfo?.guestCount || 2} Khách
+              </span>
             </div>
           </div>
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center',
-              padding: '4px 10px', borderRadius: '9999px',
-              background: 'var(--tertiary-fixed)',
-              color: 'var(--on-tertiary-fixed)',
-              fontFamily: 'Plus Jakarta Sans', fontSize: 12, fontWeight: 700,
-              boxShadow: 'var(--shadow-xs)',
-            }}>
-              {totalCount} món
-            </span>
+
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: 'var(--primary-fixed)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--primary)', boxShadow: 'var(--shadow-xs)',
+          }}>
+            <Icon name="restaurant_menu" size={24} />
           </div>
         </div>
       </div>
 
-      {/* --- Danh sach mon trong gio --- */}
-      <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* --- Section Header: Danh sach mon --- */}
+      <div style={{
+        padding: '16px 16px 8px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <h3 style={{
+          fontFamily: 'Epilogue', fontWeight: 700, fontSize: 16,
+          color: 'var(--on-surface)',
+        }}>
+          Các món đã chọn ({totalCount})
+        </h3>
+        <Link
+          to="/dining/menu"
+          style={{
+            fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: 700,
+            color: 'var(--primary)', textDecoration: 'none',
+            display: 'flex', alignItems: 'center', gap: 2,
+          }}
+        >
+          <Icon name="add" size={16} />
+          Chọn thêm món
+        </Link>
+      </div>
+
+      {/* --- Danh sach Cart Items --- */}
+      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {cartItems.map((item, idx) => (
           <div
-            key={`${item.id}-${item.note}-${idx}`}
+            key={`${item.id}-${idx}-${item.note || ''}`}
             style={{
               background: 'var(--surface-container-lowest)',
-              borderRadius: 16, padding: 14,
+              borderRadius: 16, padding: 12,
               border: '1px solid rgba(240, 230, 228, 0.6)',
-              boxShadow: 'var(--shadow-sm)',
-              display: 'flex', flexDirection: 'column', gap: 8,
-              transition: 'all 0.2s ease',
+              boxShadow: 'var(--shadow-xs)',
+              display: 'flex', flexDirection: 'column', gap: 10,
             }}
           >
-            {/* Row thong tin mon */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              {/* Anh mon */}
-              <div style={{
-                width: 80, height: 80, borderRadius: 10,
-                overflow: 'hidden', flexShrink: 0,
-                background: 'var(--surface-container)',
-                position: 'relative',
-              }}>
-                <img
-                  src={item.imageUrl}
-                  alt={item.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
-              {/* Ten + Gia */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <img
+                src={item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80'}
+                alt={item.name}
+                style={{
+                  width: 64, height: 64, borderRadius: 12,
+                  objectFit: 'cover', flexShrink: 0,
+                  background: 'var(--surface-container)',
+                }}
+                onError={(e) => {
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+                }}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4 }}>
-                  <h3 style={{
-                    fontFamily: 'Epilogue', fontWeight: 700, fontSize: 15,
-                    color: 'var(--on-surface)', lineHeight: '20px',
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
+                  <h4 style={{
+                    fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 14,
+                    color: 'var(--on-surface)', lineHeight: '18px',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    flex: 1,
                   }}>
                     {item.name}
-                  </h3>
+                  </h4>
                   <span style={{
                     fontFamily: 'Plus Jakarta Sans', fontWeight: 700, fontSize: 14,
-                    color: 'var(--primary)', flexShrink: 0,
-                    fontVariantNumeric: 'tabular-nums',
+                    color: 'var(--primary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
                   }}>
-                    {formatVND(item.price)}
+                    {formatVND(item.price * item.quantity)}
                   </span>
                 </div>
-                {/* Ghi chu */}
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6, marginTop: 4,
+                  color: 'var(--on-surface-variant)', fontFamily: 'Plus Jakarta Sans', fontSize: 11,
+                }}>
+                  <span>{formatVND(item.price)} / phần</span>
+                </div>
+
                 {item.note && (
                   <div style={{
-                    marginTop: 4,
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '3px 8px', borderRadius: '9999px',
-                    background: 'var(--surface-container)',
-                    color: 'var(--on-surface-variant)',
-                    width: 'fit-content',
+                    marginTop: 4, padding: '3px 8px', borderRadius: 6,
+                    background: 'var(--surface-container)', color: 'var(--on-surface-variant)',
+                    fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontStyle: 'italic',
+                    display: 'inline-block',
                   }}>
-                    <Icon name="check" size={12} style={{ color: 'var(--tertiary)' }} />
-                    <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 11, fontWeight: 400 }}>
-                      {item.note}
-                    </span>
+                    "{item.note}"
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Row Stepper + Xoa */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  color: 'var(--primary)', background: 'transparent', border: 'none',
-                  cursor: 'pointer', fontFamily: 'Plus Jakarta Sans', fontSize: 12, fontWeight: 600,
-                  padding: 0,
-                }}
-              >
-                <Icon name="tune" size={14} />
-                Tùy biến món ăn
-              </button>
+            {/* Controls */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              paddingTop: 8, borderTop: '1px solid var(--surface-container-high)',
+            }}>
+              <span style={{
+                color: 'var(--on-surface-variant)', fontFamily: 'Plus Jakarta Sans', fontSize: 12, fontWeight: 500
+              }}>
+                Số lượng:
+              </span>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {/* Stepper */}
-                <div className="stepper">
-                  <button
-                    className="stepper-btn"
-                    onClick={() => updateQuantity(item.id, item.note, -1)}
-                  >
-                    <Icon name="remove" size={15} />
-                  </button>
-                  <span className="stepper-count">{item.quantity}</span>
-                  <button
-                    className="stepper-btn"
-                    onClick={() => updateQuantity(item.id, item.note, 1)}
-                  >
-                    <Icon name="add" size={15} />
-                  </button>
-                </div>
+                {(() => {
+                  const totalForDish = cartItems
+                    .filter(i => Number(i.id) === Number(item.id))
+                    .reduce((s, i) => s + i.quantity, 0);
+                  const hasFinite = item.remainingStock !== null && item.remainingStock !== undefined;
+                  const atStockLimit = item.isAvailable === false || (hasFinite && totalForDish >= Number(item.remainingStock));
+                  return (
+                    <div className="stepper">
+                      <button
+                        className="stepper-btn"
+                        onClick={() => updateQuantity(item.id, item.note, -1)}
+                      >
+                        <Icon name="remove" size={15} />
+                      </button>
+                      <span className="stepper-count">{item.quantity}</span>
+                      <button
+                        className="stepper-btn"
+                        style={{
+                          opacity: atStockLimit ? 0.45 : 1,
+                          cursor: atStockLimit ? 'not-allowed' : 'pointer',
+                        }}
+                        onClick={() => {
+                          if (item.isAvailable === false) {
+                            showToast(`Món "${item.name}" hiện đã tạm ngưng phục vụ!`);
+                            return;
+                          }
+                          if (hasFinite && totalForDish >= Number(item.remainingStock)) {
+                            showToast(`Món "${item.name}" chỉ còn tối đa ${item.remainingStock} suất!`);
+                            return;
+                          }
+                          updateQuantity(item.id, item.note, 1);
+                        }}
+                      >
+                        <Icon name="add" size={15} />
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Nut xoa mon */}
                 <button
@@ -322,7 +491,9 @@ export default function CustomerCartPage() {
           </div>
           <textarea
             rows={2}
-            placeholder="Ví dụ: Mang sinh tố lên trước, sườn cắt sẵn..."
+            placeholder="Ví dụ: Mang sinh tố lên trước, sườn cắt sẵn, ít tiêu..."
+            value={orderNote}
+            onChange={e => setOrderNote(e.target.value)}
             style={{
               width: '100%',
               background: 'var(--surface-container-low)',
@@ -370,12 +541,11 @@ export default function CustomerCartPage() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Plus Jakarta Sans', fontSize: 14, color: 'var(--on-surface-variant)' }}>
-              Thuế VAT (8%)
-              <Icon name="help_outline" size={14} style={{ color: 'var(--outline)' }} />
+            <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 13, color: 'var(--on-surface-variant)', fontStyle: 'italic' }}>
+              Thuế GTGT
             </span>
-            <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 14, fontWeight: 500, color: 'var(--on-surface)' }}>
-              {formatVND(vatAmount)}
+            <span style={{ fontFamily: 'Plus Jakarta Sans', fontSize: 13, color: 'var(--on-surface-variant)', fontStyle: 'italic' }}>
+              Đã gồm trong giá món
             </span>
           </div>
 
@@ -419,12 +589,12 @@ export default function CustomerCartPage() {
           }}
         >
           <Icon name={isSubmitting ? 'autorenew' : 'send'} size={20} fill={1} />
-          {isSubmitting ? 'Đang gửi đơn...' : 'Gửi Đơn: Món Vào Bếp • Nước Cho Phục Vụ'}
+          {isSubmitting ? 'Đang chuyển đơn vào bếp...' : 'Gửi Đơn: Món Vào Bếp • Nước Cho Phục Vụ'}
         </button>
 
         {/* Nut goi nhan vien */}
         <button
-          onClick={() => showToast('Đang gọi nhân viên đến Bàn T05...')}
+          onClick={handleCallStaff}
           style={{
             width: '100%', height: 48, borderRadius: '9999px',
             background: 'var(--surface-container-lowest)', color: 'var(--secondary)',
@@ -449,10 +619,7 @@ export default function CustomerCartPage() {
       </div>
 
       {/* Toast */}
-      <div className={`toast ${toastVisible ? '' : 'hidden'}`}>
-        <Icon name="check_circle" size={18} style={{ color: 'var(--secondary-fixed-dim)' }} />
-        {toastMsg}
-      </div>
+      {toastNode}
     </div>
   );
 }
