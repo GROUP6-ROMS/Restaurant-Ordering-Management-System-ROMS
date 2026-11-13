@@ -301,8 +301,8 @@ export const broadcastRealtimeEvent = (eventData, extraData = {}) => {
   let payload;
   if (typeof eventData === 'string') {
     payload = {
-      type: eventData,
       ...(extraData && typeof extraData === 'object' ? extraData : {}),
+      type: eventData,
       timestamp: Date.now()
     };
   } else if (eventData && typeof eventData === 'object') {

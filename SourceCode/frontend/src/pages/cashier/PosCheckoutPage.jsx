@@ -11,6 +11,13 @@ import Icon from '../../components/common/Icon';
 import { QRCodeSVG } from 'qrcode.react';
 import { useDialog } from '../../context/DialogContext';
 
+const getLocalDateISO = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // Hàm sinh URL ảnh QR động chuẩn NAPAS 247
 const generateVietQrUrl = (amount, billCode, tableCode, profile) => {
   const bank = profile?.bankName || 'MB';
@@ -138,7 +145,7 @@ export default function PosCheckoutPage() {
   const [invoices, setInvoices] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
   const [historyMethodFilter, setHistoryMethodFilter] = useState('ALL');
-  const [historyDate, setHistoryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [historyDate, setHistoryDate] = useState(() => getLocalDateISO());
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [viewingHistoryInvoice, setViewingHistoryInvoice] = useState(null);
 
@@ -148,7 +155,7 @@ export default function PosCheckoutPage() {
     const hour = new Date().getHours();
     return (hour >= 6 && hour < 14) ? 'MORNING' : 'EVENING';
   });
-  const [shiftDate, setShiftDate] = useState(new Date().toISOString().split('T')[0]);
+  const [shiftDate, setShiftDate] = useState(() => getLocalDateISO());
   const [isLoadingShift, setIsLoadingShift] = useState(false);
   const [openingCash, setOpeningCash] = useState(() => {
     const saved = localStorage.getItem('roms_cashier_opening_cash');
@@ -181,7 +188,7 @@ export default function PosCheckoutPage() {
 
   const [denominations, setDenominations] = useState(() => {
     const initShift = (new Date().getHours() >= 6 && new Date().getHours() < 14) ? 'MORNING' : 'EVENING';
-    const initDate = new Date().toISOString().split('T')[0];
+    const initDate = getLocalDateISO();
     return getSavedDenominations(initShift, initDate);
   });
   const [isDenomSaved, setIsDenomSaved] = useState(true);

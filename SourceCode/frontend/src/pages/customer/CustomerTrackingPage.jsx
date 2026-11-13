@@ -99,7 +99,7 @@ export default function CustomerTrackingPage() {
 
     // Lắng nghe sự kiện realtime qua WebSocket STOMP & BroadcastChannel
     const unsubscribe = subscribeRealtimeEvents((event) => {
-      if (['ORDER_STATUS_CHANGED', 'ITEM_STATUS_UPDATED', 'NEW_ORDER_CREATED', 'CALL_WAITER', 'CALL_BILL', 'ORDER_UPDATE', 'TABLE_UPDATE', 'BILL_PAID', 'SESSION_CLOSED'].includes(event?.type)) {
+      if (['ORDER_STATUS_CHANGED', 'ITEM_STATUS_UPDATED', 'NEW_ORDER_CREATED', 'CALL_WAITER', 'CALL_BILL', 'PAYMENT_REQUEST', 'ORDER_UPDATE', 'TABLE_UPDATE', 'BILL_PAID', 'SESSION_CLOSED'].includes(event?.type)) {
         fetchTracking(true);
       }
     });
@@ -136,7 +136,13 @@ export default function CustomerTrackingPage() {
       const tNum = tableInfo?.tableNumber;
       await customerApi.requestPayment(tId, tNum, methodKey);
 
-      broadcastRealtimeEvent('CALL_WAITER', { tableId: tId, tableNumber: tNum, type: 'BILL' });
+      broadcastRealtimeEvent({
+        type: 'PAYMENT_REQUEST',
+        tableId: tId,
+        tableNumber: tNum,
+        tableName: tableInfo?.tableName || (tNum ? `Bàn ${tNum}` : undefined),
+        requestType: 'BILL'
+      });
       setPaymentSuccess(true);
       showToast(`Đã gửi yêu cầu thanh toán bằng [${methodName}] tới thu ngân POS!`);
     } catch (err) {
