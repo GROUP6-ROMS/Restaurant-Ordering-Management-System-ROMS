@@ -12,9 +12,9 @@ services:
       - MSSQL_PID=Developer
       - TZ=Asia/Ho_Chi_Minh
     ports:
-      # Bảo mật CSDL: Chỉ mở cổng 1433 trên localhost nội bộ (127.0.0.1), đóng hoàn toàn trước Internet công khai
-      # Khi cần kết nối từ máy cá nhân bằng SSMS/Azure Data Studio: sử dụng SSH Tunnel `ssh -L 1433:localhost:1433 root@222.255.184.250`
-      - "127.0.0.1:1433:1433"
+      # Bảo mật CSDL: Ánh xạ vào localhost 14333 trên máy host để tránh xung đột với SQL Server cài sẵn trên Windows (1433)
+      # Khi cần kết nối từ máy cá nhân bằng SSMS/Azure Data Studio: kết nối localhost,14333
+      - "127.0.0.1:14333:1433"
     volumes:
       - mssql-data:/var/opt/mssql
     healthcheck:
@@ -39,12 +39,13 @@ services:
     environment:
       - DB_PASSWORD=${DB_PASSWORD:-RomsPass123@2026}
       - TZ=Asia/Ho_Chi_Minh
-    entrypoint: >
-      bash -c "
-      echo 'Dang kiem tra va khoi tao database ROMS_DB...'
-      /opt/mssql-tools18/bin/sqlcmd -S database -U sa -P \"$${DB_PASSWORD}\" -C -Q \"IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = 'ROMS_DB') CREATE DATABASE ROMS_DB;\"
-      echo 'Database ROMS_DB da san sang!'
-      "
+    entrypoint:
+      - bash
+      - -c
+      - >
+        echo 'Dang kiem tra va khoi tao database ROMS_DB...' &&
+        /opt/mssql-tools18/bin/sqlcmd -S database -U sa -P "$${DB_PASSWORD}" -C -Q "IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = 'ROMS_DB') CREATE DATABASE ROMS_DB;" &&
+        echo 'Database ROMS_DB da san sang!'
     networks:
       - roms-net
 
