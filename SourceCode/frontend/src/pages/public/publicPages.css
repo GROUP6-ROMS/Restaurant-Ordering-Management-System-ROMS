@@ -71,14 +71,9 @@
     gap: 8px;
   }
 
-  /* Nút staff trên mobile: nhỏ gọn, viền cam sang trọng */
+  /* Nút staff trên mobile: ẩn khỏi thanh header để không bị tràn viền (đã có trong mobile drawer) */
   .public-header-btn-staff {
-    padding: 7px 12px !important;
-    font-size: 0.8rem !important;
-    gap: 5px !important;
-    background: #FFF8F6 !important;
-    border: 1.2px solid #FFDBC9 !important;
-    color: #9D4124 !important;
+    display: none !important;
   }
 
   .public-header-btn-primary {
@@ -370,12 +365,17 @@
   margin-bottom: 36px;
   flex-wrap: wrap;
   gap: 16px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .public-menu-categories-bar {
   display: flex;
   gap: 8px;
   overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding-bottom: 8px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;

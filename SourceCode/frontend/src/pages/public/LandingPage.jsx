@@ -54,16 +54,25 @@ export default function LandingPage() {
             if (c.items && Array.isArray(c.items)) {
               c.items.forEach(item => {
                 if (item.isAvailable !== false) {
+                  // Làm sạch tên món nếu dính hậu tố "(Tạm Hết Hàng)"
+                  const cleanName = (item.name || '').replace(/\s*\((?:Tạm Hết Hàng|Tạm Hết)\)/gi, '').trim();
+
+                  // Chuẩn hóa nhãn tag thân thiện, loại bỏ raw tag (86d)
+                  let cleanTag = item.tag || 'Bestseller';
+                  if (cleanTag.toLowerCase().includes('86d') || cleanTag.toLowerCase().includes('tạm hết')) {
+                    cleanTag = 'Tạm Hết Món';
+                  }
+
                   flatDishes.push({
                     id: item.id,
                     categoryId: c.categoryId,
                     categoryName: c.categoryName || 'Món Ngon',
-                    name: item.name,
+                    name: cleanName,
                     desc: item.description || 'Món ăn tinh hoa chế biến nóng sốt, chuẩn vị và đảm bảo vệ sinh an toàn thực phẩm.',
                     price: Number(item.price) || 0,
                     rating: '5.0',
-                    tag: item.tag || 'Bestseller',
-                    tagBg: item.tag?.toLowerCase().includes('bán chạy') || item.tag?.toLowerCase().includes('bestseller') ? '#9D4124' : '#596232',
+                    tag: cleanTag,
+                    tagBg: cleanTag === 'Tạm Hết Món' ? '#707973' : (cleanTag.toLowerCase().includes('bán chạy') || cleanTag.toLowerCase().includes('bestseller') ? '#9D4124' : '#596232'),
                     image: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80'
                   });
                 }
@@ -160,13 +169,84 @@ export default function LandingPage() {
 
   const activeDishes = menuItems.length > 0 ? menuItems : defaultDishes;
 
-  const filteredDishes = activeDishes.filter(d => {
-    if (selectedCategory === 'ALL') return true;
-    if (d.categoryId !== undefined) {
-      return d.categoryId === selectedCategory;
+  // 1. Động hóa dữ liệu món ăn trong Thẻ Vé Gọi Món (Hero Order Card) dựa trên menu thực tế của quán
+  const heroSampleOrder = React.useMemo(() => {
+    const list = activeDishes;
+    const mainDish = list.find(d =>
+      d.categoryName?.includes('Bò') ||
+      d.categoryName?.includes('Chính') ||
+      d.categoryName?.includes('Lẩu') ||
+      d.category === 'MAIN' ||
+      d.price >= 45000
+    ) || list[0];
+
+    const drinkDish = list.find(d =>
+      (d.categoryName?.includes('Uống') ||
+       d.categoryName?.includes('Trà') ||
+       d.categoryName?.includes('Cà Phê') ||
+       d.category === 'DRINK') &&
+      d.id !== mainDish?.id
+    ) || list[1] || list[0];
+
+    const item1 = {
+      name: mainDish?.name || 'Bò Wagyu A5 Nướng Đá',
+      qty: 2,
+      price: mainDish?.price || 55000,
+      total: (mainDish?.price || 55000) * 2
+    };
+
+    const item2 = {
+      name: drinkDish?.name || 'Trà Đào Cam Sả Tươi Mát',
+      qty: 2,
+      price: drinkDish?.price || 28000,
+      total: (drinkDish?.price || 28000) * 2
+    };
+
+    return {
+      tableLabel: 'BÀN T-01',
+      zone: 'Sảnh Chính • 4 Khách',
+      status: '● Đang Chế Biến KDS',
+      items: [item1, item2],
+      grandTotal: item1.total + item2.total
+    };
+  }, [activeDishes]);
+
+  // 2. Tinh tuyển chỉ hiển thị Món Ngon Tiêu Biểu / Được Yêu Thích Nhất (thay vì liệt kê toàn bộ thực đơn)
+  const signatureDishes = React.useMemo(() => {
+    const list = activeDishes;
+    // Lọc các món có tag nổi bật hoặc tiêu biểu
+    const featured = list.filter(d => {
+      const tagLower = (d.tag || '').toLowerCase();
+      return tagLower.includes('bestseller') ||
+             tagLower.includes('đặc sản') ||
+             tagLower.includes('bán chạy') ||
+             tagLower.includes('nổi bật') ||
+             tagLower.includes('thanh đạm') ||
+             tagLower.includes('đậm đà') ||
+             tagLower.includes('tụ họp') ||
+             tagLower.includes('giải nhiệt');
+    });
+
+    // Nếu số món có tag ít hơn 6, lấy bù thêm từ danh sách để đủ 6-8 món đại diện
+    if (featured.length < 6) {
+      const remaining = list.filter(d => !featured.some(f => f.id === d.id));
+      return [...featured, ...remaining.slice(0, 8 - featured.length)];
     }
-    return d.category === selectedCategory;
-  });
+    return featured.slice(0, 8); // Tối đa 8 món tiêu biểu nhất
+  }, [activeDishes]);
+
+  const filteredDishes = React.useMemo(() => {
+    const list = activeDishes;
+    if (selectedCategory === 'ALL') {
+      return signatureDishes;
+    }
+    // Khi chọn danh mục cụ thể (vd Khai vị, Món Bò...), hiển thị tối đa 4 món tiêu biểu của danh mục đó
+    const categoryDishes = list.filter(d => {
+      if (d.categoryId !== undefined) return d.categoryId === selectedCategory;
+      return d.category === selectedCategory;
+    });
+    return categoryDishes.slice(0, 4);
+  }, [selectedCategory, activeDishes, signatureDishes]);
 
   return (
     <div style={{ minHeight: '100vh', background: '#FFF8F6', color: '#1F1B1A', display: 'flex', flexDirection: 'column' }}>
@@ -512,27 +592,29 @@ export default function LandingPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ padding: '3px 9px', borderRadius: '8px', background: '#9D4124', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 800 }}>
-                    BÀN T-03
+                    {heroSampleOrder.tableLabel}
                   </span>
                   <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1F1B1A' }}>
-                    Sảnh Chính • 4 Khách
+                    {heroSampleOrder.zone}
                   </span>
                 </div>
                 <span style={{ fontSize: '0.72rem', color: '#596232', background: '#EFF2E5', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700 }}>
-                  ● Đang Chế Biến KDS
+                  {heroSampleOrder.status}
                 </span>
               </div>
 
-              {/* Realistic dishes inside the active ticket */}
+              {/* Realistic dishes inside the active ticket (Đồng bộ món ăn & giá thực tế) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', borderTop: '1px dashed #EAE0DE', paddingTop: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#1F1B1A' }}>2x Phở Bò Tái Nạm (Bếp nóng)</span>
-                  <span style={{ fontWeight: 700, color: '#9D4124' }}>110.000₫</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#1F1B1A' }}>2x Trà Đào Cam Sả Tươi Mát</span>
-                  <span style={{ fontWeight: 700, color: '#9D4124' }}>56.000₫</span>
-                </div>
+                {heroSampleOrder.items.map((it, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#1F1B1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '210px' }}>
+                      {it.qty}x {it.name}
+                    </span>
+                    <span style={{ fontWeight: 700, color: '#9D4124', flexShrink: 0, marginLeft: '8px' }}>
+                      {it.total.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+                ))}
               </div>
 
               {/* Total & Quick Pay Strip */}
@@ -547,7 +629,7 @@ export default function LandingPage() {
                 <div>
                   <span style={{ fontSize: '0.7rem', color: '#89726B', display: 'block' }}>Tổng cộng (VAT & Phí DV):</span>
                   <span style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.05rem', color: '#9D4124' }}>
-                    166.000₫
+                    {heroSampleOrder.grandTotal.toLocaleString('vi-VN')}₫
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FCF1EF', padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', color: '#9D4124', fontWeight: 700 }}>
@@ -573,7 +655,7 @@ export default function LandingPage() {
               Hương Vị Chuẩn Gu & Trải Nghiệm Ẩm Thực Tận Tâm
             </h2>
             <p style={{ fontSize: '0.98rem', color: '#56423D', lineHeight: 1.6, margin: '0 0 16px' }}>
-              Chào mừng quý khách đến với <strong>{restaurantProfile.brandName || 'Hệ Thống Ẩm Thực ROMS'}</strong>. Chúng tôi mang đến những bữa ăn ngon lành, nóng hổi với hương vị đặc trưng, giá cả phải chăng, thích hợp cho bữa trưa nhanh nhẹn, buổi họp mặt bạn bè hay bữa cơm sum vầy gia đình.
+              Chào mừng quý khách đến với <strong>{(restaurantProfile.brandName || 'Hệ Thống Ẩm Thực ROMS').trim()}</strong>. Chúng tôi mang đến những bữa ăn ngon lành, nóng hổi với hương vị đặc trưng, giá cả phải chăng, thích hợp cho bữa trưa nhanh nhẹn, buổi họp mặt bạn bè hay bữa cơm sum vầy gia đình.
             </p>
             <p style={{ fontSize: '0.92rem', color: '#89726B', lineHeight: 1.6, margin: '0 0 24px' }}>
               Mỗi đĩa món dọn lên bàn đều trải qua quy trình chế biến khắt khe: tuyển chọn nguồn thực phẩm tươi sạch mỗi ngày, nêm nếm đậm đà vừa miệng và được theo dõi chính xác qua hệ thống màn hình bếp KDS để phục vụ nhanh nhất, không để thực khách phải chờ đợi lâu.
@@ -648,7 +730,7 @@ export default function LandingPage() {
           </div>
 
           {/* Filter Pills */}
-          <div className="public-menu-categories-bar" style={{ background: '#F0E6E4', padding: '6px', borderRadius: '9999px' }}>
+          <div className="public-menu-categories-bar" style={{ background: '#F0E6E4', padding: '6px 10px', borderRadius: '9999px', maxWidth: '100%', boxSizing: 'border-box' }}>
             {(categories.length > 0
               ? [{ id: 'ALL', label: 'Tất cả món' }, ...categories]
               : [
@@ -714,7 +796,7 @@ export default function LandingPage() {
                   left: '12px',
                   padding: '4px 10px',
                   borderRadius: '9999px',
-                  background: dish.tagBg,
+                  background: dish.tag === 'Tạm Hết Món' ? '#707973' : dish.tagBg,
                   color: '#FFFFFF',
                   fontWeight: 700,
                   fontSize: '0.72rem'
@@ -769,6 +851,43 @@ export default function LandingPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Banner CTA dẫn tới Đặt bàn & Khám phá đầy đủ thực đơn */}
+        <div style={{
+          marginTop: '36px',
+          textAlign: 'center',
+          background: '#FFFFFF',
+          border: '1px solid #F0E6E4',
+          borderRadius: '24px',
+          padding: '24px 20px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+        }}>
+          <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.15rem', color: '#1F1B1A', marginBottom: '6px' }}>
+            Khám Phá Toàn Bộ Thực Đơn {restaurantProfile.brandName || 'Nhà Hàng'}
+          </div>
+          <p style={{ fontSize: '0.88rem', color: '#89726B', margin: '0 auto 16px', maxWidth: '560px', lineHeight: 1.5 }}>
+            Đây là danh sách các món ăn tiêu biểu được yêu thích nhất. Nhà hàng còn nhiều món ngon chuẩn vị khác đang chờ đón quý khách. Hãy đặt bàn ngay để thưởng thức trọn vẹn!
+          </p>
+          <Link
+            to="/reservation"
+            style={{
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              borderRadius: '9999px',
+              background: '#9D4124',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '0.9rem',
+              boxShadow: '0 4px 14px rgba(157,65,36,0.3)'
+            }}
+          >
+            <Icon name="calendar_month" size={18} />
+            <span>Đặt Bàn Giữ Chỗ & Xem Đầy Đủ Thực Đơn</span>
+          </Link>
         </div>
       </section>
 
@@ -862,9 +981,11 @@ export default function LandingPage() {
                 <div style={{ fontFamily: "'Epilogue', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#9D4124' }}>
                   {restaurantProfile.brandName || 'ROMS'}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#89726B', fontWeight: 600 }}>
-                  {restaurantProfile.name}
-                </div>
+                {restaurantProfile.name && (restaurantProfile.brandName || '').toLowerCase().trim() !== restaurantProfile.name.toLowerCase().trim() && (
+                  <div style={{ fontSize: '0.72rem', color: '#89726B', fontWeight: 600 }}>
+                    {restaurantProfile.name}
+                  </div>
+                )}
               </div>
             </div>
             <p style={{ fontSize: '0.85rem', color: '#56423D', lineHeight: 1.5, margin: 0 }}>
@@ -922,9 +1043,9 @@ export default function LandingPage() {
 
         {/* Bottom copyright line */}
         <div style={{ maxWidth: '1280px', margin: '20px auto 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#89726B', flexWrap: 'wrap', gap: '10px' }}>
-          <div>© {new Date().getFullYear()} {restaurantProfile.name}. Vận hành trên nền tảng ROMS Hospitality.</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span>Phục vụ từ {restaurantProfile.openingHours || '07:00 - 22:00'} hàng ngày</span>
+          <div>© {new Date().getFullYear()} {restaurantProfile.brandName || restaurantProfile.name || 'ROMS'}. Vận hành trên nền tảng ROMS Hospitality.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Phục vụ {restaurantProfile.openingHours || '07:00 - 22:00'} hàng ngày</span>
             <span>•</span>
             <Link to="/login" style={{ color: '#9D4124', textDecoration: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <Icon name="badge" size={15} />
