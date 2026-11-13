@@ -162,26 +162,20 @@ public class AuthServiceImpl implements AuthService {
                     );
                 }
 
-                // 6.2. Tìm ca trực: Ưu tiên ca khớp với giờ thực tế nếu nhân viên được phân nhiều ca trong ngày
+                // 6.2. Kiểm tra xem thời điểm hiện tại có nằm trong ca trực nào được phân công hôm nay không
                 StaffSchedule activeSchedule = todaySchedules.stream()
-                        .filter(s -> {
-                            if (s.getShiftType() == null) return false;
-                            LocalTime start = s.getShiftType().getStartTime();
-                            LocalTime end = s.getShiftType().getEndTime();
-                            if (start != null && end != null) {
-                                return !now.isBefore(start.minusMinutes(15)) && !now.isAfter(end);
-                            }
-                            return true;
-                        })
+                        .filter(s -> s.getShiftType() != null && s.getShiftType().isWithinShift(now))
                         .findFirst()
                         .orElse(null);
 
-                // Nếu ngoài khung giờ chuẩn nhưng đang trong giai đoạn test (ShiftType.isWithinShift trả về true), cho phép vào ca được xếp
+                // Nếu thời điểm đăng nhập nằm ngoài tất cả các ca trực được xếp hôm nay -> Ném ngoại lệ chặn đăng nhập
                 if (activeSchedule == null) {
-                    activeSchedule = todaySchedules.stream()
-                            .filter(s -> s.getShiftType() != null && s.getShiftType().isWithinShift(now))
-                            .findFirst()
-                            .orElse(todaySchedules.get(0));
+                    DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                    throw new AppException(
+                            String.format("Hiện tại (%s) không nằm trong khung giờ làm việc của bất kỳ ca trực nào bạn được phân công hôm nay (%s)! Vui lòng liên hệ Quản lý.",
+                                    now.format(timeFormatter), today.format(dateFormatter)),
+                            HttpStatus.FORBIDDEN
+                    );
                 }
 
                 currentShiftName = activeSchedule.getShiftType().name();

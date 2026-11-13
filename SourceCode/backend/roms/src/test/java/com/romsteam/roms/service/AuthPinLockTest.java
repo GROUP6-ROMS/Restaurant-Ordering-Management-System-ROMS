@@ -32,6 +32,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -168,22 +169,14 @@ class AuthPinLockTest {
     @Test
     @DisplayName("4. Nhập đúng mã PIN trước 5 lần: Reset số lần thử sai về 0")
     void testCorrectPinBeforeFiveAttempts_ResetsFailedCounter() {
+        testStaff.setRole(UserRole.MANAGER);
         testStaff.setFailedPinAttempts(3); // Từng nhập sai 3 lần
 
         when(staffRepository.findByUsername("EMP-001")).thenReturn(Optional.of(testStaff));
         when(passwordEncoder.matches("123456", testStaff.getPinCode())).thenReturn(true);
-        when(staffRepository.save(any(Staff.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Authentication mockAuth = mock(Authentication.class);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(mockAuth);
-
-        StaffSchedule schedule = StaffSchedule.builder()
-                .staff(testStaff)
-                .workDate(LocalDate.now())
-                .shiftType(ShiftType.MORNING)
-                .build();
-        when(staffScheduleRepository.findByStaffAndWorkDate(eq(testStaff), any(LocalDate.class)))
-                .thenReturn(List.of(schedule));
         when(jwtTokenProvider.generateToken(mockAuth)).thenReturn("mock-jwt-token-xyz");
 
         LoginRequest request = new LoginRequest();
@@ -196,6 +189,39 @@ class AuthPinLockTest {
         assertThat(response.getAccessToken()).isEqualTo("mock-jwt-token-xyz");
         assertThat(testStaff.getFailedPinAttempts()).isEqualTo(0);
         assertThat(testStaff.getLockedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("4.1. Nhân viên đăng nhập ngoài khung giờ ca trực: Bị từ chối với 403 FORBIDDEN")
+    void testStaffLogin_OutsideShiftHours_ThrowsForbiddenException() {
+        testStaff.setRole(UserRole.WAITER);
+
+        when(staffRepository.findByUsername("EMP-001")).thenReturn(Optional.of(testStaff));
+        when(passwordEncoder.matches("123456", testStaff.getPinCode())).thenReturn(true);
+
+        Authentication mockAuth = mock(Authentication.class);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(mockAuth);
+
+        // Giả lập ca trực không trùng với thời gian hiện tại
+        LocalTime now = LocalTime.now();
+        ShiftType oppositeShift = (now.isAfter(LocalTime.of(5, 45)) && now.isBefore(LocalTime.of(14, 0)))
+                ? ShiftType.EVENING : ShiftType.MORNING;
+
+        StaffSchedule schedule = StaffSchedule.builder()
+                .staff(testStaff)
+                .workDate(LocalDate.now())
+                .shiftType(oppositeShift)
+                .build();
+        when(staffScheduleRepository.findByStaffAndWorkDate(eq(testStaff), any(LocalDate.class)))
+                .thenReturn(List.of(schedule));
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("EMP-001");
+        request.setPinCode("123456");
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("không nằm trong khung giờ làm việc");
     }
 
     @Test

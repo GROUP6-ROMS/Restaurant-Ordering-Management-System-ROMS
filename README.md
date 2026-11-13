@@ -8,7 +8,7 @@
 [![MS SQL Server 2022](https://img.shields.io/badge/Database-MS_SQL_Server_2022-red.svg?logo=microsoftsqlserver&logoColor=white)](https://www.microsoft.com/sql-server)
 [![Docker Compose](https://img.shields.io/badge/Deploy-Docker_Compose-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF.svg?logo=githubactions&logoColor=white)](https://github.com/features/actions)
-[![Unit & Integration Tests](https://img.shields.io/badge/JUnit_5-84%2F84_Passed-success.svg?logo=junit5&logoColor=white)](https://junit.org/)
+[![Unit & Integration Tests](https://img.shields.io/badge/JUnit_5-89%2F89_Passed-success.svg?logo=junit5&logoColor=white)](https://junit.org/)
 [![License MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > 🎓 **Đồ án Tốt nghiệp / Môn học:** SWP391 — Software Development Project  
@@ -39,7 +39,7 @@
 |:---:|---|:---:|:---:|---|:---:|
 | **1** | **Dương Trong** | **DE200109** | **Team Leader** | • Kiến trúc Full-Stack, Thiết kế Database Relational & Migration DDL.<br>• Kiểm soát Concurrency: Pessimistic Write Lock, Idempotency Guards.<br>• Phân quyền RBAC Stateless JWT & Bảo mật Staff PIN BCrypt.<br>• Tích hợp Cổng thanh toán VietQR PayOS Webhook & CI/CD Cloud VPS. | [`@duogtrog06tk`](https://github.com/duogtrog06tk) |
 | **2** | **Phạm Minh Đức** | **DE200053** | **Backend Lead** | • Xây dựng nghiệp vụ Quản lý Thực đơn (Menu Management & Daily Stock).<br>• Phân hệ Thu ngân POS, Đối soát két tiền & Chốt ca (*Shift Settlement*).<br>• Tối ưu bộ nhớ đệm In-memory Caching Caffeine (<5ms latency).<br>• Báo cáo Doanh thu & Thống kê tài chính (*Reports & BI Analytics*). | [`@ducminh14-cmd`](https://github.com/ducminh14-cmd) |
-| **3** | **Ngô Viết Bảo Huy** | **DE200066** | **Frontend & QA Lead** | • Xây dựng Giao diện Điều phối Bếp KDS & Trạm Phục Vụ Waiter Mobile.<br>• Hệ thống Chuông Gọi Phục Vụ & WebSocket STOMP Event Bus.<br>• Tích hợp Trợ lý Gọi món AI (*ROMS Bot Multi-Model Failover*).<br>• Bộ kiểm thử tự động 84/84 Test Cases (JUnit 5, Mockito, Spring Test). | [`@ngo17574-ops`](https://github.com/ngo17574-ops) |
+| **3** | **Ngô Viết Bảo Huy** | **DE200066** | **Frontend & QA Lead** | • Xây dựng Giao diện Điều phối Bếp KDS & Trạm Phục Vụ Waiter Mobile.<br>• Hệ thống Chuông Gọi Phục Vụ & WebSocket STOMP Event Bus.<br>• Tích hợp Trợ lý Gọi món AI (*ROMS Bot Multi-Model Failover*).<br>• Bộ kiểm thử tự động 89/89 Test Cases (JUnit 5, Mockito, Spring Test). | [`@ngo17574-ops`](https://github.com/ngo17574-ops) |
 
 ---
 
@@ -269,7 +269,7 @@ Tại màn hình đăng nhập Nhân viên (`/staff/login`), bạn có thể s�
 Hệ thống được áp dụng phương pháp kiểm thử tự động nghiêm ngặt ở cả 2 đầu Backend và Frontend:
 
 ### 9.1. Backend Automated Testing (JUnit 5 + Mockito)
-Hệ thống sở hữu bộ kiểm thử đơn vị và kiểm thử tích hợp toàn diện gồm **84/84 Test Cases vượt qua 100%**:
+Hệ thống sở hữu bộ kiểm thử đơn vị và kiểm thử tích hợp toàn diện gồm **89/89 Test Cases vượt qua 100%**:
 - `OrderConcurrencyTest`: Kiểm tra tải đồng thời, chống Race Condition khi nhiều thread tranh chấp tồn kho món ăn.
 - `CashierServiceTest`: Kiểm tra tính toàn vẹn của nghiệp vụ hóa đơn, áp mã giảm giá và đối soát két chốt ca.
 - `CustomerAiServiceTest`: Kiểm tra Model Failover của Gemini API và logic phản hồi dự phòng thông minh.
@@ -304,7 +304,7 @@ Hệ thống tích hợp quy trình **Continuous Integration & Continuous Deploy
                ▼
    [STAGE 1: BACKEND CI]
    ├── Setup Java 21 LTS (Temurin)
-   ├── Build with Maven & Run 84/84 JUnit Tests
+   ├── Build with Maven & Run 89/89 JUnit Tests
    └── Verify Code Quality
                │
                ▼
