@@ -486,8 +486,8 @@ export default function WaiterOrderDetailPage() {
           <span style={{ fontWeight: 800, color: '#1F1B1A' }}>{tableData.guests} người lớn</span>
         </div>
         <div>
-          <span style={{ color: '#89726B', display: 'block', fontSize: '0.72rem' }}>Thời gian vào bàn:</span>
-          <span style={{ fontWeight: 800, color: '#1F1B1A' }}>{tableData.timeIn} (45 phút)</span>
+          <span style={{ color: '#89726B', display: 'block', fontSize: '0.72rem' }}>Thời gian phục vụ:</span>
+          <span style={{ fontWeight: 800, color: '#1F1B1A' }}>{tableData.timeIn}</span>
         </div>
         <div>
           <span style={{ color: '#89726B', display: 'block', fontSize: '0.72rem' }}>Nhân viên phục vụ:</span>
