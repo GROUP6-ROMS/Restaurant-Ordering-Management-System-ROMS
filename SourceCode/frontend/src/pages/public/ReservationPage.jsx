@@ -292,11 +292,28 @@ export default function ReservationPage() {
   };
 
   // Pre-order handlers
+  const hasFiniteStock = (dish) => Boolean(dish && dish.remainingStock !== null && dish.remainingStock !== undefined);
+
   const handleAddDish = (dish) => {
-    if (dish.isOutOfStock) return;
+    if (!dish || dish.isOutOfStock || dish.isAvailable === false) return;
+    if (hasFiniteStock(dish) && Number(dish.remainingStock) <= 0) return;
+
+    const existing = preOrderItems.find(i => i.id === dish.id);
+    if (existing && hasFiniteStock(dish) && existing.qty >= Number(dish.remainingStock)) {
+      showAlert({
+        title: 'Giới hạn số lượng phục vụ',
+        message: `Món "${dish.name}" hiện chỉ còn ${dish.remainingStock} phần sẵn sàng phục vụ!`,
+        type: 'warning'
+      });
+      return;
+    }
+
     setPreOrderItems(prev => {
-      const existing = prev.find(i => i.id === dish.id);
-      if (existing) {
+      const prevExisting = prev.find(i => i.id === dish.id);
+      if (prevExisting) {
+        if (hasFiniteStock(dish) && prevExisting.qty >= Number(dish.remainingStock)) {
+          return prev;
+        }
         return prev.map(i => i.id === dish.id ? { ...i, qty: i.qty + 1 } : i);
       }
       return [...prev, { ...dish, qty: 1, note: '' }];
@@ -304,12 +321,27 @@ export default function ReservationPage() {
   };
 
   const handleUpdateDishQty = (dishId, delta) => {
-    const targetDish = menuDishes.find(d => d.id === dishId);
-    if (delta > 0 && targetDish?.isOutOfStock) return;
+    const targetDish = menuDishes.find(d => d.id === dishId) || preOrderItems.find(i => i.id === dishId);
+    if (delta > 0) {
+      if (targetDish?.isOutOfStock || targetDish?.isAvailable === false) return;
+      const currentItem = preOrderItems.find(i => i.id === dishId);
+      const currentQty = currentItem?.qty || 0;
+      if (hasFiniteStock(targetDish) && currentQty + delta > Number(targetDish.remainingStock)) {
+        showAlert({
+          title: 'Giới hạn số lượng phục vụ',
+          message: `Món "${targetDish.name}" hiện chỉ còn ${targetDish.remainingStock} phần sẵn sàng phục vụ!`,
+          type: 'warning'
+        });
+        return;
+      }
+    }
     setPreOrderItems(prev => {
       return prev.map(i => {
         if (i.id === dishId) {
           const next = i.qty + delta;
+          if (delta > 0 && hasFiniteStock(targetDish) && next > Number(targetDish.remainingStock)) {
+            return i;
+          }
           return next > 0 ? { ...i, qty: next } : null;
         }
         return i;
@@ -1395,7 +1427,9 @@ export default function ReservationPage() {
                               >
                                 <Icon name="lock" size={15} /> Đã khóa
                               </button>
-                            ) : selected ? (
+                            ) : selected ? (() => {
+                              const isMaxPreOrder = hasFiniteStock(dish) && selected.qty >= Number(dish.remainingStock);
+                              return (
                               <div className="preorder-qty-group">
                                 <button
                                   type="button"
@@ -1410,12 +1444,17 @@ export default function ReservationPage() {
                                   type="button"
                                   onClick={() => handleUpdateDishQty(dish.id, 1)}
                                   className="preorder-btn-plus"
-                                  title="Tăng số lượng"
+                                  style={{
+                                    opacity: isMaxPreOrder ? 0.45 : 1,
+                                    cursor: isMaxPreOrder ? 'not-allowed' : 'pointer'
+                                  }}
+                                  title={isMaxPreOrder ? `Chỉ còn tối đa ${dish.remainingStock} phần` : 'Tăng số lượng'}
                                 >
                                   +
                                 </button>
                               </div>
-                            ) : (
+                              );
+                            })() : (
                               <button
                                 type="button"
                                 onClick={() => handleAddDish(dish)}
