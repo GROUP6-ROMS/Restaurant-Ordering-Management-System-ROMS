@@ -60,7 +60,7 @@ public class EmailServiceImpl implements EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
 
-            helper.setFrom(fromEmail, "ROMS Restaurant System");
+            helper.setFrom(fromEmail, "ROMS Restaurant");
             helper.setTo(toEmail.trim());
             helper.setSubject("[ROMS] Mã xác thực OTP đặt lại mã PIN Quản lý: " + otp);
 
@@ -170,7 +170,7 @@ public class EmailServiceImpl implements EmailService {
         });
     }
 
-    private String buildOtpHtmlContent(String recipientName, String otp) {
+    String buildOtpHtmlContent(String recipientName, String otp) {
         return """
             <!DOCTYPE html>
             <html lang="vi">
@@ -200,14 +200,14 @@ public class EmailServiceImpl implements EmailService {
                   <p>Hệ Thống Quản Lý & Vận Hành Nhà Hàng Thông Minh</p>
                 </div>
                 <div class="body">
-                  <div class="greeting">Xin chào %s,</div>
+                  <div class="greeting">Xin chào {{RECIPIENT_NAME}},</div>
                   <div class="desc">
                     Hệ thống nhận được yêu cầu đặt lại mã PIN đăng nhập cho tài khoản Quản lý cơ sở của bạn.
                     Dưới đây là mã xác thực OTP dùng một lần để hoàn tất quy trình:
                   </div>
                   <div class="otp-box">
                     <div class="otp-label">MÃ XÁC THỰC OTP CỦA BẠN</div>
-                    <div class="otp-code">%s</div>
+                    <div class="otp-code">{{OTP}}</div>
                     <div class="otp-note">⏱ Mã có hiệu lực trong vòng 5 phút</div>
                   </div>
                   <div class="warning">
@@ -220,13 +220,20 @@ public class EmailServiceImpl implements EmailService {
               </div>
             </body>
             </html>
-            """.formatted(recipientName, otp);
+            """
+            .replace("{{RECIPIENT_NAME}}", recipientName != null ? recipientName : "Quản lý")
+            .replace("{{OTP}}", otp != null ? otp : "------");
     }
 
-    private String buildReservationCreatedHtml(Reservation r) {
+    String buildReservationCreatedHtml(Reservation r) {
         String timeStr = r.getReservationTime() != null ? r.getReservationTime().format(VI_DATETIME_FORMATTER) : "Chưa xác định";
         String preOrderHtml = buildPreOrderItemsHtml(r);
         String zoneText = resolveZoneDisplayName(r.getRequestedZone());
+        String guestStr = (r.getGuestCount() != null ? r.getGuestCount() : 1) + " khách";
+
+        String noteRow = (r.getNote() != null && !r.getNote().trim().isEmpty())
+                ? "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\">" + r.getNote().trim() + "</span></div>"
+                : "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\" style=\"color: #89726B; font-weight: normal;\">Không có</span></div>";
 
         return """
             <!DOCTYPE html>
@@ -264,50 +271,50 @@ public class EmailServiceImpl implements EmailService {
                 </div>
                 <div class="body-content">
                   <span class="badge-pill">⏳ ĐÃ TIẾP NHẬN YÊU CẦU ĐẶT BÀN</span>
-                  <div class="greeting-text">Kính chào Quý khách %s,</div>
+                  <div class="greeting-text">Kính chào Quý khách {{CUSTOMER_NAME}},</div>
                   <div class="intro-text">
                     Cảm ơn Quý khách đã tin tưởng lựa chọn <b>ROMS Restaurant</b>. Hệ thống đã tiếp nhận thành công yêu cầu đặt bàn của Quý khách. Đội ngũ Quản lý nhà hàng đang kiểm tra sơ đồ bàn và sẽ liên hệ xác nhận trong thời gian sớm nhất!
                   </div>
 
                   <div class="booking-code-box">
                     <div class="booking-code-label">MÃ ĐẶT CHỖ CỦA QUÝ KHÁCH</div>
-                    <div class="booking-code-value">%s</div>
+                    <div class="booking-code-value">{{BOOKING_CODE}}</div>
                     <div style="font-size: 12px; color: #89726B; margin-top: 6px;">Vui lòng lưu lại mã này để nhân viên đối soát khi đến nhà hàng</div>
                   </div>
 
                   <div class="details-table-card">
                     <div class="detail-row">
                       <span class="detail-label">👤 Khách hàng:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{CUSTOMER_NAME}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">📞 Số điện thoại:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{CUSTOMER_PHONE}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">✉️ Email thông báo:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{CUSTOMER_EMAIL}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">📅 Thời gian hẹn:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{RESERVATION_TIME}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">👥 Số lượng khách:</span>
-                      <span class="detail-val">%d khách</span>
+                      <span class="detail-val">{{GUEST_COUNT}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">📍 Khu vực mong muốn:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{ZONE_NAME}}</span>
                     </div>
-                    %s
+                    {{NOTE_ROW}}
                     <div class="detail-row">
                       <span class="detail-label">⚡ Trạng thái:</span>
                       <span class="detail-val" style="color: #B45309;">Chờ Quản lý xác nhận & xếp bàn</span>
                     </div>
                   </div>
 
-                  %s
+                  {{PRE_ORDER_HTML}}
 
                   <div class="next-steps-box">
                     💡 <b>Quy trình tiếp theo:</b> Quản lý ROMS Restaurant sẽ nhanh chóng bố trí vị trí bàn phù hợp nhất theo yêu cầu của Quý khách. Ngay sau khi xếp bàn xong, hệ thống sẽ tự động gửi <b>Email Thông Báo Xác Nhận Kèm Vị Trí Bàn Cụ Thể</b> đến hộp thư này.
@@ -321,26 +328,28 @@ public class EmailServiceImpl implements EmailService {
               </div>
             </body>
             </html>
-            """.formatted(
-                r.getCustomerName(),
-                r.getBookingCode(),
-                r.getCustomerName(),
-                r.getCustomerPhone(),
-                r.getCustomerEmail() != null ? r.getCustomerEmail() : "Chưa cập nhật",
-                timeStr,
-                r.getGuestCount() != null ? r.getGuestCount() : 1,
-                zoneText,
-                (r.getNote() != null && !r.getNote().trim().isEmpty())
-                        ? "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\">" + r.getNote().trim() + "</span></div>"
-                        : "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\" style=\"color: #89726B; font-weight: normal;\">Không có</span></div>",
-                preOrderHtml
-        );
+            """
+            .replace("{{CUSTOMER_NAME}}", r.getCustomerName() != null ? r.getCustomerName() : "Quý khách")
+            .replace("{{BOOKING_CODE}}", r.getBookingCode() != null ? r.getBookingCode() : "N/A")
+            .replace("{{CUSTOMER_PHONE}}", r.getCustomerPhone() != null ? r.getCustomerPhone() : "Chưa cập nhật")
+            .replace("{{CUSTOMER_EMAIL}}", r.getCustomerEmail() != null ? r.getCustomerEmail() : "Chưa cập nhật")
+            .replace("{{RESERVATION_TIME}}", timeStr)
+            .replace("{{GUEST_COUNT}}", guestStr)
+            .replace("{{ZONE_NAME}}", zoneText)
+            .replace("{{NOTE_ROW}}", noteRow)
+            .replace("{{PRE_ORDER_HTML}}", preOrderHtml);
     }
 
-    private String buildReservationConfirmedHtml(Reservation r, String tableNumber, String zoneName) {
+    String buildReservationConfirmedHtml(Reservation r, String tableNumber, String zoneName) {
         String timeStr = r.getReservationTime() != null ? r.getReservationTime().format(VI_DATETIME_FORMATTER) : "Chưa xác định";
         String preOrderHtml = buildPreOrderItemsHtml(r);
-        String finalZoneName = (zoneName != null && !zoneName.trim().isEmpty()) ? zoneName : "Khu vực tiêu chuẩn";
+        String finalTable = (tableNumber != null && !tableNumber.trim().isEmpty()) ? tableNumber.trim() : "Bàn tiêu chuẩn";
+        String finalZoneName = (zoneName != null && !zoneName.trim().isEmpty()) ? zoneName.trim() : "Khu vực tiêu chuẩn";
+        String guestStr = (r.getGuestCount() != null ? r.getGuestCount() : 1) + " khách";
+
+        String noteRow = (r.getNote() != null && !r.getNote().trim().isEmpty())
+                ? "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\">" + r.getNote().trim() + "</span></div>"
+                : "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\" style=\"color: #89726B; font-weight: normal;\">Không có</span></div>";
 
         return """
             <!DOCTYPE html>
@@ -380,57 +389,57 @@ public class EmailServiceImpl implements EmailService {
                 </div>
                 <div class="body-content">
                   <span class="badge-pill">✅ ĐÃ XÁC NHẬN & ĐÃ XẾP BÀN</span>
-                  <div class="greeting-text">Kính chào Quý khách %s,</div>
+                  <div class="greeting-text">Kính chào Quý khách {{CUSTOMER_NAME}},</div>
                   <div class="intro-text">
                     ROMS Restaurant trân trọng thông báo yêu cầu đặt bàn của Quý khách đã được Quản lý duyệt và <b>xếp vị trí bàn thành công</b>. Chúng tôi đã hoàn tất chuẩn bị để chào đón Quý khách và đoàn khách!
                   </div>
 
                   <div class="table-box-highlight">
                     <div class="table-box-title">VỊ TRÍ BÀN ĂN DÀNH RIÊNG CHO BẠN</div>
-                    <div class="table-box-name">Bàn %s</div>
-                    <div class="table-box-desc">📍 Phân khu: %s</div>
+                    <div class="table-box-name">Bàn {{TABLE_NUMBER}}</div>
+                    <div class="table-box-desc">📍 Phân khu: {{ZONE_NAME}}</div>
                   </div>
 
                   <div class="details-table-card">
                     <div class="detail-row">
                       <span class="detail-label">🏷️ Mã đặt chỗ:</span>
-                      <span class="detail-val" style="font-family: monospace; font-size: 16px; color: #059669;">%s</span>
+                      <span class="detail-val" style="font-family: monospace; font-size: 16px; color: #059669;">{{BOOKING_CODE}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">👤 Khách hàng:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{CUSTOMER_NAME}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">📞 Số điện thoại:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{CUSTOMER_PHONE}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">📅 Thời gian hẹn đón:</span>
-                      <span class="detail-val">%s</span>
+                      <span class="detail-val">{{RESERVATION_TIME}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">👥 Số lượng khách:</span>
-                      <span class="detail-val">%d khách</span>
+                      <span class="detail-val">{{GUEST_COUNT}}</span>
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">🪑 Vị trí đã bố trí:</span>
-                      <span class="detail-val" style="color: #065F46;">Bàn %s (%s)</span>
+                      <span class="detail-val" style="color: #065F46;">Bàn {{TABLE_NUMBER}} ({{ZONE_NAME}})</span>
                     </div>
-                    %s
+                    {{NOTE_ROW}}
                     <div class="detail-row">
                       <span class="detail-label">⚡ Trạng thái:</span>
                       <span class="detail-val" style="color: #059669;">Đã xác nhận & Khóa giữ chỗ an toàn</span>
                     </div>
                   </div>
 
-                  %s
+                  {{PRE_ORDER_HTML}}
 
                   <div class="safe-lock-box">
-                    🛡️ <b>Cam kết giữ chỗ an toàn (Buffer Lock):</b> Bàn ăn <b>%s</b> được kích hoạt chế độ khóa độc quyền trước 60 phút và nhà hàng cam kết bảo lưu giữ chỗ tối đa trong vòng <b>45 phút</b> kể từ giờ hẹn.
+                    🛡️ <b>Cam kết giữ chỗ an toàn (Buffer Lock):</b> Bàn ăn <b>{{TABLE_NUMBER}}</b> được kích hoạt chế độ khóa độc quyền trước 60 phút và nhà hàng cam kết bảo lưu giữ chỗ tối đa trong vòng <b>45 phút</b> kể từ giờ hẹn.
                   </div>
 
                   <div class="reception-box">
-                    🛎️ <b>Hướng dẫn khi đến nhà hàng:</b> Khi đến ROMS Restaurant, Quý khách chỉ cần đọc <b>Mã đặt chỗ (%s)</b> hoặc <b>Số điện thoại (%s)</b> tại quầy Lễ tân / Thu ngân để được nhân viên dẫn trực tiếp vào bàn đã chuẩn bị sẵn sàng.
+                    🛎️ <b>Hướng dẫn khi đến nhà hàng:</b> Khi đến ROMS Restaurant, Quý khách chỉ cần đọc <b>Mã đặt chỗ ({{BOOKING_CODE}})</b> hoặc <b>Số điện thoại ({{CUSTOMER_PHONE}})</b> tại quầy Lễ tân / Thu ngân để được nhân viên dẫn trực tiếp vào bàn đã chuẩn bị sẵn sàng.
                   </div>
                 </div>
                 <div class="footer-bar">
@@ -441,29 +450,21 @@ public class EmailServiceImpl implements EmailService {
               </div>
             </body>
             </html>
-            """.formatted(
-                r.getCustomerName(),
-                tableNumber,
-                finalZoneName,
-                r.getBookingCode(),
-                r.getCustomerName(),
-                r.getCustomerPhone(),
-                timeStr,
-                r.getGuestCount() != null ? r.getGuestCount() : 1,
-                tableNumber,
-                finalZoneName,
-                (r.getNote() != null && !r.getNote().trim().isEmpty())
-                        ? "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\">" + r.getNote().trim() + "</span></div>"
-                        : "<div class=\"detail-row\"><span class=\"detail-label\">📝 Ghi chú:</span><span class=\"detail-val\" style=\"color: #89726B; font-weight: normal;\">Không có</span></div>",
-                preOrderHtml,
-                tableNumber,
-                r.getBookingCode(),
-                r.getCustomerPhone()
-        );
+            """
+            .replace("{{CUSTOMER_NAME}}", r.getCustomerName() != null ? r.getCustomerName() : "Quý khách")
+            .replace("{{TABLE_NUMBER}}", finalTable)
+            .replace("{{ZONE_NAME}}", finalZoneName)
+            .replace("{{BOOKING_CODE}}", r.getBookingCode() != null ? r.getBookingCode() : "N/A")
+            .replace("{{CUSTOMER_PHONE}}", r.getCustomerPhone() != null ? r.getCustomerPhone() : "Chưa cập nhật")
+            .replace("{{RESERVATION_TIME}}", timeStr)
+            .replace("{{GUEST_COUNT}}", guestStr)
+            .replace("{{NOTE_ROW}}", noteRow)
+            .replace("{{PRE_ORDER_HTML}}", preOrderHtml);
     }
 
-    private String buildReservationCancelledHtml(Reservation r, String cancelReason) {
+    String buildReservationCancelledHtml(Reservation r, String cancelReason) {
         String timeStr = r.getReservationTime() != null ? r.getReservationTime().format(VI_DATETIME_FORMATTER) : "Chưa xác định";
+        String reason = (cancelReason != null && !cancelReason.trim().isEmpty()) ? cancelReason.trim() : "Quản lý cập nhật theo yêu cầu khách hàng";
 
         return """
             <!DOCTYPE html>
@@ -492,13 +493,13 @@ public class EmailServiceImpl implements EmailService {
                 </div>
                 <div class="body-content">
                   <span class="badge-pill">❌ ĐÃ HỦY ĐƠN ĐẶT BÀN</span>
-                  <div class="greeting-text">Kính chào Quý khách %s,</div>
+                  <div class="greeting-text">Kính chào Quý khách {{CUSTOMER_NAME}},</div>
                   <div class="intro-text">
-                    ROMS Restaurant rất tiếc phải thông báo đơn đặt bàn mang mã <b>#%s</b> (hẹn lúc %s) đã được hủy trên hệ thống.
+                    ROMS Restaurant rất tiếc phải thông báo đơn đặt bàn mang mã <b>#{{BOOKING_CODE}}</b> (hẹn lúc {{RESERVATION_TIME}}) đã được hủy trên hệ thống.
                   </div>
 
                   <div class="cancel-reason-box">
-                    <b>Lý do hủy:</b> %s
+                    <b>Lý do hủy:</b> {{CANCEL_REASON}}
                   </div>
 
                   <p style="font-size: 14px; color: #56423D; line-height: 1.6;">
@@ -512,12 +513,11 @@ public class EmailServiceImpl implements EmailService {
               </div>
             </body>
             </html>
-            """.formatted(
-                r.getCustomerName(),
-                r.getBookingCode(),
-                timeStr,
-                (cancelReason != null && !cancelReason.trim().isEmpty()) ? cancelReason.trim() : "Quản lý cập nhật theo yêu cầu khách hàng"
-        );
+            """
+            .replace("{{CUSTOMER_NAME}}", r.getCustomerName() != null ? r.getCustomerName() : "Quý khách")
+            .replace("{{BOOKING_CODE}}", r.getBookingCode() != null ? r.getBookingCode() : "N/A")
+            .replace("{{RESERVATION_TIME}}", timeStr)
+            .replace("{{CANCEL_REASON}}", reason);
     }
 
     private String buildPreOrderItemsHtml(Reservation r) {
