@@ -75,7 +75,7 @@
 
   .waiter-foh-header-row {
     display: flex;
-    justifyContent: space-between;
+    justify-content: space-between;
     align-items: center;
     width: 100%;
   }
