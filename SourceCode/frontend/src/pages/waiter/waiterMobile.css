@@ -46,7 +46,7 @@
     min-height: 175px !important;
     display: flex !important;
     flex-direction: column !important;
-    justifyContent: space-between !important;
+    justify-content: space-between !important;
     height: 100% !important;
     box-sizing: border-box !important;
     min-width: 0 !important;
@@ -75,7 +75,7 @@
 
   .waiter-foh-header-row {
     display: flex;
-    justifyContent: space-between;
+    justify-content: space-between;
     align-items: center;
     width: 100%;
   }
@@ -115,7 +115,7 @@
     color: #56423D;
     display: flex;
     align-items: center;
-    justifyContent: center;
+    justify-content: center;
     gap: 6px;
     transition: all 0.2s ease;
   }
