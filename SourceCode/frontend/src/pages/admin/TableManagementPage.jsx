@@ -737,6 +737,60 @@ export default function TableManagementPage() {
     };
   }, [cardMenuTableId]);
 
+  // Lắng nghe phím ESC để đóng nhanh popup đang mở và Khóa cuộn trang nền khi có modal (Scroll Lock & LIFO ESC Handler)
+  const isAnyModalOpen = Boolean(
+    showAddModal || showEditModal || showDeleteModal || showZoneModal ||
+    showDeleteZoneConfirm || showBatchQrModal || selectedQrTable ||
+    orderDrawerTable || showAddOrderModal || showPreCheckBillModal ||
+    showTransferModal || showMergeModal || showReservationModal ||
+    showCheckInModal || showForceModal || showPreOrderModal ||
+    showCancelResModal || showAssignModal || statusModalTable
+  );
+
+  useEffect(() => {
+    if (!isAnyModalOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        // Ưu tiên đóng các modal con lồng nhau trước theo thứ tự LIFO (Last-In-First-Out)
+        if (showDeleteZoneConfirm) { setShowDeleteZoneConfirm(false); setDeletingZone(null); return; }
+        if (showPreOrderModal) { setShowPreOrderModal(false); setSelectedResForPreOrder(null); return; }
+        if (showCancelResModal) { setShowCancelResModal(false); setSelectedResForCancel(null); return; }
+        if (showAssignModal) { setShowAssignModal(false); setSelectedResForAssign(null); return; }
+        if (showAddOrderModal) { setShowAddOrderModal(false); setOrderCart([]); setOrderAddNote(''); return; }
+        if (showPreCheckBillModal) { setShowPreCheckBillModal(false); setPreCheckBillData(null); return; }
+        if (showTransferModal) { setShowTransferModal(false); setTransferSourceTable(null); return; }
+        if (showMergeModal) { setShowMergeModal(false); setMergeSourceTable(null); return; }
+        if (showCheckInModal) { setShowCheckInModal(false); setCheckInModalTable(null); return; }
+        if (showForceModal) { setShowForceModal(false); setForceModalTable(null); return; }
+        if (showDeleteModal) { setShowDeleteModal(false); setDeletingTable(null); return; }
+        if (showEditModal) { setShowEditModal(false); setEditTableData(null); return; }
+        if (showAddModal) { setShowAddModal(false); return; }
+        if (statusModalTable) { setStatusModalTable(null); return; }
+        if (selectedQrTable) { setSelectedQrTable(null); return; }
+        if (showBatchQrModal) { setShowBatchQrModal(false); return; }
+        if (showZoneModal) { setShowZoneModal(false); return; }
+        if (showReservationModal) { setShowReservationModal(false); return; }
+        if (orderDrawerTable) { setOrderDrawerTable(null); setActiveOrdersData(null); return; }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    isAnyModalOpen, showAddModal, showEditModal, showDeleteModal, showZoneModal,
+    showDeleteZoneConfirm, showBatchQrModal, selectedQrTable, orderDrawerTable,
+    showAddOrderModal, showPreCheckBillModal, showTransferModal, showMergeModal,
+    showReservationModal, showCheckInModal, showForceModal, showPreOrderModal,
+    showCancelResModal, showAssignModal, statusModalTable
+  ]);
+
   // Lắng nghe sự kiện đồng bộ thời gian thực từ chuông gọi phục vụ, xin thanh toán và đơn món
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((event) => {
@@ -2732,7 +2786,9 @@ export default function TableManagementPage() {
 
       {/* MODAL 1: XEM & XUẤT ẢNH TEM BÀN MICA/DECAL CAO CẤP */}
       {selectedQrTable && (
-        <div style={{
+        <div
+          onClick={() => { setSelectedQrTable(null); }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -2745,9 +2801,12 @@ export default function TableManagementPage() {
           justifyContent: 'center',
           zIndex: 1000,
           padding: '16px',
-          overflowY: 'auto'
-        }}>
-          <div style={{
+          overflowY: 'auto',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '460px',
@@ -2756,7 +2815,8 @@ export default function TableManagementPage() {
             boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
             position: 'relative',
             maxHeight: '92vh',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Nút đóng */}
             <button
@@ -3043,7 +3103,9 @@ export default function TableManagementPage() {
 
       {/* MODAL 2: THÊM BÀN MỚI (Đã loại bỏ shape hoàn toàn) */}
       {showAddModal && (
-        <div style={{
+        <div
+          onClick={() => { setShowAddModal(false); }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -3055,15 +3117,21 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '460px',
             width: '100%',
             padding: '28px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3198,7 +3266,9 @@ export default function TableManagementPage() {
 
       {/* MODAL 3: CÀI ĐẶT TRẠNG THÁI BÀN (KHÓA / ĐẶT CHỖ / DỌN DẸP) */}
       {statusModalTable && (
-        <div style={{
+        <div
+          onClick={() => { setStatusModalTable(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -3207,16 +3277,22 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '460px',
             width: '100%',
             padding: '28px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            position: 'relative'
+            position: 'relative',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <button
               type="button"
@@ -3445,7 +3521,9 @@ export default function TableManagementPage() {
 
       {/* MODAL 4: CHỈNH SỬA THÔNG TIN BÀN ĂN */}
       {showEditModal && editTableData && (
-        <div style={{
+        <div
+          onClick={() => { setShowEditModal(false); setEditTableData(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.6)',
@@ -3454,15 +3532,21 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '460px',
             width: '100%',
             padding: '28px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3598,7 +3682,9 @@ export default function TableManagementPage() {
 
       {/* MODAL 5: XÁC NHẬN XÓA BÀN ĂN */}
       {showDeleteModal && deletingTable && (
-        <div style={{
+        <div
+          onClick={() => { setShowDeleteModal(false); setDeletingTable(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -3607,16 +3693,22 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '420px',
             width: '100%',
             padding: '28px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            textAlign: 'center'
+            textAlign: 'center',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <div style={{
               width: '56px',
@@ -4217,7 +4309,9 @@ export default function TableManagementPage() {
 
       {/* MODAL 6: IN TEM BÀN MÃ QR TOÀN NHÀ HÀNG (KHỔ GIẤY A4) */}
       {showBatchQrModal && (
-        <div style={{
+        <div
+          onClick={() => { setShowBatchQrModal(false); }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -4231,10 +4325,13 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'flex-start',
           padding: '20px',
-          overflowY: 'auto'
-        }}>
+          overflowY: 'auto',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
           {/* Header thanh công cụ in ấn (ẩn khi in thực tế qua CSS no-print) */}
-          <div className="no-print" style={{
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="no-print" style={{
             background: '#FFFFFF',
             borderRadius: '16px',
             padding: '16px 24px',
@@ -4249,7 +4346,8 @@ export default function TableManagementPage() {
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
             position: 'sticky',
             top: 0,
-            zIndex: 10
+            zIndex: 10,
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
@@ -4587,7 +4685,9 @@ export default function TableManagementPage() {
 
       {/* MODAL: QUẢN LÝ KHU VỰC (ZONE CRUD) */}
       {showZoneModal && (
-        <div style={{
+        <div
+          onClick={() => { setShowZoneModal(false); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -4596,9 +4696,12 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1050,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: zoneModalMode === 'LIST' ? '780px' : '520px',
@@ -4607,7 +4710,8 @@ export default function TableManagementPage() {
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Modal Header */}
             <div style={{
@@ -4988,7 +5092,9 @@ export default function TableManagementPage() {
 
       {/* MODAL: XÁC NHẬN XÓA KHU VỰC */}
       {showDeleteZoneConfirm && deletingZone && (
-        <div style={{
+        <div
+          onClick={() => { setShowDeleteZoneConfirm(false); setDeletingZone(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -4997,16 +5103,22 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '420px',
             width: '100%',
             padding: '28px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            textAlign: 'center'
+            textAlign: 'center',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <div style={{
               width: '56px',
@@ -5121,7 +5233,9 @@ export default function TableManagementPage() {
       {/* MODAL 1: DUYỆT & QUẢN LÝ DANH SÁCH ĐẶT BÀN TRỰC TUYẾN             */}
       {/* ================================================================= */}
       {showReservationModal && (
-        <div style={{
+        <div
+          onClick={() => { setShowReservationModal(false); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -5130,9 +5244,12 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1050,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '1000px',
@@ -5141,7 +5258,8 @@ export default function TableManagementPage() {
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Modal Header */}
             <div style={{
@@ -5876,7 +5994,9 @@ export default function TableManagementPage() {
       {/* MODAL 2: GỢI Ý & CHỌN BÀN ĂN KHẢ DỤNG ĐỂ GÁN (ASSIGN TABLE MODAL) */}
       {/* ================================================================= */}
       {showAssignModal && selectedResForAssign && (
-        <div style={{
+        <div
+          onClick={() => { setShowAssignModal(false); setSelectedResForAssign(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -5885,9 +6005,12 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '680px',
@@ -5896,7 +6019,8 @@ export default function TableManagementPage() {
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Header */}
             <div style={{
@@ -6273,7 +6397,9 @@ export default function TableManagementPage() {
       {/* MODAL 3: XÁC NHẬN HỦY ĐƠN ĐẶT BÀN                                 */}
       {/* ================================================================= */}
       {showCancelResModal && selectedResForCancel && (
-        <div style={{
+        <div
+          onClick={() => { setShowCancelResModal(false); setSelectedResForCancel(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -6282,15 +6408,21 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1100,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '460px',
             width: '100%',
             padding: '24px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.25)'
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <div style={{
               width: '52px',
@@ -6423,7 +6555,9 @@ export default function TableManagementPage() {
       {/* MODAL 4: KIỂM TRA & ĐIỀU CHỈNH MÓN ĐẶT TRƯỚC (PRE-ORDER DISHES)    */}
       {/* ================================================================= */}
       {showPreOrderModal && selectedResForPreOrder && (
-        <div style={{
+        <div
+          onClick={() => { setShowPreOrderModal(false); setSelectedResForPreOrder(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -6433,9 +6567,12 @@ export default function TableManagementPage() {
           justifyContent: 'center',
           zIndex: 1100,
           padding: '20px',
-          overflowY: 'auto'
-        }}>
-          <div style={{
+          overflowY: 'auto',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '1050px',
@@ -6445,7 +6582,8 @@ export default function TableManagementPage() {
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 24px 48px rgba(0,0,0,0.25)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Modal Header */}
             <div style={{
@@ -7077,7 +7215,9 @@ export default function TableManagementPage() {
       {/* MODAL 7: GỌI THÊM MÓN VÀO BÀN TRỰC TIẾP (MANAGER ADD ORDER)   */}
       {/* ============================================================= */}
       {showAddOrderModal && orderDrawerTable && (
-        <div style={{
+        <div
+          onClick={() => { setShowAddOrderModal(false); setOrderCart([]); setOrderAddNote(''); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
@@ -7086,9 +7226,12 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '20px',
-          backdropFilter: 'blur(4px)'
-        }}>
-          <div style={{
+          backdropFilter: 'blur(4px)',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '20px',
             width: '100%',
@@ -7097,7 +7240,8 @@ export default function TableManagementPage() {
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Modal Header */}
             <div style={{
@@ -7728,7 +7872,9 @@ export default function TableManagementPage() {
       {/* MODAL 9: XEM TRƯỚC VÀ IN PHIẾU TẠM TÍNH (PRE-CHECK BILL K80)  */}
       {/* ============================================================= */}
       {showPreCheckBillModal && (
-        <div style={{
+        <div
+          onClick={() => { setShowPreCheckBillModal(false); setPreCheckBillData(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
@@ -7737,9 +7883,12 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '20px',
-          backdropFilter: 'blur(3px)'
-        }}>
-          <div style={{
+          backdropFilter: 'blur(3px)',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '20px',
             width: '100%',
@@ -7748,7 +7897,8 @@ export default function TableManagementPage() {
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Header Modal */}
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #F0E6E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF7F5' }}>
@@ -7906,7 +8056,9 @@ export default function TableManagementPage() {
 
       {/* MODAL CHECK-IN ĐÓN KHÁCH ĐẶT BÀN (STEP 3: BUFFER LOCK CHECK-IN) */}
       {showCheckInModal && checkInModalTable && (
-        <div style={{
+        <div
+          onClick={() => { setShowCheckInModal(false); setCheckInModalTable(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -7915,16 +8067,22 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1050,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '520px',
             width: '100%',
             padding: '28px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            position: 'relative'
+            position: 'relative',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <button
               type="button"
@@ -8104,7 +8262,9 @@ export default function TableManagementPage() {
 
       {/* MODAL CẢNH BÁO MỞ CƯỠNG CHẾ KHÁCH VÃNG LAI (STEP 3: FORCE OVERRIDE) */}
       {showForceModal && forceModalTable && (
-        <div style={{
+        <div
+          onClick={() => { setShowForceModal(false); setForceModalTable(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.65)',
@@ -8113,16 +8273,22 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1050,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '500px',
             width: '100%',
             padding: '28px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            position: 'relative'
+            position: 'relative',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             <button
               type="button"
@@ -8255,7 +8421,9 @@ export default function TableManagementPage() {
       {/* MODAL: CHUYỂN BÀN (TABLE TRANSFER - STEP 4)                   */}
       {/* ============================================================= */}
       {showTransferModal && transferSourceTable && (
-        <div style={{
+        <div
+          onClick={() => { setShowTransferModal(false); setTransferSourceTable(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
@@ -8264,9 +8432,12 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 10050,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '680px',
@@ -8276,7 +8447,8 @@ export default function TableManagementPage() {
             flexDirection: 'column',
             boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Header Modal */}
             <div style={{
@@ -8643,7 +8815,9 @@ export default function TableManagementPage() {
       {/* MODAL: GỘP BÀN (TABLE MERGE - STEP 4)                         */}
       {/* ============================================================= */}
       {showMergeModal && mergeSourceTable && (
-        <div style={{
+        <div
+          onClick={() => { setShowMergeModal(false); setMergeSourceTable(null); }}
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
@@ -8652,9 +8826,12 @@ export default function TableManagementPage() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 10050,
-          padding: '20px'
-        }}>
-          <div style={{
+          padding: '20px',
+            animation: 'romsOverlayFadeIn 0.2s ease-out'
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: '#FFFFFF',
             borderRadius: '24px',
             maxWidth: '680px',
@@ -8664,7 +8841,8 @@ export default function TableManagementPage() {
             flexDirection: 'column',
             boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'romsModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Header Modal */}
             <div style={{
