@@ -476,12 +476,12 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         String bufferLockBookingCode = null;
         Integer bufferLockPreOrderCount = 0;
         Integer bufferLockGuestCount = null;
+        Reservation nextUpcomingRes = null;
 
         List<Reservation> confirmedReservations = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(table.getId(), ReservationStatus.CONFIRMED);
         if (confirmedReservations != null && !confirmedReservations.isEmpty()) {
             LocalDateTime nowTime = LocalDateTime.now();
             Reservation activeBufferRes = null;
-            Reservation nextUpcomingRes = null;
 
             for (Reservation r : confirmedReservations) {
                 if (r.getReservationTime() == null) continue;
@@ -537,12 +537,26 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
         }
 
         // Xác định trạng thái phản hồi hiệu lực:
-        // Nếu bàn đang trong khung khóa an toàn (isBufferLocked) mà bàn đang AVAILABLE thì hiển thị RESERVED
+        // 1. Nếu bàn đang trong khung khóa an toàn (isBufferLocked):
+        //    Nếu bàn đang AVAILABLE -> hiển thị RESERVED ("Đã Đặt")
+        // 2. Nếu bàn KHÔNG trong khung khóa an toàn (!isBufferLocked):
+        //    Nếu trong DB bàn đang mang trạng thái RESERVED do đơn đặt trước (nhưng giờ hẹn còn xa > 60'),
+        //    thì bàn thực tế vẫn là AVAILABLE ("Bàn Trống") để phục vụ khách vãng lai,
+        //    chỉ hiển thị banner thông tin lịch hẹn tiếp theo (bufferLockTargetTime).
         TableStatus responseStatus = table.getStatus();
         String responseStatusText = statusText;
-        if (isBufferLocked && responseStatus == TableStatus.AVAILABLE) {
-            responseStatus = TableStatus.RESERVED;
-            responseStatusText = "Đã Đặt";
+        if (isBufferLocked) {
+            if (responseStatus == TableStatus.AVAILABLE) {
+                responseStatus = TableStatus.RESERVED;
+                responseStatusText = "Đã Đặt";
+            }
+        } else {
+            if (responseStatus == TableStatus.RESERVED && nextUpcomingRes != null) {
+                responseStatus = TableStatus.AVAILABLE;
+                responseStatusText = "Bàn Trống";
+                table.setStatus(TableStatus.AVAILABLE);
+                tableRepository.save(table);
+            }
         }
 
         // Tạo link gọi món thực tế dẫn tới màn hình chào bàn của khách (ưu tiên domain công khai)
