@@ -180,7 +180,6 @@ export default function StaffManagementPage() {
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
 
   // Modals
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
@@ -231,13 +230,7 @@ export default function StaffManagementPage() {
     isActive: true
   });
 
-  const { showConfirm, showAlert, showToast: globalShowToast } = useDialog();
-
-  const showToast = (msg, type = 'success') => {
-    globalShowToast(msg, type);
-    setToastMessage(typeof msg === 'string' ? msg : msg?.message);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const { showConfirm, showAlert, showToast } = useDialog();
 
   // ===================================================================
   // API FETCH CALLS
@@ -1094,27 +1087,6 @@ export default function StaffManagementPage() {
 
   return (
     <div style={{ maxWidth: '1360px', margin: '0 auto', paddingBottom: '40px' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '80px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFF8F6',
-          padding: '12px 18px',
-          borderRadius: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-          animation: 'slideDown 0.25s ease-out'
-        }}>
-          <Icon name="check_circle" size={20} fill={1} style={{ color: '#FFB68C' }} />
-          <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Header Title Area */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>

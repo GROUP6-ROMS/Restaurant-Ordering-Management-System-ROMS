@@ -288,6 +288,33 @@ export default function TableWelcomePage() {
     );
   }
 
+  const toastNode = toastMessage && (
+    <div className="no-print" style={{
+      position: 'fixed',
+      bottom: '24px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 100001,
+      background: '#1F1B1A',
+      color: '#FFFFFF',
+      padding: '12px 20px',
+      borderRadius: '16px',
+      boxShadow: '0 12px 30px rgba(0,0,0,0.3)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      fontWeight: 700,
+      fontSize: '0.85rem',
+      maxWidth: '90%',
+      width: 'max-content',
+      borderLeft: '4px solid #9D4124',
+      animation: 'fadeIn 0.2s ease-out'
+    }}>
+      <Icon name="notifications_active" size={20} style={{ color: '#E8C3BA' }} />
+      <span>{toastMessage}</span>
+    </div>
+  );
+
   // Màn hình cảnh báo mã QR hết hạn hoặc không hợp lệ
   if (verifyError) {
     return (
@@ -301,6 +328,7 @@ export default function TableWelcomePage() {
         padding: '24px',
         textAlign: 'center'
       }}>
+        {toastNode}
         <div style={{
           width: '72px',
           height: '72px',
@@ -376,32 +404,7 @@ export default function TableWelcomePage() {
       position: 'relative'
     }}>
       {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFFFFF',
-          padding: '12px 20px',
-          borderRadius: '16px',
-          boxShadow: '0 12px 30px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 700,
-          fontSize: '0.85rem',
-          maxWidth: '90%',
-          width: 'max-content',
-          borderLeft: '4px solid #9D4124',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
-          <Icon name="notifications_active" size={20} style={{ color: '#E8C3BA' }} />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {toastNode}
 
       {/* TOP BRAND & TABLE IDENTIFICATION (SCR-09) */}
       <header style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', paddingTop: '4px' }}>

@@ -8,7 +8,7 @@ import './waiterMobile.css';
 
 export default function WaiterOrderDetailPage() {
   const navigate = useNavigate();
-  const { showConfirm, showAlert } = useDialog();
+  const { showConfirm, showAlert, showToast } = useDialog();
   const [searchParams] = useSearchParams();
   const tableCodeParam = searchParams.get('table');
 
@@ -130,7 +130,6 @@ export default function WaiterOrderDetailPage() {
   const [selectedCat, setSelectedCat] = useState('ALL');
   const [searchDish, setSearchDish] = useState('');
   const [cartToAdd, setCartToAdd] = useState([]);
-  const [toastMessage, setToastMessage] = useState(null);
   const [mobileModalTab, setMobileModalTab] = useState('CATALOG'); // 'CATALOG' | 'CART'
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
 
@@ -140,10 +139,6 @@ export default function WaiterOrderDetailPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
 
   const handleRequestPayment = async () => {
     if (!tableData.id) return;
@@ -300,29 +295,6 @@ export default function WaiterOrderDetailPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', paddingBottom: isMobile ? '135px' : '24px' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '24px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFFFFF',
-          padding: '12px 20px',
-          borderRadius: '12px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 600,
-          fontSize: '0.9rem',
-          borderLeft: '4px solid #9D4124'
-        }}>
-          <Icon name="check_circle" size={20} style={{ color: '#E8C3BA' }} />
-          <span>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Header with Back button and Table Title */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>

@@ -101,7 +101,7 @@ export default function PosCheckoutPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const restaurantProfile = useRestaurantProfile();
-  const { showConfirm, showAlert } = useDialog();
+  const { showConfirm, showAlert, showToast } = useDialog();
 
   // Navigation tab chính: 'POS' | 'HISTORY' | 'SHIFT'
   const [activePosTab, setActivePosTab] = useState('POS');
@@ -254,7 +254,6 @@ export default function PosCheckoutPage() {
   const [showVietQrModal, setShowVietQrModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
-  const [toastMessage, setToastMessage] = useState(null);
 
   // Trạng thái thanh toán payOS VietQR thời gian thực
   const [payOsData, setPayOsData] = useState(null);
@@ -299,13 +298,6 @@ export default function PosCheckoutPage() {
     selectedTableIdRef.current = selectedTableId;
   }, [selectedTableId]);
 
-  // Toast notification
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3200);
-  };
 
   // 1. Tải danh mục Khu vực & Menu món ăn từ CSDL
   useEffect(() => {
@@ -1132,27 +1124,6 @@ export default function PosCheckoutPage() {
         }
       `}</style>
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '72px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFF8F6',
-          padding: '12px 18px',
-          borderRadius: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-          animation: 'slideDown 0.25s ease-out'
-        }}>
-          <Icon name="check_circle" size={20} fill={1} style={{ color: '#FFB68C' }} />
-          <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{toastMessage}</span>
-        </div>
-      )}
 
       {/* POS Top Tabs Navigation */}
       <div style={{

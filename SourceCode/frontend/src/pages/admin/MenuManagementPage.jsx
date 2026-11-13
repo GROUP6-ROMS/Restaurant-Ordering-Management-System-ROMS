@@ -41,7 +41,6 @@ export default function MenuManagementPage() {
   // Modals
   const [showAddDishModal, setShowAddDishModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
 
   // State Modal Quản lý danh mục
   const [newCatName, setNewCatName] = useState('');
@@ -62,14 +61,7 @@ export default function MenuManagementPage() {
     imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500'
   });
 
-  const { showConfirm, showAlert, showToast: globalShowToast } = useDialog();
-
-  // Hiển thị thông báo Toast
-  const showToast = (msg, type = 'success') => {
-    globalShowToast(msg, type);
-    setToastMessage(typeof msg === 'string' ? msg : msg?.message);
-    setTimeout(() => setToastMessage(null), 3200);
-  };
+  const { showConfirm, showAlert, showToast } = useDialog();
 
   // Quản lý tải lên hình ảnh từ thiết bị
   const editFileInputRef = useRef(null);
@@ -490,27 +482,6 @@ export default function MenuManagementPage() {
 
   return (
     <div style={{ maxWidth: '1360px', margin: '0 auto', paddingBottom: '40px' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '80px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFF8F6',
-          padding: '12px 20px',
-          borderRadius: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-          animation: 'slideDown 0.25s ease-out'
-        }}>
-          <Icon name="check_circle" size={20} fill={1} style={{ color: '#FFB68C' }} />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>

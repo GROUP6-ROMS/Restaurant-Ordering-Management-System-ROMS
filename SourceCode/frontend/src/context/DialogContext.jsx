@@ -3,6 +3,44 @@ import Icon from '../components/common/Icon';
 
 const DialogContext = createContext();
 
+/**
+ * Infer a semantic toast variant when callers pass only a plain message string.
+ */
+function inferToastType(text) {
+  const normalized = String(text || '').toLowerCase();
+  if (
+    normalized.includes('❌') ||
+    normalized.includes('lỗi') ||
+    normalized.includes('thất bại') ||
+    normalized.includes('không thể') ||
+    normalized.includes('không hợp lệ') ||
+    normalized.includes('từ chối') ||
+    normalized.includes('chưa nhận được') ||
+    normalized.includes('quá hạn')
+  ) {
+    return 'error';
+  }
+  if (
+    normalized.includes('⚠️') ||
+    normalized.includes('cảnh báo') ||
+    normalized.includes('vui lòng') ||
+    normalized.includes('tồn kho') ||
+    normalized.includes('hết món') ||
+    normalized.includes('tạm hết') ||
+    normalized.includes('chưa ')
+  ) {
+    return 'warning';
+  }
+  if (
+    normalized.includes('🔔') ||
+    normalized.includes('đang chờ') ||
+    normalized.includes('đang xử lý')
+  ) {
+    return 'info';
+  }
+  return 'success';
+}
+
 export function DialogProvider({ children }) {
   // State quản lý Hộp thoại Modal (Alert / Confirm)
   const [dialog, setDialog] = useState(null);
@@ -68,10 +106,10 @@ export function DialogProvider({ children }) {
   /**
    * Hiển thị Toast thông báo nổi trên góc màn hình Web (In-App Toast UI)
    */
-  const showToast = useCallback((msg, type = 'success', duration = 3500) => {
+  const showToast = useCallback((msg, type, duration = 3500) => {
     const id = Date.now() + Math.random().toString(36).substring(2, 6);
     const text = typeof msg === 'string' ? msg : msg?.message || 'Thông báo hệ thống';
-    const toastType = typeof msg === 'object' && msg?.type ? msg.type : type;
+    const toastType = (typeof msg === 'object' && msg?.type) ? msg.type : (type || inferToastType(text));
 
     setToasts((prev) => [...prev, { id, text, type: toastType }]);
 
@@ -173,6 +211,7 @@ export function DialogProvider({ children }) {
         const cfg = getTypeConfig(dialog.type);
         return (
           <div
+            className="no-print"
             style={{
               position: 'fixed',
               inset: 0,
@@ -323,15 +362,16 @@ export function DialogProvider({ children }) {
       {/* =================================================================== */}
       {toasts.length > 0 && (
         <div
+          className="no-print"
           style={{
             position: 'fixed',
             top: '20px',
-            right: '20px',
+            right: '16px',
             zIndex: 100001,
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
-            maxWidth: '380px',
+            maxWidth: 'min(380px, calc(100vw - 32px))',
             pointerEvents: 'none'
           }}
         >

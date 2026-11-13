@@ -11,6 +11,7 @@ import { useRestaurantProfile } from '../../utils/restaurantConfig';
 import { QRCodeCanvas } from 'qrcode.react';
 import JSZip from 'jszip';
 import { generateStandeeCanvas, downloadTableStandeePng } from '../../utils/tableStandeeGenerator';
+import { useDialog } from '../../context/DialogContext';
 
 // Helper chuẩn hóa hiển thị thông tin khách đặt bàn (loại bỏ tiền tố trùng lặp)
 const formatCustomerReservation = (info) => {
@@ -21,6 +22,7 @@ const formatCustomerReservation = (info) => {
 export default function TableManagementPage() {
   const location = useLocation();
   const restaurantProfile = useRestaurantProfile();
+  const { showToast } = useDialog();
   const [tables, setTables] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,6 @@ export default function TableManagementPage() {
   const [selectedQrTable, setSelectedQrTable] = useState(null);
   const [cardMenuTableId, setCardMenuTableId] = useState(null); // Menu 3 chấm tác vụ bàn
   const [showAddModal, setShowAddModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
   // State ngăn kéo (Drawer) xem nhanh Order tại bàn
   const [orderDrawerTable, setOrderDrawerTable] = useState(null); // Bàn đang chọn xem đơn
   const [activeOrdersData, setActiveOrdersData] = useState(null); // Dữ liệu món lấy từ API
@@ -247,10 +248,6 @@ export default function TableManagementPage() {
   const [catalogCatFilter, setCatalogCatFilter] = useState('ALL');
   const [savePreOrderLoading, setSavePreOrderLoading] = useState(false);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
 
   // ===================================================================
   // 1. TẢI DỮ LIỆU TỪ BACKEND QUA API
@@ -1547,29 +1544,6 @@ export default function TableManagementPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '24px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFFFFF',
-          padding: '12px 20px',
-          borderRadius: '12px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 600,
-          fontSize: '0.9rem',
-          borderLeft: '4px solid #9D4124'
-        }}>
-          <Icon name="check_circle" size={20} style={{ color: '#E8C3BA' }} />
-          <span>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Header & Quick Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>

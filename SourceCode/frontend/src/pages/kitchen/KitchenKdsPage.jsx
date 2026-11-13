@@ -3,6 +3,7 @@ import { kitchenApi } from '../../api/kitchenApi';
 import { subscribeRealtimeEvents } from '../../utils/realtimeSync';
 
 import Icon from '../../components/common/Icon';
+import { useDialog } from '../../context/DialogContext';
 
 // Đồng hồ đếm thời gian - trả về số giây đã trôi qua
 function useElapsedSeconds(startTimeString, initialElapsedSeconds) {
@@ -856,13 +857,13 @@ function KitchenDailyHistoryView({ dailyHistory, loadingHistory, onRefresh }) {
 // Dữ liệu thời gian thực từ CSDL SQL Server qua REST API
 // ====================================================
 export default function KitchenKdsPage() {
+  const { showToast: globalShowToast } = useDialog();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
-  const [toastMessage, setToastMessage] = useState(null);
   const [cancelledAlert, setCancelledAlert] = useState(null);
 
   // Chế độ xem: 'QUEUE' (Chế biến thời gian thực) | 'HISTORY' (Lịch sử trong ngày)
@@ -892,8 +893,7 @@ export default function KitchenKdsPage() {
 
   // Hiển thị thông báo phản hồi (Toast)
   const showToast = (text, isError = false) => {
-    setToastMessage({ text, isError });
-    setTimeout(() => setToastMessage(null), 3500);
+    globalShowToast(text, isError ? 'error' : 'success', 3500);
   };
 
   // Bật/tắt âm thanh chuông bếp & lưu cấu hình
@@ -1578,22 +1578,6 @@ export default function KitchenKdsPage() {
         </div>
       )}
 
-      {/* --- Toast Thông báo phản hồi người dùng --- */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-          padding: '10px 16px', borderRadius: 10,
-          background: toastMessage.isError ? 'var(--error, #ba1a1a)' : 'var(--inverse-surface, #342F2E)',
-          color: '#fff',
-          fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: 600,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-          display: 'flex', alignItems: 'center', gap: 8,
-          animation: 'fadeIn 0.2s ease',
-        }}>
-          <Icon name={toastMessage.isError ? "error" : "check_circle"} size={18} fill={1} />
-          <span>{toastMessage.text}</span>
-        </div>
-      )}
     </div>
   );
 }

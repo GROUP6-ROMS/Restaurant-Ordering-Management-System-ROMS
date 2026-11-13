@@ -41,7 +41,7 @@ const formatCustomerReservation = (info) => {
 
 export default function WaiterFloorPlanPage() {
   const navigate = useNavigate();
-  const { showConfirm, showAlert } = useDialog();
+  const { showConfirm, showAlert, showToast } = useDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tables, setTables] = useState([]);
   const [menuCatalog, setMenuCatalog] = useState([]);
@@ -128,8 +128,7 @@ export default function WaiterFloorPlanPage() {
         playWaiterChime();
         const tbl = event.tableNumber ? (event.tableNumber.toLowerCase().includes('phòng') ? event.tableNumber : `Bàn ${event.tableNumber}`) : 'Bàn ăn';
         const itemsMsg = event.payload?.itemsText || event.note || 'Có món trạm Phục Vụ sẵn sàng lên bàn';
-        setToastMessage(`🔔 [${tbl}] Trạm Phục Vụ: ${itemsMsg}`);
-        setTimeout(() => setToastMessage(null), 4000);
+        showToast(`🔔 [${tbl}] Trạm Phục Vụ: ${itemsMsg}`, 'info', 4000);
         loadFloorPlan();
         return;
       }
@@ -213,15 +212,6 @@ export default function WaiterFloorPlanPage() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState(null);
-
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
-  };
 
   // Filter
   const filteredTables = tables.filter(t => {
@@ -1398,27 +1388,6 @@ export default function WaiterFloorPlanPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: 'calc(100vh - 120px)' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '72px',
-          right: '24px',
-          zIndex: 9999,
-          background: '#1F1B1A',
-          color: '#FFF8F6',
-          padding: '12px 18px',
-          borderRadius: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-          animation: 'slideDown 0.25s ease-out'
-        }}>
-          <Icon name="check_circle" size={20} fill={1} style={{ color: '#FFB68C' }} />
-          <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{toastMessage}</span>
-        </div>
-      )}
 
       {/* 1. Operational Header & Floor Selector Bar (theo SCR-05) */}
       <div style={{

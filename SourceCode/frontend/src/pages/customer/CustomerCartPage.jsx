@@ -159,6 +159,13 @@ export default function CustomerCartPage() {
   const staffToken = sessionStorage.getItem('roms_token');
   const isTableOccupied = (tableStatus === 'OCCUPIED' || tableInfo?.status === 'OCCUPIED') && (Boolean(diningToken) || Boolean(staffToken));
 
+  const toastNode = (
+    <div className={`toast no-print ${toastVisible ? '' : 'hidden'}`}>
+      <Icon name="check_circle" size={18} style={{ color: 'var(--secondary-fixed-dim)' }} />
+      {toastMsg}
+    </div>
+  );
+
   // Chờ nhân viên mở bàn - Chặn truy cập giỏ hàng nếu bàn chưa mở
   if (!isTableOccupied) {
     return (
@@ -168,6 +175,7 @@ export default function CustomerCartPage() {
         minHeight: 'calc(100dvh - 120px)', padding: '40px 20px',
         textAlign: 'center',
       }}>
+        {toastNode}
         <div style={{
           width: 80, height: 80, borderRadius: '50%',
           background: 'rgba(239, 68, 68, 0.1)',
@@ -208,6 +216,7 @@ export default function CustomerCartPage() {
         minHeight: 'calc(100dvh - 120px)', padding: '40px 16px',
         textAlign: 'center',
       }}>
+        {toastNode}
         <div style={{
           width: 80, height: 80, borderRadius: '50%',
           background: 'var(--surface-container)',
@@ -610,10 +619,7 @@ export default function CustomerCartPage() {
       </div>
 
       {/* Toast */}
-      <div className={`toast ${toastVisible ? '' : 'hidden'}`}>
-        <Icon name="check_circle" size={18} style={{ color: 'var(--secondary-fixed-dim)' }} />
-        {toastMsg}
-      </div>
+      {toastNode}
     </div>
   );
 }
