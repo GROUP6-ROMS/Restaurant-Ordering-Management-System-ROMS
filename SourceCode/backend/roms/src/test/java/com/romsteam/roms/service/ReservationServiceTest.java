@@ -409,27 +409,5 @@ class ReservationServiceTest {
         assertThat(results.get(1).getCode()).isEqualTo("VIP-01");
         assertThat(results.get(2).getCode()).isEqualTo("T-01");
     }
-
-    @Test
-    @DisplayName("6. Thực khách tra cứu đơn đặt bàn bằng Mã đặt chỗ thành công")
-    void lookupReservation_ByBookingCode_ReturnsReservation() {
-        Reservation reservation = Reservation.builder()
-                .id(10L)
-                .bookingCode("RES-20261120-1234")
-                .customerName("Nguyễn Văn A")
-                .customerPhone("0901234567")
-                .guestCount(4)
-                .reservationTime(LocalDateTime.of(2026, 11, 20, 19, 0))
-                .status(ReservationStatus.CONFIRMED)
-                .build();
-
-        when(reservationRepository.findByBookingCode("RES-20261120-1234")).thenReturn(Optional.of(reservation));
-
-        ReservationResponse response = reservationService.lookupReservation("RES-20261120-1234", null);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getBookingCode()).isEqualTo("RES-20261120-1234");
-        assertThat(response.getCustomerName()).isEqualTo("Nguyễn Văn A");
-    }
 }
 

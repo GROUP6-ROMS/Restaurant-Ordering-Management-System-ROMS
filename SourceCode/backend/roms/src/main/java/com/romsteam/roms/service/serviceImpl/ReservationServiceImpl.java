@@ -668,30 +668,6 @@ public class ReservationServiceImpl implements ReservationService {
     // ===================================================================
     // 10. THỰC KHÁCH TRA CỨU TIẾN ĐỘ ĐƠN ĐẶT BÀN THEO MÃ ĐẶT CHỖ HOẶC SĐT
     // ===================================================================
-    @Override
-    @Transactional(readOnly = true)
-    public ReservationResponse lookupReservation(String bookingCode, String phone) {
-        if ((bookingCode == null || bookingCode.trim().isEmpty()) && (phone == null || phone.trim().isEmpty())) {
-            throw new AppException("Vui lòng cung cấp Mã đặt chỗ hoặc Số điện thoại để tra cứu!", HttpStatus.BAD_REQUEST);
-        }
-
-        Optional<Reservation> resOpt = Optional.empty();
-        if (bookingCode != null && !bookingCode.trim().isEmpty()) {
-            resOpt = reservationRepository.findByBookingCode(bookingCode.trim().toUpperCase());
-        }
-
-        if (resOpt.isEmpty() && phone != null && !phone.trim().isEmpty()) {
-            List<Reservation> byPhone = reservationRepository.findByCustomerPhoneOrderByReservationTimeDesc(phone.trim());
-            if (!byPhone.isEmpty()) {
-                resOpt = Optional.of(byPhone.get(0));
-            }
-        }
-
-        Reservation res = resOpt.orElseThrow(() -> new AppException("Không tìm thấy thông tin đơn đặt bàn với thông tin cung cấp!", HttpStatus.NOT_FOUND));
-        return mapToResponse(res);
-    }
-
-    // ===================================================================
     // HELPER: PHÂN GIẢI TÊN PHÂN KHU TỪ MÃ KHU VỰC
     // ===================================================================
     private String resolveZoneName(String zoneCode) {

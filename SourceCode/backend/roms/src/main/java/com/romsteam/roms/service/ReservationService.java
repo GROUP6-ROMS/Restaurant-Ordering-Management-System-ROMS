@@ -40,7 +40,4 @@ public interface ReservationService {
 
     // 9. Quản lý xác nhận khách đặt đã đến và check-in (1-Click Check-in)
     ReservationResponse checkInReservation(Long reservationId);
-
-    // 10. Thực khách tra cứu tiến độ / trạng thái đơn đặt bàn theo mã đặt chỗ hoặc số điện thoại
-    ReservationResponse lookupReservation(String bookingCode, String phone);
 }
