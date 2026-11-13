@@ -69,11 +69,11 @@ export default function AppRoutes() {
         <Route path="/manager" element={<Navigate to="/admin/reports" replace />} />
         <Route path="/manager/*" element={<Navigate to="/admin/reports" replace />} />
 
-        {/* 5. Bo phan phuc vu san (Chỉ Role WAITER) - Xu ly order va phuc vu nuoc dong chai */}
+        {/* 5. Bo phan phuc vu san (Role WAITER & MANAGER) - Xu ly order va phuc vu nuoc dong chai */}
         <Route
           path="/waiter"
           element={
-            <ProtectedRoute allowedRoles={['WAITER']}>
+            <ProtectedRoute allowedRoles={['WAITER', 'MANAGER']}>
               <StaffLayout />
             </ProtectedRoute>
           }

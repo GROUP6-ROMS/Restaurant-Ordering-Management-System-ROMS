@@ -183,6 +183,28 @@ export default function WaiterFloorPlanPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    const urlFilter = searchParams.get('filter');
+    setActiveFilter(urlFilter || 'ALL');
+  }, [searchParams]);
+
+  const handleFilterChange = (filterId) => {
+    setActiveFilter(filterId);
+    if (filterId === 'ALL') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ filter: filterId });
+    }
+  };
+
+  // Modals
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [mobileOrderModalTab, setMobileOrderModalTab] = useState('CATALOG'); // 'CATALOG' | 'CART'
+  const [showQrModal, setShowQrModal] = useState(false);
+
   // Khóa cuộn trang nền & lắng nghe phím ESC để đóng modal (Công thái học UX)
   useEffect(() => {
     const isAnyModalOpen = Boolean(
@@ -217,28 +239,6 @@ export default function WaiterFloorPlanPage() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [showQrModal, showTransferModal, showOrderModal, showTableModal]);
-
-  useEffect(() => {
-    const urlFilter = searchParams.get('filter');
-    setActiveFilter(urlFilter || 'ALL');
-  }, [searchParams]);
-
-  const handleFilterChange = (filterId) => {
-    setActiveFilter(filterId);
-    if (filterId === 'ALL') {
-      setSearchParams({});
-    } else {
-      setSearchParams({ filter: filterId });
-    }
-  };
-
-  // Modals
-  const [showTableModal, setShowTableModal] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferTargetId, setTransferTargetId] = useState('');
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [mobileOrderModalTab, setMobileOrderModalTab] = useState('CATALOG'); // 'CATALOG' | 'CART'
-  const [showQrModal, setShowQrModal] = useState(false);
 
   // Giỏ hàng gọi món của Waiter (Waiter Order Pad)
   const [orderCart, setOrderCart] = useState([]);
@@ -2609,7 +2609,7 @@ export default function WaiterFloorPlanPage() {
       })()}
 
       {/* MODAL 2: Transfer Table (theo SCR-07) */}
-      {showTransferModal && (
+      {showTransferModal && selectedTable && (
         <div
           onClick={() => setShowTransferModal(false)}
           style={{
@@ -2731,7 +2731,7 @@ export default function WaiterFloorPlanPage() {
       )}
 
       {/* MODAL 3: Table QR Code */}
-      {showQrModal && (
+      {showQrModal && selectedTable && (
         <div
           onClick={() => setShowQrModal(false)}
           style={{
