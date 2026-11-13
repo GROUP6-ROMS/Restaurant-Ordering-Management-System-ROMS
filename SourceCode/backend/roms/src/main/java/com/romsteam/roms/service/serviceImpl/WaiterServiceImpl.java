@@ -45,6 +45,18 @@ public class WaiterServiceImpl implements WaiterService {
     private final ReservationItemRepository reservationItemRepository;
     private final com.romsteam.roms.service.RealtimeService realtimeService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.cache.CacheManager cacheManager;
+
+    private void evictCustomerMenuCache() {
+        if (cacheManager != null) {
+            org.springframework.cache.Cache cache = cacheManager.getCache("customerMenu");
+            if (cache != null) {
+                cache.clear();
+            }
+        }
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<WaiterTableResponse> getFloorPlan(String zone) {
@@ -135,8 +147,25 @@ public class WaiterServiceImpl implements WaiterService {
 
                 for (ReservationItem resItem : preOrderItems) {
                     if (resItem.getQuantity() == null || resItem.getQuantity() <= 0) continue;
-                    MenuItem menuItem = resItem.getMenuItem();
-                    if (menuItem == null) continue;
+                    MenuItem rawMenuItem = resItem.getMenuItem();
+                    if (rawMenuItem == null) continue;
+                    MenuItem menuItem = rawMenuItem.getId() != null
+                            ? menuItemRepository.findByIdForUpdate(rawMenuItem.getId()).orElse(rawMenuItem)
+                            : rawMenuItem;
+
+                    if (menuItem.getRemainingStock() != null) {
+                        menuItem.decreaseStock(resItem.getQuantity());
+                        menuItemRepository.save(menuItem);
+                        evictCustomerMenuCache();
+                        try {
+                            realtimeService.notifyMenuItemAvailability(
+                                    menuItem.getId(),
+                                    menuItem.getName(),
+                                    Boolean.TRUE.equals(menuItem.getIsAvailable()),
+                                    menuItem.getRemainingStock()
+                            );
+                        } catch (Exception ignored) {}
+                    }
 
                     OrderItem orderItem = new OrderItem();
                     orderItem.setOrder(newOrder);
@@ -154,8 +183,9 @@ public class WaiterServiceImpl implements WaiterService {
                             isDrink = true;
                         }
                     }
+                    boolean isWaiterStation = "WAITER".equalsIgnoreCase(menuItem.getStation());
 
-                    if (isDrink) {
+                    if (isDrink || isWaiterStation) {
                         orderItem.setStatus(OrderItemStatus.READY);
                     } else {
                         orderItem.setStatus(OrderItemStatus.COOKING);
@@ -549,7 +579,17 @@ public class WaiterServiceImpl implements WaiterService {
             // Trừ tồn kho trong ngày
             menuItem.decreaseStock(qty);
             menuItemRepository.save(menuItem);
-            if (!Boolean.TRUE.equals(menuItem.getIsAvailable())) {
+            if (menuItem.getRemainingStock() != null) {
+                evictCustomerMenuCache();
+                try {
+                    realtimeService.notifyMenuItemAvailability(
+                            menuItem.getId(),
+                            menuItem.getName(),
+                            Boolean.TRUE.equals(menuItem.getIsAvailable()),
+                            menuItem.getRemainingStock()
+                    );
+                } catch (Exception ignored) {}
+            } else if (!Boolean.TRUE.equals(menuItem.getIsAvailable())) {
                 try {
                     realtimeService.notifyMenuItemAvailability(menuItem.getId(), menuItem.getName(), false, menuItem.getRemainingStock());
                 } catch (Exception ignored) {}

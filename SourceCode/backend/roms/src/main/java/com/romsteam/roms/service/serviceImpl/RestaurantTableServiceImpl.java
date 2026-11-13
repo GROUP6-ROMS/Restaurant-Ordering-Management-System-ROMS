@@ -939,27 +939,50 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
                 for (ReservationItem resItem : preOrderItems) {
                     if (resItem.getQuantity() == null || resItem.getQuantity() <= 0) continue;
-                    MenuItem menuItem = resItem.getMenuItem();
-                    if (menuItem == null) continue;
+                    MenuItem rawMenuItem = resItem.getMenuItem();
+                    if (rawMenuItem == null) continue;
+                    MenuItem lockedItem = rawMenuItem.getId() != null
+                            ? menuItemRepository.findByIdForUpdate(rawMenuItem.getId()).orElse(rawMenuItem)
+                            : rawMenuItem;
+
+                    if (lockedItem.getRemainingStock() != null) {
+                        lockedItem.decreaseStock(resItem.getQuantity());
+                        menuItemRepository.save(lockedItem);
+                        if (cacheManager != null) {
+                            org.springframework.cache.Cache cache = cacheManager.getCache("customerMenu");
+                            if (cache != null) {
+                                cache.clear();
+                            }
+                        }
+                        try {
+                            realtimeService.notifyMenuItemAvailability(
+                                    lockedItem.getId(),
+                                    lockedItem.getName(),
+                                    Boolean.TRUE.equals(lockedItem.getIsAvailable()),
+                                    lockedItem.getRemainingStock()
+                            );
+                        } catch (Exception ignored) {}
+                    }
 
                     OrderItem orderItem = new OrderItem();
                     orderItem.setOrder(newOrder);
-                    orderItem.setMenuItem(menuItem);
+                    orderItem.setMenuItem(lockedItem);
                     orderItem.setQuantity(resItem.getQuantity());
-                    orderItem.setUnitPrice(resItem.getUnitPrice() != null ? resItem.getUnitPrice() : menuItem.getPrice());
+                    orderItem.setUnitPrice(resItem.getUnitPrice() != null ? resItem.getUnitPrice() : lockedItem.getPrice());
                     BigDecimal subtotal = orderItem.getUnitPrice().multiply(BigDecimal.valueOf(orderItem.getQuantity()));
                     orderItem.setSubtotal(subtotal);
                     orderItem.setNote(resItem.getNote() != null ? resItem.getNote() : "Món đặt trước");
 
                     boolean isDrink = false;
-                    if (menuItem.getCategory() != null && menuItem.getCategory().getName() != null) {
-                        String catLower = menuItem.getCategory().getName().toLowerCase();
+                    if (lockedItem.getCategory() != null && lockedItem.getCategory().getName() != null) {
+                        String catLower = lockedItem.getCategory().getName().toLowerCase();
                         if (catLower.contains("uống") || catLower.contains("drink") || catLower.contains("nước")) {
                             isDrink = true;
                         }
                     }
+                    boolean isWaiterStation = "WAITER".equalsIgnoreCase(lockedItem.getStation());
 
-                    if (isDrink) {
+                    if (isDrink || isWaiterStation) {
                         orderItem.setStatus(OrderItemStatus.READY);
                     } else {
                         orderItem.setStatus(OrderItemStatus.COOKING);
