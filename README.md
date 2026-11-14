@@ -11,7 +11,7 @@
 [![Unit & Integration Tests](https://img.shields.io/badge/JUnit_5-89%2F89_Passed-success.svg?logo=junit5&logoColor=white)](https://junit.org/)
 [![License MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> 🎓 **Đồ án Tốt nghiệp / Môn học:** SWP391 — Software Development Project  
+> 🎓 **Đồ án Môn học:** SWP391 — Software Development Project  
 > 🏛️ **Học kỳ:** Fall 2026 | **Đại học FPT Đà Nẵng**  
 > 🌐 **Môi trường Live Production:** [http://roms-restaurant.duckdns.org/](http://roms-restaurant.duckdns.org/) *(IP VPS: `222.255.184.250`)*  
 > 🩺 **Hệ Thống Giám Sát Realtime (Health Metric):** [http://roms-restaurant.duckdns.org/actuator/health](http://roms-restaurant.duckdns.org/actuator/health)
