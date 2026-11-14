@@ -253,10 +253,11 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
 
         // 3. Nếu chuyển sang OCCUPIED (Đang phục vụ)
         if (targetStatus == TableStatus.OCCUPIED) {
+            LocalDateTime now = LocalDateTime.now();
+            List<Reservation> confirmedList = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(id, ReservationStatus.CONFIRMED);
+
             // Kiểm tra Khóa An Toàn Đón Khách Đặt Trước (Buffer Time Lock)
             if (request.getForceOverride() == null || !request.getForceOverride()) {
-                LocalDateTime now = LocalDateTime.now();
-                List<Reservation> confirmedList = reservationRepository.findByTableIdAndStatusOrderByReservationTimeAsc(id, ReservationStatus.CONFIRMED);
                 if (confirmedList != null && !confirmedList.isEmpty()) {
                     for (Reservation r : confirmedList) {
                         if (r.getReservationTime() == null) continue;
@@ -272,6 +273,23 @@ public class RestaurantTableServiceImpl implements RestaurantTableService {
                                     timeStr + " (" + prompt + "). Không thể xếp khách vãng lai trừ khi Quản lý chọn 'Mở cưỡng chế'!",
                                     HttpStatus.BAD_REQUEST
                             );
+                        }
+                    }
+                }
+            } else {
+                // Quản lý xác nhận MỞ CƯỠNG CHẾ: Tự động hủy đơn đặt bàn trong khung Buffer Lock (Khách quá giờ / No-Show)
+                if (confirmedList != null && !confirmedList.isEmpty()) {
+                    for (Reservation r : confirmedList) {
+                        if (r.getReservationTime() == null) continue;
+                        LocalDateTime startLock = r.getReservationTime().minusMinutes(60);
+                        LocalDateTime endLock = r.getReservationTime().plusMinutes(45);
+                        if (now.isAfter(startLock) && now.isBefore(endLock)) {
+                            r.setStatus(ReservationStatus.CANCELLED);
+                            r.setCancelReason("Tự động hủy do Quản lý mở cưỡng chế bàn cho khách vãng lai (Khách quá giờ hẹn / No-Show)");
+                            r.setTable(null);
+                            reservationRepository.save(r);
+                            log.warn("[BufferLock Override] Đã tự động hủy đơn đặt bàn #{} ({}) của khách {} do Quản lý mở cưỡng chế bàn {}",
+                                    r.getId(), r.getBookingCode(), r.getCustomerName(), table.getTableNumber());
                         }
                     }
                 }

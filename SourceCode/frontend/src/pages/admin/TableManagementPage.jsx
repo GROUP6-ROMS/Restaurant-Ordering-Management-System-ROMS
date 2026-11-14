@@ -219,7 +219,8 @@ export default function TableManagementPage() {
   const [reservations, setReservations] = useState([]);
   const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
   const [showReservationModal, setShowReservationModal] = useState(false);
-  const [resStatusFilter, setResStatusFilter] = useState('PENDING'); // 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'ALL'
+  const [resStatusFilter, setResStatusFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
+  const [resTimeFilter, setResTimeFilter] = useState('TODAY'); // 'TODAY' | 'WEEK' | 'MONTH' | 'ALL'
   const [resSearchTerm, setResSearchTerm] = useState('');
   const [resLoading, setResLoading] = useState(false);
 
@@ -5364,108 +5365,60 @@ export default function TableManagementPage() {
               </button>
             </div>
 
+            {/* Helper function tính toán thời gian */}
+            {(() => null)()}
             {/* Filter Tabs & Search Bar */}
             <div style={{
               padding: '14px 24px',
               borderBottom: '1px solid #F0E6E4',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
+              flexDirection: 'column',
               gap: '12px',
               background: '#FFFFFF'
             }}>
-              {/* Status Filter Tabs */}
-              <div style={{ display: 'flex', gap: '6px', background: '#F5EFEB', padding: '4px', borderRadius: '12px' }}>
-                <button
-                  type="button"
-                  onClick={() => setResStatusFilter('PENDING')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    background: resStatusFilter === 'PENDING' ? '#9D4124' : 'transparent',
-                    color: resStatusFilter === 'PENDING' ? '#FFFFFF' : '#56423D',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  Chờ Xếp Bàn
-                  {pendingReservationsCount > 0 && (
-                    <span style={{
-                      background: resStatusFilter === 'PENDING' ? '#FFFFFF' : '#EF4444',
-                      color: resStatusFilter === 'PENDING' ? '#9D4124' : '#FFFFFF',
-                      borderRadius: '999px',
-                      padding: '1px 6px',
-                      fontSize: '0.72rem',
-                      fontWeight: 800
-                    }}>
-                      {pendingReservationsCount}
-                    </span>
-                  )}
-                </button>
+              {/* Row 1: Time Filter Pills & Search */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#56423D', marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="calendar_today" size={16} style={{ color: '#9D4124' }} />
+                    Bộ Lọc Thời Gian:
+                  </span>
+                  {[
+                    { id: 'TODAY', label: 'Hôm Nay', icon: 'today' },
+                    { id: 'WEEK', label: 'Tuần Này', icon: 'date_range' },
+                    { id: 'MONTH', label: 'Tháng Này', icon: 'calendar_month' },
+                    { id: 'ALL', label: 'Tất Cả', icon: 'all_inclusive' }
+                  ].map(t => {
+                    const isSel = resTimeFilter === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setResTimeFilter(t.id)}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: '20px',
+                          border: isSel ? '1.5px solid #9D4124' : '1px solid #EAE0DE',
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          background: isSel ? '#9D4124' : '#FFFFFF',
+                          color: isSel ? '#FFFFFF' : '#56423D',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          boxShadow: isSel ? '0 2px 8px rgba(157, 65, 36, 0.2)' : 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Icon name={t.icon} size={14} />
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setResStatusFilter('CONFIRMED')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    background: resStatusFilter === 'CONFIRMED' ? '#9D4124' : 'transparent',
-                    color: resStatusFilter === 'CONFIRMED' ? '#FFFFFF' : '#56423D',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  Đã Xếp Bàn
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setResStatusFilter('CANCELLED')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    background: resStatusFilter === 'CANCELLED' ? '#9D4124' : 'transparent',
-                    color: resStatusFilter === 'CANCELLED' ? '#FFFFFF' : '#56423D',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  Đã Hủy
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setResStatusFilter('ALL')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    background: resStatusFilter === 'ALL' ? '#9D4124' : 'transparent',
-                    color: resStatusFilter === 'ALL' ? '#FFFFFF' : '#56423D',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  Tất Cả ({reservations.length})
-                </button>
-              </div>
-
-              {/* Search input & Refresh */}
+                {/* Search input & Refresh */}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <div style={{
                   display: 'flex',
@@ -5527,6 +5480,93 @@ export default function TableManagementPage() {
               </div>
             </div>
 
+            {/* Row 2: Status Tabs with Dynamic Badges */}
+            <div style={{ display: 'flex', gap: '6px', background: '#F5EFEB', padding: '4px', borderRadius: '12px', overflowX: 'auto' }}>
+              {(() => {
+                const checkTimeMatch = (r, timeFilter) => {
+                  if (timeFilter === 'ALL') return true;
+                  if (!r.reservationTime) return false;
+                  const d = new Date(r.reservationTime);
+                  const now = new Date();
+                  if (timeFilter === 'TODAY') {
+                    return d.getFullYear() === now.getFullYear() &&
+                           d.getMonth() === now.getMonth() &&
+                           d.getDate() === now.getDate();
+                  }
+                  if (timeFilter === 'WEEK') {
+                    const curr = new Date(now);
+                    const day = curr.getDay() || 7;
+                    const monday = new Date(curr);
+                    monday.setDate(curr.getDate() - day + 1);
+                    monday.setHours(0, 0, 0, 0);
+                    const sunday = new Date(monday);
+                    sunday.setDate(monday.getDate() + 6);
+                    sunday.setHours(23, 59, 59, 999);
+                    return d >= monday && d <= sunday;
+                  }
+                  if (timeFilter === 'MONTH') {
+                    return d.getFullYear() === now.getFullYear() &&
+                           d.getMonth() === now.getMonth();
+                  }
+                  return true;
+                };
+
+                const timeMatched = reservations.filter(r => checkTimeMatch(r, resTimeFilter));
+                const countAll = timeMatched.length;
+                const countPending = timeMatched.filter(r => r.status === 'PENDING').length;
+                const countConfirmed = timeMatched.filter(r => r.status === 'CONFIRMED').length;
+                const countCompleted = timeMatched.filter(r => r.status === 'COMPLETED').length;
+                const countCancelled = timeMatched.filter(r => r.status === 'CANCELLED').length;
+
+                const statusTabs = [
+                  { id: 'ALL', label: 'Tất Cả', count: countAll, badgeBg: '#FFFFFF', badgeColor: '#56423D' },
+                  { id: 'PENDING', label: 'Chờ Xếp Bàn', count: countPending, badgeBg: countPending > 0 ? '#EF4444' : '#EAE0DE', badgeColor: countPending > 0 ? '#FFFFFF' : '#89726B' },
+                  { id: 'CONFIRMED', label: 'Đã Xếp Bàn', count: countConfirmed, badgeBg: countConfirmed > 0 ? '#10B981' : '#EAE0DE', badgeColor: countConfirmed > 0 ? '#FFFFFF' : '#89726B' },
+                  { id: 'COMPLETED', label: 'Đã Dùng Bữa', count: countCompleted, badgeBg: countCompleted > 0 ? '#0284C7' : '#EAE0DE', badgeColor: countCompleted > 0 ? '#FFFFFF' : '#89726B' },
+                  { id: 'CANCELLED', label: 'Đã Hủy', count: countCancelled, badgeBg: countCancelled > 0 ? '#991B1B' : '#EAE0DE', badgeColor: countCancelled > 0 ? '#FFFFFF' : '#89726B' }
+                ];
+
+                return statusTabs.map(tab => {
+                  const isSel = resStatusFilter === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setResStatusFilter(tab.id)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        background: isSel ? '#9D4124' : 'transparent',
+                        color: isSel ? '#FFFFFF' : '#56423D',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {tab.label}
+                      <span style={{
+                        background: isSel ? '#FFFFFF' : tab.badgeBg,
+                        color: isSel ? '#9D4124' : tab.badgeColor,
+                        borderRadius: '999px',
+                        padding: '1px 7px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800
+                      }}>
+                        {tab.count}
+                      </span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+
             {/* Modal Body: Reservation Cards List */}
             <div style={{
               padding: '20px 24px',
@@ -5545,7 +5585,36 @@ export default function TableManagementPage() {
               ) : (
                 (() => {
                   const filtered = reservations.filter(r => {
+                    // 1. Lọc theo trạng thái
                     if (resStatusFilter !== 'ALL' && r.status !== resStatusFilter) return false;
+
+                    // 2. Lọc theo thời gian (TODAY | WEEK | MONTH | ALL)
+                    if (resTimeFilter !== 'ALL' && r.reservationTime) {
+                      const d = new Date(r.reservationTime);
+                      const now = new Date();
+                      if (resTimeFilter === 'TODAY') {
+                        const isToday = d.getFullYear() === now.getFullYear() &&
+                                        d.getMonth() === now.getMonth() &&
+                                        d.getDate() === now.getDate();
+                        if (!isToday) return false;
+                      } else if (resTimeFilter === 'WEEK') {
+                        const curr = new Date(now);
+                        const day = curr.getDay() || 7;
+                        const monday = new Date(curr);
+                        monday.setDate(curr.getDate() - day + 1);
+                        monday.setHours(0, 0, 0, 0);
+                        const sunday = new Date(monday);
+                        sunday.setDate(monday.getDate() + 6);
+                        sunday.setHours(23, 59, 59, 999);
+                        if (d < monday || d > sunday) return false;
+                      } else if (resTimeFilter === 'MONTH') {
+                        const isThisMonth = d.getFullYear() === now.getFullYear() &&
+                                            d.getMonth() === now.getMonth();
+                        if (!isThisMonth) return false;
+                      }
+                    }
+
+                    // 3. Tìm kiếm theo từ khóa
                     if (resSearchTerm.trim()) {
                       const q = resSearchTerm.trim().toLowerCase();
                       const codeMatch = (r.bookingCode || '').toLowerCase().includes(q);
@@ -5593,6 +5662,7 @@ export default function TableManagementPage() {
                   return filtered.map((r) => {
                     const isPending = r.status === 'PENDING';
                     const isConfirmed = r.status === 'CONFIRMED';
+                    const isCompleted = r.status === 'COMPLETED';
                     const isCancelled = r.status === 'CANCELLED';
 
                     return (
@@ -5663,6 +5733,23 @@ export default function TableManagementPage() {
                               }}>
                                 <Icon name="check_circle" size={14} />
                                 Đã Giữ Chỗ
+                              </span>
+                            )}
+                            {isCompleted && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: '#E0F2FE',
+                                color: '#0369A1',
+                                border: '1px solid #7DD3FC',
+                                padding: '4px 10px',
+                                borderRadius: '999px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800
+                              }}>
+                                <Icon name="task_alt" size={14} />
+                                Đã Dùng Bữa (Check-in)
                               </span>
                             )}
                             {isCancelled && (
