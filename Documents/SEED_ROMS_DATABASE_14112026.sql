@@ -3626,49 +3626,148 @@ INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount,
 VALUES (@s_m2, 'BILL-20261114-0002', 7500.00, 0, 0, 7500.00, 'BANK_TRANSFER', 'PAID', '2026-11-14 10:15:00', N'Thanh toán VietQR PayOS thành công', '2026-11-14 10:15:00', '2026-11-14 10:15:00');
 
 
--- 7.2. BÀN T-03 (OCCUPIED): Khách đang ăn dở, Thu ngân mở POS xem được ngay Tạm tính
+-- 7.2. BÀN T-03 (OCCUPIED): Khách đang ăn dở được 40 phút, Thu ngân mở POS xem được ngay Tạm tính
+UPDATE restaurant_tables SET status = 'OCCUPIED', blocked_reason = NULL, reservation_info = NULL, reserved_time = NULL WHERE table_number = 'T-03';
+
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, created_at, updated_at)
-SELECT id, 'sess-t-03-active-eating', 'ACTIVE', 2, '2026-11-14 11:30:00', '2026-11-14 11:30:00', '2026-11-14 11:30:00'
+SELECT id, 'sess-t-03-active-eating', 'ACTIVE', 2, DATEADD(minute, -40, GETDATE()), DATEADD(minute, -40, GETDATE()), DATEADD(minute, -40, GETDATE())
 FROM restaurant_tables WHERE table_number = 'T-03';
 DECLARE @s_t03 BIGINT = SCOPE_IDENTITY();
 
 INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
-VALUES (@s_t03, 'ORD-20261114-0003', 7500.00, 'CONFIRMED', '2026-11-14 11:35:00', '2026-11-14 11:35:00', '2026-11-14 11:35:00');
+VALUES (@s_t03, 'ORD-20261114-0003', 7500.00, 'CONFIRMED', DATEADD(minute, -35, GETDATE()), DATEADD(minute, -35, GETDATE()), DATEADD(minute, -35, GETDATE()));
 DECLARE @o_t03 BIGINT = SCOPE_IDENTITY();
 
 INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, note, created_at, updated_at)
-VALUES (@o_t03, 1, 1, 3000.00, 3000.00, 'SERVED', N'Đã lên bàn cho khách', '2026-11-14 11:35:00', '2026-11-14 11:45:00'),
-       (@o_t03, 6, 1, 4500.00, 4500.00, 'COOKING', N'Bếp đang làm món chính', '2026-11-14 11:35:00', '2026-11-14 11:35:00');
+VALUES (@o_t03, 1, 1, 3000.00, 3000.00, 'SERVED', N'Đã lên bàn cho khách', DATEADD(minute, -35, GETDATE()), DATEADD(minute, -20, GETDATE())),
+       (@o_t03, 6, 1, 4500.00, 4500.00, 'COOKING', N'Bếp đang làm món chính', DATEADD(minute, -35, GETDATE()), DATEADD(minute, -35, GETDATE()));
 
 INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, status, created_at, updated_at)
-VALUES (@s_t03, 'BILL-20261114-0003', 7500.00, 0, 0, 7500.00, 'UNPAID', '2026-11-14 11:35:00', '2026-11-14 11:35:00');
+VALUES (@s_t03, 'BILL-20261114-0003', 7500.00, 0, 0, 7500.00, 'UNPAID', DATEADD(minute, -35, GETDATE()), DATEADD(minute, -35, GETDATE()));
 
 
--- 7.3. BÀN B-01 (OCCUPIED): Màn hình KDS hiển thị thẻ đang nấu (có món Rush, Ready, Cooking) & Chuông đỏ
+-- 7.3. BÀN B-01 (OCCUPIED): Màn hình KDS hiển thị thẻ đang nấu 12 phút (có món RUSH VÀNG sắp trễ SLA 15 phút) & Chuông đỏ Waiter
+UPDATE restaurant_tables SET status = 'OCCUPIED', blocked_reason = NULL, reservation_info = NULL, reserved_time = NULL WHERE table_number = 'B-01';
+
 INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, created_at, updated_at)
-SELECT id, 'sess-b-01-active-kds', 'ACTIVE', 4, '2026-11-14 11:45:00', '2026-11-14 11:45:00', '2026-11-14 11:45:00'
+SELECT id, 'sess-b-01-active-kds', 'ACTIVE', 4, DATEADD(minute, -18, GETDATE()), DATEADD(minute, -18, GETDATE()), DATEADD(minute, -18, GETDATE())
 FROM restaurant_tables WHERE table_number = 'B-01';
 DECLARE @s_b01 BIGINT = SCOPE_IDENTITY();
 
 INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
-VALUES (@s_b01, 'ORD-20261114-0004', 11500.00, 'COOKING', '2026-11-14 11:50:00', '2026-11-14 11:50:00', '2026-11-14 11:50:00');
+VALUES (@s_b01, 'ORD-20261114-0004', 11500.00, 'COOKING', DATEADD(minute, -12, GETDATE()), DATEADD(minute, -12, GETDATE()), DATEADD(minute, -12, GETDATE()));
 DECLARE @o_b01 BIGINT = SCOPE_IDENTITY();
 
 INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, note, created_at, updated_at)
-VALUES (@o_b01, 5, 1, 5000.00, 5000.00, 'COOKING', N'HỎA TỐC: Bò Wagyu làm tái vừa (Medium Rare)', '2026-11-14 11:50:00', '2026-11-14 11:52:00'),
-       (@o_b01, 1, 1, 3000.00, 3000.00, 'PENDING', N'Sốt cam để riêng chén nhỏ', '2026-11-14 11:50:00', '2026-11-14 11:50:00'),
-       (@o_b01, 13, 1, 3500.00, 3500.00, 'READY', N'Nấu xong, chờ Waiter bưng ra', '2026-11-14 11:50:00', '2026-11-14 12:00:00');
+VALUES (@o_b01, 5, 1, 5000.00, 5000.00, 'COOKING', N'HỎA TỐC: Bò Wagyu làm tái vừa (Medium Rare)', DATEADD(minute, -12, GETDATE()), DATEADD(minute, -10, GETDATE())),
+       (@o_b01, 1, 1, 3000.00, 3000.00, 'PENDING', N'Sốt cam để riêng chén nhỏ', DATEADD(minute, -12, GETDATE()), DATEADD(minute, -12, GETDATE())),
+       (@o_b01, 13, 1, 3500.00, 3500.00, 'READY', N'Nấu xong, chờ Waiter bưng ra', DATEADD(minute, -12, GETDATE()), DATEADD(minute, -2, GETDATE()));
 
--- Tạo chuông gọi phục vụ nhấp nháy đỏ cho bàn B-01
+-- Tạo chuông gọi phục vụ nhấp nháy đỏ cho bàn B-01 (gọi 2 phút trước)
 INSERT INTO service_requests (table_id, session_id, request_type, note, status, created_at)
-SELECT id, @s_b01, 'CALL_WAITER', N'Xin thêm 1 xô đá lạnh & khăn ướt', 'PENDING', '2026-11-14 12:05:00'
+SELECT id, @s_b01, 'CALL_WAITER', N'Xin thêm 1 xô đá lạnh & khăn ướt', 'PENDING', DATEADD(minute, -2, GETDATE())
 FROM restaurant_tables WHERE table_number = 'B-01';
 
 
--- 7.4. BÀN VIP-02 (RESERVED): Đơn đặt trước hiển thị Buffer Time Lock (Khóa bàn 16:00)
+-- 7.4. BÀN T-02 (OCCUPIED): Khách mới vào 5 phút, vé KDS XANH 03:00, có món READY cho Waiter bưng ra
+UPDATE restaurant_tables SET status = 'OCCUPIED', blocked_reason = NULL, reservation_info = NULL, reserved_time = NULL WHERE table_number = 'T-02';
+
+INSERT INTO dining_sessions (table_id, session_token, status, guest_count, start_time, created_at, updated_at)
+SELECT id, 'sess-t-02-new-active', 'ACTIVE', 3, DATEADD(minute, -5, GETDATE()), DATEADD(minute, -5, GETDATE()), DATEADD(minute, -5, GETDATE())
+FROM restaurant_tables WHERE table_number = 'T-02';
+DECLARE @s_t02 BIGINT = SCOPE_IDENTITY();
+
+INSERT INTO orders (session_id, order_code, total_amount, status, order_time, created_at, updated_at)
+VALUES (@s_t02, 'ORD-20261114-0005', 6500.00, 'COOKING', DATEADD(minute, -3, GETDATE()), DATEADD(minute, -3, GETDATE()), DATEADD(minute, -3, GETDATE()));
+DECLARE @o_t02 BIGINT = SCOPE_IDENTITY();
+
+INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, status, note, created_at, updated_at)
+VALUES (@o_t02, 2, 2, 2000.00, 4000.00, 'COOKING', N'Làm ít cay cho bé', DATEADD(minute, -3, GETDATE()), DATEADD(minute, -3, GETDATE())),
+       (@o_t02, 20, 1, 1500.00, 1500.00, 'READY', N'Nhiều đá', DATEADD(minute, -3, GETDATE()), DATEADD(minute, -1, GETDATE())),
+       (@o_t02, 21, 1, 1000.00, 1000.00, 'PENDING', N'Uống sau ăn', DATEADD(minute, -3, GETDATE()), DATEADD(minute, -3, GETDATE()));
+
+INSERT INTO bills (session_id, bill_code, subtotal, tax_amount, discount_amount, final_amount, status, created_at, updated_at)
+VALUES (@s_t02, 'BILL-20261114-0005', 6500.00, 0, 0, 6500.00, 'UNPAID', DATEADD(minute, -3, GETDATE()), DATEADD(minute, -3, GETDATE()));
+
+
+-- 7.5. BÀN T-04 (DIRTY) & BÀN B-03 (BLOCKED)
+UPDATE restaurant_tables SET status = 'DIRTY', blocked_reason = NULL, reservation_info = NULL, reserved_time = NULL WHERE table_number = 'T-04';
+UPDATE restaurant_tables SET status = 'BLOCKED', blocked_reason = N'Bảo trì hệ thống quạt thông gió & đèn rọi', reservation_info = NULL, reserved_time = NULL WHERE table_number = 'B-03';
+
+
+-- 7.6. BÀN VIP-02 (RESERVED): Đang trong khung Khóa An Toàn (+30 phút nữa khách đến)
+DECLARE @vip_time DATETIME2 = DATEADD(minute, 30, GETDATE());
+DECLARE @vip_time_str NVARCHAR(50) = FORMAT(@vip_time, 'HH:mm');
+
+UPDATE restaurant_tables 
+SET status = 'RESERVED', 
+    reservation_info = N'Anh Tuấn FPT (0912345678 - 6 khách)', 
+    reserved_time = N'Hôm nay lúc ' + @vip_time_str, 
+    blocked_reason = NULL 
+WHERE table_number = 'VIP-02';
+
+
+-- =====================================================================
+-- 8. DỮ LIỆU ĐẶT BÀN LỊCH SỬ TOÀN DIỆN (21 RESERVATIONS TỪ 01/11 ĐẾN 17/11)
+-- Phục vụ hoàn hảo các bộ lọc: Hôm Nay | Tuần Này | Tháng Này | Tất Cả
+-- =====================================================================
+
+-- 8.1. Đơn bàn VIP-02 đang được khóa an toàn (Hôm nay lúc +30 phút)
 INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, note, created_at, updated_at)
-SELECT 'RSV-20261114-001', id, 'VIP', N'Anh Tuấn FPT', '0912345678', 'tuan.fpt@gmail.com', 6, '2026-11-14 16:00:00', 'CONFIRMED', N'Tiệc sinh nhật, cần bàn sạch đẹp', '2026-11-14 08:00:00', '2026-11-14 08:30:00'
+SELECT 'RES-20261114-001', id, 'VIP', N'Anh Tuấn FPT', '0912345678', 'tuan.fpt@gmail.com', 6, @vip_time, 'CONFIRMED', N'Tiệc sinh nhật tiếp khách, cần phòng riêng đẹp', DATEADD(hour, -4, GETDATE()), DATEADD(hour, -3, GETDATE())
 FROM restaurant_tables WHERE table_number = 'VIP-02';
 
+-- 8.2. Đơn PENDING tối nay (Hôm nay 19:30)
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, note, created_at, updated_at)
+VALUES ('RES-20261114-8888', NULL, 'ZONE_1', N'Chị Ngọc Mai', '0905998877', 'mai.ngoc@gmail.com', 4, '2026-11-14 19:30:00', 'PENDING', N'Cần bàn gần cửa sổ, ghế em bé', DATEADD(hour, -2, GETDATE()), DATEADD(hour, -2, GETDATE()));
 
-PRINT N'>>> ROMS DATABASE SEEDING COMPLETED SUCCESSFULLY! <<<';
+-- 8.3. Lịch sử Tuần trước & Đầu tháng 11 (Quá khứ: COMPLETED & CANCELLED)
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261102-1011', id, 'ZONE_1', N'Trần Văn Nam', '0905111222', 'nam.tran@gmail.com', 4, '2026-11-02 18:30:00', 'COMPLETED', NULL, N'Tiệc sinh nhật gia đình', '2026-11-02 10:00:00', '2026-11-02 20:30:00' FROM restaurant_tables WHERE table_number = 'T-01';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261103-2022', id, 'ZONE_2', N'Lê Thị Thảo', '0905222333', 'thao.le@gmail.com', 2, '2026-11-03 19:00:00', 'COMPLETED', NULL, N'Bàn lãng mạn cho cặp đôi', '2026-11-03 12:00:00', '2026-11-03 21:00:00' FROM restaurant_tables WHERE table_number = 'B-02';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261104-3033', id, 'VIP', N'Nguyễn Văn Hùng', '0905333444', 'hung.nguyen@gmail.com', 8, '2026-11-04 12:00:00', 'COMPLETED', NULL, N'Tiếp khách công ty FPT', '2026-11-04 09:00:00', '2026-11-04 14:00:00' FROM restaurant_tables WHERE table_number = 'VIP-01';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+VALUES ('RES-20261105-4044', NULL, 'ZONE_1', N'Vũ Quốc Bảo', '0905444555', 'bao.vu@gmail.com', 4, '2026-11-05 20:00:00', 'CANCELLED', N'Khách bận lịch công tác đột xuất', N'Khách đặt tiệc cuối tuần', '2026-11-05 11:00:00', '2026-11-05 16:00:00');
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261106-5055', id, 'ZONE_1', N'Đỗ Mai Linh', '0905555666', 'linh.do@gmail.com', 6, '2026-11-06 18:00:00', 'COMPLETED', NULL, N'Họp mặt bạn bè đại học', '2026-11-06 09:00:00', '2026-11-06 20:30:00' FROM restaurant_tables WHERE table_number = 'T-02';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261107-6066', id, 'VIP', N'Hoàng Kim Ngân', '0905666777', 'ngan.hoang@gmail.com', 10, '2026-11-07 19:30:00', 'COMPLETED', NULL, N'Tiệc kỷ niệm ngày cưới', '2026-11-07 14:00:00', '2026-11-07 22:00:00' FROM restaurant_tables WHERE table_number = 'VIP-03';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+VALUES ('RES-20261108-7077', NULL, 'ZONE_2', N'Phan Thanh Tùng', '0905777888', 'tung.phan@gmail.com', 4, '2026-11-08 19:00:00', 'CANCELLED', N'Tự động hủy do Quản lý mở cưỡng chế bàn cho khách vãng lai (Khách quá giờ hẹn / No-Show)', N'Ăn tối chủ nhật', '2026-11-08 15:00:00', '2026-11-08 19:45:00');
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261109-8088', id, 'ZONE_1', N'Bùi Đức Thắng', '0905888999', 'thang.bui@gmail.com', 2, '2026-11-09 18:30:00', 'COMPLETED', NULL, N'Ăn tối đầu tuần', '2026-11-09 10:00:00', '2026-11-09 20:00:00' FROM restaurant_tables WHERE table_number = 'T-03';
+
+-- 8.4. Lịch sử Tuần này (10/11 đến 13/11)
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261110-9099', id, 'ZONE_2', N'Đặng Thùy Dung', '0905999000', 'dung.dang@gmail.com', 4, '2026-11-10 19:00:00', 'COMPLETED', NULL, N'Gia đình sum họp', '2026-11-10 11:00:00', '2026-11-10 21:00:00' FROM restaurant_tables WHERE table_number = 'B-01';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261111-1111', id, 'VIP', N'Ngô Anh Quân', '0905123987', 'quan.ngo@gmail.com', 8, '2026-11-11 12:30:00', 'COMPLETED', NULL, N'Liên hoan phòng ban', '2026-11-11 08:30:00', '2026-11-11 14:30:00' FROM restaurant_tables WHERE table_number = 'VIP-01';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+VALUES ('RES-20261112-2222', NULL, 'ZONE_1', N'Phạm Quỳnh Chi', '0905234876', 'chi.pham@gmail.com', 6, '2026-11-12 19:30:00', 'CANCELLED', N'Khách đổi sang cơ sở khác', N'Tiệc sinh nhật', '2026-11-12 14:00:00', '2026-11-12 17:30:00');
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261113-3333', id, 'ZONE_1', N'Hồ Minh Trí', '0905345765', 'tri.ho@gmail.com', 4, '2026-11-13 19:00:00', 'COMPLETED', NULL, N'Gặp mặt đối tác', '2026-11-13 15:00:00', '2026-11-13 21:00:00' FROM restaurant_tables WHERE table_number = 'T-02';
+
+-- 8.5. Đơn tương lai (16/11 - 17/11)
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+VALUES ('RES-20261116-4444', NULL, 'VIP', N'Lê Cẩm Tú', '0905456654', 'tu.le@gmail.com', 8, '2026-11-16 18:30:00', 'PENDING', NULL, N'Tiệc sinh nhật 8 người, phòng VIP', '2026-11-14 10:00:00', '2026-11-14 10:00:00');
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+SELECT 'RES-20261116-5555', id, 'ZONE_2', N'Võ Văn Kiệt', '0905567543', 'kiet.vo@gmail.com', 2, '2026-11-16 19:00:00', 'CONFIRMED', NULL, N'Kỷ niệm 1 năm yêu nhau', '2026-11-14 09:30:00', '2026-11-14 10:30:00' FROM restaurant_tables WHERE table_number = 'B-02';
+
+INSERT INTO reservations (booking_code, table_id, requested_zone, customer_name, customer_phone, customer_email, guest_count, reservation_time, status, cancel_reason, note, created_at, updated_at)
+VALUES ('RES-20261117-6666', NULL, 'ZONE_1', N'Trương Mỹ Hạnh', '0905678432', 'hanh.truong@gmail.com', 6, '2026-11-17 19:30:00', 'PENDING', NULL, N'Họp mặt cuối tuần', '2026-11-14 11:00:00', '2026-11-14 11:00:00');
+
+
+PRINT N'>>> ROMS MASTER DATABASE SEEDED & REFRESHED CLEANLY WITH DYNAMIC DATA! <<<';
