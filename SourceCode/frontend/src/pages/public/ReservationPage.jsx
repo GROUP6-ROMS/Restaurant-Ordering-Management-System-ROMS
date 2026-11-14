@@ -1122,12 +1122,6 @@ export default function ReservationPage() {
                               </p>
                             </div>
                           </div>
-
-                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <span style={{ fontSize: '0.78rem', color: '#596232', fontWeight: 700, background: '#EFF5D3', padding: '4px 10px', borderRadius: '8px' }}>
-                              {z.availableTables ? `${z.availableTables} bàn trống` : 'Sẵn sàng xếp bàn'}
-                            </span>
-                          </div>
                         </div>
                       );
                     })}
